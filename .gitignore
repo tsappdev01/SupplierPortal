@@ -1,0 +1,15 @@
+# The canonical source is committed as src.zip; the extracted working
+# copy under src/ is a scratch checkout and must not be tracked.
+src/
+
+# .NET build artifacts
+bin/
+obj/
+
+# Local, secret-bearing config (never commit real credentials)
+appsettings.Local.json
+
+# IDE / OS noise
+.vs/
+*.user
+.DS_Store
