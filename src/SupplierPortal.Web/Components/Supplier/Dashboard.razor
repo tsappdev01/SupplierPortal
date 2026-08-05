@@ -137,7 +137,6 @@
             <th>First Name</th>
             <th>Supplier Type</th>
             <th>Contact Email</th>
-            <th>Workflow</th>
             <th>Status</th>
             <th class="no-print">Actions</th>
         </tr>
@@ -168,18 +167,6 @@
                     @if (!string.IsNullOrEmpty(supplier.StatusName))
                     {
                         <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
-                    }
-                </td>
-                <td>
-                    @if (supplier.IsDraft)
-                    {
-                        <span class="badge bg-warning text-dark">Draft</span>
-                    }
-                    else
-                    {
-                        <span class="badge @(supplier.IsActive ? "bg-success" : "bg-secondary")">
-                            @(supplier.IsActive ? "Active" : "Inactive")
-                        </span>
                     }
                 </td>
                 <td class="no-print">
