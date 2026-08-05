@@ -4,6 +4,7 @@
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierFieldSettingService SupplierFieldSettingService
 @inject SupplierDocumentService SupplierDocumentService
+@inject ToastService ToastService
 
 <div class="di-form-page">
 
@@ -176,10 +177,6 @@
                 @if (Supplier.Id == 0)
                 {
                     <p class="text-muted di-document-hint">Documents can be uploaded after the first save (click Next).</p>
-                }
-                @if (documentMessage is not null)
-                {
-                    <div class="alert alert-info di-document-message">@documentMessage</div>
                 }
             </div>
         </div>
@@ -552,7 +549,6 @@
     private List<BusinessUnit> businessUnits = [];
     private List<SupplierDocument> documents = [];
     private bool uploadingDocument;
-    private string? documentMessage;
     private HashSet<string> changedFieldKeys = [];
     private HashSet<string> hiddenFromSupplierKeys = [];
     private int? originalBankId;
@@ -663,40 +659,47 @@
         }
 
         uploadingDocument = true;
-        documentMessage = null;
 
         var (success, error, extractedNumber) = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
-        documentMessage = success ? $"'{e.File.Name}' uploaded successfully." : error;
 
-        if (success && extractedNumber is not null)
+        if (!success)
+        {
+            ToastService.ShowError(error ?? "Upload failed.");
+            uploadingDocument = false;
+            return;
+        }
+
+        var message = $"'{e.File.Name}' uploaded successfully.";
+        if (extractedNumber is not null)
         {
             if (documentType == SupplierDocumentType.VatCertification)
             {
                 formModel.TaxRegistrationNumber = extractedNumber;
-                documentMessage += $" Tax Registration Number '{extractedNumber}' was read from the document and filled in.";
+                message += $" Tax Registration Number '{extractedNumber}' was read from the document and filled in.";
             }
             else if (documentType == SupplierDocumentType.TradeLicense)
             {
                 formModel.TradeLicenseNumber = extractedNumber;
-                documentMessage += $" Trade License Number '{extractedNumber}' was read from the document and filled in.";
+                message += $" Trade License Number '{extractedNumber}' was read from the document and filled in.";
             }
         }
 
-        if (success)
-        {
-            documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
-        }
-
+        ToastService.ShowSuccess(message);
+        documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
         uploadingDocument = false;
     }
 
     private async Task RemoveDocumentAsync(int documentId)
     {
         var (success, error) = await SupplierDocumentService.DeleteAsync(documentId, CurrentUser);
-        documentMessage = success ? "Document removed." : error;
         if (success)
         {
+            ToastService.ShowSuccess("Document removed.");
             documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
+        }
+        else
+        {
+            ToastService.ShowError(error ?? "Could not remove the document.");
         }
     }
 
