@@ -34,7 +34,11 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     public async Task<HashSet<string>> GetMandatoryFieldKeysAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var keys = await db.SupplierFieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToListAsync();
+        // A field hidden from the supplier is treated as optional, so it is never returned as mandatory.
+        var keys = await db.SupplierFieldSettings
+            .Where(f => f.IsMandatory && f.IsVisibleToSupplier)
+            .Select(f => f.FieldKey)
+            .ToListAsync();
         return keys.Where(k => !IsHidden(k)).ToHashSet();
     }
 
@@ -72,20 +76,32 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, $"Set dashboard records-per-page to {pageSize}");
     }
 
-    public async Task SaveAsync(Dictionary<string, bool> mandatoryByFieldKey, string actorUsername)
+    public async Task SaveAsync(
+        Dictionary<string, bool> mandatoryByFieldKey, Dictionary<string, bool> visibleByFieldKey, string actorUsername)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var settings = await db.SupplierFieldSettings.ToListAsync();
 
         foreach (var setting in settings)
         {
+            if (visibleByFieldKey.TryGetValue(setting.FieldKey, out var isVisible))
+            {
+                setting.IsVisibleToSupplier = isVisible;
+            }
+
             if (mandatoryByFieldKey.TryGetValue(setting.FieldKey, out var isMandatory))
             {
                 setting.IsMandatory = isMandatory;
             }
+
+            // A field that is not shown to the supplier is automatically optional.
+            if (!setting.IsVisibleToSupplier)
+            {
+                setting.IsMandatory = false;
+            }
         }
 
         await db.SaveChangesAsync();
-        await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, "Updated supplier field mandatory/optional settings");
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, "Updated supplier field mandatory/visibility settings");
     }
 }

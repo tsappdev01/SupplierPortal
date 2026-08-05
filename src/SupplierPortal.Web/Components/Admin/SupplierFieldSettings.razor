@@ -44,6 +44,7 @@ else
                 <thead>
                     <tr>
                         <th>Field</th>
+                        <th style="width: 160px;">Show to Supplier</th>
                         <th style="width: 140px;">Mandatory</th>
                     </tr>
                 </thead>
@@ -54,7 +55,15 @@ else
                             <td>@field.DisplayLabel</td>
                             <td>
                                 <label class="di-switch">
+                                    <input type="checkbox" checked="@visibleByKey[field.FieldKey]"
+                                           @onchange="e => OnVisibilityChanged(field.FieldKey, (bool)e.Value!)" />
+                                    <span class="di-switch-slider"></span>
+                                </label>
+                            </td>
+                            <td>
+                                <label class="di-switch">
                                     <input type="checkbox" checked="@mandatoryByKey[field.FieldKey]"
+                                           disabled="@(!visibleByKey[field.FieldKey])"
                                            @onchange="e => mandatoryByKey[field.FieldKey] = (bool)e.Value!" />
                                     <span class="di-switch-slider"></span>
                                 </label>
@@ -143,6 +152,7 @@ else
 
     private List<SupplierFieldSetting> settings = [];
     private Dictionary<string, bool> mandatoryByKey = [];
+    private Dictionary<string, bool> visibleByKey = [];
     private string currentUser = "unknown";
     private bool isSaving;
     private string? savedMessage;
@@ -155,7 +165,18 @@ else
 
         settings = await SupplierFieldSettingService.GetAllAsync();
         mandatoryByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsMandatory);
+        visibleByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsVisibleToSupplier);
         pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
+    }
+
+    // Hiding a field from the supplier makes it optional automatically, so clear Mandatory too.
+    private void OnVisibilityChanged(string fieldKey, bool isVisible)
+    {
+        visibleByKey[fieldKey] = isVisible;
+        if (!isVisible)
+        {
+            mandatoryByKey[fieldKey] = false;
+        }
     }
 
     private async Task SaveAsync()
@@ -163,10 +184,12 @@ else
         isSaving = true;
         try
         {
-            await SupplierFieldSettingService.SaveAsync(mandatoryByKey, currentUser);
+            await SupplierFieldSettingService.SaveAsync(mandatoryByKey, visibleByKey, currentUser);
             await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
             savedMessage = "Settings saved.";
             settings = await SupplierFieldSettingService.GetAllAsync();
+            mandatoryByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsMandatory);
+            visibleByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsVisibleToSupplier);
             pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
         }
         finally

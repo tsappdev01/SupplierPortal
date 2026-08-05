@@ -335,6 +335,21 @@
                         <label for="intlPay" style="margin:0;">Allow International Payments</label>
                     </div>
                 </div>
+
+                <div class="di-documents-row">
+                    <div class="di-document-slot">
+                        <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
+                        @if (GetDocument(SupplierDocumentType.BankConfirmationLetter) is { } bankLetterDoc)
+                        {
+                            <div class="di-document-current">Uploaded: @bankLetterDoc.FileName</div>
+                        }
+                        <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.BankConfirmationLetter)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        @if (RequiresBankConfirmationLetter())
+                        {
+                            <div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>
+                        }
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -468,6 +483,10 @@
     </EditForm>
 </div>
 
+<style>
+    .di-hidden-field { display: none !important; }
+</style>
+
 @code {
     [Parameter, EditorRequired] public Supplier Supplier { get; set; } = default!;
     [Parameter] public bool IsCreateMode { get; set; }
@@ -482,6 +501,11 @@
     /// <summary>Attributed to any resulting SupplierFieldChange rows so admin edits and supplier
     /// self-service edits can be told apart; null for admin edits.</summary>
     [Parameter] public int? AccessTokenId { get; set; }
+
+    /// <summary>True when the form is shown to the supplier (self-service). Fields the business has
+    /// marked "not visible to supplier" are hidden, and adding a new bank account requires a Bank
+    /// Confirmation Letter attachment.</summary>
+    [Parameter] public bool SupplierFacing { get; set; }
 
     private static readonly Dictionary<int, string> StepLabels = new()
     {
@@ -518,6 +542,9 @@
     private bool uploadingDocument;
     private string? documentMessage;
     private HashSet<string> changedFieldKeys = [];
+    private HashSet<string> hiddenFromSupplierKeys = [];
+    private int? originalBankId;
+    private string? originalAccountNumber;
 
     private List<BankBranch> SelectedBankBranches =>
         banks.FirstOrDefault(b => b.Id == formModel.BankId)?.Branches ?? [];
@@ -547,6 +574,11 @@
 
         fieldSettings = await SupplierFieldSettingService.GetAllAsync();
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
+        hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+
+        // Remember the bank account as loaded, to detect a supplier adding/changing a bank account.
+        originalBankId = Supplier.BankId;
+        originalAccountNumber = Supplier.AccountNumber;
 
         formModel = SupplierFormModel.FromSupplier(Supplier);
 
@@ -576,9 +608,36 @@
         }
     }
 
-    /// <summary>CSS class for a field wrapper: highlights it green when its current value came
-    /// from a supplier self-service edit that an admin hasn't reviewed (saved over) yet.</summary>
-    private string FieldClass(string fieldKey) => changedFieldKeys.Contains(fieldKey) ? "di-field-changed" : "";
+    /// <summary>CSS class for a field wrapper: highlights it green when its current value came from a
+    /// supplier self-service edit that an admin hasn't reviewed (saved over) yet, and hides it
+    /// entirely when the form is supplier-facing and the field is marked not visible to suppliers.</summary>
+    private string FieldClass(string fieldKey)
+    {
+        var classes = "";
+        if (changedFieldKeys.Contains(fieldKey))
+        {
+            classes = "di-field-changed";
+        }
+        if (SupplierFacing && hiddenFromSupplierKeys.Contains(fieldKey))
+        {
+            classes = string.IsNullOrEmpty(classes) ? "di-hidden-field" : classes + " di-hidden-field";
+        }
+        return classes;
+    }
+
+    private bool IsHiddenFromSupplier(string fieldKey) => SupplierFacing && hiddenFromSupplierKeys.Contains(fieldKey);
+
+    private bool BankAccountChanged() =>
+        formModel.BankId != originalBankId ||
+        !string.Equals((formModel.AccountNumber ?? "").Trim(), (originalAccountNumber ?? "").Trim(), StringComparison.Ordinal);
+
+    private bool HasBankConfirmationLetter() =>
+        documents.Any(d => d.DocumentType == SupplierDocumentType.BankConfirmationLetter);
+
+    /// <summary>A Bank Confirmation Letter must be attached when an existing (already-submitted)
+    /// supplier changes/adds a bank account. Drafts (initial registration) are exempt.</summary>
+    private bool RequiresBankConfirmationLetter() =>
+        Supplier.Id != 0 && !Supplier.IsDraft && BankAccountChanged() && !HasBankConfirmationLetter();
 
     private async Task UploadDocumentAsync(InputFileChangeEventArgs e, SupplierDocumentType documentType)
     {
@@ -668,7 +727,7 @@
     private List<string> ValidateStep(SupplierFormModel model, int step)
     {
         var errors = new List<string>();
-        foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory))
+        foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
         {
             var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
             var value = property?.GetValue(model);
@@ -684,6 +743,10 @@
         {
             foreach (var (key, label) in emailFields)
             {
+                if (IsHiddenFromSupplier(key))
+                {
+                    continue;
+                }
                 var value = typeof(SupplierFormModel).GetProperty(key)?.GetValue(model) as string;
                 if (!string.IsNullOrWhiteSpace(value) && !EmailValidator.IsValid(value))
                 {
@@ -731,6 +794,12 @@
         if (errors.Count > 0)
         {
             errorMessage = string.Join(" ", errors);
+            return;
+        }
+
+        if (currentStep == 3 && RequiresBankConfirmationLetter())
+        {
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
 
@@ -786,6 +855,14 @@
             }
 
             errorMessage = "Complete all required fields before submitting: " + string.Join(" ", errors);
+            return;
+        }
+
+        if (RequiresBankConfirmationLetter())
+        {
+            currentStep = 3;
+            maxStepReached = Math.Max(maxStepReached, 3);
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
 

@@ -3,6 +3,9 @@ namespace SupplierPortal.Web.Data;
 /// <summary>Supplier master lookup data (source: Dubai Investments supplier LOV export).</summary>
 public static class SupplierMasterSeedData
 {
+    /// <summary>Workflow statuses for the supplier review lifecycle. Order here defines seed order.</summary>
+    public static readonly string[] SupplierStatuses = SupplierPortal.Web.Models.SupplierStatuses.All;
+
     public static readonly string[] TaxOrganizationTypes =
     [
         "Charitable Organization",

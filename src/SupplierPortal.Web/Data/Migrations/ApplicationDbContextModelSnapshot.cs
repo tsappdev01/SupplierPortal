@@ -355,6 +355,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<int?>("StatusId")
+                        .HasColumnType("int");
+
                     b.Property<string>("SupplierName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -438,6 +441,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("ProcurementBuId");
 
                     b.HasIndex("ProvinceId");
+
+                    b.HasIndex("StatusId");
 
                     b.HasIndex("SupplierSiteBuId");
 
@@ -648,6 +653,11 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsVisibleToSupplier")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
 
@@ -846,6 +856,11 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("ProvinceId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "Status")
+                        .WithMany()
+                        .HasForeignKey("StatusId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "SupplierSiteBu")
                         .WithMany()
                         .HasForeignKey("SupplierSiteBuId")
@@ -908,6 +923,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("ProcurementBu");
 
                     b.Navigation("Province");
+
+                    b.Navigation("Status");
 
                     b.Navigation("SupplierSiteBu");
 

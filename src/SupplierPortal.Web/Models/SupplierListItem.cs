@@ -15,6 +15,7 @@ public class SupplierListItem
     public string? TaxRegistrationNumber { get; set; }
     public string? TradeLicenseNumber { get; set; }
     public string? ContactEmail { get; set; }
+    public string? StatusName { get; set; }
     public bool IsActive { get; set; }
     public bool IsDraft { get; set; }
     public int BusinessUnitId { get; set; }

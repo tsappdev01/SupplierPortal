@@ -64,6 +64,22 @@ public class SupplierEmailService(
             actorUsername, AuditAction.Notify, "Supplier", supplierId,
             $"Sent update notification email to {contactEmail}");
 
+        // The supplier has now been asked to review: move the record to "Awaiting Supplier Response".
+        await using (var statusDb = await dbFactory.CreateDbContextAsync())
+        {
+            var awaitingStatusId = (await statusDb.LookupValues.FirstOrDefaultAsync(
+                l => l.Category == LookupCategory.SupplierStatus && l.DisplayName == SupplierStatuses.AwaitingSupplierResponse))?.Id;
+            if (awaitingStatusId is not null)
+            {
+                var supplier = await statusDb.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+                if (supplier is not null)
+                {
+                    supplier.StatusId = awaitingStatusId;
+                    await statusDb.SaveChangesAsync();
+                }
+            }
+        }
+
         return (true, null);
     }
 

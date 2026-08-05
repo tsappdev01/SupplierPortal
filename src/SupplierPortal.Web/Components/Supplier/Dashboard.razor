@@ -37,7 +37,18 @@
     <a class="btn btn-outline-secondary" href="@ExportUrl("csv")">Export to CSV</a>
     <a class="btn btn-outline-secondary" href="@ExportUrl("pdf")">Export to PDF</a>
     <button class="btn btn-outline-secondary" @onclick="PrintAsync">Print</button>
-    <a class="btn btn-primary ms-auto" href="/supplier/register">Register Supplier</a>
+    <button class="btn btn-outline-primary ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync">
+        @if (bulkSending)
+        {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <text> Sending...</text>
+        }
+        else
+        {
+            <text>Notify All Suppliers</text>
+        }
+    </button>
+    <a class="btn btn-primary" href="/supplier/register">Register Supplier</a>
     <a class="btn btn-primary" href="/supplier/upload">Upload Supplier Data</a>
 </div>
 
@@ -118,6 +129,7 @@
             <th>First Name</th>
             <th>Supplier Type</th>
             <th>Contact Email</th>
+            <th>Workflow</th>
             <th>Status</th>
             <th class="no-print">Actions</th>
         </tr>
@@ -144,6 +156,12 @@
                 <td>@supplier.FirstName</td>
                 <td>@supplier.SupplierTypeName</td>
                 <td>@supplier.ContactEmail</td>
+                <td>
+                    @if (!string.IsNullOrEmpty(supplier.StatusName))
+                    {
+                        <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
+                    }
+                </td>
                 <td>
                     @if (supplier.IsDraft)
                     {
@@ -173,6 +191,12 @@
                                 </svg>
                             }
                         </button>
+                        @if (supplier.StatusName == SupplierStatuses.ForReview)
+                        {
+                            <button class="btn btn-sm btn-outline-success" title="Mark review complete" @onclick="() => MarkCompleteAsync(supplier)">
+                                Mark Complete
+                            </button>
+                        }
                     }
                 </td>
             </tr>
@@ -445,6 +469,83 @@ else if (TotalPages > 1)
 
         notifyingSupplierId = null;
     }
+
+    private async Task NotifyAllAsync()
+    {
+        var candidates = suppliers.Where(s => !s.IsDraft).ToList();
+        var toSend = candidates.Where(HasValidEmail).ToList();
+        var skipped = candidates.Count - toSend.Count;
+
+        if (toSend.Count == 0)
+        {
+            ToastService.ShowWarning("No suppliers with a valid Contact Email to notify.");
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"Send a review notification email to {toSend.Count} supplier(s)?" + (skipped > 0 ? $" ({skipped} without a valid email will be skipped.)" : ""));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        bulkSending = true;
+        StateHasChanged();
+
+        var sent = 0;
+        var failed = 0;
+        foreach (var supplier in toSend)
+        {
+            var (success, _) = await SupplierEmailService.NotifySupplierAsync(
+                supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
+            if (success)
+            {
+                sent++;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        var summary = $"{sent} email(s) sent.";
+        if (skipped > 0)
+        {
+            summary += $" {skipped} skipped (no valid email).";
+        }
+        if (failed > 0)
+        {
+            summary += $" {failed} failed to send.";
+        }
+
+        if (failed > 0)
+        {
+            ToastService.ShowError(summary);
+        }
+        else
+        {
+            ToastService.ShowSuccess(summary);
+        }
+
+        bulkSending = false;
+        await ReloadAsync();
+    }
+
+    private async Task MarkCompleteAsync(SupplierListItem supplier)
+    {
+        await SupplierService.MarkCompleteAsync(supplier.Id, currentUser);
+        ToastService.ShowSuccess($"{supplier.SupplierName} marked Complete.");
+        await ReloadAsync();
+    }
+
+    private static string WorkflowBadgeClass(string? statusName) => statusName switch
+    {
+        SupplierStatuses.New => "bg-secondary",
+        SupplierStatuses.AwaitingSupplierResponse => "bg-info text-dark",
+        SupplierStatuses.ForReview => "bg-warning text-dark",
+        SupplierStatuses.Complete => "bg-success",
+        _ => "bg-light text-dark"
+    };
 
     private async Task PrintAsync()
     {

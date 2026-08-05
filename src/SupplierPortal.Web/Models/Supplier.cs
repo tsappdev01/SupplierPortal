@@ -175,6 +175,11 @@ public class Supplier
 
     // -- Status / ownership --
 
+    /// <summary>Workflow status (LookupValue in the SupplierStatus category): New →
+    /// Awaiting Supplier Response → For Review → Complete. See <see cref="SupplierStatuses"/>.</summary>
+    public int? StatusId { get; set; }
+    public LookupValue? Status { get; set; }
+
     /// <summary>True while the registration wizard is still in progress (not yet Submitted for Approval).</summary>
     public bool IsDraft { get; set; } = true;
 

@@ -25,4 +25,8 @@ public class SupplierFieldSetting
     public int Sequence { get; set; }
 
     public bool IsMandatory { get; set; }
+
+    /// <summary>When false, the field is hidden from the supplier self-service form and is treated as
+    /// optional automatically (a hidden field can never be mandatory).</summary>
+    public bool IsVisibleToSupplier { get; set; } = true;
 }

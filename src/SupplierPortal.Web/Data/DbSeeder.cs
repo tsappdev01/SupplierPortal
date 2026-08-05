@@ -28,6 +28,7 @@ public static class DbSeeder
         await SeedSimpleCategoryAsync(db, LookupCategory.Prefix, SupplierMasterSeedData.Prefixes);
         await SeedSimpleCategoryAsync(db, LookupCategory.BusinessRelationship, SupplierMasterSeedData.BusinessRelationships);
         await SeedSimpleCategoryAsync(db, LookupCategory.CommunicationMethod, SupplierMasterSeedData.CommunicationMethods);
+        await SeedSimpleCategoryAsync(db, LookupCategory.SupplierStatus, SupplierMasterSeedData.SupplierStatuses);
         await SeedPairCategoryAsync(db, LookupCategory.VatCode, SupplierMasterSeedData.VatCodes);
         await SeedPairCategoryAsync(db, LookupCategory.Currency, SupplierMasterSeedData.Currencies);
 

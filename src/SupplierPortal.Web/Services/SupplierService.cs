@@ -41,6 +41,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.Currency)
             .Include(s => s.Bank)
             .Include(s => s.BankBranch)
+            .Include(s => s.Status)
             .Include(s => s.PhoneCountryCode)
             .Include(s => s.ProcurementBu)
             .Include(s => s.ClientBu)
@@ -98,6 +99,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 TaxRegistrationNumber = s.TaxRegistrationNumber,
                 TradeLicenseNumber = s.TradeLicenseNumber,
                 ContactEmail = s.ContactEmail,
+                StatusName = s.Status != null ? s.Status.DisplayName : null,
                 IsActive = s.IsActive,
                 IsDraft = s.IsDraft,
                 BusinessUnitId = s.BusinessUnitId,
@@ -151,15 +153,40 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return $"{businessUnit.Code}-{(count + 1):D6}";
     }
 
+    /// <summary>Resolves a workflow status LookupValue id by its well-known name (see
+    /// <see cref="SupplierStatuses"/>). Returns null if the status row hasn't been seeded.</summary>
+    private static async Task<int?> ResolveStatusIdAsync(ApplicationDbContext db, string statusName) =>
+        (await db.LookupValues.FirstOrDefaultAsync(
+            l => l.Category == LookupCategory.SupplierStatus && l.DisplayName == statusName))?.Id;
+
     public async Task<int> CreateAsync(Supplier supplier, string actorUsername)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        supplier.StatusId ??= await ResolveStatusIdAsync(db, SupplierStatuses.New);
         db.Suppliers.Add(supplier);
         await db.SaveChangesAsync();
 
         await auditService.LogAsync(actorUsername, AuditAction.Create, "Supplier", supplier.Id, $"Created supplier '{supplier.SupplierName}'");
 
         return supplier.Id;
+    }
+
+    /// <summary>Marks a supplier's workflow status Complete (business has finished reviewing).</summary>
+    public async Task MarkCompleteAsync(int supplierId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null)
+        {
+            return;
+        }
+
+        supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Complete) ?? supplier.StatusId;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = actorUsername;
+        await db.SaveChangesAsync();
+
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, $"Marked supplier '{supplier.SupplierName}' Complete");
     }
 
     public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null)
@@ -250,6 +277,12 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 change.AcknowledgedAt = DateTime.UtcNow;
                 change.AcknowledgedBy = updatedBy;
             }
+        }
+        else
+        {
+            // A supplier self-service submission moves the record to "For Review" so the business
+            // knows there are supplier-made changes waiting to be checked.
+            supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.ForReview) ?? supplier.StatusId;
         }
 
         await db.SaveChangesAsync();
@@ -358,6 +391,14 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var list = suppliers.ToList();
+
+        // Bulk-uploaded suppliers start at "New" (not yet sent to the supplier for review).
+        var newStatusId = await ResolveStatusIdAsync(db, SupplierStatuses.New);
+        foreach (var supplier in list)
+        {
+            supplier.StatusId ??= newStatusId;
+        }
+
         db.Suppliers.AddRange(list);
         await db.SaveChangesAsync();
         return list.Count;

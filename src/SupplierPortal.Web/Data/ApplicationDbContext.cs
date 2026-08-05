@@ -186,6 +186,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(s => s.BankBranchId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.Status)
+            .WithMany()
+            .HasForeignKey(s => s.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<BankBranch>()
             .HasOne(b => b.Bank)
             .WithMany(b => b.Branches)
@@ -199,6 +205,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<SupplierFieldSetting>()
             .HasIndex(f => f.FieldKey)
             .IsUnique();
+
+        // Default true so that when this column is added to an existing database, every already-seeded
+        // field stays visible to suppliers (rather than defaulting to hidden).
+        modelBuilder.Entity<SupplierFieldSetting>()
+            .Property(f => f.IsVisibleToSupplier)
+            .HasDefaultValue(true);
 
         // Owned child rows of a specific Supplier (not shared master data), so cascade-delete
         // here is intentional and diverges from the Restrict pattern used above.
