@@ -142,12 +142,16 @@
 
                 <div class="di-documents-row">
                     <div class="di-document-slot">
-                        <label>Trade License</label>
+                        <label>Trade License <span class="di-req">*</span></label>
                         @if (GetDocument(SupplierDocumentType.TradeLicense) is { } tradeLicenseDoc)
                         {
                             <div class="di-document-current">Uploaded: @tradeLicenseDoc.FileName</div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        @if (Supplier.Id != 0 && !HasTradeLicenseDocument())
+                        {
+                            <div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>
+                        }
                     </div>
                     <div class="di-document-slot">
                         <label>VAT Certificate</label>
@@ -642,6 +646,10 @@
     private bool HasBankConfirmationLetter() =>
         documents.Any(d => d.DocumentType == SupplierDocumentType.BankConfirmationLetter);
 
+    /// <summary>A Trade License document is mandatory before a supplier can be submitted.</summary>
+    private bool HasTradeLicenseDocument() =>
+        documents.Any(d => d.DocumentType == SupplierDocumentType.TradeLicense);
+
     /// <summary>A Bank Confirmation Letter must be attached when an existing (already-submitted)
     /// supplier changes/adds a bank account. Drafts (initial registration) are exempt.</summary>
     private bool RequiresBankConfirmationLetter() =>
@@ -863,6 +871,13 @@
             }
 
             errorMessage = "Complete all required fields before submitting: " + string.Join(" ", errors);
+            return;
+        }
+
+        if (!HasTradeLicenseDocument())
+        {
+            currentStep = 1;
+            errorMessage = "A Trade License document must be attached before submitting.";
             return;
         }
 
