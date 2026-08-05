@@ -119,13 +119,15 @@
 .di-section-body {
     padding: 20px 20px 8px;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    /* minmax(0, 1fr) instead of 1fr so a column with a wide <select>/long value can't blow out
+       and squeeze the others - keeps all columns equal width. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 20px;
 }
 
 @media (min-width: 768px) {
     .di-section-body {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
