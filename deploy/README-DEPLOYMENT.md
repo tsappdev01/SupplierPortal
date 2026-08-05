@@ -9,6 +9,22 @@ The deployment ZIP (`SupplierPortal-deploy.zip`) contains the published app plus
 
 ---
 
+## Running the PowerShell scripts
+
+Windows blocks unsigned scripts by default (`... is not digitally signed`). Run them by
+bypassing the execution policy for that process only — this does **not** change the machine policy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Deploy-IIS.ps1
+# or, before running normally:
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+```
+
+If a script was extracted from a downloaded ZIP, also clear the "blocked" flag once:
+`Unblock-File .\*.ps1`.
+
+---
+
 ## 1. Server prerequisites (once per server)
 
 1. **Windows Server with IIS** enabled (Web Server role), including *IIS Management Scripts and Tools*
@@ -61,7 +77,7 @@ On first request the app **automatically applies EF Core migrations and seeds** 
 From an **elevated PowerShell** prompt in `C:\Websites\SupplierPortal`:
 
 ```powershell
-.\Deploy-IIS.ps1
+powershell -ExecutionPolicy Bypass -File .\Deploy-IIS.ps1
 ```
 
 This creates:
