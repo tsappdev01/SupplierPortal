@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
@@ -39,6 +40,15 @@ builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ToastService>();
+
+// Persist Data Protection keys to a stable folder (under the site's content root) so authentication
+// cookies remain valid across app restarts and IIS app-pool recycles. Without this, keys default to
+// a per-process/profile location and every recycle silently logs all users out.
+var keysDirectory = Path.Combine(builder.Environment.ContentRootPath, "keys");
+Directory.CreateDirectory(keysDirectory);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory))
+    .SetApplicationName("SupplierPortal");
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

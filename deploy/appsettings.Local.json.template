@@ -1,0 +1,17 @@
+{
+  "//": "Rename this file to appsettings.Local.json on the server and fill in real values. This file is git-ignored and must NEVER be committed. It overrides appsettings.json.",
+
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=UATWEB01;Database=BP;User Id=bpuser;Password=CHANGE_ME;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+  },
+
+  "//DefaultAdmin": "Optional: override the seeded default administrator (only used on first run, before a real Administrator exists).",
+  "DefaultAdmin": {
+    "Username": "admin",
+    "Email": "admin@supplierportal.local",
+    "Password": "Admin@12345"
+  },
+
+  "//DetailedErrors": "Set true only while troubleshooting; it exposes internal exception details to anyone who triggers an error.",
+  "DetailedErrors": false
+}
