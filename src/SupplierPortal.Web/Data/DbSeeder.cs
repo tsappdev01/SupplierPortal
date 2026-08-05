@@ -29,6 +29,11 @@ public static class DbSeeder
         await SeedSimpleCategoryAsync(db, LookupCategory.BusinessRelationship, SupplierMasterSeedData.BusinessRelationships);
         await SeedSimpleCategoryAsync(db, LookupCategory.CommunicationMethod, SupplierMasterSeedData.CommunicationMethods);
         await SeedSimpleCategoryAsync(db, LookupCategory.SupplierStatus, SupplierMasterSeedData.SupplierStatuses);
+
+        // Idempotent: bring earlier workflow-status labels up to their current display names on
+        // databases that were seeded before the rename (New -> Not Submitted, Complete -> Completes).
+        await RenameLookupAsync(db, LookupCategory.SupplierStatus, "New", SupplierStatuses.New);
+        await RenameLookupAsync(db, LookupCategory.SupplierStatus, "Complete", SupplierStatuses.Complete);
         await SeedPairCategoryAsync(db, LookupCategory.VatCode, SupplierMasterSeedData.VatCodes);
         await SeedPairCategoryAsync(db, LookupCategory.Currency, SupplierMasterSeedData.Currencies);
 
@@ -41,6 +46,24 @@ public static class DbSeeder
                 DisplayName = c.Name,
                 PhoneCode = c.PhoneCode
             }));
+            await db.SaveChangesAsync();
+        }
+    }
+
+    private static async Task RenameLookupAsync(ApplicationDbContext db, LookupCategory category, string oldName, string newName)
+    {
+        if (oldName == newName)
+        {
+            return;
+        }
+
+        var rows = await db.LookupValues.Where(l => l.Category == category && l.DisplayName == oldName).ToListAsync();
+        foreach (var row in rows)
+        {
+            row.DisplayName = newName;
+        }
+        if (rows.Count > 0)
+        {
             await db.SaveChangesAsync();
         }
     }

@@ -24,12 +24,20 @@
         <div class="di-stat-label">Total Suppliers</div>
     </div>
     <div class="di-stat-tile">
-        <div class="di-stat-value">@suppliers.Count(s => s.IsActive)</div>
-        <div class="di-stat-label">Active</div>
+        <div class="di-stat-value">@CountByStatus(SupplierStatuses.New)</div>
+        <div class="di-stat-label">Not Submitted</div>
     </div>
     <div class="di-stat-tile">
-        <div class="di-stat-value">@suppliers.Count(s => !s.IsActive)</div>
-        <div class="di-stat-label">Inactive</div>
+        <div class="di-stat-value">@CountByStatus(SupplierStatuses.AwaitingSupplierResponse)</div>
+        <div class="di-stat-label">Awaiting Supplier Response</div>
+    </div>
+    <div class="di-stat-tile">
+        <div class="di-stat-value">@CountByStatus(SupplierStatuses.ForReview)</div>
+        <div class="di-stat-label">For Review</div>
+    </div>
+    <div class="di-stat-tile">
+        <div class="di-stat-value">@CountByStatus(SupplierStatuses.Complete)</div>
+        <div class="di-stat-label">Completes</div>
     </div>
 </div>
 
@@ -312,6 +320,8 @@ else if (TotalPages > 1)
         TabFilteredSuppliers.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
 
     private bool AllOnPageSelected => PagedSuppliers.Count > 0 && PagedSuppliers.All(s => selectedIds.Contains(s.Id));
+
+    private int CountByStatus(string statusName) => suppliers.Count(s => s.StatusName == statusName);
 
     protected override async Task OnInitializedAsync()
     {

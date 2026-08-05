@@ -28,10 +28,12 @@ public enum LookupCategory
 /// LookupValues table after seeding without breaking transitions, which resolve by these names.</summary>
 public static class SupplierStatuses
 {
-    public const string New = "New";
+    // Constant names are kept stable (New/Complete) so transition code doesn't churn; only the
+    // display text stored in LookupValues and shown in the UI is "Not Submitted"/"Completes".
+    public const string New = "Not Submitted";
     public const string AwaitingSupplierResponse = "Awaiting Supplier Response";
     public const string ForReview = "For Review";
-    public const string Complete = "Complete";
+    public const string Complete = "Completes";
 
     public static readonly string[] All = [New, AwaitingSupplierResponse, ForReview, Complete];
 }
