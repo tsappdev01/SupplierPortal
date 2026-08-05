@@ -66,16 +66,26 @@
         <table class="table di-home-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Code</th>
+                    <th>Business Unit</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var businessUnit in user.BusinessUnits)
                 {
                     <tr>
-                        <td>@businessUnit.Name</td>
-                        <td>@businessUnit.Code</td>
+                        <td>
+                            <span class="di-home-bu">
+                                @if (businessUnit.Logo is not null)
+                                {
+                                    <img src="/business-units/@businessUnit.Id/logo" alt="" class="di-home-bu-logo" />
+                                }
+                                else
+                                {
+                                    <span class="di-home-bu-logo di-home-bu-placeholder">@GetInitials(businessUnit.Name)</span>
+                                }
+                                <span>@businessUnit.Name</span>
+                            </span>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -131,6 +141,35 @@
         width: 200px;
         color: #1a2233;
         background: #f4f6f9;
+    }
+
+    .di-home-bu {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .di-home-bu-logo {
+        height: 32px;
+        max-width: 110px;
+        object-fit: contain;
+        border: 1px solid #e2e5ea;
+        border-radius: 4px;
+        background: #fff;
+        padding: 2px 5px;
+    }
+
+    .di-home-bu-placeholder {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 32px;
+        background: #1a2233;
+        color: #c8a24a;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 0;
     }
 </style>
 
