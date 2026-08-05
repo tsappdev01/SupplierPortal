@@ -170,3 +170,16 @@ table thead th {
 .card {
     box-shadow: 0 1px 3px rgba(26, 34, 51, 0.06);
 }
+
+/* Gold corporate action button */
+.btn-di-gold {
+    background-color: var(--di-gold);
+    border-color: var(--di-gold);
+    color: #1a2233;
+    font-weight: 600;
+}
+.btn-di-gold:hover, .btn-di-gold:focus, .btn-di-gold:active {
+    background-color: var(--di-gold-dark) !important;
+    border-color: var(--di-gold-dark) !important;
+    color: #fff !important;
+}

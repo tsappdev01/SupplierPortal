@@ -42,10 +42,10 @@
 </div>
 
 <div class="d-flex gap-2 mb-3 no-print">
-    <a class="btn btn-outline-secondary" href="@ExportUrl("csv")">Export to CSV</a>
-    <a class="btn btn-outline-secondary" href="@ExportUrl("pdf")">Export to PDF</a>
-    <button class="btn btn-outline-secondary" @onclick="PrintAsync">Print</button>
-    <button class="btn btn-outline-primary ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync">
+    <a class="btn btn-success" href="@ExportUrl("csv")">Export to CSV</a>
+    <a class="btn btn-danger" href="@ExportUrl("pdf")">Export to PDF</a>
+    <button class="btn btn-secondary" @onclick="PrintAsync">Print</button>
+    <button class="btn btn-info text-white ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync">
         @if (bulkSending)
         {
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -57,7 +57,7 @@
         }
     </button>
     <a class="btn btn-primary" href="/supplier/register">Register Supplier</a>
-    <a class="btn btn-primary" href="/supplier/upload">Upload Supplier Data</a>
+    <a class="btn btn-di-gold" href="/supplier/upload">Upload Supplier Data</a>
 </div>
 
 <div class="row g-2 mb-3 no-print">

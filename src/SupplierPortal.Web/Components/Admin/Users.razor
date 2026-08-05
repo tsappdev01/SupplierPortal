@@ -62,7 +62,28 @@
                 <td>@(user.Designation ?? "-")</td>
                 <td>@user.Email</td>
                 <td>@user.UserType</td>
-                <td>@(user.BusinessUnits.Count > 0 ? string.Join(", ", user.BusinessUnits.Select(b => b.Name)) : "-")</td>
+                <td>
+                    @if (user.BusinessUnits.Count == 0)
+                    {
+                        <span>-</span>
+                    }
+                    else
+                    {
+                        <div class="di-bu-logos">
+                            @foreach (var bu in user.BusinessUnits)
+                            {
+                                @if (bu.Logo is not null)
+                                {
+                                    <img src="/business-units/@bu.Id/logo" alt="@bu.Name" title="@bu.Name" class="di-bu-logo" />
+                                }
+                                else
+                                {
+                                    <span class="di-bu-chip" title="@bu.Name">@bu.Code</span>
+                                }
+                            }
+                        </div>
+                    }
+                </td>
                 <td>
                     @if (user.IsPendingRegistration)
                     {
@@ -109,6 +130,33 @@
         color: #b5892f;
         font-size: 0.75rem;
         font-weight: 700;
+    }
+
+    .di-bu-logos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .di-bu-logo {
+        height: 28px;
+        max-width: 80px;
+        object-fit: contain;
+        border: 1px solid #e2e5ea;
+        border-radius: 4px;
+        background: #fff;
+        padding: 1px 4px;
+    }
+
+    .di-bu-chip {
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: #eef1f6;
+        color: #1a2233;
+        border: 1px solid #dce1ea;
+        border-radius: 4px;
+        padding: 2px 7px;
     }
 
     .di-switch {
