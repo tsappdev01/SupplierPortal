@@ -5,6 +5,7 @@
 @inject SupplierFieldSettingService SupplierFieldSettingService
 @inject SupplierDocumentService SupplierDocumentService
 @inject ToastService ToastService
+@inject LoadingService Loading
 
 <div class="di-form-page">
 
@@ -788,23 +789,26 @@
     {
         formModel.ApplyTo(Supplier);
 
-        if (PersistOverride is not null)
+        await Loading.RunAsync(async () =>
         {
-            await PersistOverride(Supplier);
-            return;
-        }
+            if (PersistOverride is not null)
+            {
+                await PersistOverride(Supplier);
+                return;
+            }
 
-        if (Supplier.Id == 0)
-        {
-            Supplier.SupplierNumber = await SupplierService.GenerateSupplierNumberAsync(Supplier.BusinessUnitId);
-            Supplier.CreatedBy = CurrentUser;
-            await SupplierService.CreateAsync(Supplier, CurrentUser);
-            formModel.SupplierNumber = Supplier.SupplierNumber;
-        }
-        else
-        {
-            await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId);
-        }
+            if (Supplier.Id == 0)
+            {
+                Supplier.SupplierNumber = await SupplierService.GenerateSupplierNumberAsync(Supplier.BusinessUnitId);
+                Supplier.CreatedBy = CurrentUser;
+                await SupplierService.CreateAsync(Supplier, CurrentUser);
+                formModel.SupplierNumber = Supplier.SupplierNumber;
+            }
+            else
+            {
+                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId);
+            }
+        });
     }
 
     private async Task NextAsync()

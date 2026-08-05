@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using SupplierPortal.Web.Services
 @inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
@@ -111,7 +112,8 @@ else
             return;
         }
 
-        var (success, error) = await BusinessUnitService.UpdateAsync(Id, Input.Name, Input.Code, logoBytes, logoContentType, currentUser);
+        var (success, error) = await Loading.RunAsync(
+            () => BusinessUnitService.UpdateAsync(Id, Input.Name, Input.Code, logoBytes, logoContentType, currentUser));
         if (!success)
         {
             errorMessage = error;

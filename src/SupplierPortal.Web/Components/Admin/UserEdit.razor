@@ -7,6 +7,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject UserService UserService
+@inject LoadingService Loading
 @inject BusinessUnitService BusinessUnitService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -237,9 +238,9 @@ else
             return;
         }
 
-        var (success, error) = await UserService.UpdateUserAsync(
+        var (success, error) = await Loading.RunAsync(() => UserService.UpdateUserAsync(
             Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
-            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword, currentUser);
+            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword, currentUser));
 
         if (!success)
         {

@@ -7,6 +7,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject UserService UserService
+@inject LoadingService Loading
 @inject BusinessUnitService BusinessUnitService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
@@ -233,10 +234,10 @@
 
     private async Task SaveAsync()
     {
-        var (success, error) = await UserService.AddOrLinkUserAsync(
+        var (success, error) = await Loading.RunAsync(() => UserService.AddOrLinkUserAsync(
             Input.Username, Input.FullName, Input.Designation, Input.Email, Input.Password, Input.UserType,
             selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, currentUser,
-            Input.AuthSource, Input.AdLogin);
+            Input.AuthSource, Input.AdLogin));
 
         if (!success)
         {

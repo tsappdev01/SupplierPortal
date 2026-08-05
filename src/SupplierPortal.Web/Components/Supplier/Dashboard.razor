@@ -10,6 +10,7 @@
 @inject SupplierEmailService SupplierEmailService
 @inject SupplierFieldSettingService SupplierFieldSettingService
 @inject ToastService ToastService
+@inject LoadingService Loading
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -371,7 +372,10 @@ else if (TotalPages > 1)
             businessUnitIds = isAdministrator ? null : userBusinessUnitIds;
         }
 
-        suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter);
+        await Loading.RunAsync(async () =>
+        {
+            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter);
+        });
         currentPage = 1;
         selectedIds.Clear();
     }
@@ -437,19 +441,22 @@ else if (TotalPages > 1)
 
         var sent = 0;
         var failed = 0;
-        foreach (var supplier in targets)
+        await Loading.RunAsync(async () =>
         {
-            var (success, _) = await SupplierEmailService.NotifySupplierAsync(
-                supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
-            if (success)
+            foreach (var supplier in targets)
             {
-                sent++;
+                var (success, _) = await SupplierEmailService.NotifySupplierAsync(
+                    supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
+                if (success)
+                {
+                    sent++;
+                }
+                else
+                {
+                    failed++;
+                }
             }
-            else
-            {
-                failed++;
-            }
-        }
+        });
 
         var summary = $"{sent} email(s) sent.";
         if (skipped > 0)
@@ -529,19 +536,22 @@ else if (TotalPages > 1)
 
         var sent = 0;
         var failed = 0;
-        foreach (var supplier in toSend)
+        await Loading.RunAsync(async () =>
         {
-            var (success, _) = await SupplierEmailService.NotifySupplierAsync(
-                supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
-            if (success)
+            foreach (var supplier in toSend)
             {
-                sent++;
+                var (success, _) = await SupplierEmailService.NotifySupplierAsync(
+                    supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
+                if (success)
+                {
+                    sent++;
+                }
+                else
+                {
+                    failed++;
+                }
             }
-            else
-            {
-                failed++;
-            }
-        }
+        });
 
         var summary = $"{sent} email(s) sent.";
         if (skipped > 0)

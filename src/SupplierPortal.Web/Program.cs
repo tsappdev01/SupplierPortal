@@ -42,6 +42,7 @@ builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<LoadingService>();
 
 // Persist Data Protection keys to a stable folder (under the site's content root) so authentication
 // cookies remain valid across app restarts and IIS app-pool recycles. Without this, keys default to

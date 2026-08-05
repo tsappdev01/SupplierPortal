@@ -6,6 +6,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using SupplierPortal.Web.Services
 @inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
@@ -74,7 +75,8 @@
 
     private async Task SaveAsync()
     {
-        var (success, error) = await BusinessUnitService.AddAsync(Input.Name, Input.Code, logoBytes, logoContentType, currentUser);
+        var (success, error) = await Loading.RunAsync(
+            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, logoBytes, logoContentType, currentUser));
         if (!success)
         {
             errorMessage = error;

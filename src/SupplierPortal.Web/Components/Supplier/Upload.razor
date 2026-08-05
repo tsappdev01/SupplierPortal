@@ -8,6 +8,7 @@
 @using SupplierPortal.Web.Services
 @inject ExcelImportService ExcelImportService
 @inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Upload Supplier Data - Supplier Portal</PageTitle>
@@ -140,7 +141,7 @@
         try
         {
             await using var stream = e.File.OpenReadStream(MaxFileSize);
-            result = await ExcelImportService.ImportAsync(stream, targetBusinessUnitId, uploadedBy);
+            result = await Loading.RunAsync(() => ExcelImportService.ImportAsync(stream, targetBusinessUnitId, uploadedBy));
         }
         catch (Exception ex)
         {
