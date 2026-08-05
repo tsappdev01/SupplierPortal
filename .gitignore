@@ -1,0 +1,19 @@
+## .NET
+bin/
+obj/
+*.user
+
+## Local secrets - never commit real connection strings
+appsettings.Local.json
+appsettings.*.Local.json
+
+## Runtime-uploaded supplier documents - never commit real business documents
+src/SupplierPortal.Web/doc/supplier/
+
+## IDE
+.vs/
+.vscode/
+*.suo
+
+## OS
+.DS_Store

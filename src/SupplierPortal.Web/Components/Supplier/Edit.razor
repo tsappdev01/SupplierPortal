@@ -1,0 +1,66 @@
+@page "/supplier/edit/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierService SupplierService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Supplier - Supplier Portal</PageTitle>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">Supplier not found.</div>
+}
+else if (forbidden)
+{
+    <div class="alert alert-danger">You do not have access to this supplier.</div>
+}
+else if (supplier is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="currentUser" OnComplete="HandleComplete" />
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Supplier? supplier;
+    private bool notFound;
+    private bool forbidden;
+    private string currentUser = "unknown";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        var isAdministrator = state.User.IsAdministrator();
+        var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+
+        var loaded = await SupplierService.GetByIdAsync(Id);
+        if (loaded is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        if (!isAdministrator && !userBusinessUnitIds.Contains(loaded.BusinessUnitId))
+        {
+            forbidden = true;
+            return;
+        }
+
+        supplier = loaded;
+    }
+
+    private void HandleComplete(Supplier _)
+    {
+        NavigationManager.NavigateTo("/supplier/dashboard");
+    }
+}

@@ -1,0 +1,94 @@
+@page "/admin/business-units/new"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Services
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add Business Unit - Supplier Portal</PageTitle>
+
+<h1>Add Business Unit</h1>
+
+<EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="add-business-unit" style="max-width: 480px;">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+
+    <div class="mb-3">
+        <label class="form-label">Business Unit Name</label>
+        <InputText class="form-control" @bind-Value="Input.Name" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Business Unit Code</label>
+        <InputText class="form-control" @bind-Value="Input.Code" placeholder="Auto-generated if blank" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Logo</label>
+        <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
+        @if (logoPreview is not null)
+        {
+            <img src="@logoPreview" alt="Preview" class="mt-2" style="max-width: 120px; max-height: 80px; object-fit: contain;" />
+        }
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <button type="submit" class="btn btn-primary">Save Business Unit</button>
+    <a class="btn btn-secondary" href="/admin/business-units">Cancel</a>
+</EditForm>
+
+@code {
+    private const long MaxLogoSize = 2 * 1024 * 1024;
+
+    private string currentUser = "unknown";
+    private string? errorMessage;
+    private string? logoPreview;
+    private byte[]? logoBytes;
+    private string? logoContentType;
+
+    [SupplyParameterFromForm]
+    private BusinessUnitModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+    }
+
+    private async Task OnLogoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxLogoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        logoBytes = memoryStream.ToArray();
+        logoContentType = file.ContentType;
+        logoPreview = $"data:{logoContentType};base64,{Convert.ToBase64String(logoBytes)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        var (success, error) = await BusinessUnitService.AddAsync(Input.Name, Input.Code, logoBytes, logoContentType, currentUser);
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin/business-units");
+    }
+
+    private sealed class BusinessUnitModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = "";
+
+        public string? Code { get; set; }
+    }
+}

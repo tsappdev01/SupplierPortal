@@ -1,0 +1,137 @@
+@page "/supplier/self-service/{Token}"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierAccessTokenService AccessTokenService
+@inject ToastService ToastService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Verify Your Identity - Supplier Portal</PageTitle>
+
+<div class="di-otp-card">
+    @if (loading)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (token is null)
+    {
+        <h1>Link Not Available</h1>
+        <p class="text-muted">
+            This link is invalid or has expired. Please contact us to request a new supplier
+            information update link.
+        </p>
+    }
+    else
+    {
+        <h1>Verify Your Identity</h1>
+        <p class="text-muted">
+            We've sent a 4-digit verification code to the email address on file for
+            <strong>@token.Supplier?.SupplierName</strong>. Enter it below to continue.
+        </p>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Verification Code</label>
+            <input class="form-control di-otp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                   @bind="enteredCode" @bind:event="oninput" placeholder="0000" />
+        </div>
+
+        <button class="btn btn-primary w-100 mb-2" disabled="@(verifying || enteredCode.Length != 4)" @onclick="VerifyAsync">
+            @(verifying ? "Verifying..." : "Verify Code")
+        </button>
+        <button class="btn btn-link w-100" disabled="@resending" @onclick="ResendAsync">
+            @(resending ? "Sending..." : "Resend code")
+        </button>
+    }
+</div>
+
+<style>
+    .di-otp-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        padding: 2rem;
+    }
+
+    .di-otp-input {
+        font-size: 1.5rem;
+        letter-spacing: 0.5rem;
+        text-align: center;
+    }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private SupplierAccessToken? token;
+    private bool loading = true;
+    private bool verifying;
+    private bool resending;
+    private string enteredCode = "";
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = await AccessTokenService.GetValidTokenAsync(Token);
+
+        if (token is not null && NeedsFreshOtp(token))
+        {
+            var (success, error) = await AccessTokenService.GenerateAndSendOtpAsync(token.Id);
+            if (!success)
+            {
+                errorMessage = error;
+            }
+        }
+
+        loading = false;
+    }
+
+    private static bool NeedsFreshOtp(SupplierAccessToken t) =>
+        t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
+
+    private async Task VerifyAsync()
+    {
+        if (token is null) return;
+
+        verifying = true;
+        errorMessage = null;
+
+        var (success, error, sessionToken) = await AccessTokenService.VerifyOtpAsync(token.Id, enteredCode);
+        if (success && sessionToken is not null)
+        {
+            NavigationManager.NavigateTo($"/supplier/self-service/{Token}/form?s={sessionToken}");
+            return;
+        }
+
+        errorMessage = error;
+        verifying = false;
+    }
+
+    private async Task ResendAsync()
+    {
+        if (token is null) return;
+
+        resending = true;
+        errorMessage = null;
+
+        var (success, error) = await AccessTokenService.GenerateAndSendOtpAsync(token.Id);
+        if (success)
+        {
+            ToastService.ShowSuccess("A new verification code has been sent.");
+        }
+        else
+        {
+            errorMessage = error;
+        }
+
+        resending = false;
+    }
+}

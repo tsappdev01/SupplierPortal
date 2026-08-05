@@ -1,0 +1,272 @@
+@page "/admin/users/edit/{Id:int}"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject UserService UserService
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit User - Supplier Portal</PageTitle>
+
+<h1>Edit User</h1>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">User not found.</div>
+}
+else if (Input is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="edit-user" style="max-width: 640px;">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <InputText class="form-control" @bind-Value="Input.Username" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <InputText class="form-control" @bind-Value="Input.FullName" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Designation</label>
+            <InputText class="form-control" @bind-Value="Input.Designation" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <InputText class="form-control" @bind-Value="Input.Email" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">New Password</label>
+            <InputText type="password" class="form-control" @bind-Value="Input.NewPassword" />
+            <div class="form-text">Leave blank to keep the current password.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Profile Photo</label>
+            <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
+            @if (photoPreview is not null)
+            {
+                <img src="@photoPreview" alt="Preview" class="mt-2" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;" />
+            }
+            else if (hasExistingPhoto)
+            {
+                <img src="/users/@Id/photo" alt="Current photo" class="mt-2" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;" />
+            }
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Role</label>
+            <InputSelect class="form-select" style="max-width: 260px;" @bind-Value="Input.UserType">
+                <option value="@UserType.NormalUser">Normal User</option>
+                <option value="@UserType.Administrator">Administrator</option>
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Business Unit(s)</label>
+            <div class="di-bu-checklist">
+                @foreach (var businessUnit in businessUnits)
+                {
+                    <label class="di-bu-check">
+                        <input type="checkbox" checked="@selectedBusinessUnitIds.Contains(businessUnit.Id)"
+                               @onchange="e => ToggleBusinessUnit(businessUnit.Id, (bool)e.Value!)" />
+                        @businessUnit.Name
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label d-block">Status</label>
+            <label class="di-switch">
+                <input type="checkbox" @bind="Input.IsActive" />
+                <span class="di-switch-slider"></span>
+            </label>
+            <span class="ms-2">@(Input.IsActive ? "Active" : "Inactive")</span>
+        </div>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-secondary" href="/admin/users">Cancel</a>
+    </EditForm>
+}
+
+<style>
+    .di-bu-checklist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+    }
+
+    .di-bu-check {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: normal;
+        margin-bottom: 0;
+    }
+
+    .di-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        vertical-align: middle;
+    }
+
+    .di-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .di-switch-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #dc3545;
+        border-radius: 24px;
+        transition: background-color 0.15s ease;
+    }
+
+    .di-switch-slider::before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        border-radius: 50%;
+        transition: transform 0.15s ease;
+    }
+
+    .di-switch input:checked + .di-switch-slider {
+        background-color: #28a745;
+    }
+
+    .di-switch input:checked + .di-switch-slider::before {
+        transform: translateX(20px);
+    }
+</style>
+
+@code {
+    private const long MaxPhotoSize = 2 * 1024 * 1024;
+
+    [Parameter] public int Id { get; set; }
+
+    private List<BusinessUnit> businessUnits = [];
+    private HashSet<int> selectedBusinessUnitIds = [];
+    private string currentUser = "unknown";
+    private bool notFound;
+    private bool hasExistingPhoto;
+    private string? errorMessage;
+    private string? photoPreview;
+    private byte[]? photoBytes;
+    private string? photoContentType;
+
+    private UserModel? Input { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        businessUnits = await BusinessUnitService.GetAllAsync();
+
+        var user = await UserService.GetByIdAsync(Id);
+        if (user is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        hasExistingPhoto = user.ProfilePhoto is not null;
+        selectedBusinessUnitIds = user.BusinessUnits.Select(b => b.Id).ToHashSet();
+        Input = new UserModel
+        {
+            Username = user.Username,
+            FullName = user.FullName ?? "",
+            Designation = user.Designation,
+            Email = user.Email,
+            UserType = user.UserType,
+            IsActive = user.IsActive
+        };
+    }
+
+    private void ToggleBusinessUnit(int businessUnitId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            selectedBusinessUnitIds.Add(businessUnitId);
+        }
+        else
+        {
+            selectedBusinessUnitIds.Remove(businessUnitId);
+        }
+    }
+
+    private async Task OnPhotoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxPhotoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        photoBytes = memoryStream.ToArray();
+        photoContentType = file.ContentType;
+        photoPreview = $"data:{photoContentType};base64,{Convert.ToBase64String(photoBytes)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Input is null)
+        {
+            return;
+        }
+
+        var (success, error) = await UserService.UpdateUserAsync(
+            Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
+            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword, currentUser);
+
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin/users");
+    }
+
+    private sealed class UserModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Username { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FullName { get; set; } = "";
+
+        public string? Designation { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        public string? NewPassword { get; set; }
+
+        public UserType UserType { get; set; } = UserType.NormalUser;
+
+        public bool IsActive { get; set; } = true;
+    }
+}
