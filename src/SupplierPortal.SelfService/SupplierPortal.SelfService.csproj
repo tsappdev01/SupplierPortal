@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SupplierPortal.SelfService</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DMZ portal: shares ONLY the DTO contracts. No EF, no data layer, no connection string. -->
+    <ProjectReference Include="..\SupplierPortal.Contracts\SupplierPortal.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+{
+  "_comment": "Copy this file to appsettings.Local.json (gitignored) and fill in REAL values. Never commit secrets.",
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=INTERNAL-SQL;Database=BP;User Id=bpuser;Password=REPLACE_ME;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+  },
+  "ApiSecurity": {
+    "SigningKey": "REPLACE_WITH_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS",
+    "Clients": [
+      {
+        "ClientId": "selfservice-portal",
+        "ClientSecret": "REPLACE_WITH_A_LONG_RANDOM_CLIENT_SECRET"
+      }
+    ]
+  },
+  "Notifications": {
+    "AdminBaseUrl": "https://bp.dipark.com"
+  }
+}

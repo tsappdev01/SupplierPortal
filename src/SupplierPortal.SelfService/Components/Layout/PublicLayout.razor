@@ -1,0 +1,28 @@
+@inherits LayoutComponentBase
+
+<div class="public-layout">
+    <div class="public-header">
+        <img src="/images/di-logo.png" alt="Dubai Investments" class="public-brand-logo" />
+        <span class="public-title">Supplier Self-Service</span>
+    </div>
+    <div class="public-content">
+        @Body
+    </div>
+</div>
+
+<style>
+    .public-layout { min-height: 100vh; background-color: #f4f6f9; }
+
+    .public-header {
+        background-color: #1a2233;
+        padding: 0.9rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .public-brand-logo { height: 2.5rem; width: auto; border-radius: 4px; }
+    .public-title { color: #c8a24a; font-weight: 700; letter-spacing: 0.04em; }
+
+    .public-content { display: flex; justify-content: center; padding: 2.5rem 1rem; }
+</style>

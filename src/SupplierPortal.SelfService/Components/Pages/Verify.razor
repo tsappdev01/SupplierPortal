@@ -1,0 +1,122 @@
+@page "/self-service/{Token}"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject SupplierApiClient Api
+@inject SelfServiceSession Session
+@inject NavigationManager Nav
+
+<PageTitle>Verify — Supplier Self-Service</PageTitle>
+
+<div class="ss-card">
+    <h1 class="ss-title">Verify it's you</h1>
+
+    @if (loading)
+    {
+        <p class="ss-muted">Sending a verification code…</p>
+    }
+    else if (!linkValid)
+    {
+        <div class="ss-alert ss-alert-error">@(error ?? "This link is invalid or has expired.")</div>
+    }
+    else
+    {
+        <p class="ss-muted">
+            We sent a 4-digit verification code to <strong>@maskedEmail</strong>.
+            Enter it below to continue. The code expires in @expiresInMinutes minutes.
+        </p>
+
+        @if (devOtp is not null)
+        {
+            <div class="ss-alert ss-alert-info">Development mode — your code is <strong>@devOtp</strong>.</div>
+        }
+
+        <div class="ss-field">
+            <label>Verification code</label>
+            <input type="text" inputmode="numeric" maxlength="4" @bind="code" @bind:event="oninput"
+                   class="ss-input ss-code" placeholder="0000" autocomplete="one-time-code" />
+        </div>
+
+        @if (error is not null)
+        {
+            <div class="ss-alert ss-alert-error">@error</div>
+        }
+
+        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || code.Length < 4)">
+            @(verifying ? "Verifying…" : "Verify and continue")
+        </button>
+        <button class="ss-btn ss-btn-link" @onclick="ResendAsync" disabled="@verifying">Resend code</button>
+    }
+</div>
+
+<style>
+    .ss-card { width: 100%; max-width: 460px; background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .ss-title { font-size: 24px; font-weight: 700; color: #1a2233; margin: 0 0 1rem; }
+    .ss-muted { color: #7b8697; font-size: 15px; line-height: 1.5; }
+    .ss-field { margin: 1.25rem 0; display: flex; flex-direction: column; }
+    .ss-field label { font-weight: 600; color: #46618f; margin-bottom: 6px; }
+    .ss-input { padding: 10px 12px; border: 1px solid #e2e5ea; border-radius: 5px; font-size: 15px; }
+    .ss-code { font-size: 28px; letter-spacing: 0.5em; text-align: center; }
+    .ss-btn { font-family: inherit; font-size: 15px; font-weight: 700; padding: 10px 22px; border-radius: 5px; cursor: pointer; border: none; margin-right: 10px; }
+    .ss-btn-primary { background: #3b5bdb; color: #fff; }
+    .ss-btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .ss-btn-link { background: none; color: #46618f; text-decoration: underline; padding: 10px 4px; }
+    .ss-alert { padding: 0.7rem 0.9rem; border-radius: 6px; margin: 0.75rem 0; font-size: 14px; }
+    .ss-alert-error { background: #fdecea; color: #c0392b; }
+    .ss-alert-info { background: #eef1ff; color: #1a2233; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private bool loading = true;
+    private bool linkValid;
+    private bool verifying;
+    private string code = "";
+    private string? maskedEmail;
+    private string? devOtp;
+    private int expiresInMinutes = 10;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.RequestOtpAsync(Token);
+        loading = false;
+        linkValid = result.Success;
+        maskedEmail = result.MaskedEmail;
+        devOtp = result.DevOtp;
+        expiresInMinutes = result.ExpiresInMinutes;
+        error = result.Success ? null : result.Error;
+    }
+
+    private async Task VerifyAsync()
+    {
+        error = null;
+        verifying = true;
+        var result = await Api.VerifyOtpAsync(Token, code.Trim());
+        verifying = false;
+
+        if (!result.Success || result.SessionToken is null)
+        {
+            error = result.Error ?? "Incorrect code. Please try again.";
+            return;
+        }
+
+        Session.SessionToken = result.SessionToken;
+        Session.SupplierName = result.SupplierName;
+        Session.ContactEmail = result.ContactEmail;
+        Session.ExpiresAtUtc = result.ExpiresAtUtc;
+        Nav.NavigateTo($"/self-service/{Token}/form");
+    }
+
+    private async Task ResendAsync()
+    {
+        error = null;
+        code = "";
+        var result = await Api.RequestOtpAsync(Token);
+        maskedEmail = result.MaskedEmail;
+        devOtp = result.DevOtp;
+        if (!result.Success)
+        {
+            error = result.Error;
+        }
+    }
+}

@@ -62,27 +62,45 @@ public class SupplierAccessTokenService(
         return token is null || token.ExpiresAt < DateTime.UtcNow ? null : token;
     }
 
+    /// <summary>Blazor internal-app entry point: generate, persist and email a fresh OTP.</summary>
     public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId)
+    {
+        var (success, error, _) = await IssueOtpAsync(tokenId, sendEmail: true);
+        return (success, error);
+    }
+
+    /// <summary>
+    /// Generates, persists and (optionally) emails a fresh OTP for a link. Returns the plaintext code so
+    /// that a NON-PRODUCTION caller (the REST API in Development) can surface it for automated end-to-end
+    /// testing when no Database Mail profile exists. Production callers must send the email
+    /// (<paramref name="sendEmail"/> = true) and must never expose the returned code.
+    /// </summary>
+    public async Task<(bool Success, string? Error, string? Code)> IssueOtpAsync(int tokenId, bool sendEmail = true)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var token = await db.SupplierAccessTokens.Include(t => t.Supplier).FirstOrDefaultAsync(t => t.Id == tokenId);
         if (token is null)
         {
-            return (false, "Link not found.");
+            return (false, "Link not found.", null);
         }
         if (token.Supplier is null || string.IsNullOrWhiteSpace(token.Supplier.ContactEmail))
         {
-            return (false, "This supplier has no Contact Email on file.");
+            return (false, "This supplier has no Contact Email on file.", null);
         }
         if (token.OtpSendCount >= MaxOtpSends)
         {
-            return (false, "Too many verification code requests for this link. Please contact us for assistance.");
+            return (false, "Too many verification code requests for this link. Please contact us for assistance.", null);
         }
 
-        var templatePath = Path.Combine(env.WebRootPath, "doc", "supplier_otp_code.html");
-        if (!File.Exists(templatePath))
+        string? body = null;
+        if (sendEmail)
         {
-            return (false, $"Email template not found at wwwroot/{OtpTemplateRelativePath}.");
+            var templatePath = Path.Combine(env.WebRootPath, "doc", "supplier_otp_code.html");
+            if (!File.Exists(templatePath))
+            {
+                return (false, $"Email template not found at wwwroot/{OtpTemplateRelativePath}.", null);
+            }
+            body = await File.ReadAllTextAsync(templatePath);
         }
 
         var code = RandomNumberGenerator.GetInt32(0, 10000).ToString("D4");
@@ -92,33 +110,47 @@ public class SupplierAccessTokenService(
         token.OtpAttemptCount = 0;
         token.OtpSendCount++;
 
-        var body = await File.ReadAllTextAsync(templatePath);
-        body = body
-            .Replace("{Supplier Name}", token.Supplier.SupplierName)
-            .Replace("{OTP Code}", code)
-            .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
-
         // Persist the OTP state before attempting delivery: if the send fails (transient mail
         // outage), the code the supplier will retry with via "Resend" is still consistent, rather
         // than silently discarding a hashed code no email ever carried.
         await db.SaveChangesAsync();
 
-        try
+        if (sendEmail)
         {
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {token.Supplier.ContactEmail},
-                    @subject = {"Your Verification Code"},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            body = body!
+                .Replace("{Supplier Name}", token.Supplier.SupplierName)
+                .Replace("{OTP Code}", code)
+                .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
+            try
+            {
+                await db.Database.ExecuteSqlInterpolatedAsync($@"
+                    EXEC msdb.dbo.sp_send_dbmail
+                        @profile_name = {MailProfileName},
+                        @recipients = {token.Supplier.ContactEmail},
+                        @subject = {"Your Verification Code"},
+                        @body = {body},
+                        @body_format = 'HTML';");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Database Mail send failed: {ex.Message}", null);
+            }
         }
 
-        return (true, null);
+        return (true, null, code);
+    }
+
+    /// <summary>Masks an email like <c>jo***@acme.com</c> for safe display on the OTP screen.</summary>
+    public static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            return "your email on file";
+        }
+        var parts = email.Split('@', 2);
+        var name = parts[0];
+        var shown = name.Length <= 2 ? name[..1] : name[..2];
+        return $"{shown}{new string('*', Math.Max(2, name.Length - shown.Length))}@{parts[1]}";
     }
 
     public async Task<(bool Success, string? Error, string? SessionToken)> VerifyOtpAsync(int tokenId, string enteredCode)

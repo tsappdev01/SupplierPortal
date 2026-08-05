@@ -12,9 +12,11 @@ appsettings.*.Local.json
 
 ## Runtime-uploaded supplier documents - never commit real business documents
 src/SupplierPortal.Web/doc/supplier/
+src/SupplierPortal.Api/doc/supplier/
 
 ## Data Protection keys - generated at runtime, never commit
 src/SupplierPortal.Web/keys/
+src/SupplierPortal.SelfService/keys/
 
 ## IDE
 .vs/

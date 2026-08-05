@@ -1,0 +1,76 @@
+namespace SupplierPortal.Contracts;
+
+/// <summary>
+/// The full editable supplier payload exchanged between the DMZ self-service portal and the internal
+/// REST API. Mirrors the internal <c>SupplierFormModel</c> field-for-field, but is a plain,
+/// dependency-free DTO so the DMZ portal never needs the EF entities or the data layer.
+/// Nullable reference-id fields map to lookup rows; the portal only ever holds ids + free text.
+/// </summary>
+public class SupplierDto
+{
+    public int Id { get; set; }
+    public string? SupplierNumber { get; set; }
+
+    // -- Step 1: Business / Organization --
+    public string SupplierName { get; set; } = "";
+    public int? PrefixId { get; set; }
+    public int? TaxOrganizationTypeId { get; set; }
+    public string FirstName { get; set; } = "";
+    public string Email { get; set; } = "";
+    public int? SupplierTypeId { get; set; }
+    public int? TaxpayerCountryId { get; set; }
+    public string TaxRegistrationNumber { get; set; } = "";
+    public string TradeLicenseNumber { get; set; } = "";
+    public int? VatCodeId { get; set; }
+    public int? BusinessRelationshipId { get; set; }
+    public bool IsOneTimeSupplier { get; set; }
+    public string? DunsNumber { get; set; }
+    public string? CorporateWebSite { get; set; }
+
+    // -- Step 2: Contact --
+    public string? AddressLine1 { get; set; }
+    public string? AddressLine2 { get; set; }
+    public int? CityId { get; set; }
+    public int? CountryId { get; set; }
+    public string? PostalCode { get; set; }
+    public int? CountryNameId { get; set; }
+    public string? AddressName { get; set; }
+    public string? AdministrativeContact { get; set; }
+    public int? PhoneCountryCodeId { get; set; }
+    public string? PhoneAreaCode { get; set; }
+    public string? State { get; set; }
+    public int? ProvinceId { get; set; }
+
+    // -- Step 3: Payment / Banking --
+    public int? BankId { get; set; }
+    public int? BankBranchId { get; set; }
+    public int? AccountCountryCodeId { get; set; }
+    public string? AccountName { get; set; }
+    public string? AccountNumber { get; set; }
+    public int? AccountCurrencyCodeId { get; set; }
+    public string? SwiftCode { get; set; }
+    public bool AllowInternationalPayments { get; set; }
+    public DateTime? AccountStartDate { get; set; }
+    public string? Iban { get; set; }
+    public string? PaymentMethodCode { get; set; }
+    public string? RemitAdviceEmail { get; set; }
+
+    // -- Step 4: Site / Business Unit --
+    public string? RemittanceEmail { get; set; }
+    public bool IsRfqOrBidding { get; set; }
+    public bool IsOrdering { get; set; }
+    public bool IsPay { get; set; }
+    public string? Phone { get; set; }
+    public int? SupplierSiteBuId { get; set; }
+    public bool IsSourcingOnly { get; set; }
+    public bool IsPurchasing { get; set; }
+    public bool IsPrimaryPay { get; set; }
+    public int? CommunicationMethodId { get; set; }
+    public string? CommunicationEmail { get; set; }
+    public string ContactEmail { get; set; } = "";
+    public int? PaymentMethodId { get; set; }
+    public int? PaymentTermsId { get; set; }
+    public int? ProcurementBuId { get; set; }
+    public int? ClientBuId { get; set; }
+    public int? BillToBuId { get; set; }
+}

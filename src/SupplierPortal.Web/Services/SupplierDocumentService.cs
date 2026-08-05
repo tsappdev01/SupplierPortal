@@ -43,6 +43,7 @@ public class SupplierDocumentService(
             .ToListAsync();
     }
 
+    /// <summary>Blazor upload path (interactive <c>InputFile</c>).</summary>
     public async Task<(bool Success, string? Error, string? ExtractedNumber)> UploadAsync(
         int supplierId, SupplierDocumentType documentType, IBrowserFile file, string uploadedBy)
     {
@@ -51,16 +52,32 @@ public class SupplierDocumentService(
             return (false, "File exceeds the 10 MB size limit.", null);
         }
 
+        await using var source = file.OpenReadStream(MaxFileSizeBytes);
+        return await UploadFromStreamAsync(
+            supplierId, documentType, source, file.Name, file.ContentType, file.Size, uploadedBy);
+    }
+
+    /// <summary>Stream-based upload path, shared by the Blazor upload and the REST API (which receives an
+    /// <c>IFormFile</c>). Keeps a single implementation of storage, single-slot replacement, number
+    /// extraction and auditing regardless of the transport.</summary>
+    public async Task<(bool Success, string? Error, string? ExtractedNumber)> UploadFromStreamAsync(
+        int supplierId, SupplierDocumentType documentType, Stream content, string fileName,
+        string? contentType, long size, string uploadedBy)
+    {
+        if (size > MaxFileSizeBytes)
+        {
+            return (false, "File exceeds the 10 MB size limit.", null);
+        }
+
         var directory = DocumentsDirectory(supplierId);
         Directory.CreateDirectory(directory);
 
-        var storedFileName = $"{Guid.NewGuid():N}{Path.GetExtension(file.Name)}";
+        var storedFileName = $"{Guid.NewGuid():N}{Path.GetExtension(fileName)}";
         var fullPath = Path.Combine(directory, storedFileName);
 
         await using (var destination = new FileStream(fullPath, FileMode.Create))
-        await using (var source = file.OpenReadStream(MaxFileSizeBytes))
         {
-            await source.CopyToAsync(destination);
+            await content.CopyToAsync(destination);
         }
 
         string? extractedNumber = documentType switch
@@ -90,15 +107,15 @@ public class SupplierDocumentService(
         {
             SupplierId = supplierId,
             DocumentType = documentType,
-            FileName = file.Name,
+            FileName = fileName,
             StoredFileName = storedFileName,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
-            FileSizeBytes = file.Size,
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            FileSizeBytes = size,
             UploadedBy = uploadedBy
         });
 
         await db.SaveChangesAsync();
-        await auditService.LogAsync(uploadedBy, AuditAction.Update, "Supplier", supplierId, $"Uploaded {documentType} document '{file.Name}'");
+        await auditService.LogAsync(uploadedBy, AuditAction.Update, "Supplier", supplierId, $"Uploaded {documentType} document '{fileName}'");
 
         return (true, null, extractedNumber);
     }

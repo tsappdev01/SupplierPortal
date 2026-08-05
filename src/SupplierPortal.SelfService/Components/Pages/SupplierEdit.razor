@@ -1,0 +1,53 @@
+@page "/self-service/{Token}/form"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject SupplierApiClient Api
+@inject SelfServiceSession Session
+@inject NavigationManager Nav
+
+<PageTitle>Your details — Supplier Self-Service</PageTitle>
+
+@if (loading)
+{
+    <div class="ss-loading"><h1>Loading your details…</h1></div>
+}
+else if (bootstrap is null)
+{
+    <div class="ss-loading">
+        <h1>Session expired</h1>
+        <p>Your secure session has ended. Please use your link again to receive a new verification code.</p>
+    </div>
+}
+else
+{
+    <SelfServiceWizard Bootstrap="bootstrap" SessionToken="@(Session.SessionToken!)" />
+}
+
+<style>
+    .ss-loading { background:#fff; border:1px solid #e2e5ea; border-radius:8px; padding:2rem; max-width:520px; }
+    .ss-loading h1 { font-size:22px; color:#1a2233; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private bool loading = true;
+    private SupplierFormBootstrapDto? bootstrap;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsActive)
+        {
+            Nav.NavigateTo($"/self-service/{Token}");
+            return;
+        }
+
+        bootstrap = await Api.GetBootstrapAsync(Session.SessionToken!);
+        loading = false;
+
+        // A null bootstrap means the session was rejected by the API (expired/revoked); clear it.
+        if (bootstrap is null)
+        {
+            Session.Clear();
+        }
+    }
+}
