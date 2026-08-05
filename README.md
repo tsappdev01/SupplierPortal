@@ -146,11 +146,14 @@ deactivated.
     Payment Terms value that isn't in the seeded list — doesn't reject the
     row; that field is left blank and reported as a separate "imported with
     blanks" warning so real-world data with free-text variants still imports.
-- **Supplier Dashboard**: view, edit, deactivate, print, and export (CSV/PDF)
-  supplier records, plus stat tiles (Total/Active/Inactive). Normal users see
-  only their own business unit's data; Administrators can filter by business
-  unit or view all. CSV export includes the full field set; PDF export uses a
-  curated subset so columns stay legible on a landscape page.
+- **Supplier Dashboard**: view, edit, deactivate, print, and export supplier
+  records, plus stat tiles (Total/Active/Inactive). Normal users see only their
+  own business unit's data; Administrators can filter by business unit or view
+  all. **Excel export** produces an `.xlsx` in the exact Oracle Fusion "Supplier
+  Data Template" layout (57 columns, matching header text and order) so it can be
+  re-imported unchanged through Upload Supplier Data; PDF/print use a curated
+  subset so columns stay legible on a landscape page. (A full-field CSV is still
+  available at `/export/csv`.)
 
 ## Master data
 

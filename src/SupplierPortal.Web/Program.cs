@@ -112,6 +112,8 @@ app.MapGet("/export/{format}", async (string format, int? businessUnitId, HttpCo
     return format.ToLowerInvariant() switch
     {
         "csv" => Results.File(exportService.ExportToCsv(suppliers), "text/csv", "suppliers.csv"),
+        "xlsx" => Results.File(exportService.ExportToExcelTemplate(suppliers),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Supplier Data Template.xlsx"),
         "pdf" => Results.File(exportService.ExportToPdf(suppliers), "application/pdf", "suppliers.pdf"),
         _ => Results.BadRequest("Unsupported export format.")
     };

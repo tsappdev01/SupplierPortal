@@ -10,6 +10,109 @@ namespace SupplierPortal.Web.Services;
 
 public class ExportService
 {
+    // The official Oracle Fusion "Supplier Data Template" column set, in the exact order and with the
+    // exact header text (including the *, ** and "(LOV)" decorations, and the doubled headers) that
+    // the template ships with. Exporting through this map produces a workbook that re-imports cleanly
+    // via ExcelImportService (NormalizeHeader strips the decorations back off). The "E-Mail", "Pay"
+    // and "Supplier Site" headers repeat exactly as the template repeats them.
+    private static readonly (string Header, Func<Supplier, string> Value)[] TemplateColumns =
+    [
+        ("Supplier Number", s => s.SupplierNumber),
+        ("*Supplier Name", s => s.SupplierName),
+        ("*Tax Organization Type (LOV)", s => s.TaxOrganizationType?.DisplayName ?? ""),
+        ("Supplier Type  (LOV)", s => s.SupplierType?.DisplayName ?? ""),
+        ("*Taxpayer Country (LOV)", s => s.TaxpayerCountry?.DisplayName ?? ""),
+        ("Country Name (LOV)", s => s.CountryName?.DisplayName ?? ""),
+        ("Tax Registration Number", s => s.TaxRegistrationNumber),
+        ("*Address Line 1", s => s.AddressLine1 ?? ""),
+        ("Address Line 2", s => s.AddressLine2 ?? ""),
+        ("*City", s => s.City?.DisplayName ?? ""),
+        ("Country (LOV)", s => s.Country?.DisplayName ?? ""),
+        ("Postal code", s => s.PostalCode ?? ""),
+        ("Business Relationship", s => s.BusinessRelationship?.DisplayName ?? ""),
+        ("D-U-N-S Number", s => s.DunsNumber ?? ""),
+        ("One-time supplier", s => s.IsOneTimeSupplier ? "Yes" : "No"),
+        ("Corporate Web Site", s => s.CorporateWebSite ?? ""),
+        ("* Trade License Number", s => s.TradeLicenseNumber ?? ""),
+        ("VAT Code (LOV)", s => s.VatCode?.Code ?? ""),
+        ("Remittance E-mail", s => s.RemittanceEmail ?? ""),
+        ("Address Name *", s => s.AddressName ?? ""),
+        ("State", s => s.State ?? ""),
+        ("*Province (LOV)", s => s.Province?.DisplayName ?? ""),
+        ("RFQ Or Bidding", s => s.IsRfqOrBidding ? "Yes" : "No"),
+        ("Ordering", s => s.IsOrdering ? "Yes" : "No"),
+        ("Pay", s => s.IsPay ? "Yes" : "No"),
+        ("Prefix", s => s.Prefix?.DisplayName ?? ""),
+        ("First Name", s => s.FirstName ?? ""),
+        ("Administrative Contact", s => s.AdministrativeContact ?? ""),
+        ("E-Mail", s => s.ContactEmail ?? ""),
+        ("Phone Country Code (LOV)", s => s.PhoneCountryCode?.PhoneCode ?? ""),
+        ("Phone Area Code", s => s.PhoneAreaCode ?? ""),
+        ("Phone", s => s.Phone ?? ""),
+        ("Supplier Site*", s => s.SupplierSiteBu?.Name ?? ""),
+        ("Sourcing only", s => s.IsSourcingOnly ? "Yes" : "No"),
+        ("Purchasing", s => s.IsPurchasing ? "Yes" : "No"),
+        ("Pay", s => s.IsPay ? "Yes" : "No"),
+        ("Primary Pay", s => s.IsPrimaryPay ? "Yes" : "No"),
+        ("Communication Method", s => s.CommunicationMethod?.DisplayName ?? ""),
+        ("E-Mail", s => s.CommunicationEmail ?? ""),
+        ("*Payment Method (LOV)", s => s.PaymentMethod?.DisplayName ?? ""),
+        ("Payment Terms (LOV)", s => s.PaymentTerms?.DisplayName ?? ""),
+        ("Procurement BU* (LOV)", s => s.ProcurementBu?.Name ?? ""),
+        ("Client BU*(LOV)", s => s.ClientBu?.Name ?? ""),
+        ("Bill-to BU (LOV)", s => s.BillToBu?.Name ?? ""),
+        ("Supplier Site", s => s.SupplierSiteBu?.Name ?? ""),
+        ("**Bank Name (LOV)", s => s.Bank?.Name ?? ""),
+        ("**Branch Name (LOV)", s => s.BankBranch?.Name ?? ""),
+        ("*Account Country Code (LOV)", s => s.AccountCountryCode?.DisplayName ?? ""),
+        ("Account Name", s => s.AccountName ?? ""),
+        ("*Account Number", s => s.AccountNumber ?? ""),
+        ("Account Currency Code", s => s.AccountCurrencyCode?.Code ?? ""),
+        ("Swift Code/BIC Code", s => s.SwiftCode ?? ""),
+        ("Allow International Payments", s => s.AllowInternationalPayments ? "Yes" : "No"),
+        ("Account Start Date", s => s.AccountStartDate?.ToString("yyyy-MM-dd") ?? ""),
+        ("IBAN", s => s.Iban ?? ""),
+        ("Payment Method Code", s => s.PaymentMethodCode ?? ""),
+        ("Remit Advice Email", s => s.RemitAdviceEmail ?? ""),
+    ];
+
+    /// <summary>Exports suppliers as an .xlsx workbook that reproduces the Oracle Fusion "Supplier
+    /// Data Template" layout exactly (sheet name, 57 columns, header text and order), so the file can
+    /// be re-imported unchanged through the Upload Supplier Data screen. Values are written as text so
+    /// account numbers, IBANs and phone numbers keep their exact form (no numeric coercion).</summary>
+    public byte[] ExportToExcelTemplate(IEnumerable<Supplier> suppliers)
+    {
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Supplier Data Template");
+
+        for (var col = 0; col < TemplateColumns.Length; col++)
+        {
+            var headerCell = sheet.Cell(1, col + 1);
+            headerCell.Value = TemplateColumns[col].Header;
+            headerCell.Style.Font.Bold = true;
+        }
+
+        var row = 2;
+        foreach (var supplier in suppliers)
+        {
+            for (var col = 0; col < TemplateColumns.Length; col++)
+            {
+                // Assigning a string keeps the cell typed as Text, so account numbers, IBANs and
+                // phone numbers aren't coerced to numbers (no scientific notation / lost leading zeros).
+                sheet.Cell(row, col + 1).Value = TemplateColumns[col].Value(supplier);
+            }
+            row++;
+        }
+
+        sheet.SheetView.FreezeRows(1);
+        // Auto-fit against the header plus a sample of rows; fitting every row can be slow on large sets.
+        sheet.Columns(1, TemplateColumns.Length).AdjustToContents(1, Math.Min(row - 1, 60));
+
+        using var output = new MemoryStream();
+        workbook.SaveAs(output);
+        return output.ToArray();
+    }
+
     // Full field set for CSV (opened in Excel, width is not a concern).
     private static readonly string[] CsvColumns =
     [

@@ -43,15 +43,15 @@
 </div>
 
 <div class="d-flex gap-2 mb-3 no-print align-items-center">
-    <a class="di-export-btn" href="@ExportUrl("csv")" title="Export to CSV" aria-label="Export to CSV">
+    <a class="di-export-btn" href="@ExportUrl("xlsx")" title="Export to Excel (Supplier Data Template)" aria-label="Export to Excel">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#2e7d32" stroke-width="2.5" />
             <path d="M30 3h9v9z" fill="#a5d6a7" stroke="#2e7d32" stroke-width="1.5" stroke-linejoin="round" />
             <path d="M12 15h16M12 21h16M12 27h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round" />
             <rect x="5" y="33" width="34" height="15" rx="3" fill="#2e7d32" />
-            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">CSV</text>
+            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">XLS</text>
         </svg>
-        <span>CSV</span>
+        <span>Excel</span>
     </a>
     <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF" aria-label="Export to PDF">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -73,19 +73,40 @@
         </svg>
         <span>Print</span>
     </button>
-    <button class="btn btn-info text-white ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync">
+    <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync"
+            title="Email a review notification to every supplier" aria-label="Notify all suppliers">
         @if (bulkSending)
         {
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            <text> Sending...</text>
+            <span>Sending...</span>
         }
         else
         {
-            <text>Notify All Suppliers</text>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2.5" y="4.5" width="19" height="14" rx="2.5" fill="#e3f6fb" stroke="#0aa2c0" stroke-width="1.7" />
+                <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0aa2c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2" />
+                <path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+            <span>Notify All Suppliers</span>
         }
     </button>
-    <a class="btn btn-primary" href="/supplier/register">Register Supplier</a>
-    <a class="btn btn-di-gold" href="/supplier/upload">Upload Supplier Data</a>
+    <a class="di-action-btn is-register" href="/supplier/register" title="Register a new supplier" aria-label="Register supplier">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" />
+            <path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round" />
+            <circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233" />
+            <path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+        <span>Register Supplier</span>
+    </a>
+    <a class="di-action-btn is-upload" href="/supplier/upload" title="Bulk-upload suppliers from an Excel file" aria-label="Upload supplier data">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round" />
+            <path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <span>Upload Supplier Data</span>
+    </a>
 </div>
 
 <div class="row g-2 mb-3 no-print">
