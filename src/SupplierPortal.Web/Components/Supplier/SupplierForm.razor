@@ -97,6 +97,14 @@
                         }
                     </InputSelect>
                 </div>
+                <div class="di-field @FieldClass("TaxRegistrationNumber")">
+                    <label>Tax Registration Number@(Req("TaxRegistrationNumber"))</label>
+                    <InputText @bind-Value="formModel.TaxRegistrationNumber" />
+                </div>
+                <div class="di-field @FieldClass("TradeLicenseNumber")">
+                    <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
+                    <InputText @bind-Value="formModel.TradeLicenseNumber" />
+                </div>
                 <div class="di-field @FieldClass("VatCodeId")">
                     <label>VAT Code@(Req("VatCodeId"))</label>
                     <InputSelect @bind-Value="formModel.VatCodeId">

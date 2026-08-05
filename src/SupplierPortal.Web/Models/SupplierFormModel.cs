@@ -31,11 +31,10 @@ public class SupplierFormModel
 
     public int? TaxpayerCountryId { get; set; }
 
-    // Tax Registration Number and Trade License Number are retained on the entity and Excel import
-    // for historical data, but are no longer collected on the registration form (removed from the
-    // UI), so they are no longer required here.
+    [Required(ErrorMessage = "Tax Registration Number is required.")]
     public string TaxRegistrationNumber { get; set; } = "";
 
+    [Required(ErrorMessage = "Trade License Number is required.")]
     public string TradeLicenseNumber { get; set; } = "";
 
     public int? VatCodeId { get; set; }
