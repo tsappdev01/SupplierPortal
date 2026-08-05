@@ -358,7 +358,7 @@
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.BankConfirmationLetter)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                         @if (RequiresBankConfirmationLetter())
                         {
-                            <div class="text-danger" style="font-size:0.85em;">Required: you changed Payment/Banking details, so a Bank Confirmation Letter must be attached.</div>
+                            <div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>
                         }
                     </div>
                 </div>
@@ -555,7 +555,8 @@
     private string? documentMessage;
     private HashSet<string> changedFieldKeys = [];
     private HashSet<string> hiddenFromSupplierKeys = [];
-    private string originalBankingSignature = "";
+    private int? originalBankId;
+    private string? originalAccountNumber;
 
     private List<BankBranch> SelectedBankBranches =>
         banks.FirstOrDefault(b => b.Id == formModel.BankId)?.Branches ?? [];
@@ -587,6 +588,10 @@
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
 
+        // Remember the bank account as loaded, to detect a supplier adding/changing a bank account.
+        originalBankId = Supplier.BankId;
+        originalAccountNumber = Supplier.AccountNumber;
+
         formModel = SupplierFormModel.FromSupplier(Supplier);
 
         if (IsCreateMode && Supplier.Id == 0)
@@ -607,10 +612,6 @@
         {
             maxStepReached = 4;
         }
-
-        // Snapshot of the Payment/Banking section as loaded, so any later change to it can be
-        // detected (and a fresh Bank Confirmation Letter required).
-        originalBankingSignature = BankingSignature();
 
         if (Supplier.Id != 0)
         {
@@ -638,16 +639,9 @@
 
     private bool IsHiddenFromSupplier(string fieldKey) => SupplierFacing && hiddenFromSupplierKeys.Contains(fieldKey);
 
-    /// <summary>Signature of every Payment/Banking (Step 3) field, compared against the snapshot
-    /// taken at load to detect ANY change to the section.</summary>
-    private string BankingSignature() => string.Join("|",
-        formModel.BankId, formModel.BankBranchId, formModel.AccountCountryCodeId,
-        (formModel.AccountName ?? "").Trim(), (formModel.AccountNumber ?? "").Trim(),
-        formModel.AccountCurrencyCodeId, (formModel.SwiftCode ?? "").Trim(), (formModel.Iban ?? "").Trim(),
-        formModel.AccountStartDate?.ToString("o") ?? "", (formModel.PaymentMethodCode ?? "").Trim(),
-        (formModel.RemitAdviceEmail ?? "").Trim(), formModel.AllowInternationalPayments);
-
-    private bool BankingSectionChanged() => BankingSignature() != originalBankingSignature;
+    private bool BankAccountChanged() =>
+        formModel.BankId != originalBankId ||
+        !string.Equals((formModel.AccountNumber ?? "").Trim(), (originalAccountNumber ?? "").Trim(), StringComparison.Ordinal);
 
     private bool HasBankConfirmationLetter() =>
         documents.Any(d => d.DocumentType == SupplierDocumentType.BankConfirmationLetter);
@@ -657,9 +651,9 @@
         documents.Any(d => d.DocumentType == SupplierDocumentType.TradeLicense);
 
     /// <summary>A Bank Confirmation Letter must be attached when an existing (already-submitted)
-    /// supplier changes ANY Payment/Banking detail. Drafts (initial registration) are exempt.</summary>
+    /// supplier changes/adds a bank account. Drafts (initial registration) are exempt.</summary>
     private bool RequiresBankConfirmationLetter() =>
-        Supplier.Id != 0 && !Supplier.IsDraft && BankingSectionChanged() && !HasBankConfirmationLetter();
+        Supplier.Id != 0 && !Supplier.IsDraft && BankAccountChanged() && !HasBankConfirmationLetter();
 
     private async Task UploadDocumentAsync(InputFileChangeEventArgs e, SupplierDocumentType documentType)
     {
@@ -821,7 +815,7 @@
 
         if (currentStep == 3 && RequiresBankConfirmationLetter())
         {
-            errorMessage = "A Bank Confirmation Letter must be attached because the Payment/Banking details were changed.";
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
 
@@ -891,7 +885,7 @@
         {
             currentStep = 3;
             maxStepReached = Math.Max(maxStepReached, 3);
-            errorMessage = "A Bank Confirmation Letter must be attached because the Payment/Banking details were changed.";
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
 
