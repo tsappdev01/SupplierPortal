@@ -97,14 +97,6 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("TaxRegistrationNumber")">
-                    <label>Tax Registration Number@(Req("TaxRegistrationNumber"))</label>
-                    <InputText @bind-Value="formModel.TaxRegistrationNumber" />
-                </div>
-                <div class="di-field @FieldClass("TradeLicenseNumber")">
-                    <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
-                    <InputText @bind-Value="formModel.TradeLicenseNumber" />
-                </div>
                 <div class="di-field @FieldClass("VatCodeId")">
                     <label>VAT Code@(Req("VatCodeId"))</label>
                     <InputSelect @bind-Value="formModel.VatCodeId">
@@ -662,6 +654,17 @@
         currentStep = Math.Max(1, currentStep - 1);
     }
 
+    /// <summary>Email fields shown on each wizard step, with their display label, so their format can
+    /// be validated with a regular expression regardless of whether they are marked mandatory.</summary>
+    private static readonly Dictionary<int, (string Key, string Label)[]> EmailFieldsByStep = new()
+    {
+        [1] = [("Email", "Business E-Mail")],
+        [3] = [("RemitAdviceEmail", "Remit Advice Email")],
+        [4] = [("ContactEmail", "Contact Email"), ("CommunicationEmail", "Communication Email"), ("RemittanceEmail", "Remittance E-mail")]
+    };
+
+    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+
     private List<string> ValidateStep(SupplierFormModel model, int step)
     {
         var errors = new List<string>();
@@ -674,6 +677,21 @@
                 errors.Add($"{setting.DisplayLabel} is required.");
             }
         }
+
+        // Validate the format of any email field on this step that has a value (a required-but-empty
+        // email is already reported above; here we catch entries that are present but malformed).
+        if (EmailFieldsByStep.TryGetValue(step, out var emailFields))
+        {
+            foreach (var (key, label) in emailFields)
+            {
+                var value = typeof(SupplierFormModel).GetProperty(key)?.GetValue(model) as string;
+                if (!string.IsNullOrWhiteSpace(value) && !EmailValidator.IsValid(value))
+                {
+                    errors.Add($"{label} is not a valid email address.");
+                }
+            }
+        }
+
         return errors;
     }
 

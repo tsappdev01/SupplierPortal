@@ -6,6 +6,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierService SupplierService
+@inject SupplierAccessTokenService SupplierAccessTokenService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 
@@ -25,16 +26,80 @@ else if (supplier is null)
 }
 else
 {
-    <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="currentUser" OnComplete="HandleComplete" />
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.Details ? "active" : "")" @onclick="() => activeTab = Tab.Details">
+                Supplier Details
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.EmailHistory ? "active" : "")" @onclick="ShowEmailHistoryAsync">
+                Email History@(emailHistory.Count > 0 ? $" ({emailHistory.Count})" : "")
+            </button>
+        </li>
+    </ul>
+
+    <div style="display:@(activeTab == Tab.Details ? "block" : "none")">
+        <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="currentUser" OnComplete="HandleComplete" />
+    </div>
+
+    <div style="display:@(activeTab == Tab.EmailHistory ? "block" : "none")">
+        <h2 class="h5">Notification Email History</h2>
+        <p class="text-muted">Every self-service notification email sent for this supplier.</p>
+
+        @if (!emailHistoryLoaded)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (emailHistory.Count == 0)
+        {
+            <p><em>No notification emails have been sent for this supplier yet.</em></p>
+        }
+        else
+        {
+            <div style="overflow-x: auto;">
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>Sent On (UTC)</th>
+                            <th>Sent By</th>
+                            <th>Type</th>
+                            <th>Code Verified</th>
+                            <th>Submitted</th>
+                            <th>Link Expires (UTC)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in emailHistory)
+                        {
+                            <tr>
+                                <td>@entry.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@entry.CreatedBy</td>
+                                <td>@(entry.IsAdminTest ? "Admin test" : "Supplier")</td>
+                                <td>@(entry.OtpVerifiedAt is null ? "—" : entry.OtpVerifiedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
+                                <td>@(entry.UsedAt is null ? "—" : entry.UsedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
+                                <td>@entry.ExpiresAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 }
 
 @code {
     [Parameter] public int Id { get; set; }
 
+    private enum Tab { Details, EmailHistory }
+
     private Supplier? supplier;
     private bool notFound;
     private bool forbidden;
     private string currentUser = "unknown";
+    private Tab activeTab = Tab.Details;
+    private List<SupplierAccessToken> emailHistory = [];
+    private bool emailHistoryLoaded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,6 +122,16 @@ else
         }
 
         supplier = loaded;
+    }
+
+    private async Task ShowEmailHistoryAsync()
+    {
+        activeTab = Tab.EmailHistory;
+        if (!emailHistoryLoaded && supplier is not null)
+        {
+            emailHistory = await SupplierAccessTokenService.GetHistoryForSupplierAsync(supplier.Id);
+            emailHistoryLoaded = true;
+        }
     }
 
     private void HandleComplete(Supplier _)

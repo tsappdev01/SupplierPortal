@@ -8,6 +8,8 @@
 @inject SupplierService SupplierService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierEmailService SupplierEmailService
+@inject SupplierFieldSettingService SupplierFieldSettingService
+@inject ToastService ToastService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
@@ -15,13 +17,6 @@
 <PageTitle>Manage Supplier - Supplier Portal</PageTitle>
 
 <h1>Manage Supplier</h1>
-
-@if (notifyMessage is not null)
-{
-    <div class="alert @(notifySuccess ? "alert-success" : "alert-danger") no-print" role="alert">
-        @notifyMessage
-    </div>
-}
 
 <div class="di-stat-row no-print">
     <div class="di-stat-tile">
@@ -103,6 +98,15 @@
     </div>
 }
 
+@if (suppliers.Count > 0 && TotalPages > 1)
+{
+    <div class="d-flex align-items-center gap-2 no-print mb-2">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == 1)" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+        <span>Page @currentPage of @TotalPages (@TabFilteredSuppliers.Count() suppliers)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+    </div>
+}
+
 <div style="overflow-x: auto;">
 <table class="table table-striped table-sm">
     <thead>
@@ -113,8 +117,6 @@
             <th>Tax Organization Type</th>
             <th>First Name</th>
             <th>Supplier Type</th>
-            <th>Tax Registration Number</th>
-            <th>Trade License Number</th>
             <th>Contact Email</th>
             <th>Status</th>
             <th class="no-print">Actions</th>
@@ -141,8 +143,6 @@
                 <td>@supplier.TaxOrganizationTypeName</td>
                 <td>@supplier.FirstName</td>
                 <td>@supplier.SupplierTypeName</td>
-                <td>@supplier.TaxRegistrationNumber</td>
-                <td>@supplier.TradeLicenseNumber</td>
                 <td>@supplier.ContactEmail</td>
                 <td>
                     @if (supplier.IsDraft)
@@ -257,7 +257,10 @@ else if (TotalPages > 1)
 @code {
     private enum SupplierTab { RecentlyUpdated, UpdatedLastWeek, EverythingElse }
 
-    private const int PageSize = 50;
+    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+
+    // How many rows to show per page; admin-configurable via Settings > Supplier Fields.
+    private int pageSize = 50;
 
     private List<SupplierListItem> suppliers = [];
     private List<BusinessUnit> businessUnits = [];
@@ -268,8 +271,6 @@ else if (TotalPages > 1)
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
-    private string? notifyMessage;
-    private bool notifySuccess;
     private int currentPage = 1;
     private HashSet<int> selectedIds = [];
     private bool bulkSending;
@@ -281,10 +282,10 @@ else if (TotalPages > 1)
         _ => suppliers.Where(IsEverythingElse)
     };
 
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFilteredSuppliers.Count() / (double)PageSize));
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFilteredSuppliers.Count() / (double)pageSize));
 
     private List<SupplierListItem> PagedSuppliers =>
-        TabFilteredSuppliers.Skip((currentPage - 1) * PageSize).Take(PageSize).ToList();
+        TabFilteredSuppliers.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
 
     private bool AllOnPageSelected => PagedSuppliers.Count > 0 && PagedSuppliers.All(s => selectedIds.Contains(s.Id));
 
@@ -299,6 +300,8 @@ else if (TotalPages > 1)
         businessUnits = isAdministrator
             ? allBusinessUnits
             : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
+
+        pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
 
         await ReloadAsync();
     }
@@ -359,13 +362,20 @@ else if (TotalPages > 1)
 
     private void ClearSelection() => selectedIds.Clear();
 
+    private static bool HasValidEmail(SupplierListItem supplier) =>
+        !string.IsNullOrWhiteSpace(supplier.ContactEmail) && EmailValidator.IsValid(supplier.ContactEmail);
+
     private async Task BulkNotifyAsync()
     {
         bulkSending = true;
-        notifyMessage = null;
         StateHasChanged();
 
-        var targets = suppliers.Where(s => selectedIds.Contains(s.Id) && !s.IsDraft).ToList();
+        var selected = suppliers.Where(s => selectedIds.Contains(s.Id) && !s.IsDraft).ToList();
+
+        // Skip suppliers that have no valid Contact Email rather than counting them as failures.
+        var skipped = selected.Count(s => !HasValidEmail(s));
+        var targets = selected.Where(HasValidEmail).ToList();
+
         var sent = 0;
         var failed = 0;
         foreach (var supplier in targets)
@@ -382,10 +392,28 @@ else if (TotalPages > 1)
             }
         }
 
-        notifySuccess = failed == 0;
-        notifyMessage = failed == 0
-            ? $"Notification email sent to {sent} supplier(s)."
-            : $"Sent {sent} notification(s); {failed} failed (e.g. missing Contact Email).";
+        var summary = $"{sent} email(s) sent.";
+        if (skipped > 0)
+        {
+            summary += $" {skipped} skipped (no valid email).";
+        }
+        if (failed > 0)
+        {
+            summary += $" {failed} failed to send.";
+        }
+
+        if (failed > 0)
+        {
+            ToastService.ShowError(summary);
+        }
+        else if (sent == 0)
+        {
+            ToastService.ShowWarning(summary);
+        }
+        else
+        {
+            ToastService.ShowSuccess(summary);
+        }
 
         selectedIds.Clear();
         bulkSending = false;
@@ -394,15 +422,26 @@ else if (TotalPages > 1)
     private async Task NotifyAsync(SupplierListItem supplier)
     {
         notifyingSupplierId = supplier.Id;
-        notifyMessage = null;
         StateHasChanged();
+
+        if (!HasValidEmail(supplier))
+        {
+            ToastService.ShowWarning($"{supplier.SupplierName} was skipped — no valid Contact Email on file.");
+            notifyingSupplierId = null;
+            return;
+        }
 
         var (success, error) = await SupplierEmailService.NotifySupplierAsync(
             supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
-        notifySuccess = success;
-        notifyMessage = success
-            ? $"Notification email sent to {supplier.ContactEmail}."
-            : $"Could not send notification: {error}";
+
+        if (success)
+        {
+            ToastService.ShowSuccess($"1 email sent to {supplier.ContactEmail}.");
+        }
+        else
+        {
+            ToastService.ShowError($"Could not send notification: {error}");
+        }
 
         notifyingSupplierId = null;
     }

@@ -31,10 +31,11 @@ public class SupplierFormModel
 
     public int? TaxpayerCountryId { get; set; }
 
-    [Required(ErrorMessage = "Tax Registration Number is required.")]
+    // Tax Registration Number and Trade License Number are retained on the entity and Excel import
+    // for historical data, but are no longer collected on the registration form (removed from the
+    // UI), so they are no longer required here.
     public string TaxRegistrationNumber { get; set; } = "";
 
-    [Required(ErrorMessage = "Trade License Number is required.")]
     public string TradeLicenseNumber { get; set; } = "";
 
     public int? VatCodeId { get; set; }
@@ -78,9 +79,12 @@ public class SupplierFormModel
     public DateTime? AccountStartDate { get; set; }
     public string? Iban { get; set; }
     public string? PaymentMethodCode { get; set; }
+
+    [EmailAddress(ErrorMessage = "Enter a valid Remit Advice Email.")]
     public string? RemitAdviceEmail { get; set; }
 
     // -- Step 4: Site / Business Unit --
+    [EmailAddress(ErrorMessage = "Enter a valid Remittance E-mail.")]
     public string? RemittanceEmail { get; set; }
     public bool IsRfqOrBidding { get; set; }
     public bool IsOrdering { get; set; }
@@ -91,6 +95,8 @@ public class SupplierFormModel
     public bool IsPurchasing { get; set; }
     public bool IsPrimaryPay { get; set; }
     public int? CommunicationMethodId { get; set; }
+
+    [EmailAddress(ErrorMessage = "Enter a valid Communication Email.")]
     public string? CommunicationEmail { get; set; }
 
     [Required(ErrorMessage = "Contact Email is required."), EmailAddress(ErrorMessage = "Enter a valid email address.")]

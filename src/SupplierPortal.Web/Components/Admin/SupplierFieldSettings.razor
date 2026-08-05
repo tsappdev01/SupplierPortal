@@ -21,6 +21,15 @@
     <div class="alert alert-success">@savedMessage</div>
 }
 
+<div class="di-field-settings-section">
+    <div class="di-field-settings-header">Dashboard Display</div>
+    <div class="p-3">
+        <label class="form-label mb-1">Records to display per page (Manage Supplier)</label>
+        <input type="number" min="1" max="500" class="form-control" style="max-width: 160px;" @bind="pageSize" />
+        <div class="form-text">How many supplier rows are shown per page on the Manage Supplier screen.</div>
+    </div>
+</div>
+
 @if (settings.Count == 0)
 {
     <p><em>Loading...</em></p>
@@ -137,6 +146,7 @@ else
     private string currentUser = "unknown";
     private bool isSaving;
     private string? savedMessage;
+    private int pageSize = 50;
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,6 +155,7 @@ else
 
         settings = await SupplierFieldSettingService.GetAllAsync();
         mandatoryByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsMandatory);
+        pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
     }
 
     private async Task SaveAsync()
@@ -153,8 +164,10 @@ else
         try
         {
             await SupplierFieldSettingService.SaveAsync(mandatoryByKey, currentUser);
+            await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
             savedMessage = "Settings saved.";
             settings = await SupplierFieldSettingService.GetAllAsync();
+            pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
         }
         finally
         {

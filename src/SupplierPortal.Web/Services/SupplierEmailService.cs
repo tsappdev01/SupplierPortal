@@ -5,7 +5,7 @@ using SupplierPortal.Web.Models;
 namespace SupplierPortal.Web.Services;
 
 /// <summary>Sends supplier notification emails via SQL Server Database Mail (sp_send_dbmail),
-/// using the "CGS" Database Mail profile configured on the SQL Server instance.</summary>
+/// using the "BP" Database Mail profile configured on the SQL Server instance.</summary>
 public class SupplierEmailService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     SupplierAccessTokenService accessTokenService, UserService userService)

@@ -211,7 +211,7 @@ public class ExcelImportService(
 
             if (string.IsNullOrWhiteSpace(supplierNumber)) rowErrors.Add("Supplier Number is required.");
             if (string.IsNullOrWhiteSpace(supplierName)) rowErrors.Add("Supplier Name is required.");
-            if (IsMandatory("TaxRegistrationNumber") && string.IsNullOrWhiteSpace(taxRegistrationNumber)) rowErrors.Add("Tax Registration Number is required.");
+            // Tax Registration Number was removed from the supplier form and is no longer required.
 
             var taxOrgTypeId = ResolveLookup(values, "TaxOrganizationType", taxOrgTypes, IsMandatory("TaxOrganizationType"), rowErrors, rowWarnings);
             var supplierTypeId = ResolveLookup(values, "SupplierType", supplierTypes, IsMandatory("SupplierType"), rowErrors, rowWarnings);
@@ -282,7 +282,7 @@ public class ExcelImportService(
                 SupplierTypeId = supplierTypeId,
                 TaxpayerCountryId = taxpayerCountryId,
                 CountryNameId = countryNameId,
-                TaxRegistrationNumber = taxRegistrationNumber!,
+                TaxRegistrationNumber = taxRegistrationNumber ?? "",
                 TradeLicenseNumber = GetOrNull(values, "TradeLicenseNumber"),
                 DunsNumber = GetOrNull(values, "DunsNumber"),
                 CorporateWebSite = GetOrNull(values, "CorporateWebSite"),

@@ -43,6 +43,17 @@ public class SupplierAccessTokenService(
         return raw;
     }
 
+    /// <summary>All self-service notification emails ever sent for a supplier (most recent first),
+    /// including admin test links, for the Email History tab on the supplier edit screen.</summary>
+    public async Task<List<SupplierAccessToken>> GetHistoryForSupplierAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.SupplierAccessTokens
+            .Where(t => t.SupplierId == supplierId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<SupplierAccessToken?> GetValidTokenAsync(string rawToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
