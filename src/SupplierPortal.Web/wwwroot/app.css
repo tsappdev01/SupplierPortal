@@ -4,11 +4,7 @@ html, body {
 
 table, .table {
     font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-<<<<<<< HEAD
-    font-size: 10pt;
-=======
-    font-size: 11.5pt;
->>>>>>> 084e0e78b48d5427368d1bce72e5c86be3568ce3
+    font-size: 10.5pt;
 }
 
 table th, table td, .table th, .table td {
@@ -77,4 +73,100 @@ h1:focus {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
+}
+/* ============================================================
+   Dubai Investments corporate theme (navy + gold)
+   ============================================================ */
+:root {
+    --di-navy: #1a2233;
+    --di-navy-2: #26324a;
+    --di-gold: #c8a24a;
+    --di-gold-dark: #a8842f;
+    --di-page-bg: #f4f6f9;
+    --di-border: #e2e5ea;
+}
+
+body {
+    background-color: var(--di-page-bg);
+    color: #26303f;
+}
+
+/* Headings in corporate navy with a gold underline accent on page titles */
+h1, h2, h3, .h1, .h2, .h3 {
+    color: var(--di-navy);
+}
+
+main > article.content > h1:first-child,
+.di-form-title {
+    border-bottom: 3px solid var(--di-gold);
+    padding-bottom: 0.35rem;
+    display: inline-block;
+}
+
+.form-label {
+    color: var(--di-navy);
+    font-weight: 600;
+}
+
+/* Primary buttons -> corporate navy; add a gold-accented variant */
+.btn-primary {
+    background-color: var(--di-navy);
+    border-color: var(--di-navy);
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background-color: var(--di-navy-2) !important;
+    border-color: var(--di-navy-2) !important;
+}
+
+.btn-outline-primary {
+    color: var(--di-navy);
+    border-color: var(--di-navy);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--di-navy);
+    border-color: var(--di-navy);
+    color: #fff;
+}
+
+a, .btn-link { color: var(--di-navy-2); }
+
+/* Data grid: navy header, subtle striping, gold row hover */
+.table > thead th,
+table thead th {
+    background-color: var(--di-navy);
+    color: #fff;
+    border-color: var(--di-navy) !important;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.table > tbody tr:hover > * {
+    background-color: #fbf6ea;   /* faint gold tint on hover */
+}
+
+.table {
+    border: 1px solid var(--di-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Tabs: navy active text with a gold underline */
+.nav-tabs .nav-link {
+    color: #5a6678;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--di-navy);
+    font-weight: 700;
+    border-bottom: 2px solid var(--di-gold);
+}
+
+/* Cards / panels pick up a soft shadow so they lift off the grey page */
+.di-stat-tile,
+.di-field-settings-section,
+.di-form-page,
+.card {
+    box-shadow: 0 1px 3px rgba(26, 34, 51, 0.06);
 }

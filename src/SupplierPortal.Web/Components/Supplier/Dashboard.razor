@@ -19,23 +19,23 @@
 <h1>Manage Supplier</h1>
 
 <div class="di-stat-row no-print">
-    <div class="di-stat-tile">
+    <div class="di-stat-tile di-stat-total">
         <div class="di-stat-value">@suppliers.Count</div>
         <div class="di-stat-label">Total Suppliers</div>
     </div>
-    <div class="di-stat-tile">
+    <div class="di-stat-tile di-stat-new">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.New)</div>
         <div class="di-stat-label">Not Submitted</div>
     </div>
-    <div class="di-stat-tile">
+    <div class="di-stat-tile di-stat-await">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.AwaitingSupplierResponse)</div>
         <div class="di-stat-label">Awaiting Supplier Response</div>
     </div>
-    <div class="di-stat-tile">
+    <div class="di-stat-tile di-stat-review">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.ForReview)</div>
         <div class="di-stat-label">For Review</div>
     </div>
-    <div class="di-stat-tile">
+    <div class="di-stat-tile di-stat-complete">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.Complete)</div>
         <div class="di-stat-label">Completes</div>
     </div>
@@ -238,8 +238,9 @@ else if (TotalPages > 1)
     .di-stat-tile {
         background: #fff;
         border: 1px solid #e2e5ea;
+        border-top: 3px solid var(--di-navy, #1a2233);
         border-radius: 10px;
-        padding: 1.1rem 1.4rem;
+        padding: 1.0rem 1.4rem;
         min-width: 160px;
     }
 
@@ -249,6 +250,22 @@ else if (TotalPages > 1)
         color: #1a2233;
         line-height: 1.2;
     }
+
+    /* Corporate colour accents per workflow status */
+    .di-stat-total { border-top-color: #1a2233; }
+    .di-stat-total .di-stat-value { color: #1a2233; }
+
+    .di-stat-new { border-top-color: #6c757d; }
+    .di-stat-new .di-stat-value { color: #6c757d; }
+
+    .di-stat-await { border-top-color: #2f80b5; }
+    .di-stat-await .di-stat-value { color: #2f80b5; }
+
+    .di-stat-review { border-top-color: #c8a24a; }
+    .di-stat-review .di-stat-value { color: #a8842f; }
+
+    .di-stat-complete { border-top-color: #2e7d46; }
+    .di-stat-complete .di-stat-value { color: #2e7d46; }
 
     .di-stat-label {
         font-size: 0.8rem;
