@@ -3,6 +3,9 @@ bin/
 obj/
 *.user
 
+## Deployment package output (created by deploy/Publish-And-Package.ps1)
+dist/
+
 ## Local secrets - never commit real connection strings
 appsettings.Local.json
 appsettings.*.Local.json
