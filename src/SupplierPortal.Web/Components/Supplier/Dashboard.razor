@@ -78,22 +78,32 @@
         <label class="form-label">Supplier Name</label>
         <input class="form-control" @bind="supplierNameFilter" @bind:event="oninput" @bind:after="ReloadAsync" placeholder="Search by name..." />
     </div>
+    <div class="col-auto" style="min-width: 220px;">
+        <label class="form-label">Status</label>
+        <select class="form-select" @bind="statusFilter" @bind:after="OnStatusFilterChanged">
+            <option value="">All Statuses</option>
+            @foreach (var status in SupplierStatuses.All)
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+    </div>
 </div>
 
 <ul class="nav nav-tabs no-print mb-3">
     <li class="nav-item">
         <button class="nav-link @(activeTab == SupplierTab.RecentlyUpdated ? "active" : "")" @onclick="() => SetTab(SupplierTab.RecentlyUpdated)">
-            Recently Updated (@suppliers.Count(IsRecentlyUpdated))
+            Recently Updated (@StatusFiltered.Count(IsRecentlyUpdated))
         </button>
     </li>
     <li class="nav-item">
         <button class="nav-link @(activeTab == SupplierTab.UpdatedLastWeek ? "active" : "")" @onclick="() => SetTab(SupplierTab.UpdatedLastWeek)">
-            Updated Last Week (@suppliers.Count(IsUpdatedLastWeek))
+            Updated Last Week (@StatusFiltered.Count(IsUpdatedLastWeek))
         </button>
     </li>
     <li class="nav-item">
         <button class="nav-link @(activeTab == SupplierTab.EverythingElse ? "active" : "")" @onclick="() => SetTab(SupplierTab.EverythingElse)">
-            Everything Else (@suppliers.Count(IsEverythingElse))
+            Everything Else (@StatusFiltered.Count(IsEverythingElse))
         </button>
     </li>
 </ul>
@@ -287,6 +297,7 @@ else if (TotalPages > 1)
     private List<int> userBusinessUnitIds = [];
     private int filterBusinessUnitId;
     private string supplierNameFilter = "";
+    private string statusFilter = SupplierStatuses.New;   // default: "Not Submitted"
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
@@ -294,11 +305,15 @@ else if (TotalPages > 1)
     private HashSet<int> selectedIds = [];
     private bool bulkSending;
 
+    // Suppliers matching the selected workflow-status filter (empty = all statuses).
+    private IEnumerable<SupplierListItem> StatusFiltered =>
+        string.IsNullOrEmpty(statusFilter) ? suppliers : suppliers.Where(s => s.StatusName == statusFilter);
+
     private IEnumerable<SupplierListItem> TabFilteredSuppliers => activeTab switch
     {
-        SupplierTab.RecentlyUpdated => suppliers.Where(IsRecentlyUpdated),
-        SupplierTab.UpdatedLastWeek => suppliers.Where(IsUpdatedLastWeek),
-        _ => suppliers.Where(IsEverythingElse)
+        SupplierTab.RecentlyUpdated => StatusFiltered.Where(IsRecentlyUpdated),
+        SupplierTab.UpdatedLastWeek => StatusFiltered.Where(IsUpdatedLastWeek),
+        _ => StatusFiltered.Where(IsEverythingElse)
     };
 
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFilteredSuppliers.Count() / (double)pageSize));
@@ -348,6 +363,12 @@ else if (TotalPages > 1)
     {
         activeTab = tab;
         currentPage = 1;
+    }
+
+    private void OnStatusFilterChanged()
+    {
+        currentPage = 1;
+        selectedIds.Clear();
     }
 
     private void GoToPage(int newPage)

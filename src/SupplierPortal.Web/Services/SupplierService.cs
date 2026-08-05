@@ -184,6 +184,20 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Complete) ?? supplier.StatusId;
         supplier.UpdatedAt = DateTime.UtcNow;
         supplier.UpdatedBy = actorUsername;
+
+        // Completing the review expires any outstanding self-service link (and active OTP session) so
+        // the supplier can no longer change their record - until the business sends a new notification,
+        // which issues a fresh link and moves the status back to "Awaiting Supplier Response".
+        var now = DateTime.UtcNow;
+        var activeTokens = await db.SupplierAccessTokens
+            .Where(t => t.SupplierId == supplierId && t.ExpiresAt > now)
+            .ToListAsync();
+        foreach (var token in activeTokens)
+        {
+            token.ExpiresAt = now;
+            token.SessionExpiresAt = now;
+        }
+
         await db.SaveChangesAsync();
 
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, $"Marked supplier '{supplier.SupplierName}' Complete");
