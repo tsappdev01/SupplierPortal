@@ -50,12 +50,20 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     /// </summary>
     public async Task<(bool Success, string? Error)> AddOrLinkUserAsync(
         string username, string fullName, string? designation, string email, string? password, UserType userType,
-        List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string actorUsername)
+        List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string actorUsername,
+        AuthSource authSource = AuthSource.Local, string? adLogin = null)
     {
         username = username.Trim();
         fullName = fullName.Trim();
         designation = designation?.Trim();
         email = email.Trim();
+        adLogin = adLogin?.Trim();
+
+        var isAd = authSource == AuthSource.ActiveDirectory;
+        if (isAd && string.IsNullOrWhiteSpace(adLogin))
+        {
+            return (false, "An Active Directory login (e.g. user@domain) is required for an AD user.");
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync();
 
@@ -82,7 +90,13 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
             existing.BusinessUnits = businessUnits;
             existing.IsActive = isActive;
             existing.IsPendingRegistration = false;
-            if (!string.IsNullOrWhiteSpace(password))
+            existing.AuthSource = authSource;
+            existing.AdLogin = isAd ? adLogin : null;
+            if (isAd)
+            {
+                existing.PasswordHash = "";   // password lives in AD
+            }
+            else if (!string.IsNullOrWhiteSpace(password))
             {
                 existing.PasswordHash = hasher.HashPassword(existing, password);
             }
@@ -96,9 +110,9 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(password))
+            if (!isAd && string.IsNullOrWhiteSpace(password))
             {
-                return (false, "A password is required for a new user.");
+                return (false, "A password is required for a new local user.");
             }
 
             user = new User
@@ -112,9 +126,11 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
                 IsActive = isActive,
                 IsPendingRegistration = false,
                 ProfilePhoto = photo,
-                ProfilePhotoContentType = photoContentType
+                ProfilePhotoContentType = photoContentType,
+                AuthSource = authSource,
+                AdLogin = isAd ? adLogin : null
             };
-            user.PasswordHash = hasher.HashPassword(user, password);
+            user.PasswordHash = isAd ? "" : hasher.HashPassword(user, password!);
             db.Users.Add(user);
         }
 

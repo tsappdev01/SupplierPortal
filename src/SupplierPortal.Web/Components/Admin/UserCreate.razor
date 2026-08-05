@@ -50,10 +50,28 @@
         </datalist>
     </div>
     <div class="mb-3">
-        <label class="form-label">Password</label>
-        <InputText type="password" class="form-control" @bind-Value="Input.Password" />
-        <div class="form-text">Leave blank if linking a self-registered email.</div>
+        <label class="form-label">Authentication</label>
+        <InputSelect class="form-select" style="max-width: 260px;" @bind-Value="Input.AuthSource">
+            <option value="@AuthSource.Local">Local password</option>
+            <option value="@AuthSource.ActiveDirectory">Active Directory</option>
+        </InputSelect>
     </div>
+    @if (Input.AuthSource == AuthSource.ActiveDirectory)
+    {
+        <div class="mb-3">
+            <label class="form-label">Active Directory Login</label>
+            <InputText class="form-control" @bind-Value="Input.AdLogin" placeholder="user@dipark.local or DIPARK\user" />
+            <div class="form-text">The user signs in with this AD account — no local password is stored.</div>
+        </div>
+    }
+    else
+    {
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <InputText type="password" class="form-control" @bind-Value="Input.Password" />
+            <div class="form-text">Leave blank if linking a self-registered email.</div>
+        </div>
+    }
     <div class="mb-3">
         <label class="form-label">Profile Photo</label>
         <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
@@ -217,7 +235,8 @@
     {
         var (success, error) = await UserService.AddOrLinkUserAsync(
             Input.Username, Input.FullName, Input.Designation, Input.Email, Input.Password, Input.UserType,
-            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, currentUser);
+            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, currentUser,
+            Input.AuthSource, Input.AdLogin);
 
         if (!success)
         {
@@ -242,6 +261,10 @@
         public string Email { get; set; } = "";
 
         public string? Password { get; set; }
+
+        public AuthSource AuthSource { get; set; } = AuthSource.Local;
+
+        public string? AdLogin { get; set; }
 
         public UserType UserType { get; set; } = UserType.NormalUser;
 

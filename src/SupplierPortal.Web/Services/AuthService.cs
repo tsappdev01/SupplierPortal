@@ -7,7 +7,8 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class AuthService(IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher)
+public class AuthService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, ActiveDirectoryService activeDirectory)
 {
     public async Task<(bool Success, string? Error)> RegisterAsync(string email, string password)
     {
@@ -36,11 +37,26 @@ public class AuthService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
 
     public async Task<(bool Success, string? Error, User? User)> ValidateCredentialsAsync(string email, string password)
     {
-        email = email.Trim();
+        var login = email.Trim();
         await using var db = await dbFactory.CreateDbContextAsync();
 
-        var user = await db.Users.Include(u => u.BusinessUnits).FirstOrDefaultAsync(u => u.Email == email);
-        if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
+        // Match by email or by the AD login the user was linked with.
+        var user = await db.Users.Include(u => u.BusinessUnits)
+            .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
+        if (user is null)
+        {
+            return (false, "Invalid email or password.", null);
+        }
+
+        if (user.AuthSource == AuthSource.ActiveDirectory)
+        {
+            var (adOk, adError) = activeDirectory.ValidateCredentials(user.AdLogin ?? login, password);
+            if (!adOk)
+            {
+                return (false, adError, null);
+            }
+        }
+        else if (hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
         {
             return (false, "Invalid email or password.", null);
         }

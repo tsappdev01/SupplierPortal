@@ -13,5 +13,16 @@
   },
 
   "//DetailedErrors": "Set true only while troubleshooting; it exposes internal exception details to anyone who triggers an error.",
-  "DetailedErrors": false
+  "DetailedErrors": false,
+
+  "//ActiveDirectory": "Internal-staff login via on-prem AD (LDAP). Set Enabled=true to turn it on. Users must be added by an administrator with Authentication = Active Directory and their AD login; the seeded local admin stays as break-glass. Use LDAPS (port 636) so passwords are never sent in clear text.",
+  "ActiveDirectory": {
+    "Enabled": false,
+    "Host": "dc01.dipark.local",
+    "Port": 636,
+    "UseLdaps": true,
+    "Domain": "dipark.local",
+    "NetbiosName": "DIPARK",
+    "LoginFormat": "UPN"
+  }
 }

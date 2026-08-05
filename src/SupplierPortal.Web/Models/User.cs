@@ -23,8 +23,17 @@ public class User
     [MaxLength(100)]
     public string? ProfilePhotoContentType { get; set; }
 
+    /// <summary>Local password hash. Empty for Active Directory users (their password lives in AD).</summary>
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
+
+    /// <summary>Whether this account signs in with a local password or against Active Directory.</summary>
+    public AuthSource AuthSource { get; set; } = AuthSource.Local;
+
+    /// <summary>The AD login the user types (UPN e.g. user@dipark.local, or DOMAIN\user). Only set for
+    /// <see cref="AuthSource.ActiveDirectory"/> accounts; used to match the sign-in and to bind to AD.</summary>
+    [MaxLength(256)]
+    public string? AdLogin { get; set; }
 
     public UserType UserType { get; set; } = UserType.NormalUser;
 

@@ -6,6 +6,14 @@ public enum UserType
     NormalUser = 2
 }
 
+/// <summary>How a user's credentials are verified at login. Local = password hash in this database
+/// (used by the seeded break-glass admin); ActiveDirectory = validated against on-prem AD via LDAP.</summary>
+public enum AuthSource
+{
+    Local = 0,
+    ActiveDirectory = 1
+}
+
 public enum LookupCategory
 {
     TaxOrganizationType = 1,
