@@ -10,63 +10,8 @@ public record ImportRowError(int RowNumber, string Message);
 public record ImportResult(int SuccessCount, List<ImportRowError> Errors, List<ImportRowError> Warnings);
 
 public class ExcelImportService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, SupplierService supplierService, SupplierFieldSettingService fieldSettingService)
+    IDbContextFactory<ApplicationDbContext> dbFactory, SupplierService supplierService)
 {
-    /// <summary>Maps an ExcelImportService-internal field name to the <see cref="SupplierFieldSetting"/>
-    /// key (matching <see cref="SupplierFormModel"/> property names) that governs whether it's
-    /// hard-required for import, mirroring the same admin-configured setting used by the
-    /// registration wizard. Fields with no entry here (e.g. Currency, a legacy field not on the
-    /// wizard) are never hard-required on import.</summary>
-    private static readonly Dictionary<string, string> ImportFieldToSettingKey = new()
-    {
-        ["SupplierName"] = "SupplierName",
-        ["TaxRegistrationNumber"] = "TaxRegistrationNumber",
-        ["TaxOrganizationType"] = "TaxOrganizationTypeId",
-        ["SupplierType"] = "SupplierTypeId",
-        ["TaxpayerCountry"] = "TaxpayerCountryId",
-        ["CountryName"] = "CountryNameId",
-        ["Country"] = "CountryId",
-        ["BusinessRelationship"] = "BusinessRelationshipId",
-        ["City"] = "CityId",
-        ["Province"] = "ProvinceId",
-        ["VatCode"] = "VatCodeId",
-        ["PaymentMethod"] = "PaymentMethodId",
-        ["PaymentTerms"] = "PaymentTermsId",
-        ["Prefix"] = "PrefixId",
-        ["CommunicationMethod"] = "CommunicationMethodId",
-        ["AccountCountryCode"] = "AccountCountryCodeId",
-        ["AccountCurrencyCode"] = "AccountCurrencyCodeId",
-        ["PhoneCountryCode"] = "PhoneCountryCodeId",
-        ["SupplierSite"] = "SupplierSiteBuId",
-        ["ProcurementBu"] = "ProcurementBuId",
-        ["ClientBu"] = "ClientBuId",
-        ["BillToBu"] = "BillToBuId",
-        ["BankName"] = "BankId",
-        ["BranchName"] = "BankBranchId",
-        ["TradeLicenseNumber"] = "TradeLicenseNumber",
-        ["DunsNumber"] = "DunsNumber",
-        ["CorporateWebSite"] = "CorporateWebSite",
-        ["AddressName"] = "AddressName",
-        ["AddressLine1"] = "AddressLine1",
-        ["AddressLine2"] = "AddressLine2",
-        ["State"] = "State",
-        ["PostalCode"] = "PostalCode",
-        ["RemittanceEmail"] = "RemittanceEmail",
-        ["FirstName"] = "FirstName",
-        ["AdministrativeContact"] = "AdministrativeContact",
-        ["PhoneAreaCode"] = "PhoneAreaCode",
-        ["Phone"] = "Phone",
-        ["PaymentMethodCode"] = "PaymentMethodCode",
-        ["RemitAdviceEmail"] = "RemitAdviceEmail",
-        ["AccountName"] = "AccountName",
-        ["AccountNumber"] = "AccountNumber",
-        ["SwiftCode"] = "SwiftCode",
-        ["Iban"] = "Iban",
-        ["AccountStartDate"] = "AccountStartDate",
-        ["ContactEmail"] = "ContactEmail",
-        ["CommunicationEmail"] = "CommunicationEmail"
-    };
-
     // Maps accepted header text (lower-cased, trimmed) to the field it feeds.
     private static readonly Dictionary<string, string> HeaderMap = new()
     {
@@ -137,22 +82,23 @@ public class ExcelImportService(
     {
         await using var db = await dbFactory.CreateDbContextAsync();
 
-        var mandatorySettingKeys = await fieldSettingService.GetMandatoryFieldKeysAsync();
-        bool IsMandatory(string importField) =>
-            ImportFieldToSettingKey.TryGetValue(importField, out var settingKey) && mandatorySettingKeys.Contains(settingKey);
-
+        // Bulk import of legacy/master data is intentionally lenient: only Supplier Number and
+        // Supplier Name are hard-required. Every other field is best-effort - a value that isn't
+        // recognized against a lookup is left blank and reported as a warning, never rejecting the
+        // row. (The strict Mandatory field settings apply to the interactive registration wizard,
+        // not to importing historical data that is usually incomplete.)
         var taxOrgTypes = await LoadLookupAsync(db, LookupCategory.TaxOrganizationType);
         var supplierTypes = await LoadLookupAsync(db, LookupCategory.SupplierType);
-        var countries = await LoadLookupAsync(db, LookupCategory.Country);
+        var countries = await LoadLookupAsync(db, LookupCategory.Country, includeCode: true);
         var countriesByPhoneCode = await LoadCountriesByPhoneCodeAsync(db);
         var businessRelationships = await LoadLookupAsync(db, LookupCategory.BusinessRelationship);
         var provinces = await LoadLookupAsync(db, LookupCategory.Province);
-        var vatCodes = await LoadLookupAsync(db, LookupCategory.VatCode);
+        var vatCodes = await LoadLookupAsync(db, LookupCategory.VatCode, includeCode: true);
         var paymentMethods = await LoadLookupAsync(db, LookupCategory.PaymentMethod);
         var paymentTerms = await LoadLookupAsync(db, LookupCategory.PaymentTerms);
         var prefixes = await LoadLookupAsync(db, LookupCategory.Prefix);
         var communicationMethods = await LoadLookupAsync(db, LookupCategory.CommunicationMethod);
-        var currencies = await LoadLookupAsync(db, LookupCategory.Currency);
+        var currencies = await LoadLookupAsync(db, LookupCategory.Currency, includeCode: true);
         var banks = await db.Banks.Include(b => b.Branches).ToListAsync();
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name.ToLowerInvariant(), b => b.Id);
 
@@ -211,57 +157,35 @@ public class ExcelImportService(
 
             if (string.IsNullOrWhiteSpace(supplierNumber)) rowErrors.Add("Supplier Number is required.");
             if (string.IsNullOrWhiteSpace(supplierName)) rowErrors.Add("Supplier Name is required.");
-            // Tax Registration Number was removed from the supplier form and is no longer required.
 
-            var taxOrgTypeId = ResolveLookup(values, "TaxOrganizationType", taxOrgTypes, IsMandatory("TaxOrganizationType"), rowErrors, rowWarnings);
-            var supplierTypeId = ResolveLookup(values, "SupplierType", supplierTypes, IsMandatory("SupplierType"), rowErrors, rowWarnings);
-            var taxpayerCountryId = ResolveLookup(values, "TaxpayerCountry", countries, IsMandatory("TaxpayerCountry"), rowErrors, rowWarnings);
-            var countryNameId = ResolveLookup(values, "CountryName", countries, IsMandatory("CountryName"), rowErrors, rowWarnings);
-            var countryId = ResolveLookup(values, "Country", countries, IsMandatory("Country"), rowErrors, rowWarnings);
-            var businessRelationshipId = ResolveLookup(values, "BusinessRelationship", businessRelationships, IsMandatory("BusinessRelationship"), rowErrors, rowWarnings);
-            var cityId = ResolveLookup(values, "City", provinces, IsMandatory("City"), rowErrors, rowWarnings);
-            var provinceId = ResolveLookup(values, "Province", provinces, IsMandatory("Province"), rowErrors, rowWarnings);
-            var vatCodeId = ResolveLookup(values, "VatCode", vatCodes, IsMandatory("VatCode"), rowErrors, rowWarnings);
-            var paymentMethodId = ResolveLookup(values, "PaymentMethod", paymentMethods, IsMandatory("PaymentMethod"), rowErrors, rowWarnings);
-            var paymentTermsId = ResolveLookup(values, "PaymentTerms", paymentTerms, IsMandatory("PaymentTerms"), rowErrors, rowWarnings);
-            var prefixId = ResolveLookup(values, "Prefix", prefixes, IsMandatory("Prefix"), rowErrors, rowWarnings);
-            var communicationMethodId = ResolveLookup(values, "CommunicationMethod", communicationMethods, IsMandatory("CommunicationMethod"), rowErrors, rowWarnings);
+            // Every lookup below is optional on import: an unrecognized value is left blank and noted
+            // as a warning (see ResolveLookup), so incomplete legacy data still imports.
+            var taxOrgTypeId = ResolveLookup(values, "TaxOrganizationType", taxOrgTypes, required: false, rowErrors, rowWarnings);
+            var supplierTypeId = ResolveLookup(values, "SupplierType", supplierTypes, required: false, rowErrors, rowWarnings);
+            var taxpayerCountryId = ResolveLookup(values, "TaxpayerCountry", countries, required: false, rowErrors, rowWarnings);
+            var countryNameId = ResolveLookup(values, "CountryName", countries, required: false, rowErrors, rowWarnings);
+            var countryId = ResolveLookup(values, "Country", countries, required: false, rowErrors, rowWarnings);
+            var businessRelationshipId = ResolveLookup(values, "BusinessRelationship", businessRelationships, required: false, rowErrors, rowWarnings);
+            var cityId = ResolveLookup(values, "City", provinces, required: false, rowErrors, rowWarnings);
+            var provinceId = ResolveLookup(values, "Province", provinces, required: false, rowErrors, rowWarnings);
+            var vatCodeId = ResolveLookup(values, "VatCode", vatCodes, required: false, rowErrors, rowWarnings);
+            var paymentMethodId = ResolveLookup(values, "PaymentMethod", paymentMethods, required: false, rowErrors, rowWarnings);
+            var paymentTermsId = ResolveLookup(values, "PaymentTerms", paymentTerms, required: false, rowErrors, rowWarnings);
+            var prefixId = ResolveLookup(values, "Prefix", prefixes, required: false, rowErrors, rowWarnings);
+            var communicationMethodId = ResolveLookup(values, "CommunicationMethod", communicationMethods, required: false, rowErrors, rowWarnings);
             var currencyId = ResolveLookup(values, "Currency", currencies, required: false, rowErrors, rowWarnings);
-            var accountCountryCodeId = ResolveLookup(values, "AccountCountryCode", countries, IsMandatory("AccountCountryCode"), rowErrors, rowWarnings);
-            var accountCurrencyCodeId = ResolveLookup(values, "AccountCurrencyCode", currencies, IsMandatory("AccountCurrencyCode"), rowErrors, rowWarnings);
-            var phoneCountryCodeId = ResolveLookup(values, "PhoneCountryCode", countriesByPhoneCode, IsMandatory("PhoneCountryCode"), rowErrors, rowWarnings);
-            var supplierSiteBuId = ResolveLookup(values, "SupplierSite", businessUnits, IsMandatory("SupplierSite"), rowErrors, rowWarnings);
-            var procurementBuId = ResolveLookup(values, "ProcurementBu", businessUnits, IsMandatory("ProcurementBu"), rowErrors, rowWarnings);
-            var clientBuId = ResolveLookup(values, "ClientBu", businessUnits, IsMandatory("ClientBu"), rowErrors, rowWarnings);
-            var billToBuId = ResolveLookup(values, "BillToBu", businessUnits, IsMandatory("BillToBu"), rowErrors, rowWarnings);
-            var (bankId, bankBranchId) = ResolveBankBranch(values, banks, IsMandatory("BankName"), IsMandatory("BranchName"), rowErrors);
+            var accountCountryCodeId = ResolveLookup(values, "AccountCountryCode", countries, required: false, rowErrors, rowWarnings);
+            var accountCurrencyCodeId = ResolveLookup(values, "AccountCurrencyCode", currencies, required: false, rowErrors, rowWarnings);
+            var phoneCountryCodeId = ResolveLookup(values, "PhoneCountryCode", countriesByPhoneCode, required: false, rowErrors, rowWarnings);
+            var supplierSiteBuId = ResolveLookup(values, "SupplierSite", businessUnits, required: false, rowErrors, rowWarnings);
+            var procurementBuId = ResolveLookup(values, "ProcurementBu", businessUnits, required: false, rowErrors, rowWarnings);
+            var clientBuId = ResolveLookup(values, "ClientBu", businessUnits, required: false, rowErrors, rowWarnings);
+            var billToBuId = ResolveLookup(values, "BillToBu", businessUnits, required: false, rowErrors, rowWarnings);
+            var (bankId, bankBranchId) = ResolveBankBranch(values, banks, rowWarnings);
 
             values.TryGetValue("AddressLine2", out var addressLine2);
             values.TryGetValue("PostalCode", out var postalCode);
             values.TryGetValue("Phone", out var phone);
-
-            RequireIfMandatory("TradeLicenseNumber", rowErrors, IsMandatory, values);
-            RequireIfMandatory("DunsNumber", rowErrors, IsMandatory, values);
-            RequireIfMandatory("CorporateWebSite", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AddressName", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AddressLine1", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AddressLine2", rowErrors, IsMandatory, values);
-            RequireIfMandatory("State", rowErrors, IsMandatory, values);
-            RequireIfMandatory("PostalCode", rowErrors, IsMandatory, values);
-            RequireIfMandatory("RemittanceEmail", rowErrors, IsMandatory, values);
-            RequireIfMandatory("FirstName", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AdministrativeContact", rowErrors, IsMandatory, values);
-            RequireIfMandatory("PhoneAreaCode", rowErrors, IsMandatory, values);
-            RequireIfMandatory("Phone", rowErrors, IsMandatory, values);
-            RequireIfMandatory("PaymentMethodCode", rowErrors, IsMandatory, values);
-            RequireIfMandatory("RemitAdviceEmail", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AccountName", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AccountNumber", rowErrors, IsMandatory, values);
-            RequireIfMandatory("SwiftCode", rowErrors, IsMandatory, values);
-            RequireIfMandatory("Iban", rowErrors, IsMandatory, values);
-            RequireIfMandatory("AccountStartDate", rowErrors, IsMandatory, values);
-            RequireIfMandatory("ContactEmail", rowErrors, IsMandatory, values);
-            RequireIfMandatory("CommunicationEmail", rowErrors, IsMandatory, values);
 
             if (rowErrors.Count > 0)
             {
@@ -409,18 +333,10 @@ public class ExcelImportService(
         return null;
     }
 
-    private static void RequireIfMandatory(
-        string field, List<string> rowErrors, Func<string, bool> isMandatory, Dictionary<string, string> values)
-    {
-        if (!isMandatory(field)) return;
-        if (!values.TryGetValue(field, out var text) || string.IsNullOrWhiteSpace(text))
-        {
-            rowErrors.Add($"{SplitCamelCase(field)} is required.");
-        }
-    }
-
+    /// <summary>Resolves Bank/Branch names to ids. Best-effort like the LOV fields: an unrecognized
+    /// bank or branch is left blank with a warning rather than rejecting the row.</summary>
     private static (int? BankId, int? BankBranchId) ResolveBankBranch(
-        Dictionary<string, string> values, List<Bank> banks, bool bankRequired, bool branchRequired, List<string> rowErrors)
+        Dictionary<string, string> values, List<Bank> banks, List<string> rowWarnings)
     {
         values.TryGetValue("BankName", out var bankName);
         values.TryGetValue("BranchName", out var branchName);
@@ -429,11 +345,7 @@ public class ExcelImportService(
         {
             if (!string.IsNullOrWhiteSpace(branchName))
             {
-                rowErrors.Add("Branch Name requires a Bank Name.");
-            }
-            else if (bankRequired)
-            {
-                rowErrors.Add("Bank Name is required.");
+                rowWarnings.Add("Branch Name has no matching Bank Name — left blank.");
             }
             return (null, null);
         }
@@ -441,23 +353,19 @@ public class ExcelImportService(
         var bank = banks.FirstOrDefault(b => string.Equals(b.Name, bankName, StringComparison.OrdinalIgnoreCase));
         if (bank is null)
         {
-            rowErrors.Add($"Unrecognized Bank Name value '{bankName}'.");
+            rowWarnings.Add($"Unrecognized Bank Name value '{bankName}' — left blank.");
             return (null, null);
         }
 
         if (string.IsNullOrWhiteSpace(branchName))
         {
-            if (branchRequired)
-            {
-                rowErrors.Add("Branch Name is required.");
-            }
             return (bank.Id, null);
         }
 
         var branch = bank.Branches.FirstOrDefault(b => string.Equals(b.Name, branchName, StringComparison.OrdinalIgnoreCase));
         if (branch is null)
         {
-            rowErrors.Add($"Unrecognized Branch Name value '{branchName}' for bank '{bankName}'.");
+            rowWarnings.Add($"Unrecognized Branch Name value '{branchName}' for bank '{bankName}' — left blank.");
             return (bank.Id, null);
         }
 
@@ -509,10 +417,24 @@ public class ExcelImportService(
     private static string SplitCamelCase(string value) =>
         System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", " $1");
 
-    private static async Task<Dictionary<string, int>> LoadLookupAsync(ApplicationDbContext db, LookupCategory category)
+    /// <summary>Builds a case-insensitive value→id map keyed by DisplayName. When
+    /// <paramref name="includeCode"/> is set (Country, VAT Code, Currency), the short Code is added
+    /// as an alias too, so the Oracle template's codes (e.g. "AE", "PBR", "AED") also resolve.
+    /// Uses the indexer (not ToDictionary) so a duplicate DisplayName/Code can't throw.</summary>
+    private static async Task<Dictionary<string, int>> LoadLookupAsync(
+        ApplicationDbContext db, LookupCategory category, bool includeCode = false)
     {
         var rows = await db.LookupValues.Where(l => l.Category == category && l.IsActive).ToListAsync();
-        return rows.ToDictionary(l => l.DisplayName.ToLowerInvariant(), l => l.Id);
+        var map = new Dictionary<string, int>();
+        foreach (var l in rows)
+        {
+            map[l.DisplayName.ToLowerInvariant()] = l.Id;
+            if (includeCode && !string.IsNullOrWhiteSpace(l.Code))
+            {
+                map.TryAdd(l.Code.ToLowerInvariant(), l.Id);
+            }
+        }
+        return map;
     }
 
     private static async Task<Dictionary<string, int>> LoadCountriesByPhoneCodeAsync(ApplicationDbContext db)
