@@ -33,7 +33,14 @@
 
 @if (isImporting)
 {
-    <p><em>Importing...</em></p>
+    <div class="mb-3" style="max-width: 400px;">
+        <div class="progress" role="progressbar" aria-label="Importing" style="height: 22px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: 100%; background-color: var(--di-navy, #1a2233);">
+                Importing…
+            </div>
+        </div>
+    </div>
 }
 
 @if (result is not null)
