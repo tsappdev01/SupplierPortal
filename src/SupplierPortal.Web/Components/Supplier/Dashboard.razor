@@ -42,10 +42,37 @@
     </div>
 </div>
 
-<div class="d-flex gap-2 mb-3 no-print">
-    <a class="btn btn-success" href="@ExportUrl("csv")">Export to CSV</a>
-    <a class="btn btn-danger" href="@ExportUrl("pdf")">Export to PDF</a>
-    <button class="btn btn-secondary" @onclick="PrintAsync">Print</button>
+<div class="d-flex gap-2 mb-3 no-print align-items-center">
+    <a class="di-export-btn" href="@ExportUrl("csv")" title="Export to CSV" aria-label="Export to CSV">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#2e7d32" stroke-width="2.5" />
+            <path d="M30 3h9v9z" fill="#a5d6a7" stroke="#2e7d32" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M12 15h16M12 21h16M12 27h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round" />
+            <rect x="5" y="33" width="34" height="15" rx="3" fill="#2e7d32" />
+            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">CSV</text>
+        </svg>
+        <span>CSV</span>
+    </a>
+    <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF" aria-label="Export to PDF">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#c62828" stroke-width="2.5" />
+            <path d="M30 3h9v9z" fill="#ef9a9a" stroke="#c62828" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M12 15h16M12 21h16M12 27h9" stroke="#ef9a9a" stroke-width="2" stroke-linecap="round" />
+            <rect x="5" y="33" width="34" height="15" rx="3" fill="#c62828" />
+            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">PDF</text>
+        </svg>
+        <span>PDF</span>
+    </a>
+    <button type="button" class="di-export-btn" @onclick="PrintAsync" title="Print" aria-label="Print">
+        <svg width="28" height="30" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 6h20v11H14z" fill="#ffffff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round" />
+            <rect x="7" y="16" width="34" height="17" rx="3.5" fill="#607d8b" />
+            <rect x="14" y="29" width="20" height="13" rx="1.5" fill="#ffffff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round" />
+            <path d="M18 34h12M18 38h8" stroke="#455a64" stroke-width="2" stroke-linecap="round" />
+            <circle cx="35" cy="22" r="2.2" fill="#c8e6c9" />
+        </svg>
+        <span>Print</span>
+    </button>
     <button class="btn btn-info text-white ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync">
         @if (bulkSending)
         {
