@@ -1,4 +1,5 @@
 using System.Globalization;
+using ClosedXML.Excel;
 using CsvHelper;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -194,5 +195,54 @@ public class ExportService
 
         static IContainer CellStyle(IContainer container) =>
             container.Border(1).Padding(3);
+    }
+
+    /// <summary>Combines supplier attachment images into a single PDF, one image per page (scaled to
+    /// fit the page), with the file name as a caption.</summary>
+    public byte[] ImagesToPdf(IReadOnlyList<(byte[] Bytes, string FileName)> images)
+    {
+        var document = Document.Create(container =>
+        {
+            foreach (var image in images)
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(20);
+                    page.Header().Text(image.FileName).FontSize(10).Bold();
+                    page.Content().PaddingVertical(8).AlignCenter().AlignMiddle().Image(image.Bytes).FitArea();
+                });
+            }
+        });
+
+        return document.GeneratePdf();
+    }
+
+    /// <summary>Embeds supplier attachment images into an Excel workbook, one image per worksheet.</summary>
+    public byte[] ImagesToExcel(IReadOnlyList<(byte[] Bytes, string FileName)> images)
+    {
+        using var workbook = new XLWorkbook();
+        var index = 0;
+        foreach (var image in images)
+        {
+            index++;
+            // Worksheet names are limited to 31 chars and can't contain : \ / ? * [ ]
+            var safeName = new string(image.FileName.Where(c => !"[]:\\/?*".Contains(c)).ToArray());
+            if (safeName.Length > 28) { safeName = safeName[..28]; }
+            var sheet = workbook.Worksheets.Add(string.IsNullOrWhiteSpace(safeName) ? $"Image {index}" : $"{index}. {safeName}"[..Math.Min(31, ($"{index}. {safeName}").Length)]);
+
+            sheet.Cell(1, 1).Value = image.FileName;
+            using var stream = new MemoryStream(image.Bytes);
+            sheet.AddPicture(stream).MoveTo(sheet.Cell(3, 1));
+        }
+
+        if (index == 0)
+        {
+            workbook.Worksheets.Add("No Images");
+        }
+
+        using var output = new MemoryStream();
+        workbook.SaveAs(output);
+        return output.ToArray();
     }
 }

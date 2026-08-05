@@ -159,6 +159,28 @@ public class SupplierDocumentService(
         return (true, null);
     }
 
+    /// <summary>Returns the bytes + file name of every image attachment for a supplier (in display
+    /// order), for combining into a PDF / Excel export. Non-image documents (e.g. PDFs) are skipped.</summary>
+    public async Task<List<(byte[] Bytes, string FileName)>> GetImageFilesAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var docs = await db.SupplierDocuments
+            .Where(d => d.SupplierId == supplierId && d.ContentType.StartsWith("image/"))
+            .OrderBy(d => d.DocumentType).ThenBy(d => d.UploadedAt)
+            .ToListAsync();
+
+        var result = new List<(byte[] Bytes, string FileName)>();
+        foreach (var doc in docs)
+        {
+            var fullPath = Path.Combine(DocumentsDirectory(supplierId), doc.StoredFileName);
+            if (File.Exists(fullPath))
+            {
+                result.Add((await File.ReadAllBytesAsync(fullPath), doc.FileName));
+            }
+        }
+        return result;
+    }
+
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

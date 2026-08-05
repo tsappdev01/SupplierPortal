@@ -132,4 +132,22 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentServi
     return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
 }).RequireAuthorization();
 
+// Combine a supplier's attached images into a single PDF / Excel workbook.
+app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
+{
+    var images = await documentService.GetImageFilesAsync(id);
+    return images.Count == 0
+        ? Results.NotFound("This supplier has no image attachments.")
+        : Results.File(exportService.ImagesToPdf(images), "application/pdf", $"supplier-{id}-documents.pdf");
+}).RequireAuthorization();
+
+app.MapGet("/suppliers/{id:int}/documents.xlsx", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
+{
+    var images = await documentService.GetImageFilesAsync(id);
+    return images.Count == 0
+        ? Results.NotFound("This supplier has no image attachments.")
+        : Results.File(exportService.ImagesToExcel(images),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"supplier-{id}-documents.xlsx");
+}).RequireAuthorization();
+
 app.Run();

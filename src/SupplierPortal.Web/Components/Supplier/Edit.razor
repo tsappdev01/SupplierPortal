@@ -3,12 +3,15 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierService SupplierService
 @inject SupplierAccessTokenService SupplierAccessTokenService
+@inject SupplierDocumentService SupplierDocumentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <PageTitle>Edit Supplier - Supplier Portal</PageTitle>
 
@@ -33,6 +36,11 @@ else
             </button>
         </li>
         <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.Documents ? "active" : "")" @onclick="ShowDocumentsAsync">
+                Documents@(documentsLoaded && documents.Count > 0 ? $" ({documents.Count})" : "")
+            </button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link @(activeTab == Tab.EmailHistory ? "active" : "")" @onclick="ShowEmailHistoryAsync">
                 Email History@(emailHistory.Count > 0 ? $" ({emailHistory.Count})" : "")
             </button>
@@ -41,6 +49,57 @@ else
 
     <div style="display:@(activeTab == Tab.Details ? "block" : "none")">
         <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="currentUser" OnComplete="HandleComplete" />
+    </div>
+
+    <div style="display:@(activeTab == Tab.Documents ? "block" : "none")">
+        <h2 class="h5">Attached Documents</h2>
+        @if (!documentsLoaded)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (documents.Count == 0)
+        {
+            <p><em>No documents have been attached for this supplier.</em></p>
+        }
+        else
+        {
+            var current = documents[currentDocIndex];
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.pdf" target="_blank">Download images as PDF</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.xlsx">Download images as Excel</a>
+            </div>
+
+            <div class="di-doc-viewer" tabindex="0" @ref="viewerRef" @onkeydown="OnViewerKeyDown" @onkeydown:preventDefault="true">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="PrevDoc" disabled="@(currentDocIndex == 0)">&larr; Previous</button>
+                    <span class="fw-semibold text-truncate px-2">
+                        @(currentDocIndex + 1) / @documents.Count &mdash; @current.FileName
+                        <span class="badge bg-light text-dark">@SplitType(current.DocumentType)</span>
+                    </span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="NextDoc" disabled="@(currentDocIndex == documents.Count - 1)">Next &rarr;</button>
+                </div>
+
+                <div class="text-center di-doc-stage">
+                    @if (IsImage(current))
+                    {
+                        <img src="/suppliers/documents/@current.Id" alt="@current.FileName" class="di-doc-image" />
+                    }
+                    else
+                    {
+                        <iframe src="/suppliers/documents/@current.Id" class="di-doc-frame" title="@current.FileName"></iframe>
+                    }
+                </div>
+
+                <div class="d-flex gap-2 mt-2 flex-wrap">
+                    @if (IsImage(current))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => PrintCurrentAsync(current.Id)">Print</button>
+                    }
+                    <a class="btn btn-sm btn-outline-secondary" href="/suppliers/documents/@current.Id" target="_blank">Open / download original</a>
+                </div>
+                <div class="small text-muted mt-1">Tip: use the &larr; and &rarr; arrow keys to move between documents.</div>
+            </div>
+        }
     </div>
 
     <div style="display:@(activeTab == Tab.EmailHistory ? "block" : "none")">
@@ -88,18 +147,37 @@ else
     </div>
 }
 
+<style>
+    .di-doc-viewer { outline: none; }
+    .di-doc-stage { background: #f6f7f9; border: 1px solid #e2e5ea; border-radius: 6px; padding: 8px; }
+    .di-doc-image { max-width: 100%; max-height: 70vh; object-fit: contain; }
+    .di-doc-frame { width: 100%; height: 70vh; border: 0; }
+</style>
+
 @code {
     [Parameter] public int Id { get; set; }
 
-    private enum Tab { Details, EmailHistory }
+    private enum Tab { Details, Documents, EmailHistory }
 
     private Supplier? supplier;
     private bool notFound;
     private bool forbidden;
     private string currentUser = "unknown";
     private Tab activeTab = Tab.Details;
+
+    private List<SupplierDocument> documents = [];
+    private bool documentsLoaded;
+    private int currentDocIndex;
+    private ElementReference viewerRef;
+    private bool focusViewerPending;
+
     private List<SupplierAccessToken> emailHistory = [];
     private bool emailHistoryLoaded;
+
+    private SupplierDocument CurrentDoc => documents[currentDocIndex];
+    private static bool IsImage(SupplierDocument d) => d.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    private static string SplitType(SupplierDocumentType t) =>
+        System.Text.RegularExpressions.Regex.Replace(t.ToString(), "(?<!^)([A-Z])", " $1");
 
     protected override async Task OnInitializedAsync()
     {
@@ -122,6 +200,48 @@ else
         }
 
         supplier = loaded;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusViewerPending)
+        {
+            focusViewerPending = false;
+            try { await viewerRef.FocusAsync(); } catch { /* element not ready; harmless */ }
+        }
+    }
+
+    private async Task ShowDocumentsAsync()
+    {
+        activeTab = Tab.Documents;
+        if (!documentsLoaded && supplier is not null)
+        {
+            documents = await SupplierDocumentService.GetDocumentsAsync(supplier.Id);
+            currentDocIndex = 0;
+            documentsLoaded = true;
+        }
+        focusViewerPending = documents.Count > 0;   // focus so arrow keys work
+    }
+
+    private void PrevDoc()
+    {
+        if (currentDocIndex > 0) { currentDocIndex--; }
+    }
+
+    private void NextDoc()
+    {
+        if (currentDocIndex < documents.Count - 1) { currentDocIndex++; }
+    }
+
+    private void OnViewerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowRight" || e.Key == "PageDown") { NextDoc(); }
+        else if (e.Key == "ArrowLeft" || e.Key == "PageUp") { PrevDoc(); }
+    }
+
+    private async Task PrintCurrentAsync(int documentId)
+    {
+        await JS.InvokeVoidAsync("printImageUrl", $"/suppliers/documents/{documentId}");
     }
 
     private async Task ShowEmailHistoryAsync()
