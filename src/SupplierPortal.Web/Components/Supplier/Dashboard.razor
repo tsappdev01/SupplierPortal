@@ -143,11 +143,7 @@
             <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
             <th>Supplier Number</th>
             <th>Supplier Name</th>
-            <th>Tax Organization Type</th>
             <th>First Name</th>
-            <th>Supplier Type</th>
-            <th>Tax Registration Number</th>
-            <th>Trade License Number</th>
             <th>Contact Email</th>
             <th>Status</th>
             <th class="no-print">Actions</th>
@@ -171,11 +167,7 @@
                         </a>
                     }
                 </td>
-                <td>@supplier.TaxOrganizationTypeName</td>
                 <td>@supplier.FirstName</td>
-                <td>@supplier.SupplierTypeName</td>
-                <td>@supplier.TaxRegistrationNumber</td>
-                <td>@supplier.TradeLicenseNumber</td>
                 <td>@supplier.ContactEmail</td>
                 <td>
                     @if (!string.IsNullOrEmpty(supplier.StatusName))
