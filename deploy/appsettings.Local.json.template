@@ -33,5 +33,15 @@
     "ApiKey": "CHANGE_ME",
     "ModelId": "prebuilt-read",
     "ApiVersion": "2024-11-30"
+  },
+
+  "//Sso": "Single sign-on via OpenID Connect (e.g. Microsoft Entra ID). Set Enabled=true and fill in Authority + ClientId + ClientSecret so the login screen federates to the IdP. The signed-in email must match an existing app user (create users first). ClientSecret is a secret - keep it only here, never in committed appsettings.",
+  "Sso": {
+    "Enabled": true,
+    "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    "ClientId": "<application-client-id>",
+    "ClientSecret": "CHANGE_ME",
+    "CallbackPath": "/signin-oidc",
+    "SignedOutCallbackPath": "/signout-callback-oidc"
   }
 }

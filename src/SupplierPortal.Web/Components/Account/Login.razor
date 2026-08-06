@@ -4,14 +4,22 @@
 @using System.ComponentModel.DataAnnotations
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
+@using Microsoft.Extensions.Options
 @layout Layout.AccountLayout
 @inject AuthService AuthService
 @inject AuditService AuditService
 @inject NavigationManager NavigationManager
+@inject IOptions<SsoOptions> Sso
 
 <PageTitle>Login - Supplier Portal</PageTitle>
 
 <h1>Login</h1>
+
+@if (Sso.Value.IsEnabled)
+{
+    <a class="btn btn-primary w-100 mb-3" href="@SsoLoginUrl">Sign in with company SSO</a>
+    <div class="text-center text-muted small mb-3">&mdash; or administrator sign-in &mdash;</div>
+}
 
 <EditForm Model="Input" method="post" OnValidSubmit="LoginAsync" FormName="login">
     <DataAnnotationsValidator />
@@ -47,6 +55,11 @@
     private string? ReturnUrl { get; set; }
 
     private string? errorMessage;
+
+    private string SsoLoginUrl =>
+        string.IsNullOrEmpty(ReturnUrl)
+            ? "/account/sso-login"
+            : $"/account/sso-login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
 
     private async Task LoginAsync()
     {

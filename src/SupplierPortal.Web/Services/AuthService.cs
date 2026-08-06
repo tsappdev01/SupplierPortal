@@ -72,6 +72,33 @@ public class AuthService(
         return (true, null, user);
     }
 
+    /// <summary>Resolves an SSO-authenticated identity (by email, or the AD login it was linked with)
+    /// to an active app user. Identity is proven by the identity provider; role and business units
+    /// still come from the local Users table. Returns (null, reason) when there is no active match, so
+    /// SSO accounts without a provisioned app user are refused.</summary>
+    public async Task<(User? User, string? Error)> GetActiveUserByEmailAsync(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return (null, "The single sign-on token did not include an email address.");
+        }
+
+        var login = email.Trim();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.Users.Include(u => u.BusinessUnits)
+            .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
+        if (user is null)
+        {
+            return (null, "No Supplier Portal account is linked to this single sign-on user.");
+        }
+        if (!user.IsActive)
+        {
+            return (null, "This account has been deactivated.");
+        }
+
+        return (user, null);
+    }
+
     public static ClaimsPrincipal BuildPrincipal(User user)
     {
         var claims = new List<Claim>

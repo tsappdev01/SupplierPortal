@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using System.Security.Claims;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -55,7 +57,17 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory))
     .SetApplicationName("SupplierPortal");
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+var ssoOptions = builder.Configuration.GetSection(SsoOptions.SectionName).Get<SsoOptions>() ?? new SsoOptions();
+builder.Services.Configure<SsoOptions>(builder.Configuration.GetSection(SsoOptions.SectionName));
+
+var authenticationBuilder = builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        // When SSO is configured, an unauthenticated request is challenged straight to the IdP.
+        options.DefaultChallengeScheme = ssoOptions.IsEnabled
+            ? OpenIdConnectDefaults.AuthenticationScheme
+            : CookieAuthenticationDefaults.AuthenticationScheme;
+    })
     .AddCookie(options =>
     {
         options.LoginPath = "/account/login";
@@ -63,6 +75,55 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     });
+
+if (ssoOptions.IsEnabled)
+{
+    // Federated single sign-on (OpenID Connect). The IdP proves identity; the signed-in email is
+    // matched to an existing app user, which still governs role + business units. SSO accounts with
+    // no provisioned app user are refused. A local password path remains only for the break-glass admin.
+    authenticationBuilder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = ssoOptions.Authority;
+        options.ClientId = ssoOptions.ClientId;
+        options.ClientSecret = ssoOptions.ClientSecret;
+        options.ResponseType = "code";
+        options.CallbackPath = ssoOptions.CallbackPath;
+        options.SignedOutCallbackPath = ssoOptions.SignedOutCallbackPath;
+        options.SaveTokens = true;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.Events = new OpenIdConnectEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
+                    ?? context.Principal?.FindFirst("preferred_username")?.Value
+                    ?? context.Principal?.FindFirst("upn")?.Value
+                    ?? context.Principal?.FindFirst("email")?.Value;
+
+                var authService = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
+                var (user, _) = await authService.GetActiveUserByEmailAsync(email);
+                if (user is null)
+                {
+                    // Authenticated at the IdP but not authorized here - send to Access Denied.
+                    context.Response.Redirect("/account/access-denied");
+                    context.HandleResponse();
+                    return;
+                }
+
+                // Replace the IdP principal with our app principal so the cookie carries role + BUs.
+                context.Principal = AuthService.BuildPrincipal(user);
+                var auditService = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
+                await auditService.LogAsync(user.Username, AuditAction.Login, "User", user.Id);
+            }
+        };
+    });
+}
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -99,8 +160,25 @@ app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService
     {
         await auditService.LogAsync(username, AuditAction.Logout, "User");
     }
+
+    // With SSO on, also end the session at the identity provider.
+    if (ssoOptions.IsEnabled)
+    {
+        return Results.SignOut(
+            new AuthenticationProperties { RedirectUri = "/account/login" },
+            [OpenIdConnectDefaults.AuthenticationScheme]);
+    }
     return Results.LocalRedirect("/account/login");
 });
+
+// Challenge the identity provider (SSO). Only mapped when SSO is configured.
+if (ssoOptions.IsEnabled)
+{
+    app.MapGet("/account/sso-login", (string? returnUrl) =>
+        Results.Challenge(
+            new AuthenticationProperties { RedirectUri = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl },
+            [OpenIdConnectDefaults.AuthenticationScheme]));
+}
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {
