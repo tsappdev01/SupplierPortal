@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -57,74 +60,77 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keysDirectory))
     .SetApplicationName("SupplierPortal");
 
-var ssoOptions = builder.Configuration.GetSection(SsoOptions.SectionName).Get<SsoOptions>() ?? new SsoOptions();
-builder.Services.Configure<SsoOptions>(builder.Configuration.GetSection(SsoOptions.SectionName));
+var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<AuthOptions>() ?? new AuthOptions();
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+builder.Services.Configure<BreakGlassOptions>(builder.Configuration.GetSection(BreakGlassOptions.SectionName));
+
+var useEntra = authOptions.Entra.Enabled;
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        // When SSO is configured, an unauthenticated request is challenged straight to the IdP.
-        options.DefaultChallengeScheme = ssoOptions.IsEnabled
+        // SSO-first: an unauthenticated request is challenged straight to the identity provider.
+        options.DefaultChallengeScheme = useEntra
             ? OpenIdConnectDefaults.AuthenticationScheme
             : CookieAuthenticationDefaults.AuthenticationScheme;
     })
     .AddCookie(options =>
     {
+        options.Cookie.Name = "__Host-SupplierPortalAuth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;  // Lax so the SSO redirect back still carries the cookie
+        options.Cookie.Path = "/";
         options.LoginPath = "/account/login";
         options.AccessDeniedPath = "/account/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     });
 
-if (ssoOptions.IsEnabled)
+if (useEntra)
 {
-    // Federated single sign-on (OpenID Connect). The IdP proves identity; the signed-in email is
-    // matched to an existing app user, which still governs role + business units. SSO accounts with
-    // no provisioned app user are refused. A local password path remains only for the break-glass admin.
+    // Federated single sign-on (OpenID Connect, authorization-code + PKCE). The IdP proves identity;
+    // RoleClaimsTransformation then maps that identity to an app user (role + business units) on each
+    // request. No tokens are kept on the front channel.
     authenticationBuilder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        options.Authority = ssoOptions.Authority;
-        options.ClientId = ssoOptions.ClientId;
-        options.ClientSecret = ssoOptions.ClientSecret;
-        options.ResponseType = "code";
-        options.CallbackPath = ssoOptions.CallbackPath;
-        options.SignedOutCallbackPath = ssoOptions.SignedOutCallbackPath;
-        options.SaveTokens = true;
-        options.GetClaimsFromUserInfoEndpoint = true;
+        options.Authority = authOptions.Entra.Authority;
+        options.ClientId = authOptions.Entra.ClientId;
+        options.ClientSecret = authOptions.Entra.ClientSecret;
+        options.CallbackPath = authOptions.Entra.CallbackPath;
+        options.SignedOutCallbackPath = authOptions.Entra.SignedOutCallbackPath;
         options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.ResponseType = OpenIdConnectResponseType.Code;
+        options.UsePkce = true;
+        options.SaveTokens = false;
+        options.GetClaimsFromUserInfoEndpoint = true;
         options.Scope.Clear();
         options.Scope.Add("openid");
         options.Scope.Add("profile");
         options.Scope.Add("email");
-        options.Events = new OpenIdConnectEvents
-        {
-            OnTokenValidated = async context =>
-            {
-                var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
-                    ?? context.Principal?.FindFirst("preferred_username")?.Value
-                    ?? context.Principal?.FindFirst("upn")?.Value
-                    ?? context.Principal?.FindFirst("email")?.Value;
-
-                var authService = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
-                var (user, _) = await authService.GetActiveUserByEmailAsync(email);
-                if (user is null)
-                {
-                    // Authenticated at the IdP but not authorized here - send to Access Denied.
-                    context.Response.Redirect("/account/access-denied");
-                    context.HandleResponse();
-                    return;
-                }
-
-                // Replace the IdP principal with our app principal so the cookie carries role + BUs.
-                context.Principal = AuthService.BuildPrincipal(user);
-                var auditService = context.HttpContext.RequestServices.GetRequiredService<AuditService>();
-                await auditService.LogAsync(user.Username, AuditAction.Login, "User", user.Id);
-            }
-        };
+        options.TokenValidationParameters.NameClaimType = "name";
     });
 }
 
-builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IClaimsTransformation, RoleClaimsTransformation>();
+builder.Services.AddScoped<BreakGlassService>();
+
+// Deny-by-default for [Authorize] pages/endpoints: require an authenticated, provisioned app user.
+// (Set only as the default policy, not a global fallback, so the OIDC callback and Blazor hub work.)
+var appUserPolicy = new AuthorizationPolicyBuilder()
+    .RequireAuthenticatedUser()
+    .RequireClaim(AppClaims.AppUser, "true")
+    .Build();
+builder.Services.AddAuthorizationBuilder().SetDefaultPolicy(appUserPolicy);
+
+builder.Services.AddRateLimiter(options =>
+    options.AddFixedWindowLimiter("credential", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 5;
+        limiter.QueueLimit = 0;
+    }));
 
 var app = builder.Build();
 
@@ -145,6 +151,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseStaticFiles();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -162,23 +169,32 @@ app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService
     }
 
     // With SSO on, also end the session at the identity provider.
-    if (ssoOptions.IsEnabled)
+    if (useEntra)
     {
         return Results.SignOut(
             new AuthenticationProperties { RedirectUri = "/account/login" },
-            [OpenIdConnectDefaults.AuthenticationScheme]);
+            [CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme]);
     }
     return Results.LocalRedirect("/account/login");
 });
 
 // Challenge the identity provider (SSO). Only mapped when SSO is configured.
-if (ssoOptions.IsEnabled)
+if (useEntra)
 {
     app.MapGet("/account/sso-login", (string? returnUrl) =>
         Results.Challenge(
             new AuthenticationProperties { RedirectUri = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl },
-            [OpenIdConnectDefaults.AuthenticationScheme]));
+            [OpenIdConnectDefaults.AuthenticationScheme]))
+        .AllowAnonymous();
 }
+
+// Break-glass emergency access. Disabled unless a secret hash is configured. Anonymous + rate-limited.
+app.MapPost("/api/breakglass", async (BreakGlassRequest body, BreakGlassService breakGlass, HttpContext ctx, CancellationToken ct) =>
+        await breakGlass.TryActivateAsync(ctx, body.Secret, ct)
+            ? Results.NoContent()
+            : Results.Problem("Emergency access was not granted.", statusCode: StatusCodes.Status401Unauthorized))
+    .AllowAnonymous()
+    .RequireRateLimiting("credential");
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {

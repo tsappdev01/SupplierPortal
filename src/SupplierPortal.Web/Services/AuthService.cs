@@ -99,25 +99,34 @@ public class AuthService(
         return (user, null);
     }
 
-    public static ClaimsPrincipal BuildPrincipal(User user)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.UserType.ToString()),
-            new("FullName", string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName),
-            new("Designation", user.Designation ?? ""),
-            new("HasPhoto", (user.ProfilePhoto is not null).ToString())
-        };
+    public static ClaimsPrincipal BuildPrincipal(User user) => new(BuildAppIdentity(user));
 
+    /// <summary>Builds the app's cookie identity for a user: the role + business-unit claims the rest
+    /// of the app reads, plus the app-user marker/id and the resolved marker.</summary>
+    public static ClaimsIdentity BuildAppIdentity(User user)
+    {
+        var identity = new ClaimsIdentity(
+            CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
+        identity.AddClaim(new Claim(AppClaims.RoleResolved, "true"));
+        AddAppClaims(identity, user);
+        return identity;
+    }
+
+    /// <summary>Adds the app's user/role/business-unit claims to an identity.</summary>
+    public static void AddAppClaims(ClaimsIdentity identity, User user)
+    {
+        identity.AddClaim(new Claim(AppClaims.AppUser, "true"));
+        identity.AddClaim(new Claim(AppClaims.AppUserId, user.Id.ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.Name, user.Username));
+        identity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
+        identity.AddClaim(new Claim(ClaimTypes.Role, user.UserType.ToString()));
+        identity.AddClaim(new Claim("FullName", string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName));
+        identity.AddClaim(new Claim("Designation", user.Designation ?? ""));
+        identity.AddClaim(new Claim("HasPhoto", (user.ProfilePhoto is not null).ToString()));
         foreach (var businessUnit in user.BusinessUnits)
         {
-            claims.Add(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
+            identity.AddClaim(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
         }
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-        return new ClaimsPrincipal(identity);
     }
 }

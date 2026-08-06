@@ -765,6 +765,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Subject")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int>("UserType")
                         .HasColumnType("int");
 

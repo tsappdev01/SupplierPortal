@@ -15,7 +15,9 @@ public static class ClaimsPrincipalExtensions
 
     public static int GetUserId(this ClaimsPrincipal principal)
     {
-        return int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var value = principal.FindFirstValue(AppClaims.AppUserId)
+            ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        return int.TryParse(value, out var id) ? id : 0;
     }
 
     public static bool IsAdministrator(this ClaimsPrincipal principal)

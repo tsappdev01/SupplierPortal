@@ -35,6 +35,11 @@ public class User
     [MaxLength(256)]
     public string? AdLogin { get; set; }
 
+    /// <summary>Identity-provider object id (Entra oid), captured on first SSO login and used to match
+    /// the user on later logins. Null until an admin-pre-created account is first claimed via SSO.</summary>
+    [MaxLength(100)]
+    public string? Subject { get; set; }
+
     public UserType UserType { get; set; } = UserType.NormalUser;
 
     /// <summary>A user may be assigned to more than one Business Unit; scopes which suppliers they can see.</summary>
