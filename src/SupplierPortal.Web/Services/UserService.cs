@@ -154,7 +154,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<(bool Success, string? Error)> UpdateUserAsync(
         int id, string username, string fullName, string? designation, string email, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string? newPassword,
-        string actorUsername)
+        AuthSource authSource, string? adLogin, string actorUsername)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -185,6 +185,8 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         user.Designation = designation;
         user.Email = email;
         user.UserType = userType;
+        user.AuthSource = authSource;
+        user.AdLogin = authSource == AuthSource.ActiveDirectory ? adLogin?.Trim() : null;
         user.BusinessUnits = businessUnits;
         user.IsActive = isActive;
         if (photo is not null)

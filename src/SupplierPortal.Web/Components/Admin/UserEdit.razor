@@ -46,11 +46,27 @@ else
             <label class="form-label">Email</label>
             <InputText class="form-control" @bind-Value="Input.Email" />
         </div>
-        <div class="mb-3">
-            <label class="form-label">New Password</label>
-            <InputText type="password" class="form-control" @bind-Value="Input.NewPassword" />
-            <div class="form-text">Leave blank to keep the current password.</div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="useLdap" @bind="UseLdap" />
+            <label class="form-check-label" for="useLdap">Authenticate using LDAP (Active Directory)</label>
+            <div class="form-text">When ticked, the user signs in with their AD account instead of a local password.</div>
         </div>
+        @if (UseLdap)
+        {
+            <div class="mb-3">
+                <label class="form-label">Active Directory Login</label>
+                <InputText class="form-control" @bind-Value="Input.AdLogin" placeholder="sAMAccountName, user@dipark.local or DIPARK\user" />
+                <div class="form-text">The user signs in with this AD account &mdash; no local password is used.</div>
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label">New Password</label>
+                <InputText type="password" class="form-control" @bind-Value="Input.NewPassword" />
+                <div class="form-text">Leave blank to keep the current password.</div>
+            </div>
+        }
         <div class="mb-3">
             <label class="form-label">Profile Photo</label>
             <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
@@ -204,7 +220,9 @@ else
             Designation = user.Designation,
             Email = user.Email,
             UserType = user.UserType,
-            IsActive = user.IsActive
+            IsActive = user.IsActive,
+            AuthSource = user.AuthSource,
+            AdLogin = user.AdLogin
         };
     }
 
@@ -240,7 +258,8 @@ else
 
         var (success, error) = await Loading.RunAsync(() => UserService.UpdateUserAsync(
             Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
-            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword, currentUser));
+            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword,
+            Input.AuthSource, Input.AdLogin, currentUser));
 
         if (!success)
         {
@@ -249,6 +268,13 @@ else
         }
 
         NavigationManager.NavigateTo("/admin/users");
+    }
+
+    // Checkbox <-> AuthSource: ticked means the account authenticates against Active Directory (LDAP).
+    private bool UseLdap
+    {
+        get => Input?.AuthSource == AuthSource.ActiveDirectory;
+        set { if (Input is not null) { Input.AuthSource = value ? AuthSource.ActiveDirectory : AuthSource.Local; } }
     }
 
     private sealed class UserModel
@@ -265,6 +291,10 @@ else
         public string Email { get; set; } = "";
 
         public string? NewPassword { get; set; }
+
+        public AuthSource AuthSource { get; set; } = AuthSource.Local;
+
+        public string? AdLogin { get; set; }
 
         public UserType UserType { get; set; } = UserType.NormalUser;
 
