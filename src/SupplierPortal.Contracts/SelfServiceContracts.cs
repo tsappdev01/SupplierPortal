@@ -133,6 +133,8 @@ public class DocumentUploadResponse
     public string? Error { get; set; }
     /// <summary>Number auto-extracted from an uploaded PDF (TRN / trade-license), to prefill the field.</summary>
     public string? ExtractedNumber { get; set; }
+    /// <summary>D-U-N-S number auto-extracted from an uploaded Trade License, to prefill the field.</summary>
+    public string? DunsNumber { get; set; }
     public List<SupplierDocumentDto> Documents { get; set; } = [];
 }
 

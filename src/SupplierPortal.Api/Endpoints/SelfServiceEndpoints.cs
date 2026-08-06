@@ -181,6 +181,7 @@ public static class SelfServiceEndpoints
                 Success = result.Success,
                 Error = result.Error,
                 ExtractedNumber = result.ExtractedNumber,
+                DunsNumber = result.DunsNumber,
                 Documents = current.Select(Mapping.DtoMapper.ToDto).ToList()
             });
         })

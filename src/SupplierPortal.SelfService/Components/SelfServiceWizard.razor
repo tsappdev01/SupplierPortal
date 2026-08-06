@@ -445,6 +445,11 @@
                     message += $" Trade License Number '{result.ExtractedNumber}' was read from the document.";
                 }
             }
+            if (documentType == SelfServiceDocumentType.TradeLicense && result.DunsNumber is not null)
+            {
+                model.DunsNumber = result.DunsNumber;
+                message += $" D-U-N-S Number '{result.DunsNumber}' was read from the document.";
+            }
             statusMessage = message;
         }
         finally { uploadingDocument = false; }
