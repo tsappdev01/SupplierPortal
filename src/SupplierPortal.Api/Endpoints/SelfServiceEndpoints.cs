@@ -171,16 +171,17 @@ public static class SelfServiceEndpoints
             }
 
             await using var stream = file.OpenReadStream();
-            var (success, error, extracted) = await docs.UploadFromStreamAsync(
+            var result = await docs.UploadFromStreamAsync(
                 session.SupplierId, (SupplierDocumentType)(int)dtoType, stream, file.FileName,
                 file.ContentType, file.Length, ActorLabel(session));
 
             var current = await docs.GetDocumentsAsync(session.SupplierId);
             return Results.Ok(new DocumentUploadResponse
             {
-                Success = success,
-                Error = error,
-                ExtractedNumber = extracted,
+                Success = result.Success,
+                Error = result.Error,
+                ExtractedNumber = result.ExtractedNumber,
+                DunsNumber = result.DunsNumber,
                 Documents = current.Select(Mapping.DtoMapper.ToDto).ToList()
             });
         })

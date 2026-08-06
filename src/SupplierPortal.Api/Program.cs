@@ -41,6 +41,8 @@ builder.Services.AddScoped<BusinessUnitService>();
 builder.Services.AddScoped<SupplierService>();
 builder.Services.AddScoped<SupplierFieldSettingService>();
 builder.Services.AddScoped<SupplierDocumentService>();
+builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
+builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierEmailService>();
 

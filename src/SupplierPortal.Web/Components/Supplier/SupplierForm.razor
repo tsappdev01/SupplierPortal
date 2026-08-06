@@ -661,28 +661,34 @@
 
         uploadingDocument = true;
 
-        var (success, error, extractedNumber) = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
+        var result = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
 
-        if (!success)
+        if (!result.Success)
         {
-            ToastService.ShowError(error ?? "Upload failed.");
+            ToastService.ShowError(result.Error ?? "Upload failed.");
             uploadingDocument = false;
             return;
         }
 
         var message = $"'{e.File.Name}' uploaded successfully.";
-        if (extractedNumber is not null)
+        if (result.ExtractedNumber is not null)
         {
             if (documentType == SupplierDocumentType.VatCertification)
             {
-                formModel.TaxRegistrationNumber = extractedNumber;
-                message += $" Tax Registration Number '{extractedNumber}' was read from the document and filled in.";
+                formModel.TaxRegistrationNumber = result.ExtractedNumber;
+                message += $" Tax Registration Number '{result.ExtractedNumber}' was read from the document and filled in.";
             }
             else if (documentType == SupplierDocumentType.TradeLicense)
             {
-                formModel.TradeLicenseNumber = extractedNumber;
-                message += $" Trade License Number '{extractedNumber}' was read from the document and filled in.";
+                formModel.TradeLicenseNumber = result.ExtractedNumber;
+                message += $" Trade License Number '{result.ExtractedNumber}' was read from the document and filled in.";
             }
+        }
+
+        if (documentType == SupplierDocumentType.TradeLicense && result.DunsNumber is not null)
+        {
+            formModel.DunsNumber = result.DunsNumber;
+            message += $" D-U-N-S Number '{result.DunsNumber}' was read from the document and filled in.";
         }
 
         ToastService.ShowSuccess(message);

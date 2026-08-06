@@ -573,6 +573,44 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierDocuments");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierPartner", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Nationality")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SerialNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Share")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierPartners");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierFieldChange", b =>
                 {
                     b.Property<int>("Id")
@@ -956,6 +994,17 @@ namespace SupplierPortal.Web.Data.Migrations
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierPartner", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
                         .WithMany()

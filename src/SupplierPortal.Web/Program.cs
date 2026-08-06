@@ -40,6 +40,8 @@ builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
+builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
+builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<LoadingService>();
