@@ -25,4 +25,8 @@ public class SupplierListItem
     /// <summary>Count of unacknowledged field changes the supplier made via self-service; drives
     /// the pending-review bell icon on the dashboard row.</summary>
     public int PendingSupplierChangeCount { get; set; }
+
+    /// <summary>Number of documents attached to this supplier; drives the dashboard's
+    /// "view attached documents" action (enabled only when there is at least one).</summary>
+    public int DocumentCount { get; set; }
 }
