@@ -13,5 +13,17 @@
 <body>
     <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        // Turns raw document bytes (passed from the Blazor circuit) into a same-origin blob URL so an
+        // <iframe> can preview the PDF/image inline, without ever exposing the session token to the browser.
+        window.ssDoc = {
+            makeUrl: function (bytes, contentType) {
+                const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+                const blob = new Blob([view], { type: contentType || 'application/octet-stream' });
+                return URL.createObjectURL(blob);
+            },
+            revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } }
+        };
+    </script>
 </body>
 </html>

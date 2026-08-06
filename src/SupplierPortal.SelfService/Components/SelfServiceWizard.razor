@@ -1,4 +1,5 @@
 @inject SupplierApiClient Api
+@inject IJSRuntime JS
 
 <div class="di-form-page">
     <div class="di-form-title">Supplier Registration</div>
@@ -113,18 +114,18 @@
                     <div class="di-documents-row">
                         <div class="di-document-slot">
                             <label>Trade License <span class="di-req">*</span></label>
-                            @if (GetDocument(SelfServiceDocumentType.TradeLicense) is { } tl){<div class="di-document-current">Uploaded: @tl.FileName</div>}
+                            @if (GetDocument(SelfServiceDocumentType.TradeLicense) is { } tl){<div class="di-document-current">Uploaded: @tl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tl.Id)" disabled="@viewingDocument">View</button></div>}
                             <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.TradeLicense)" disabled="@uploadingDocument" />
                             @if (!HasTradeLicenseDocument()){<div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>}
                         </div>
                         <div class="di-document-slot">
                             <label>VAT Certificate</label>
-                            @if (GetDocument(SelfServiceDocumentType.VatCertification) is { } vd){<div class="di-document-current">Uploaded: @vd.FileName</div>}
+                            @if (GetDocument(SelfServiceDocumentType.VatCertification) is { } vd){<div class="di-document-current">Uploaded: @vd.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vd.Id)" disabled="@viewingDocument">View</button></div>}
                             <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.VatCertification)" disabled="@uploadingDocument" />
                         </div>
                         <div class="di-document-slot">
                             <label>Other Documents</label>
-                            @foreach (var doc in OtherDocuments){<div class="di-document-current">@doc.FileName<button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button></div>}
+                            @foreach (var doc in OtherDocuments){<div class="di-document-current">@doc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button><button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button></div>}
                             <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
                         </div>
                     </div>
@@ -170,7 +171,7 @@
                     <div class="di-documents-row">
                         <div class="di-document-slot">
                             <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
-                            @if (GetDocument(SelfServiceDocumentType.BankConfirmationLetter) is { } bl){<div class="di-document-current">Uploaded: @bl.FileName</div>}
+                            @if (GetDocument(SelfServiceDocumentType.BankConfirmationLetter) is { } bl){<div class="di-document-current">Uploaded: @bl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bl.Id)" disabled="@viewingDocument">View</button></div>}
                             <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.BankConfirmationLetter)" disabled="@uploadingDocument" />
                             @if (RequiresBankConfirmationLetter()){<div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>}
                         </div>
@@ -221,6 +222,19 @@
             </div>
         </EditForm>
     }
+
+    @if (viewerUrl is not null)
+    {
+        <div class="di-viewer-backdrop" @onclick="CloseViewer">
+            <div class="di-viewer" @onclick:stopPropagation="true">
+                <div class="di-viewer-head">
+                    <span class="di-viewer-name">@viewerName</span>
+                    <button type="button" class="di-viewer-close" title="Close" @onclick="CloseViewer">&times;</button>
+                </div>
+                <iframe class="di-viewer-frame" src="@viewerUrl" title="Document preview"></iframe>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -247,6 +261,9 @@
     private bool isSaving;
     private bool submitted;
     private bool uploadingDocument;
+    private bool viewingDocument;
+    private string? viewerUrl;
+    private string? viewerName;
     private string? errorMessage;
     private string? statusMessage;
 
@@ -426,7 +443,14 @@
         uploadingDocument = true;
         try
         {
-            await using var stream = e.File.OpenReadStream(10 * 1024 * 1024);
+            const long maxBytes = 10 * 1024 * 1024;
+            if (e.File.Size > maxBytes)
+            {
+                errorMessage = $"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the 10 MB limit. Please attach a smaller file.";
+                return;
+            }
+
+            await using var stream = e.File.OpenReadStream(maxBytes);
             var result = await Api.UploadDocumentAsync(SessionToken, documentType, stream, e.File.Name, e.File.ContentType);
             if (!result.Success) { errorMessage = result.Error ?? "Upload failed."; return; }
 
@@ -452,7 +476,47 @@
             }
             statusMessage = message;
         }
+        catch (Exception)
+        {
+            // Any failure (oversized stream, transient network, bad response) surfaces as a friendly
+            // message instead of an unhandled circuit error that looks like "nothing happened".
+            errorMessage = $"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.";
+        }
         finally { uploadingDocument = false; }
+    }
+
+    private async Task ViewDocumentAsync(int documentId)
+    {
+        errorMessage = null;
+        statusMessage = null;
+        viewingDocument = true;
+        try
+        {
+            await CloseViewer();
+            var file = await Api.GetDocumentAsync(SessionToken, documentId);
+            if (file is null)
+            {
+                errorMessage = "Could not open the document. Please try again.";
+                return;
+            }
+            viewerUrl = await JS.InvokeAsync<string>("ssDoc.makeUrl", file.Value.Bytes, file.Value.ContentType);
+            viewerName = file.Value.FileName;
+        }
+        catch (Exception)
+        {
+            errorMessage = "Could not open the document. Please try again.";
+        }
+        finally { viewingDocument = false; }
+    }
+
+    private async Task CloseViewer()
+    {
+        if (viewerUrl is not null)
+        {
+            try { await JS.InvokeVoidAsync("ssDoc.revoke", viewerUrl); } catch { /* ignore */ }
+            viewerUrl = null;
+            viewerName = null;
+        }
     }
 
     private async Task RemoveDocumentAsync(int documentId)

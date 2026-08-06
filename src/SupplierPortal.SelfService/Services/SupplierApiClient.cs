@@ -109,6 +109,32 @@ public class SupplierApiClient(
                ?? new DocumentUploadResponse { Success = false, Error = "Unexpected response." };
     }
 
+    /// <summary>Fetches a document's bytes for in-form preview. The internal API enforces that the
+    /// document belongs to this session's supplier. Returns null on any failure.</summary>
+    public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetDocumentAsync(string sessionToken, int documentId)
+    {
+        try
+        {
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.GetAsync($"/api/selfservice/documents/{documentId}");
+            if (!res.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var bytes = await res.Content.ReadAsByteArrayAsync();
+            var contentType = res.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            var fileName = res.Content.Headers.ContentDisposition?.FileNameStar
+                ?? res.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "document";
+            return (bytes, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetDocument failed");
+            return null;
+        }
+    }
+
     public async Task<DocumentUploadResponse> DeleteDocumentAsync(string sessionToken, int documentId)
     {
         var http = await AuthedClientAsync(sessionToken);
