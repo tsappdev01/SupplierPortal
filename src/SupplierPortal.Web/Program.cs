@@ -66,10 +66,12 @@ var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<BreakGlassOptions>(builder.Configuration.GetSection(BreakGlassOptions.SectionName));
 
-var useEntra = authOptions.Entra.Enabled;
+// SSO is active only when it is BOTH selected (Auth:Mode = Sso) and actually configured. If Sso is
+// selected without Entra credentials, fall back to local sign-in so no one is locked out.
+var useEntra = authOptions.UseSso;
 
-// Local dev sign-in without SSO. Requires BOTH an explicit opt-in AND no SSO configured, so it is
-// impossible to enable anywhere Entra is set up (i.e. production). Never turn this on for a public site.
+// Local dev sign-in without a password. Requires BOTH an explicit opt-in AND that SSO is not the active
+// mode, so it is impossible to enable while SSO is on (i.e. production). Never turn this on for a public site.
 var allowDevBypass = authOptions.DevBypassEnabled && !useEntra;
 
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
@@ -140,6 +142,13 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+if (authOptions.Mode == AuthMode.Sso && !authOptions.Entra.Enabled)
+{
+    app.Logger.LogWarning(
+        "Auth:Mode is 'Sso' but Entra ID is not configured (TenantId/ClientId missing). " +
+        "Falling back to local username/password sign-in.");
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
@@ -199,8 +208,8 @@ if (useEntra)
 if (allowDevBypass)
 {
     app.Logger.LogWarning(
-        "Auth:DevBypassEnabled is ON and SSO is not configured. /account/dev-login grants Administrator " +
-        "access WITHOUT authentication - use this only in local development.");
+        "Auth:DevBypassEnabled is ON and SSO is not the active mode. /account/dev-login grants Administrator " +
+        "access WITHOUT a password - use this only in local development.");
 
     app.MapGet("/account/dev-login", async Task<IResult> (string? returnUrl, HttpContext ctx,
             IDbContextFactory<ApplicationDbContext> dbFactory) =>
