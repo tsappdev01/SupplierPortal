@@ -31,9 +31,10 @@ public static class DbSeeder
         await SeedSimpleCategoryAsync(db, LookupCategory.SupplierStatus, SupplierMasterSeedData.SupplierStatuses);
 
         // Idempotent: bring earlier workflow-status labels up to their current display names on
-        // databases that were seeded before the rename (New -> Not Submitted, Complete -> Completes).
+        // databases that were seeded before the rename (New -> Not Submitted, Complete/Completes -> Completed).
         await RenameLookupAsync(db, LookupCategory.SupplierStatus, "New", SupplierStatuses.New);
         await RenameLookupAsync(db, LookupCategory.SupplierStatus, "Complete", SupplierStatuses.Complete);
+        await RenameLookupAsync(db, LookupCategory.SupplierStatus, "Completes", SupplierStatuses.Complete);
         await SeedPairCategoryAsync(db, LookupCategory.VatCode, SupplierMasterSeedData.VatCodes);
         await SeedPairCategoryAsync(db, LookupCategory.Currency, SupplierMasterSeedData.Currencies);
 

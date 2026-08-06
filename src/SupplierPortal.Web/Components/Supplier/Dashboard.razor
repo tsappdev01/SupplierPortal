@@ -39,7 +39,7 @@
     </div>
     <div class="di-stat-tile di-stat-complete">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.Complete)</div>
-        <div class="di-stat-label">Completes</div>
+        <div class="di-stat-label">Completed</div>
     </div>
 </div>
 
@@ -75,7 +75,7 @@
         <span>Print</span>
     </button>
     <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync"
-            title="Email a review notification to every supplier" aria-label="Notify all suppliers">
+            title="@($"Email a review notification to suppliers in {NotifyScopeLabel}")" aria-label="Notify suppliers in the selected business unit">
         @if (bulkSending)
         {
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -89,7 +89,7 @@
                 <circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2" />
                 <path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round" />
             </svg>
-            <span>Notify All Suppliers</span>
+            <span>@(filterBusinessUnitId == 0 ? "Notify All Suppliers" : $"Notify Suppliers in {SelectedBuLabel}")</span>
         }
     </button>
     <a class="di-action-btn is-register" href="/supplier/register" title="Register a new supplier" aria-label="Register supplier">
@@ -502,6 +502,13 @@ else if (TotalPages > 1)
         ? (isAdministrator ? "All Business Units" : "All My Business Units")
         : businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "";
 
+    // Human-readable scope for the "Notify" action, matching the current business-unit filter: a single
+    // subsidiary when one is selected, otherwise all subsidiaries in view. The supplier list itself is
+    // already filtered to this scope, so the notification only ever reaches suppliers in it.
+    private string NotifyScopeLabel => filterBusinessUnitId == 0
+        ? (isAdministrator ? "all subsidiaries" : "all your business units")
+        : SelectedBuLabel;
+
     // Suppliers matching the selected workflow-status filter (empty = all statuses).
     private IEnumerable<SupplierListItem> StatusFiltered =>
         string.IsNullOrEmpty(statusFilter) ? suppliers : suppliers.Where(s => s.StatusName == statusFilter);
@@ -758,7 +765,7 @@ else if (TotalPages > 1)
         }
 
         var confirmed = await JS.InvokeAsync<bool>("confirm",
-            $"Send a review notification email to {toSend.Count} supplier(s)?" + (skipped > 0 ? $" ({skipped} without a valid email will be skipped.)" : ""));
+            $"Send a review notification email to {toSend.Count} supplier(s) in {NotifyScopeLabel}?" + (skipped > 0 ? $" ({skipped} without a valid email will be skipped.)" : ""));
         if (!confirmed)
         {
             return;

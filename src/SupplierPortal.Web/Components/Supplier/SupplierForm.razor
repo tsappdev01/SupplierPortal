@@ -12,9 +12,12 @@
 
     <div class="di-form-title">Supplier Registration</div>
     <div class="di-form-sub">Dubai Investments Entities &mdash; @(IsCreateMode ? "New supplier onboarding" : "Edit supplier")</div>
-    <div class="di-legend">
-        <div><span class="di-req">*</span> Required field (set by Settings &gt; Supplier Fields)</div>
-    </div>
+    @if (SupplierFacing)
+    {
+        <div class="di-legend">
+            <div><span class="di-req">*</span> Required field (set by Settings &gt; Supplier Fields)</div>
+        </div>
+    }
 
     <div class="di-stepper">
         @for (var i = 1; i <= 4; i++)
@@ -145,13 +148,13 @@
 
                 <div class="di-documents-row">
                     <div class="di-document-slot">
-                        <label>Trade License <span class="di-req">*</span></label>
+                        <label>Trade License @if (SupplierFacing){<span class="di-req">*</span>}</label>
                         @if (GetDocument(SupplierDocumentType.TradeLicense) is { } tradeLicenseDoc)
                         {
                             <div class="di-document-current">Uploaded: @tradeLicenseDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tradeLicenseDoc.Id)" disabled="@viewingDocument">View</button></div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
-                        @if (Supplier.Id != 0 && !HasTradeLicenseDocument())
+                        @if (SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument())
                         {
                             <div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>
                         }
@@ -782,7 +785,9 @@
 
     private RenderFragment Req(string fieldKey) => builder =>
     {
-        if (mandatoryKeys.Contains(fieldKey))
+        // Required markers appear only on the supplier-facing self-service portal; mandatory settings
+        // do not restrict internal admin/user editing, so no asterisks are shown there.
+        if (SupplierFacing && mandatoryKeys.Contains(fieldKey))
         {
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "class", "di-req");
@@ -823,13 +828,19 @@
     private List<string> ValidateStep(SupplierFormModel model, int step)
     {
         var errors = new List<string>();
-        foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
+
+        // Mandatory-field enforcement applies only to the supplier-facing self-service portal. Internal
+        // admin/user editing must never be blocked by a mandatory setting, so skip the required checks.
+        if (SupplierFacing)
         {
-            var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
-            var value = property?.GetValue(model);
-            if (IsEmpty(value))
+            foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
             {
-                errors.Add($"{setting.DisplayLabel} is required.");
+                var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
+                var value = property?.GetValue(model);
+                if (IsEmpty(value))
+                {
+                    errors.Add($"{setting.DisplayLabel} is required.");
+                }
             }
         }
 
@@ -957,7 +968,7 @@
             return;
         }
 
-        if (!HasTradeLicenseDocument())
+        if (SupplierFacing && !HasTradeLicenseDocument())
         {
             currentStep = 1;
             errorMessage = "A Trade License document must be attached before submitting.";

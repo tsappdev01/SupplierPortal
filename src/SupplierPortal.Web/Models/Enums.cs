@@ -37,11 +37,11 @@ public enum LookupCategory
 public static class SupplierStatuses
 {
     // Constant names are kept stable (New/Complete) so transition code doesn't churn; only the
-    // display text stored in LookupValues and shown in the UI is "Not Submitted"/"Completes".
+    // display text stored in LookupValues and shown in the UI is "Not Submitted"/"Completed".
     public const string New = "Not Submitted";
     public const string AwaitingSupplierResponse = "Awaiting Supplier Response";
     public const string ForReview = "For Review";
-    public const string Complete = "Completes";
+    public const string Complete = "Completed";
 
     public static readonly string[] All = [New, AwaitingSupplierResponse, ForReview, Complete];
 }
