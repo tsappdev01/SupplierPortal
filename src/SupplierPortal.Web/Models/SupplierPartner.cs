@@ -26,5 +26,9 @@ public class SupplierPartner
     [MaxLength(30)]
     public string? Share { get; set; }
 
+    /// <summary>The partner's role on the license, e.g. "Shares Owner", "Manager", "Partner".</summary>
+    [MaxLength(80)]
+    public string? Role { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

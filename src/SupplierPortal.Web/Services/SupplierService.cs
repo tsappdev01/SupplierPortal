@@ -106,7 +106,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 CreatedAt = s.CreatedAt,
                 UpdatedAt = s.UpdatedAt,
                 PendingSupplierChangeCount = db.SupplierFieldChanges.Count(
-                    c => c.SupplierId == s.Id && !c.IsAcknowledged && c.SupplierAccessTokenId != null)
+                    c => c.SupplierId == s.Id && !c.IsAcknowledged && c.SupplierAccessTokenId != null),
+                DocumentCount = db.SupplierDocuments.Count(d => d.SupplierId == s.Id)
             })
             .ToListAsync();
     }
