@@ -6,6 +6,7 @@
 @inject SupplierDocumentService SupplierDocumentService
 @inject ToastService ToastService
 @inject LoadingService Loading
+@inject IJSRuntime JS
 
 <div class="di-form-page">
 
@@ -147,7 +148,7 @@
                         <label>Trade License <span class="di-req">*</span></label>
                         @if (GetDocument(SupplierDocumentType.TradeLicense) is { } tradeLicenseDoc)
                         {
-                            <div class="di-document-current">Uploaded: @tradeLicenseDoc.FileName</div>
+                            <div class="di-document-current">Uploaded: @tradeLicenseDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tradeLicenseDoc.Id)" disabled="@viewingDocument">View</button></div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                         @if (Supplier.Id != 0 && !HasTradeLicenseDocument())
@@ -159,7 +160,7 @@
                         <label>VAT Certificate</label>
                         @if (GetDocument(SupplierDocumentType.VatCertification) is { } vatDoc)
                         {
-                            <div class="di-document-current">Uploaded: @vatDoc.FileName</div>
+                            <div class="di-document-current">Uploaded: @vatDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vatDoc.Id)" disabled="@viewingDocument">View</button></div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.VatCertification)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                     </div>
@@ -169,6 +170,7 @@
                         {
                             <div class="di-document-current">
                                 @doc.FileName
+                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
                                 <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
                             </div>
                         }
@@ -351,7 +353,7 @@
                         <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
                         @if (GetDocument(SupplierDocumentType.BankConfirmationLetter) is { } bankLetterDoc)
                         {
-                            <div class="di-document-current">Uploaded: @bankLetterDoc.FileName</div>
+                            <div class="di-document-current">Uploaded: @bankLetterDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bankLetterDoc.Id)" disabled="@viewingDocument">View</button></div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.BankConfirmationLetter)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                         @if (RequiresBankConfirmationLetter())
@@ -491,6 +493,19 @@
             }
         </div>
     </EditForm>
+
+    @if (viewerUrl is not null)
+    {
+        <div class="di-viewer-backdrop" @onclick="CloseViewer">
+            <div class="di-viewer" @onclick:stopPropagation="true">
+                <div class="di-viewer-head">
+                    <span class="di-viewer-name">@viewerName</span>
+                    <button type="button" class="di-viewer-close" title="Close" @onclick="CloseViewer">&times;</button>
+                </div>
+                <iframe class="di-viewer-frame" src="@viewerUrl" title="Document preview"></iframe>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
@@ -550,6 +565,9 @@
     private List<BusinessUnit> businessUnits = [];
     private List<SupplierDocument> documents = [];
     private bool uploadingDocument;
+    private bool viewingDocument;
+    private string? viewerUrl;
+    private string? viewerName;
     private HashSet<string> changedFieldKeys = [];
     private HashSet<string> hiddenFromSupplierKeys = [];
     private int? originalBankId;
@@ -659,8 +677,15 @@
             return;
         }
 
-        uploadingDocument = true;
+        if (e.File.Size > 10 * 1024 * 1024)
+        {
+            ToastService.ShowError($"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the 10 MB limit. Please attach a smaller file.");
+            return;
+        }
 
+        uploadingDocument = true;
+        try
+        {
         var result = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
 
         if (!result.Success)
@@ -693,7 +718,52 @@
 
         ToastService.ShowSuccess(message);
         documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
-        uploadingDocument = false;
+        }
+        catch (Exception)
+        {
+            // A failure (oversized stream, transient error) shows a message instead of an unhandled
+            // circuit error that looks like the upload silently did nothing.
+            ToastService.ShowError($"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.");
+        }
+        finally { uploadingDocument = false; }
+    }
+
+    private async Task ViewDocumentAsync(int documentId)
+    {
+        // Only documents attached to this supplier can be viewed.
+        if (documents.All(d => d.Id != documentId))
+        {
+            return;
+        }
+
+        viewingDocument = true;
+        try
+        {
+            await CloseViewer();
+            var file = await SupplierDocumentService.GetFileAsync(documentId);
+            if (file is null)
+            {
+                ToastService.ShowError("Could not open the document. Please try again.");
+                return;
+            }
+            viewerUrl = await JS.InvokeAsync<string>("ssDoc.makeUrl", file.Value.Bytes, file.Value.ContentType);
+            viewerName = file.Value.FileName;
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("Could not open the document. Please try again.");
+        }
+        finally { viewingDocument = false; }
+    }
+
+    private async Task CloseViewer()
+    {
+        if (viewerUrl is not null)
+        {
+            try { await JS.InvokeVoidAsync("ssDoc.revoke", viewerUrl); } catch { /* ignore */ }
+            viewerUrl = null;
+            viewerName = null;
+        }
     }
 
     private async Task RemoveDocumentAsync(int documentId)

@@ -26,6 +26,17 @@
                 + '</body></html>');
             w.document.close();
         };
+
+        // Turns raw document bytes (passed from the Blazor circuit) into a same-origin blob URL so an
+        // <iframe> can preview the PDF/image inline in the document viewer modal.
+        window.ssDoc = {
+            makeUrl: function (bytes, contentType) {
+                var view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+                var blob = new Blob([view], { type: contentType || 'application/octet-stream' });
+                return URL.createObjectURL(blob);
+            },
+            revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } }
+        };
     </script>
 </body>
 
