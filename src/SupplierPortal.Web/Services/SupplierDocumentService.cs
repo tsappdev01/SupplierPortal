@@ -17,7 +17,7 @@ public record DocumentUploadResult(bool Success, string? Error, string? Extracte
 /// web-servable - with only their metadata in the database.</summary>
 public class SupplierDocumentService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
-    IDocumentOcrService ocr)
+    IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -43,6 +43,11 @@ public class SupplierDocumentService(
         @"D\W*U\W*N\W*S.*?\b(\d{9})\b",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex DunsBare = new(@"\b(\d{9})\b", RegexOptions.Compiled);
+
+    // Legal/license type as printed on the license, e.g. "Legal Type Limited Liability Company(LLC)".
+    private static readonly Regex LegalTypeLabeled = new(
+        @"Legal\s*Type\s*[:\-]?\s*([A-Za-z][A-Za-z0-9 ()/&.,'\-]{2,80})",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // A row of the license "Partners" annex: a serial/person number, a Latin (English) name that
     // stops at the first digit or line break, then the ownership share as a percentage. Any Arabic
@@ -111,17 +116,36 @@ public class SupplierDocumentService(
 
         string? extractedNumber = null;
         string? dunsNumber = null;
+        string? licenseType = null;
         List<ParsedPartner> partners = [];
 
         if (documentType is SupplierDocumentType.VatCertification or SupplierDocumentType.TradeLicense)
         {
+            var extractionPath = fullPath;
+            string? tempOfficialPdf = null;
+
+            // Trade License: if the document carries a DED verification QR code, download the official
+            // PDF it points to and extract from that authoritative copy instead of the uploaded image.
+            if (documentType == SupplierDocumentType.TradeLicense)
+            {
+                var qrUrl = qrService.TryReadQrUrl(fullPath);
+                if (!string.IsNullOrWhiteSpace(qrUrl))
+                {
+                    tempOfficialPdf = await TryDownloadPdfAsync(qrUrl);
+                    if (tempOfficialPdf is not null)
+                    {
+                        extractionPath = tempOfficialPdf;
+                    }
+                }
+            }
+
             // Prefer the PDF's own text layer; fall back to cloud OCR (Azure Document Intelligence)
             // for scanned/image licenses that carry no embedded text. Both are best-effort - if neither
             // yields text, every extracted value stays null/empty and the upload still succeeds.
-            var text = TryReadPdfText(fullPath);
+            var text = TryReadPdfText(extractionPath);
             if (string.IsNullOrWhiteSpace(text) && ocr.IsEnabled)
             {
-                text = await ocr.ExtractTextAsync(fullPath);
+                text = await ocr.ExtractTextAsync(extractionPath);
             }
 
             if (!string.IsNullOrWhiteSpace(text))
@@ -144,8 +168,20 @@ public class SupplierDocumentService(
                         dunsNumber = dunsMatch.Groups[1].Value;
                     }
 
+                    var legalTypeMatch = LegalTypeLabeled.Match(text);
+                    if (legalTypeMatch.Success)
+                    {
+                        licenseType = Regex.Replace(legalTypeMatch.Groups[1].Value, @"\s+", " ").Trim();
+                    }
+
                     partners = ExtractPartners(text);
                 }
+            }
+
+            if (tempOfficialPdf is not null)
+            {
+                try { File.Delete(tempOfficialPdf); }
+                catch { /* best-effort temp cleanup */ }
             }
         }
 
@@ -187,6 +223,11 @@ public class SupplierDocumentService(
                 if (!string.IsNullOrWhiteSpace(dunsNumber))
                 {
                     supplier.DunsNumber = dunsNumber;
+                }
+
+                if (!string.IsNullOrWhiteSpace(licenseType))
+                {
+                    supplier.LicenseType = licenseType;
                 }
 
                 if (partners.Count > 0)
@@ -236,6 +277,44 @@ public class SupplierDocumentService(
         }
 
         return null;
+    }
+
+    /// <summary>Downloads a PDF from a QR-code URL (the Dubai DED verification link) so extraction
+    /// can use the authoritative copy. Best-effort: returns null on any failure or a non-PDF response.
+    /// The caller deletes the returned temp file after use.</summary>
+    private async Task<string?> TryDownloadPdfAsync(string url)
+    {
+        try
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                return null;
+            }
+
+            var client = httpClientFactory.CreateClient("license");
+            using var response = await client.GetAsync(uri);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var looksPdf = response.Content.Headers.ContentType?.MediaType == "application/pdf"
+                || (bytes.Length > 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46);
+            if (!looksPdf)
+            {
+                return null;
+            }
+
+            var tempPath = Path.Combine(Path.GetTempPath(), $"license-{Guid.NewGuid():N}.pdf");
+            await File.WriteAllBytesAsync(tempPath, bytes);
+            return tempPath;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Reads the concatenated text layer of a PDF (best-effort). A non-PDF file, a scanned

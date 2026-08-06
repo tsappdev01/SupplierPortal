@@ -47,6 +47,8 @@ builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
+builder.Services.AddSingleton<LicenseQrService>();
+builder.Services.AddHttpClient("license");
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<LoadingService>();
