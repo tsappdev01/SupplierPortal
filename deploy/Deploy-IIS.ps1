@@ -26,7 +26,11 @@ param(
     [string]$AppPoolName    = "SupplierPortal",
     [int]   $HttpPort       = 80,
     [int]   $HttpsPort      = 443,
-    [string]$CertThumbprint = ""   # optional; if set, an HTTPS binding + SNI mapping is added
+    [string]$CertThumbprint = "",  # optional; if set, an HTTPS binding + SNI mapping is added
+    # UAT single-server layout: the supplier self-service portal is served by this same app under a
+    # second host header. Set to "" to skip it (e.g. when the DMZ SelfService app is deployed separately).
+    [string]$SelfServiceHostName       = "bps.dipark.com",
+    [string]$SelfServiceCertThumbprint = ""   # optional; falls back to -CertThumbprint if a shared/wildcard cert covers both
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,6 +86,25 @@ if ($CertThumbprint -ne "") {
     Write-Host "Added HTTPS binding on port $HttpsPort using cert $CertThumbprint." -ForegroundColor Green
 } else {
     Write-Host "No -CertThumbprint supplied; skipping HTTPS binding (add it later for production)." -ForegroundColor Yellow
+}
+
+# --- second host header (UAT): the supplier self-service portal shares this same app ---
+if ($SelfServiceHostName -ne "") {
+    if (-not (Get-WebBinding -Name $SiteName -Protocol http -HostHeader $SelfServiceHostName -Port $HttpPort -ErrorAction SilentlyContinue)) {
+        New-WebBinding -Name $SiteName -Protocol http -Port $HttpPort -HostHeader $SelfServiceHostName
+        Write-Host "Added HTTP binding for $SelfServiceHostName." -ForegroundColor Green
+    }
+    $ssThumb = if ($SelfServiceCertThumbprint -ne "") { $SelfServiceCertThumbprint } else { $CertThumbprint }
+    if ($ssThumb -ne "") {
+        if (-not (Get-WebBinding -Name $SiteName -Protocol https -HostHeader $SelfServiceHostName -Port $HttpsPort -ErrorAction SilentlyContinue)) {
+            New-WebBinding -Name $SiteName -Protocol https -Port $HttpsPort -HostHeader $SelfServiceHostName -SslFlags 1  # SNI
+        }
+        $ssCert = Get-Item "Cert:\LocalMachine\My\$ssThumb"
+        New-Item -Path "IIS:\SslBindings\!$HttpsPort!$SelfServiceHostName" -Value $ssCert -SSLFlags 1 -ErrorAction SilentlyContinue | Out-Null
+        Write-Host "Added HTTPS binding for $SelfServiceHostName using cert $ssThumb." -ForegroundColor Green
+    } else {
+        Write-Host "No cert for $SelfServiceHostName; added HTTP only (add HTTPS later)." -ForegroundColor Yellow
+    }
 }
 
 # --- permissions: app pool identity needs Modify on doc + keys (uploads & auth keys) ---

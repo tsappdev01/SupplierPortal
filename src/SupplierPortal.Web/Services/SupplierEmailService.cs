@@ -8,7 +8,7 @@ namespace SupplierPortal.Web.Services;
 /// using the "BP" Database Mail profile configured on the SQL Server instance.</summary>
 public class SupplierEmailService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
-    SupplierAccessTokenService accessTokenService, UserService userService)
+    SupplierAccessTokenService accessTokenService, UserService userService, IConfiguration configuration)
 {
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/supplier_update_notification.html";
@@ -35,7 +35,13 @@ public class SupplierEmailService(
         // edit URL - it carries no supplier id/number and is further protected by an emailed OTP
         // once opened (see SupplierAccessTokenService).
         var rawToken = await accessTokenService.CreateTokenAsync(supplierId, actorUsername);
-        var link = $"{baseUrl.TrimEnd('/')}/supplier/self-service/{rawToken}";
+
+        // Suppliers are external, so the link must point at the public self-service host, not the
+        // intranet URL the admin happens to be browsing. SelfService:PortalUrl (e.g. https://bps.dipark.com)
+        // overrides the base when set; otherwise fall back to the caller's base URL.
+        var portalUrl = configuration["SelfService:PortalUrl"];
+        var linkBase = string.IsNullOrWhiteSpace(portalUrl) ? baseUrl : portalUrl;
+        var link = $"{linkBase.TrimEnd('/')}/supplier/self-service/{rawToken}";
 
         var body = await File.ReadAllTextAsync(templatePath);
         body = body

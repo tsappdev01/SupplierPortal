@@ -71,7 +71,7 @@ Remove-Item (Join-Path $stageDir "appsettings.Development.json") -Force -ErrorAc
 Remove-Item (Join-Path $stageDir "appsettings.Local.json") -Force -ErrorAction SilentlyContinue
 
 # --- 4. copy deploy helpers into the package ---
-foreach ($f in @("Deploy-IIS.ps1", "README-DEPLOYMENT.md", "appsettings.Local.json.template")) {
+foreach ($f in @("Deploy-IIS.ps1", "README-DEPLOYMENT.md", "README-UAT.md", "appsettings.Local.json.template")) {
     Copy-Item (Join-Path $deployDir $f) (Join-Path $stageDir $f) -Force
 }
 
