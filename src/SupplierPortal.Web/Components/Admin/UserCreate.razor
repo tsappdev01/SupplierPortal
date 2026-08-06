@@ -50,18 +50,16 @@
             }
         </datalist>
     </div>
-    <div class="mb-3">
-        <label class="form-label">Authentication</label>
-        <InputSelect class="form-select" style="max-width: 260px;" @bind-Value="Input.AuthSource">
-            <option value="@AuthSource.Local">Local password</option>
-            <option value="@AuthSource.ActiveDirectory">Active Directory</option>
-        </InputSelect>
-    </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="useLdap" @bind="UseLdap" />
+            <label class="form-check-label" for="useLdap">Authenticate using LDAP (Active Directory)</label>
+            <div class="form-text">When ticked, the user signs in with their AD account instead of a local password.</div>
+        </div>
     @if (Input.AuthSource == AuthSource.ActiveDirectory)
     {
         <div class="mb-3">
             <label class="form-label">Active Directory Login</label>
-            <InputText class="form-control" @bind-Value="Input.AdLogin" placeholder="user@dipark.local or DIPARK\user" />
+            <InputText class="form-control" @bind-Value="Input.AdLogin" placeholder="sAMAccountName, user@dipark.local or DIPARK\user" />
             <div class="form-text">The user signs in with this AD account — no local password is stored.</div>
         </div>
     }
@@ -246,6 +244,13 @@
         }
 
         NavigationManager.NavigateTo("/admin/users");
+    }
+
+    // Checkbox <-> AuthSource: ticked means the account authenticates against Active Directory (LDAP).
+    private bool UseLdap
+    {
+        get => Input.AuthSource == AuthSource.ActiveDirectory;
+        set => Input.AuthSource = value ? AuthSource.ActiveDirectory : AuthSource.Local;
     }
 
     private sealed class UserModel
