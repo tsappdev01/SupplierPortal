@@ -35,7 +35,7 @@
     "ApiVersion": "2024-11-30"
   },
 
-  "//Auth": "SSO via OpenID Connect (Microsoft Entra ID). SSO turns on automatically once Entra.TenantId + ClientId are set. ClientSecret is a secret - keep it only here, never in committed appsettings. BootstrapAdminEmails are provisioned as Administrator on their first SSO login.",
+  "//Auth": "SSO via OpenID Connect (Microsoft Entra ID). SSO turns on automatically once Entra.TenantId + ClientId are set. ClientSecret is a secret - keep it only here, never in committed appsettings. BootstrapAdminEmails are provisioned as Administrator on their first SSO login. DevBypassEnabled=true exposes /account/dev-login for local sign-in WITHOUT SSO - only honoured while no SSO is configured; leave it false/absent on any real server.",
   "Auth": {
     "Entra": {
       "Instance": "https://login.microsoftonline.com/",
@@ -45,7 +45,8 @@
       "CallbackPath": "/signin-oidc",
       "SignedOutCallbackPath": "/signout-callback-oidc"
     },
-    "BootstrapAdminEmails": [ "firstadmin@dubaiinvestments.com" ]
+    "BootstrapAdminEmails": [ "firstadmin@dubaiinvestments.com" ],
+    "DevBypassEnabled": false
   },
 
   "//BreakGlass": "Emergency admin access. Disabled by default. Store ONLY the Base64 SHA-256 hash of the secret (never the plaintext). Generate: [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes('your-strong-secret'))). Activate: POST /api/breakglass { \"secret\": \"your-strong-secret\" } over HTTPS.",

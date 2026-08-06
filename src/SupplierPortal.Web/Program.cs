@@ -68,6 +68,10 @@ builder.Services.Configure<BreakGlassOptions>(builder.Configuration.GetSection(B
 
 var useEntra = authOptions.Entra.Enabled;
 
+// Local dev sign-in without SSO. Requires BOTH an explicit opt-in AND no SSO configured, so it is
+// impossible to enable anywhere Entra is set up (i.e. production). Never turn this on for a public site.
+var allowDevBypass = authOptions.DevBypassEnabled && !useEntra;
+
 var authenticationBuilder = builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -188,6 +192,57 @@ if (useEntra)
             new AuthenticationProperties { RedirectUri = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl },
             [OpenIdConnectDefaults.AuthenticationScheme]))
         .AllowAnonymous();
+}
+
+// Development bypass: sign in locally as an administrator without an identity provider. Guarded by
+// allowDevBypass (opt-in AND no SSO), so the endpoint simply does not exist in an SSO deployment.
+if (allowDevBypass)
+{
+    app.Logger.LogWarning(
+        "Auth:DevBypassEnabled is ON and SSO is not configured. /account/dev-login grants Administrator " +
+        "access WITHOUT authentication - use this only in local development.");
+
+    app.MapGet("/account/dev-login", async Task<IResult> (string? returnUrl, HttpContext ctx,
+            IDbContextFactory<ApplicationDbContext> dbFactory) =>
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+
+        // Prefer the first configured bootstrap-admin email (create it if missing); otherwise fall back
+        // to any active administrator - e.g. the default admin re-seeded after a full data reset.
+        var bootstrapEmail = authOptions.BootstrapAdminEmails.FirstOrDefault();
+        User? user = null;
+        if (!string.IsNullOrWhiteSpace(bootstrapEmail))
+        {
+            user = await db.Users.Include(u => u.BusinessUnits)
+                .FirstOrDefaultAsync(u => u.Email == bootstrapEmail);
+            if (user is null)
+            {
+                user = new User
+                {
+                    Email = bootstrapEmail,
+                    Username = bootstrapEmail,
+                    FullName = "Dev Administrator",
+                    UserType = UserType.Administrator,
+                    IsActive = true
+                };
+                db.Users.Add(user);
+                await db.SaveChangesAsync();
+            }
+        }
+
+        user ??= await db.Users.Include(u => u.BusinessUnits)
+            .FirstOrDefaultAsync(u => u.IsActive && u.UserType == UserType.Administrator);
+
+        if (user is null)
+        {
+            return Results.Problem("No administrator account is available for dev login.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        await ctx.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme, AuthService.BuildPrincipal(user));
+        return Results.LocalRedirect(string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl);
+    }).AllowAnonymous();
 }
 
 // Break-glass emergency access. Disabled unless a secret hash is configured. Anonymous + rate-limited.

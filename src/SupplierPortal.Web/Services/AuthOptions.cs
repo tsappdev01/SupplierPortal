@@ -11,6 +11,11 @@ public sealed class AuthOptions
 
     /// <summary>Emails provisioned as Administrator on their first SSO login (bootstrap the first admin).</summary>
     public List<string> BootstrapAdminEmails { get; set; } = [];
+
+    /// <summary>Development-only escape hatch. When true AND no SSO is configured, exposes
+    /// <c>/account/dev-login</c> for local sign-in as an administrator with no identity provider.
+    /// It is ignored the moment Entra SSO is configured, so it can never bypass SSO where SSO exists.</summary>
+    public bool DevBypassEnabled { get; set; }
 }
 
 public sealed class EntraIdOptions

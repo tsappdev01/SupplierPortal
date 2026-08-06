@@ -13,6 +13,12 @@
     <p class="text-muted">Sign in with your organisation account.</p>
     <a class="btn btn-primary w-100" href="@SsoLoginUrl">Sign in with company SSO</a>
 }
+else if (Auth.Value.DevBypassEnabled)
+{
+    <p class="text-muted">Single sign-on is not configured. Development sign-in is enabled.</p>
+    <a class="btn btn-warning w-100" href="@DevLoginUrl">Dev sign-in (Administrator)</a>
+    <p class="text-muted small mt-2 mb-0">This bypass works only when SSO is not configured. It is disabled automatically once Entra SSO is set up.</p>
+}
 else
 {
     <div class="alert alert-warning mb-0">Single sign-on is not configured yet. Please contact your administrator.</div>
@@ -25,4 +31,9 @@ else
         string.IsNullOrEmpty(ReturnUrl)
             ? "/account/sso-login"
             : $"/account/sso-login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    private string DevLoginUrl =>
+        string.IsNullOrEmpty(ReturnUrl)
+            ? "/account/dev-login"
+            : $"/account/dev-login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
 }
