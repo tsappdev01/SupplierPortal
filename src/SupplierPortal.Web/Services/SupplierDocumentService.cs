@@ -223,46 +223,63 @@ public class SupplierDocumentService(
             UploadedBy = uploadedBy
         });
 
-        // Trade License extras: fold the D-U-N-S number into the supplier record and store the
-        // partners annex for later reference (not shown anywhere in the UI). Each is written only
-        // when something actually parsed, so a re-upload that fails to parse never wipes good data.
-        if (documentType == SupplierDocumentType.TradeLicense)
+        // Commit the document (and any single-slot replacement) first. This is the critical path: the
+        // file must be recorded and the extracted number returned to the form regardless of whether the
+        // optional enrichment below succeeds.
+        await db.SaveChangesAsync();
+
+        // Trade License extras: fold the D-U-N-S number and legal type into the supplier record and store
+        // the partners annex for later reference. This is OPTIONAL enrichment, persisted in a separate,
+        // best-effort save so any problem here - for example a database not yet migrated for the
+        // LicenseType column or the SupplierPartners table - can never undo the upload above or block the
+        // extracted number from reaching the form. Written only when something parsed, so a re-upload
+        // that fails to parse never wipes good data.
+        if (documentType == SupplierDocumentType.TradeLicense
+            && (!string.IsNullOrWhiteSpace(dunsNumber) || !string.IsNullOrWhiteSpace(licenseType) || partners.Count > 0))
         {
-            var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
-            if (supplier is not null)
+            try
             {
-                if (!string.IsNullOrWhiteSpace(dunsNumber))
+                var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+                if (supplier is not null)
                 {
-                    supplier.DunsNumber = dunsNumber;
-                }
-
-                if (!string.IsNullOrWhiteSpace(licenseType))
-                {
-                    supplier.LicenseType = licenseType;
-                }
-
-                if (partners.Count > 0)
-                {
-                    var existingPartners = await db.SupplierPartners
-                        .Where(p => p.SupplierId == supplierId).ToListAsync();
-                    db.SupplierPartners.RemoveRange(existingPartners);
-                    foreach (var partner in partners)
+                    if (!string.IsNullOrWhiteSpace(dunsNumber))
                     {
-                        db.SupplierPartners.Add(new SupplierPartner
-                        {
-                            SupplierId = supplierId,
-                            Name = partner.Name,
-                            Nationality = partner.Nationality,
-                            SerialNo = partner.SerialNo,
-                            Share = partner.Share,
-                            Role = partner.Role
-                        });
+                        supplier.DunsNumber = dunsNumber;
                     }
+
+                    if (!string.IsNullOrWhiteSpace(licenseType))
+                    {
+                        supplier.LicenseType = licenseType;
+                    }
+
+                    if (partners.Count > 0)
+                    {
+                        var existingPartners = await db.SupplierPartners
+                            .Where(p => p.SupplierId == supplierId).ToListAsync();
+                        db.SupplierPartners.RemoveRange(existingPartners);
+                        foreach (var partner in partners)
+                        {
+                            db.SupplierPartners.Add(new SupplierPartner
+                            {
+                                SupplierId = supplierId,
+                                Name = partner.Name,
+                                Nationality = partner.Nationality,
+                                SerialNo = partner.SerialNo,
+                                Share = partner.Share,
+                                Role = partner.Role
+                            });
+                        }
+                    }
+
+                    await db.SaveChangesAsync();
                 }
+            }
+            catch
+            {
+                // Enrichment is optional; the document is already saved and the number already returned.
             }
         }
 
-        await db.SaveChangesAsync();
         await auditService.LogAsync(uploadedBy, AuditAction.Update, "Supplier", supplierId, $"Uploaded {documentType} document '{fileName}'");
 
         return new DocumentUploadResult(true, null, extractedNumber, dunsNumber);
