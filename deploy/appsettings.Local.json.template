@@ -24,5 +24,14 @@
     "Domain": "dipark.local",
     "NetbiosName": "DIPARK",
     "LoginFormat": "UPN"
+  },
+
+  "//Ocr": "Cloud OCR for scanned/image trade-license PDFs (no embedded text). Set Provider=Azure and fill in the Azure AI Document Intelligence Endpoint + ApiKey to enable it; leave Provider empty to disable OCR. Text-based PDFs never call OCR.",
+  "Ocr": {
+    "Provider": "Azure",
+    "Endpoint": "https://YOUR-RESOURCE.cognitiveservices.azure.com",
+    "ApiKey": "CHANGE_ME",
+    "ModelId": "prebuilt-read",
+    "ApiVersion": "2024-11-30"
   }
 }

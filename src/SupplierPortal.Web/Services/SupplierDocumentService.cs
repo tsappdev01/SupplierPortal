@@ -16,7 +16,8 @@ public record DocumentUploadResult(bool Success, string? Error, string? Extracte
 /// physical files under the app's content root - not wwwroot, so they are never directly
 /// web-servable - with only their metadata in the database.</summary>
 public class SupplierDocumentService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService)
+    IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
+    IDocumentOcrService ocr)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -104,34 +105,39 @@ public class SupplierDocumentService(
         string? dunsNumber = null;
         List<ParsedPartner> partners = [];
 
-        if (documentType == SupplierDocumentType.VatCertification)
+        if (documentType is SupplierDocumentType.VatCertification or SupplierDocumentType.TradeLicense)
         {
-            extractedNumber = TryExtractNumber(fullPath, TrnLabeled, TrnBare);
-        }
-        else if (documentType == SupplierDocumentType.TradeLicense)
-        {
-            // Read the license text once and pull the license number, the D-U-N-S number and the
-            // partners annex from it - each best-effort, so a missing value just stays null/empty.
-            var licenseText = TryReadPdfText(fullPath);
-            if (licenseText is not null)
+            // Prefer the PDF's own text layer; fall back to cloud OCR (Azure Document Intelligence)
+            // for scanned/image licenses that carry no embedded text. Both are best-effort - if neither
+            // yields text, every extracted value stays null/empty and the upload still succeeds.
+            var text = TryReadPdfText(fullPath);
+            if (string.IsNullOrWhiteSpace(text) && ocr.IsEnabled)
             {
-                var licenseMatch = TradeLicenseLabeled.Match(licenseText);
-                if (licenseMatch.Success)
-                {
-                    extractedNumber = Regex.Replace(licenseMatch.Groups[1].Value, @"\s+", "");
-                }
+                text = await ocr.ExtractTextAsync(fullPath);
+            }
 
-                var dunsMatch = DunsLabeled.Match(licenseText);
-                if (!dunsMatch.Success)
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                if (documentType == SupplierDocumentType.VatCertification)
                 {
-                    dunsMatch = DunsBare.Match(licenseText);
+                    extractedNumber = MatchNumber(text, TrnLabeled, TrnBare);
                 }
-                if (dunsMatch.Success)
+                else
                 {
-                    dunsNumber = dunsMatch.Groups[1].Value;
-                }
+                    extractedNumber = MatchNumber(text, TradeLicenseLabeled, null);
 
-                partners = ExtractPartners(licenseText);
+                    var dunsMatch = DunsLabeled.Match(text);
+                    if (!dunsMatch.Success)
+                    {
+                        dunsMatch = DunsBare.Match(text);
+                    }
+                    if (dunsMatch.Success)
+                    {
+                        dunsNumber = dunsMatch.Groups[1].Value;
+                    }
+
+                    partners = ExtractPartners(text);
+                }
             }
         }
 
@@ -201,18 +207,10 @@ public class SupplierDocumentService(
         return new DocumentUploadResult(true, null, extractedNumber, dunsNumber);
     }
 
-    /// <summary>Best-effort text-layer extraction for scanned/native PDFs: tries a labeled match
-    /// first (e.g. "TRN: 100333156600003"), falling back to a bare-pattern match when provided.
-    /// A non-PDF file, a scanned image with no text layer, or a parse failure all just yield no
-    /// match rather than an error - the corresponding form field stays available for manual entry.</summary>
-    private static string? TryExtractNumber(string pdfPath, Regex labeled, Regex? bareFallback)
+    /// <summary>Runs a labeled regex (then an optional bare fallback) over already-extracted text and
+    /// returns the first capture with inner whitespace stripped, or null when neither matches.</summary>
+    private static string? MatchNumber(string text, Regex labeled, Regex? bareFallback)
     {
-        var text = TryReadPdfText(pdfPath);
-        if (text is null)
-        {
-            return null;
-        }
-
         var labeledMatch = labeled.Match(text);
         if (labeledMatch.Success)
         {
@@ -256,16 +254,26 @@ public class SupplierDocumentService(
     /// and tuned to that bilingual layout: each row carries a serial/person number, a Latin name and
     /// an ownership share; nationality is captured only when it prints in Latin next to the row.
     /// Returns an empty list when nothing parses, so a non-standard license never breaks the upload.</summary>
+    private static int FirstIndexOf(string text, params string[] needles)
+    {
+        foreach (var needle in needles)
+        {
+            var i = text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+            if (i >= 0)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static List<ParsedPartner> ExtractPartners(string text)
     {
-        // Scope to the partners annex: start at the owners heading ("License Partners" / "اصحاب الرخصة"),
-        // fall back to the English "Partners" title, and stop at the page footer ("Print Date") so
-        // numbers from later pages (receipts, the commercial register) cannot look like partner rows.
-        var start = text.IndexOf("اصحاب", StringComparison.Ordinal);
-        if (start < 0)
-        {
-            start = text.IndexOf("Partners", StringComparison.OrdinalIgnoreCase);
-        }
+        // Scope to the owners/members section. Two layouts exist: the older "Partners" / "ملحق الشركاء"
+        // annex, and the newer inline "License Members" / "الاطراف" block. Start at the first heading we
+        // recognise (priority order) and stop at the page footer ("Print Date") so numbers from later
+        // pages (receipts, the commercial register) cannot look like partner rows.
+        var start = FirstIndexOf(text, "اصحاب", "الاطراف", "License Members", "Partners");
         var scope = start >= 0 ? text[start..] : text;
         var footer = scope.IndexOf("Print Date", StringComparison.OrdinalIgnoreCase);
         if (footer > 0)
