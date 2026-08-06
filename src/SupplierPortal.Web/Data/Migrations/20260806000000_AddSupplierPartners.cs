@@ -22,6 +22,7 @@ namespace SupplierPortal.Web.Data.Migrations
                     Nationality = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
                     SerialNo = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     Share = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    Role = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>

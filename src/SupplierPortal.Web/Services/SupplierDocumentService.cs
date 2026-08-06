@@ -51,6 +51,14 @@ public class SupplierDocumentService(
         @"(\d{4,7})\s+([A-Za-z][^\n%\d]*[A-Za-z.)])[^%]*?(\d{1,3}(?:\.\d+)?)\s*%",
         RegexOptions.Compiled);
 
+    // Inline "License Members" layout helpers. A member name is >= 2 all-caps Latin words
+    // (e.g. "ARIF ABDULLA AHMAD OBAID ALSHAMSI"); serial and share are read from a window around it.
+    private static readonly Regex MemberName = new(
+        @"\b[A-Z][A-Z]+(?:\s+[A-Z][A-Z.'&()\-]+){1,6}\b",
+        RegexOptions.Compiled);
+    private static readonly Regex SerialNumber = new(@"\b\d{4,7}\b", RegexOptions.Compiled);
+    private static readonly Regex SharePercent = new(@"(\d{1,3}(?:\.\d+)?)\s*%", RegexOptions.Compiled);
+
     private string DocumentsDirectory(int supplierId) =>
         Path.Combine(env.ContentRootPath, "doc", "supplier", supplierId.ToString());
 
@@ -194,7 +202,8 @@ public class SupplierDocumentService(
                             Name = partner.Name,
                             Nationality = partner.Nationality,
                             SerialNo = partner.SerialNo,
-                            Share = partner.Share
+                            Share = partner.Share,
+                            Role = partner.Role
                         });
                     }
                 }
@@ -250,10 +259,6 @@ public class SupplierDocumentService(
         }
     }
 
-    /// <summary>Parses the "Partners" (ملحق الشركاء) annex of a Dubai DED trade license. Best-effort
-    /// and tuned to that bilingual layout: each row carries a serial/person number, a Latin name and
-    /// an ownership share; nationality is captured only when it prints in Latin next to the row.
-    /// Returns an empty list when nothing parses, so a non-standard license never breaks the upload.</summary>
     private static int FirstIndexOf(string text, params string[] needles)
     {
         foreach (var needle in needles)
@@ -267,43 +272,163 @@ public class SupplierDocumentService(
         return -1;
     }
 
+    private static int EarliestIndexOf(string text, params string[] needles)
+    {
+        var best = -1;
+        foreach (var needle in needles)
+        {
+            var i = text.IndexOf(needle, StringComparison.OrdinalIgnoreCase);
+            if (i >= 0 && (best < 0 || i < best))
+            {
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    // Known nationality/role strings so they can be read out of a member row wherever the text places
+    // them. Roles are listed longest-first so "Shares Owner" wins over "Owner", "General Manager" over
+    // "Manager", etc.
+    private static readonly string[] KnownNationalities =
+    [
+        "United Arab Emirates", "Saudi Arabia", "Oman", "Kuwait", "Bahrain", "Qatar", "Yemen",
+        "Egypt", "Jordan", "Lebanon", "Syria", "Sudan", "Iraq", "Iran", "Palestine",
+        "India", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Philippines", "China",
+        "United Kingdom", "United States", "Canada", "Germany", "France"
+    ];
+
+    private static readonly string[] KnownRoles =
+    [
+        "Shares Owner", "Managing Partner", "General Manager", "Managing Director",
+        "Sole Proprietor", "Authorized Signatory", "Local Service Agent",
+        "Manager", "Partner", "Director", "Owner", "Agent"
+    ];
+
+    private static readonly string[] StatusWords = ["Active", "Inactive", "Expired", "Cancelled"];
+
+    /// <summary>Normalises a captured name and strips any trailing nationality / role / status words
+    /// that a single-line inline row folds onto the end of the name (e.g. "... ALSHAMSI United Arab
+    /// Emirates Shares Owner" -> "... ALSHAMSI").</summary>
+    private static string CleanName(string raw)
+    {
+        var name = Regex.Replace(raw, @"\s+", " ").Trim().Trim('.', ',', '-', '/').Trim();
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var token in KnownRoles.Concat(KnownNationalities).Concat(StatusWords))
+            {
+                if (name.Length > token.Length
+                    && name.EndsWith(token, StringComparison.OrdinalIgnoreCase)
+                    && char.IsWhiteSpace(name[name.Length - token.Length - 1]))
+                {
+                    name = name[..^token.Length].Trim().Trim('.', ',', '-', '/').Trim();
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        return name;
+    }
+
+    private static string? FirstContained(string haystack, string[] options)
+    {
+        foreach (var option in options)
+        {
+            if (haystack.Contains(option, StringComparison.OrdinalIgnoreCase))
+            {
+                return option;
+            }
+        }
+        return null;
+    }
+
+
+    private static string Slice(string s, int from, int to)
+    {
+        from = Math.Max(0, from);
+        to = Math.Min(s.Length, to);
+        return from < to ? s[from..to] : "";
+    }
+
+    /// <summary>Parses the owners/members section of a Dubai DED license. Handles both the older
+    /// "Partners" / "ملحق الشركاء" annex (serial + name + share%) and the newer inline "License
+    /// Members" / "الاطراف" table (No., Name, Nationality, Role, Share - the share is often blank for a
+    /// manager). Best-effort and tuned to that bilingual layout; returns an empty list when nothing
+    /// parses, so a non-standard license never breaks the upload. Names are matched in Latin, so an
+    /// Arabic-only name yields no row.</summary>
     private static List<ParsedPartner> ExtractPartners(string text)
     {
-        // Scope to the owners/members section. Two layouts exist: the older "Partners" / "ملحق الشركاء"
-        // annex, and the newer inline "License Members" / "الاطراف" block. Start at the first heading we
-        // recognise (priority order) and stop at the page footer ("Print Date") so numbers from later
-        // pages (receipts, the commercial register) cannot look like partner rows.
+        // Scope to the members section: start at the first heading we recognise (priority order) and
+        // end at the next section/footer, so activities and later pages cannot look like member rows.
         var start = FirstIndexOf(text, "اصحاب", "الاطراف", "License Members", "Partners");
         var scope = start >= 0 ? text[start..] : text;
-        var footer = scope.IndexOf("Print Date", StringComparison.OrdinalIgnoreCase);
-        if (footer > 0)
+        var end = EarliestIndexOf(scope, "License Activities", "نشاط الرخصة", "الملاحظات", "Remarks", "Print Date");
+        if (end > 0)
         {
-            scope = scope[..footer];
+            scope = scope[..end];
         }
 
         var partners = new List<ParsedPartner>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(string rawName, string? serial, string? share, string? role, string? nationality)
+        {
+            var name = CleanName(rawName);
+            if (name.Length < 3
+                || name.Contains('&') || name.Contains('®')
+                || name.Contains("D-U-N-S", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("License", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Members", StringComparison.OrdinalIgnoreCase)
+                || KnownRoles.Any(r => name.Equals(r, StringComparison.OrdinalIgnoreCase))
+                || KnownNationalities.Any(n => name.Equals(n, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+            if (!seen.Add(name))
+            {
+                return;
+            }
+            partners.Add(new ParsedPartner(
+                name,
+                nationality,
+                string.IsNullOrWhiteSpace(serial) ? null : serial.Trim(),
+                string.IsNullOrWhiteSpace(share) ? null : share.Trim(),
+                role));
+        }
+
+        // Pass 1 - share-anchored rows (the classic annex, and any inline row that prints a share).
         foreach (Match m in PartnerRow.Matches(scope))
         {
-            var name = Regex.Replace(m.Groups[2].Value, @"\s+", " ").Trim();
-            // Skip header/receipt noise that structurally resembles a row but is not a partner
-            // (the license-details line carries "D&B D-U-N-S ® No.", receipts carry "Renew License").
-            if (name.Length < 2 || name.Contains('&') || name.Contains('®')
-                || name.Contains("D-U-N-S", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("License", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            var serial = m.Groups[1].Value.Trim();
-            var share = m.Groups[3].Value.Trim();
-            var nationality = Regex.Match(m.Value, "United Arab Emirates", RegexOptions.IgnoreCase).Success
-                ? "United Arab Emirates"
-                : null;
-            partners.Add(new ParsedPartner(name, nationality, serial, share));
+            var window = Slice(scope, m.Index - 40, m.Index + m.Length + 40);
+            Add(m.Groups[2].Value, m.Groups[1].Value, m.Groups[3].Value,
+                FirstContained(window, KnownRoles), FirstContained(window, KnownNationalities));
         }
+
+        // Pass 2 - inline "License Members" rows anchored on the all-caps Latin name, so members whose
+        // share is blank (e.g. a manager) are still captured. Serial/share/role/nationality are read
+        // from a window around the name; names already captured in pass 1 are skipped by the dedupe.
+        foreach (Match m in MemberName.Matches(scope))
+        {
+            // The serial/No. prints just before the name; nationality, role and share print just after
+            // it on the same table row. Read each from its own side so a neighbouring row's share (e.g.
+            // the owner's 100%) can't leak onto a share-less manager.
+            var before = Slice(scope, m.Index - 30, m.Index);
+            var after = Slice(scope, m.Index + m.Length, m.Index + m.Length + 90);
+            var serials = SerialNumber.Matches(before);
+            var shareMatch = SharePercent.Match(after);
+            Add(m.Value,
+                serials.Count > 0 ? serials[^1].Value : null,
+                shareMatch.Success ? shareMatch.Groups[1].Value : null,
+                FirstContained(after, KnownRoles),
+                FirstContained(after, KnownNationalities));
+        }
+
         return partners;
     }
 
-    private sealed record ParsedPartner(string Name, string? Nationality, string? SerialNo, string? Share);
+    private sealed record ParsedPartner(
+        string Name, string? Nationality, string? SerialNo, string? Share, string? Role);
 
     public async Task<(bool Success, string? Error)> DeleteAsync(int documentId, string actorUsername)
     {
