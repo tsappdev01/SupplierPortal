@@ -3,6 +3,7 @@
 ───────────────────────────────────────────────────────────────────────────
   Deletes every supplier record and its history:
       • Suppliers
+      • SupplierPartners         (partners read from trade licenses)
       • SupplierDocuments        (uploaded-document metadata)
       • SupplierFieldChanges     (the change log / review history)
       • SupplierAccessTokens     (self-service links + OTP / email history)
@@ -42,6 +43,7 @@ BEGIN TRY
     PRINT '--- Row counts BEFORE ---';
     SELECT
         (SELECT COUNT(*) FROM dbo.Suppliers)            AS Suppliers,
+        (SELECT COUNT(*) FROM dbo.SupplierPartners)     AS SupplierPartners,
         (SELECT COUNT(*) FROM dbo.SupplierDocuments)    AS SupplierDocuments,
         (SELECT COUNT(*) FROM dbo.SupplierFieldChanges) AS SupplierFieldChanges,
         (SELECT COUNT(*) FROM dbo.SupplierAccessTokens) AS SupplierAccessTokens;
@@ -50,6 +52,7 @@ BEGIN TRY
     DELETE FROM dbo.SupplierFieldChanges;
     DELETE FROM dbo.SupplierAccessTokens;
     DELETE FROM dbo.SupplierDocuments;
+    DELETE FROM dbo.SupplierPartners;
     DELETE FROM dbo.Suppliers;
 
     -- Reset identity seeds so new records number from 1 again (optional but tidy).
@@ -57,11 +60,13 @@ BEGIN TRY
     DBCC CHECKIDENT ('dbo.SupplierFieldChanges', RESEED, 0) WITH NO_INFOMSGS;
     DBCC CHECKIDENT ('dbo.SupplierAccessTokens', RESEED, 0) WITH NO_INFOMSGS;
     DBCC CHECKIDENT ('dbo.SupplierDocuments',    RESEED, 0) WITH NO_INFOMSGS;
+    DBCC CHECKIDENT ('dbo.SupplierPartners',     RESEED, 0) WITH NO_INFOMSGS;
     DBCC CHECKIDENT ('dbo.Suppliers',            RESEED, 0) WITH NO_INFOMSGS;
 
     PRINT '--- Row counts AFTER (all should be 0) ---';
     SELECT
         (SELECT COUNT(*) FROM dbo.Suppliers)            AS Suppliers,
+        (SELECT COUNT(*) FROM dbo.SupplierPartners)     AS SupplierPartners,
         (SELECT COUNT(*) FROM dbo.SupplierDocuments)    AS SupplierDocuments,
         (SELECT COUNT(*) FROM dbo.SupplierFieldChanges) AS SupplierFieldChanges,
         (SELECT COUNT(*) FROM dbo.SupplierAccessTokens) AS SupplierAccessTokens;
