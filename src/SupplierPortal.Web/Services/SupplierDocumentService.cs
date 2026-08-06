@@ -121,6 +121,11 @@ public class SupplierDocumentService(
 
         if (documentType is SupplierDocumentType.VatCertification or SupplierDocumentType.TradeLicense)
         {
+            // Metadata extraction (QR decode, official-PDF download, OCR, regex parsing) is best-effort.
+            // A failure anywhere here must never block the upload, so the whole block is guarded; on error
+            // the extracted values simply stay null/empty and the file is still saved to the DB below.
+            try
+            {
             var extractionPath = fullPath;
             string? tempOfficialPdf = null;
 
@@ -182,6 +187,12 @@ public class SupplierDocumentService(
             {
                 try { File.Delete(tempOfficialPdf); }
                 catch { /* best-effort temp cleanup */ }
+            }
+            }
+            catch
+            {
+                // Extraction is optional enrichment; swallow so a parse/OCR/download failure never
+                // stops the file from being saved. Extracted values remain null and are simply not applied.
             }
         }
 
