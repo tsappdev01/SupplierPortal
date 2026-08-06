@@ -18,8 +18,9 @@
     <ValidationSummary class="text-danger" />
 
     <div class="mb-3">
-        <label for="email" class="form-label">Email</label>
-        <InputText id="email" class="form-control" @bind-Value="Input.Email" autocomplete="username" />
+        <label for="email" class="form-label">Email or Login name</label>
+        <InputText id="email" class="form-control" @bind-Value="Input.Email" autocomplete="username" placeholder="you@company.com or DOMAIN\login" />
+        <div class="form-text">Local users sign in with their email; Active Directory users can use their login name (e.g. DOMAIN\login) or email.</div>
     </div>
     <div class="mb-3">
         <label for="password" class="form-label">Password</label>
@@ -65,7 +66,10 @@
 
     private sealed class LoginModel
     {
-        [Required, EmailAddress]
+        // Accepts an email (local users) or an AD login name such as DOMAIN\login (Active Directory
+        // users), so [EmailAddress] is intentionally not applied. AuthService matches either form.
+        [Required]
+        [Display(Name = "Email or Login name")]
         public string Email { get; set; } = "";
 
         [Required]

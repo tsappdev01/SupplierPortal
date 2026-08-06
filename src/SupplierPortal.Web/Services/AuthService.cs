@@ -45,7 +45,7 @@ public class AuthService(
             .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
         if (user is null)
         {
-            return (false, "Invalid email or password.", null);
+            return (false, "Invalid login or password.", null);
         }
 
         if (user.AuthSource == AuthSource.ActiveDirectory)
@@ -58,7 +58,7 @@ public class AuthService(
         }
         else if (hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
         {
-            return (false, "Invalid email or password.", null);
+            return (false, "Invalid login or password.", null);
         }
 
         if (!user.IsActive)
