@@ -45,7 +45,7 @@ public class AuthService(
             .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
         if (user is null)
         {
-            return (false, "Invalid email or password.", null);
+            return (false, "Invalid login or password.", null);
         }
 
         if (user.AuthSource == AuthSource.ActiveDirectory)
@@ -58,7 +58,7 @@ public class AuthService(
         }
         else if (hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
         {
-            return (false, "Invalid email or password.", null);
+            return (false, "Invalid login or password.", null);
         }
 
         if (!user.IsActive)
@@ -72,25 +72,61 @@ public class AuthService(
         return (true, null, user);
     }
 
-    public static ClaimsPrincipal BuildPrincipal(User user)
+    /// <summary>Resolves an SSO-authenticated identity (by email, or the AD login it was linked with)
+    /// to an active app user. Identity is proven by the identity provider; role and business units
+    /// still come from the local Users table. Returns (null, reason) when there is no active match, so
+    /// SSO accounts without a provisioned app user are refused.</summary>
+    public async Task<(User? User, string? Error)> GetActiveUserByEmailAsync(string? email)
     {
-        var claims = new List<Claim>
+        if (string.IsNullOrWhiteSpace(email))
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Email, user.Email),
-            new(ClaimTypes.Role, user.UserType.ToString()),
-            new("FullName", string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName),
-            new("Designation", user.Designation ?? ""),
-            new("HasPhoto", (user.ProfilePhoto is not null).ToString())
-        };
-
-        foreach (var businessUnit in user.BusinessUnits)
-        {
-            claims.Add(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
+            return (null, "The single sign-on token did not include an email address.");
         }
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-        return new ClaimsPrincipal(identity);
+        var login = email.Trim();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.Users.Include(u => u.BusinessUnits)
+            .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
+        if (user is null)
+        {
+            return (null, "No Supplier Portal account is linked to this single sign-on user.");
+        }
+        if (!user.IsActive)
+        {
+            return (null, "This account has been deactivated.");
+        }
+
+        return (user, null);
+    }
+
+    public static ClaimsPrincipal BuildPrincipal(User user) => new(BuildAppIdentity(user));
+
+    /// <summary>Builds the app's cookie identity for a user: the role + business-unit claims the rest
+    /// of the app reads, plus the app-user marker/id and the resolved marker.</summary>
+    public static ClaimsIdentity BuildAppIdentity(User user)
+    {
+        var identity = new ClaimsIdentity(
+            CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
+        identity.AddClaim(new Claim(AppClaims.RoleResolved, "true"));
+        AddAppClaims(identity, user);
+        return identity;
+    }
+
+    /// <summary>Adds the app's user/role/business-unit claims to an identity.</summary>
+    public static void AddAppClaims(ClaimsIdentity identity, User user)
+    {
+        identity.AddClaim(new Claim(AppClaims.AppUser, "true"));
+        identity.AddClaim(new Claim(AppClaims.AppUserId, user.Id.ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.Name, user.Username));
+        identity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
+        identity.AddClaim(new Claim(ClaimTypes.Role, user.UserType.ToString()));
+        identity.AddClaim(new Claim("FullName", string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName));
+        identity.AddClaim(new Claim("Designation", user.Designation ?? ""));
+        identity.AddClaim(new Claim("HasPhoto", (user.ProfilePhoto is not null).ToString()));
+        foreach (var businessUnit in user.BusinessUnits)
+        {
+            identity.AddClaim(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
+        }
     }
 }

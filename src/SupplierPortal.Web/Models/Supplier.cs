@@ -33,6 +33,11 @@ public class Supplier
     [MaxLength(100)]
     public string? TradeLicenseNumber { get; set; }
 
+    /// <summary>Legal type / license type as printed on the trade license (e.g. "Limited Liability
+    /// Company (LLC)"), captured from the license document.</summary>
+    [MaxLength(150)]
+    public string? LicenseType { get; set; }
+
     [MaxLength(50)]
     public string? DunsNumber { get; set; }
 

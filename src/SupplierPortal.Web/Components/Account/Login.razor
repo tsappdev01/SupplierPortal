@@ -1,74 +1,28 @@
 @page "/account/login"
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
-@using System.ComponentModel.DataAnnotations
-@using SupplierPortal.Web.Models
+@using Microsoft.Extensions.Options
 @using SupplierPortal.Web.Services
 @layout Layout.AccountLayout
-@inject AuthService AuthService
-@inject AuditService AuditService
-@inject NavigationManager NavigationManager
+@inject IOptions<AuthOptions> Auth
 
 <PageTitle>Login - Supplier Portal</PageTitle>
 
 <h1>Login</h1>
 
-<EditForm Model="Input" method="post" OnValidSubmit="LoginAsync" FormName="login">
-    <DataAnnotationsValidator />
-    <ValidationSummary class="text-danger" />
-
-    <div class="mb-3">
-        <label for="email" class="form-label">Email</label>
-        <InputText id="email" class="form-control" @bind-Value="Input.Email" autocomplete="username" />
-    </div>
-    <div class="mb-3">
-        <label for="password" class="form-label">Password</label>
-        <InputText id="password" type="password" class="form-control" @bind-Value="Input.Password" autocomplete="current-password" />
-    </div>
-
-    @if (errorMessage is not null)
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
-
-    <button type="submit" class="btn btn-primary">Log in</button>
-</EditForm>
-
-<p class="mt-3">Don't have an account? <a href="/account/register">Register</a></p>
+@if (Auth.Value.Entra.Enabled)
+{
+    <p class="text-muted">Sign in with your organisation account.</p>
+    <a class="btn btn-primary w-100" href="@SsoLoginUrl">Sign in with company SSO</a>
+}
+else
+{
+    <div class="alert alert-warning mb-0">Single sign-on is not configured yet. Please contact your administrator.</div>
+}
 
 @code {
-    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
 
-    [SupplyParameterFromForm]
-    private LoginModel Input { get; set; } = new();
-
-    [SupplyParameterFromQuery]
-    private string? ReturnUrl { get; set; }
-
-    private string? errorMessage;
-
-    private async Task LoginAsync()
-    {
-        var (success, error, user) = await AuthService.ValidateCredentialsAsync(Input.Email, Input.Password);
-        if (!success || user is null)
-        {
-            errorMessage = error;
-            return;
-        }
-
-        var principal = AuthService.BuildPrincipal(user);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
-        await AuditService.LogAsync(user.Username, AuditAction.Login, "User", user.Id);
-
-        NavigationManager.NavigateTo(string.IsNullOrEmpty(ReturnUrl) ? "/" : ReturnUrl, forceLoad: true);
-    }
-
-    private sealed class LoginModel
-    {
-        [Required, EmailAddress]
-        public string Email { get; set; } = "";
-
-        [Required]
-        public string Password { get; set; } = "";
-    }
+    private string SsoLoginUrl =>
+        string.IsNullOrEmpty(ReturnUrl)
+            ? "/account/sso-login"
+            : $"/account/sso-login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
 }
