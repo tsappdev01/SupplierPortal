@@ -16,6 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
     public DbSet<SupplierFieldChange> SupplierFieldChanges => Set<SupplierFieldChange>();
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
+    public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -251,5 +252,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<SupplierDocument>()
             .HasIndex(d => new { d.SupplierId, d.DocumentType });
+
+        // Owned child rows of a specific Supplier (partners read from its Trade License),
+        // so cascade-delete matches the SupplierDocument pattern above.
+        modelBuilder.Entity<SupplierPartner>()
+            .HasOne(p => p.Supplier)
+            .WithMany()
+            .HasForeignKey(p => p.SupplierId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SupplierPartner>()
+            .HasIndex(p => p.SupplierId);
     }
 }
