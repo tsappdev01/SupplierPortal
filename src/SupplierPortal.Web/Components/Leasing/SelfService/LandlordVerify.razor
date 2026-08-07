@@ -99,7 +99,8 @@
         if (success && sessionToken is not null)
         {
             await LandlordService.MarkOtpVerifiedAsync(token.LandlordId, $"Landlord ({token.Landlord?.Email})", null);
-            NavigationManager.NavigateTo($"/landlord/{Token}/update?s={sessionToken}");
+            // UAE Pass identity verification is required immediately after OTP, before the form opens.
+            NavigationManager.NavigateTo($"/landlord/{Token}/uaepass?s={sessionToken}");
             return;
         }
         errorMessage = error;

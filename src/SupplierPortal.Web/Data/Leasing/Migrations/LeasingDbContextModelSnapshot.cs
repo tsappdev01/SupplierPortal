@@ -187,6 +187,33 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("UaePassEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UaePassEmiratesId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("UaePassFullName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UaePassMobile")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("UaePassState")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("UaePassSub")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("UaePassVerifiedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime2");
 
@@ -225,6 +252,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<string>("EmiratesId")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("EmiratesIdExpiry")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("FullName")
                         .IsRequired()

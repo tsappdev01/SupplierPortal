@@ -167,6 +167,8 @@ public class LandlordContact
     [MaxLength(40)] public string? Mobile { get; set; }
     [MaxLength(200)] public string Email { get; set; } = string.Empty;
     [MaxLength(50)] public string? EmiratesId { get; set; }
+    /// <summary>Emirates ID expiry date, captured (or OCR-extracted) alongside the Emirates ID document.</summary>
+    public DateTime? EmiratesIdExpiry { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -308,4 +310,16 @@ public class LandlordAccessToken
 
     [MaxLength(64)] public string? SessionTokenHash { get; set; }
     public DateTime? SessionExpiresAt { get; set; }
+
+    // ---- UAE Pass identity (captured right after OTP, before the form opens) ----
+    /// <summary>Random anti-forgery <c>state</c> issued when the UAE Pass round-trip starts; matched on callback.</summary>
+    [MaxLength(64)] public string? UaePassState { get; set; }
+    public DateTime? UaePassVerifiedAt { get; set; }
+    /// <summary>UAE Pass subject / UUID of the authenticated person.</summary>
+    [MaxLength(100)] public string? UaePassSub { get; set; }
+    [MaxLength(200)] public string? UaePassFullName { get; set; }
+    [MaxLength(200)] public string? UaePassEmail { get; set; }
+    [MaxLength(40)] public string? UaePassMobile { get; set; }
+    /// <summary>Emirates ID number (UAE Pass <c>idn</c>) where the profile scope exposes it.</summary>
+    [MaxLength(50)] public string? UaePassEmiratesId { get; set; }
 }
