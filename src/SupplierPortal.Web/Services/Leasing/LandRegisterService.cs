@@ -126,19 +126,28 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
                 || (p.ContactName != null && p.ContactName.Contains(t)) || (p.EmailAddress != null && p.EmailAddress.Contains(t)));
         }
 
-        var premises = await q.OrderBy(p => p.PropertyCode).ThenBy(p => p.BuildingName).Take(take).ToListAsync();
-        var ids = premises.Select(p => p.Id).ToList();
+        var premises = await q.OrderBy(p => p.PropertyCode).ThenBy(p => p.BuildingName).ToListAsync();
 
+        // A property code has one Property-View row per building — collapse to ONE row per property code
+        // (buildings are ignored on this list). The representative row prefers one that carries an email.
+        var byCode = premises
+            .GroupBy(p => p.PropertyCode)
+            .Select(g => g.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.EmailAddress)) ?? g.First())
+            .OrderBy(p => p.PropertyCode)
+            .Take(take)
+            .ToList();
+
+        var codes = byCode.Select(p => p.PropertyCode).ToList();
         var regsRaw = await db.Landlords.AsNoTracking()
-            .Where(l => ids.Contains(l.PropertyId))
-            .Select(l => new { l.Id, l.PropertyId, l.Status, l.LinkActive })
+            .Where(l => codes.Contains(l.PropertyCode))
+            .Select(l => new { l.Id, l.PropertyCode, l.Status, l.LinkActive })
             .ToListAsync();
-        var latest = regsRaw.GroupBy(r => r.PropertyId)
+        var latest = regsRaw.GroupBy(r => r.PropertyCode)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
 
-        var rows = premises.Select(p =>
+        var rows = byCode.Select(p =>
         {
-            latest.TryGetValue(p.Id, out var reg);
+            latest.TryGetValue(p.PropertyCode, out var reg);
             return new PropertyListRow(
                 p.Id, p.PropertyCode, p.BuildingName, p.CategoryName, p.CompanyName, p.ContactName, p.EmailAddress,
                 reg?.Id, reg?.Status, reg?.LinkActive ?? false);
