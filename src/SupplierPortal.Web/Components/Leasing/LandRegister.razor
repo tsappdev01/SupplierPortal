@@ -2,190 +2,190 @@
 @attribute [Authorize(Roles = "Administrator,LeasingManager")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
 @using SupplierPortal.Web.Services.Leasing
 @inject LandRegisterService LandRegisterService
+@inject LandlordService LandlordService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
 
-<PageTitle>Land Register - Supplier Portal</PageTitle>
+<PageTitle>Property List - Supplier Portal</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-1">
-    <h1 class="mb-0">Land Register</h1>
-</div>
-<p class="text-muted">Land is read from the Dubai Municipality property view. Each building is an ownable premises to which one or more landlords are assigned.</p>
-
-<ul class="nav nav-tabs mb-3">
-    @foreach (var z in LandRegisterService.Zones)
-    {
-        <li class="nav-item">
-            <button type="button" class="nav-link @(z == zone ? "active" : "")" @onclick="() => SelectZone(z)">
-                Zone @z
-            </button>
-        </li>
-    }
-</ul>
+<h1 class="mb-1">Property List</h1>
+<p class="text-muted">Initiate and track landlord registrations. Company, contact and email are read from the Property View; the invitation is always sent to that email.</p>
 
 <div class="row g-2 mb-3">
     <div class="col-sm-3">
-        <div class="di-stat-card">
-            <span class="di-stat-value">@(view?.PropertyCount ?? 0)</span>
-            <span class="di-stat-label">Property Codes</span>
-        </div>
+        <label class="form-label small mb-0">Zone</label>
+        <select class="form-select form-select-sm" @bind="zone" @bind:after="LoadAsync">
+            @foreach (var z in LandRegisterService.Zones)
+            {
+                <option value="@z">@z</option>
+            }
+        </select>
     </div>
     <div class="col-sm-3">
-        <div class="di-stat-card">
-            <span class="di-stat-value">@(view?.TotalBuildings ?? 0)</span>
-            <span class="di-stat-label">Buildings / Premises</span>
-        </div>
+        <label class="form-label small mb-0">Category</label>
+        <select class="form-select form-select-sm" @bind="category" @bind:after="LoadAsync">
+            <option value="">All</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c">@c</option>
+            }
+        </select>
     </div>
     <div class="col-sm-3">
-        <div class="di-stat-card">
-            <span class="di-stat-value text-success">@(view?.AssignedBuildings ?? 0)</span>
-            <span class="di-stat-label">With Owner</span>
-        </div>
+        <label class="form-label small mb-0">Status</label>
+        <select class="form-select form-select-sm" @bind="statusText" @bind:after="LoadAsync">
+            <option value="">All</option>
+            @foreach (var s in filterStatuses)
+            {
+                <option value="@s">@Landlords.Label(s)</option>
+            }
+        </select>
     </div>
     <div class="col-sm-3">
-        <div class="di-stat-card">
-            <span class="di-stat-value text-warning">@(view?.UnassignedBuildings ?? 0)</span>
-            <span class="di-stat-label">Unassigned</span>
-        </div>
+        <label class="form-label small mb-0">Search</label>
+        <input class="form-control form-control-sm" placeholder="Code, company, contact, email…" value="@search" @oninput="OnSearchInput" />
     </div>
-</div>
-
-<div class="input-group mb-3" style="max-width: 420px;">
-    <span class="input-group-text">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
-        </svg>
-    </span>
-    <input class="form-control" placeholder="Search property code or building…"
-           value="@search" @oninput="OnSearchInput" />
-    @if (!string.IsNullOrEmpty(search))
-    {
-        <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">Clear</button>
-    }
 </div>
 
 @if (loading)
 {
-    <p class="text-muted">Loading land register…</p>
+    <p class="text-muted">Loading…</p>
 }
-else if (view is null || view.Properties.Count == 0)
+else if (rows.Count == 0)
 {
-    <div class="alert alert-light border">No properties found in zone @zone@(string.IsNullOrEmpty(search) ? "" : $" matching \"{search}\"").</div>
+    <div class="alert alert-light border">No properties match the current filter.</div>
 }
 else
 {
-    <div class="accordion" id="landRegisterAccordion">
-        @foreach (var (property, index) in view.Properties.Select((p, i) => (p, i)))
-        {
-            var isOpen = expanded.Contains(property.PropertyCode);
-            <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button type="button" class="accordion-button @(isOpen ? "" : "collapsed")" @onclick="() => Toggle(property.PropertyCode)">
-                        <span class="di-prop-code">@property.PropertyCode</span>
-                        <span class="badge bg-secondary ms-2">@property.Buildings.Count building@(property.Buildings.Count == 1 ? "" : "s")</span>
-                        @if (property.AssignedCount > 0)
-                        {
-                            <span class="badge bg-success ms-2">@property.AssignedCount assigned</span>
-                        }
-                    </button>
-                </h2>
-                @if (isOpen)
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="di-thead">
+                <tr>
+                    <th>PropertyCode</th>
+                    <th>CompanyName</th>
+                    <th>ContactName</th>
+                    <th>EmailAddress</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in rows)
                 {
-                    <div class="accordion-body p-0 table-responsive">
-                        <table class="table table-sm mb-0 align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Building</th>
-                                    <th>Lease No</th>
-                                    <th>Landlord Code</th>
-                                    <th>Company</th>
-                                    <th>Contact</th>
-                                    <th>Email</th>
-                                    <th>Owner(s)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var b in property.Buildings)
-                                {
-                                    <tr>
-                                        <td>@(string.IsNullOrWhiteSpace(b.BuildingName) ? "—" : b.BuildingName)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(b.LeaseNo) ? "—" : b.LeaseNo)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(b.LandLordCode) ? "—" : b.LandLordCode)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(b.CompanyName) ? "—" : b.CompanyName)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(b.ContactName) ? "—" : b.ContactName)</td>
-                                        <td>@(string.IsNullOrWhiteSpace(b.EmailAddress) ? "—" : b.EmailAddress)</td>
-                                        <td>
-                                            @if (b.Owners.Count == 0)
-                                            {
-                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Unassigned</span>
-                                            }
-                                            else
-                                            {
-                                                @foreach (var o in b.Owners)
-                                                {
-                                                    <span class="badge @StatusClass(o.Status) me-1" title="@o.Status">@o.LegalName</span>
-                                                }
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
+                    <tr>
+                        <td class="text-nowrap">@r.PropertyCode</td>
+                        <td>@(r.CompanyName ?? "—")</td>
+                        <td>@(r.ContactName ?? "—")</td>
+                        <td>@(r.EmailAddress ?? "—")</td>
+                        <td>
+                            @if (r.Status is LandlordStatus s)
+                            {
+                                <span class="badge @Landlords.StatusClass(s)">@Landlords.Label(s)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">Not started</span>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap di-actions">
+                            <a href="javascript:void(0)" @onclick="() => EditAsync(r)">Edit</a>
+                            <span class="text-muted">|</span>
+                            <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
+                            <span class="text-muted">|</span>
+                            <a href="javascript:void(0)" class="@(CanReview(r) ? "" : "di-disabled")" @onclick="() => ReviewAsync(r)">Review</a>
+                        </td>
+                    </tr>
                 }
+            </tbody>
+        </table>
+    </div>
+    <p class="small text-muted">Showing @rows.Count propert@(rows.Count == 1 ? "y" : "ies").</p>
+}
+
+@if (initiating is not null)
+{
+    <div class="di-modal-backdrop" @onclick="CancelInitiate">
+        <div class="di-modal" @onclick:stopPropagation="true">
+            <h5 class="mb-3">Initiate Landlord Registration</h5>
+            <dl class="row small mb-3">
+                <dt class="col-5">Property Code</dt><dd class="col-7">@initiating.PropertyCode</dd>
+                <dt class="col-5">Company</dt><dd class="col-7">@(initiating.CompanyName ?? "—")</dd>
+                <dt class="col-5">Invitation Email</dt><dd class="col-7 fw-semibold">@(initiating.EmailAddress ?? "—")</dd>
+            </dl>
+            <p class="small text-muted">The invitation will be sent to the email held against this property in the Property View. It cannot be changed here.</p>
+            <div class="mb-3">
+                <label class="form-label">Landlord Type</label>
+                <select class="form-select" @bind="initiateType">
+                    <option value="@LandlordType.Company">Company</option>
+                    <option value="@LandlordType.Individual">Individual</option>
+                </select>
             </div>
-        }
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-link" @onclick="CancelInitiate">Cancel</button>
+                <button class="btn btn-primary" disabled="@initiateBusy" @onclick="ConfirmInitiateAsync">
+                    @(initiateBusy ? "Creating…" : (initiateThenNotify ? "Create & Notify" : "Create & Open"))
+                </button>
+            </div>
+        </div>
     </div>
 }
 
 <style>
-    .di-stat-card {
-        display: flex;
-        flex-direction: column;
-        padding: .75rem 1rem;
-        border: 1px solid var(--bs-border-color);
-        border-radius: .5rem;
-        background: var(--bs-body-bg);
-    }
-    .di-stat-value { font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
-    .di-stat-label { font-size: .8rem; color: var(--bs-secondary-color); }
-    .di-prop-code { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .di-thead th { background: #1a5276; color: #fff; }
+    .di-actions a { color: #b8860b; font-weight: 600; text-decoration: none; margin: 0 .15rem; }
+    .di-actions a:hover { text-decoration: underline; }
+    .di-actions a.di-disabled { color: #b7bcc4; pointer-events: none; }
+    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 3000; }
+    .di-modal { width: 100%; max-width: 460px; background: var(--bs-body-bg); border-radius: .6rem; box-shadow: 0 12px 40px rgba(0,0,0,.3); padding: 1.25rem 1.5rem; }
 </style>
 
 @code {
     private string zone = "";
+    private string category = "";
+    private string statusText = "";
     private string search = "";
     private bool loading = true;
-    private LandRegisterView? view;
-    private readonly HashSet<string> expanded = new();
+    private List<PropertyListRow> rows = [];
+    private List<string> categories = [];
     private CancellationTokenSource? debounceCts;
+
+    private PropertyListRow? initiating;
+    private LandlordType initiateType = LandlordType.Company;
+    private bool initiateBusy;
+    private bool initiateThenNotify;
+
+    private string currentUser = "unknown";
+    private int businessUnitId;
+
+    private static readonly LandlordStatus[] filterStatuses =
+        [LandlordStatus.Draft, LandlordStatus.InvitationSent, LandlordStatus.InProgress, LandlordStatus.Submitted,
+         LandlordStatus.UnderReview, LandlordStatus.CorrectionRequired, LandlordStatus.Rejected, LandlordStatus.RegistrationComplete];
+
+    private LandlordStatus? StatusFilter => Enum.TryParse<LandlordStatus>(statusText, out var s) ? s : null;
 
     protected override async Task OnInitializedAsync()
     {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        businessUnitId = state.User.GetBusinessUnitIds().FirstOrDefault();
         zone = LandRegisterService.ResolveZone(null);
+        categories = await LandRegisterService.GetCategoriesAsync(zone);
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         loading = true;
-        view = await LandRegisterService.GetRegisterAsync(zone, search);
-        expanded.RemoveWhere(code => view!.Properties.All(p => p.PropertyCode != code));
+        categories = await LandRegisterService.GetCategoriesAsync(zone);
+        rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, search);
         loading = false;
-    }
-
-    private async Task SelectZone(string z)
-    {
-        if (z == zone) return;
-        zone = z;
-        expanded.Clear();
-        await LoadAsync();
-    }
-
-    private void Toggle(string code)
-    {
-        if (!expanded.Add(code)) expanded.Remove(code);
     }
 
     private async Task OnSearchInput(ChangeEventArgs e)
@@ -194,27 +194,69 @@ else
         debounceCts?.Cancel();
         debounceCts = new CancellationTokenSource();
         var token = debounceCts.Token;
-        try
-        {
-            await Task.Delay(300, token);
-            await LoadAsync();
-            StateHasChanged();
-        }
+        try { await Task.Delay(300, token); await LoadAsync(); StateHasChanged(); }
         catch (TaskCanceledException) { }
     }
 
-    private async Task ClearSearch()
+    private static bool CanNotify(PropertyListRow r) =>
+        !string.IsNullOrWhiteSpace(r.EmailAddress)
+        && r.Status is not (LandlordStatus.RegistrationComplete or LandlordStatus.Rejected);
+    private static bool CanReview(PropertyListRow r) =>
+        r.RegistrationId is not null && r.Status is LandlordStatus.Submitted or LandlordStatus.UnderReview;
+
+    // Edit: open the registration if one exists, otherwise initiate then open.
+    private async Task EditAsync(PropertyListRow r)
     {
-        search = "";
-        await LoadAsync();
+        if (r.RegistrationId is int id) { Nav.NavigateTo($"/admin/landlords/{id}"); return; }
+        if (string.IsNullOrWhiteSpace(r.EmailAddress)) { Toast.ShowError("This property has no email in the Property View."); return; }
+        initiateThenNotify = false;
+        initiating = r;
+        initiateType = LandlordType.Company;
     }
 
-    private static string StatusClass(LandlordStatus status) => status switch
+    // Notify: send the secure link, initiating first if there is no registration yet.
+    private async Task NotifyAsync(PropertyListRow r)
     {
-        LandlordStatus.Approved => "bg-success",
-        LandlordStatus.UnderReview => "bg-info text-dark",
-        LandlordStatus.AwaitingLandlordResponse => "bg-primary",
-        LandlordStatus.Rejected => "bg-danger",
-        _ => "bg-secondary"
-    };
+        if (!CanNotify(r)) return;
+        if (r.RegistrationId is int id)
+        {
+            var (ok, error, _) = await Loading.RunAsync(() => LandlordService.InviteAsync(id, currentUser, Nav.BaseUri));
+            if (!ok) { Toast.ShowError(error ?? "Could not send the invitation."); return; }
+            Toast.ShowSuccess($"Invitation sent to {r.EmailAddress}.");
+            await LoadAsync();
+            return;
+        }
+        initiateThenNotify = true;
+        initiating = r;
+        initiateType = LandlordType.Company;
+    }
+
+    private async Task ReviewAsync(PropertyListRow r)
+    {
+        if (!CanReview(r)) { Toast.ShowInfo("There is no submitted registration to review yet."); return; }
+        Nav.NavigateTo($"/admin/landlords/{r.RegistrationId}");
+    }
+
+    private void CancelInitiate() => initiating = null;
+
+    private async Task ConfirmInitiateAsync()
+    {
+        if (initiating is null) return;
+        initiateBusy = true;
+        var (ok, error, id) = await Loading.RunAsync(
+            () => LandlordService.InitiateFromPropertyAsync(initiating.PremisesId, initiateType, businessUnitId, currentUser));
+        if (!ok) { initiateBusy = false; Toast.ShowError(error ?? "Could not initiate registration."); return; }
+
+        if (initiateThenNotify)
+        {
+            var (sent, err, _) = await LandlordService.InviteAsync(id, currentUser, Nav.BaseUri);
+            initiateBusy = false;
+            if (!sent) { Toast.ShowError(err ?? "Registration created but the invitation could not be sent."); Nav.NavigateTo($"/admin/landlords/{id}"); return; }
+            Toast.ShowSuccess("Registration created and invitation sent.");
+            Nav.NavigateTo($"/admin/landlords/{id}");
+            return;
+        }
+        initiateBusy = false;
+        Nav.NavigateTo($"/admin/landlords/{id}");
+    }
 }

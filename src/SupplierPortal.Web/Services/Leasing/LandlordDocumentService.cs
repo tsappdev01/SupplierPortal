@@ -12,26 +12,46 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
+    /// <summary>Accepted upload types (FRD §12 — supported file type).</summary>
+    private static readonly string[] AllowedExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"];
+
     private string DocumentsDirectory(int landlordId) =>
         Path.Combine(env.ContentRootPath, "doc", "landlord", landlordId.ToString());
 
+    /// <summary>Current (live) documents only — replaced versions are hidden here but kept for the audit trail.</summary>
     public async Task<List<LandlordDocument>> GetDocumentsAsync(int landlordId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.LandlordDocuments
-            .Where(d => d.LandlordId == landlordId)
+            .Where(d => d.LandlordId == landlordId && d.IsCurrent)
             .OrderBy(d => d.DocumentType).ThenBy(d => d.UploadedAt)
             .ToListAsync();
     }
 
-    public async Task<(bool Success, string? Error)> UploadAsync(
-        int landlordId, LandlordDocumentType documentType, IBrowserFile file, string uploadedBy, int? signatoryId = null)
+    /// <summary>Every document ever uploaded, including superseded versions, for the review history.</summary>
+    public async Task<List<LandlordDocument>> GetAllVersionsAsync(int landlordId)
     {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId)
+            .OrderBy(d => d.DocumentType).ThenByDescending(d => d.UploadedAt)
+            .ToListAsync();
+    }
+
+    public async Task<(bool Success, string? Error)> UploadAsync(
+        int landlordId, LandlordDocumentType documentType, IBrowserFile file, string uploadedBy,
+        int? contactId = null, int? signatoryId = null)
+    {
+        // FRD §12 validation: not empty, supported type, within the size limit.
+        if (file.Size == 0) return (false, "The selected file is empty.");
         if (file.Size > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!AllowedExtensions.Contains(ext))
+            return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
 
         var directory = DocumentsDirectory(landlordId);
         Directory.CreateDirectory(directory);
-        var storedFileName = $"{Guid.NewGuid():N}{Path.GetExtension(file.Name)}";
+        var storedFileName = $"{Guid.NewGuid():N}{ext}";
         var fullPath = Path.Combine(directory, storedFileName);
 
         await using (var source = file.OpenReadStream(MaxFileSizeBytes))
@@ -42,16 +62,20 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
 
         await using var db = await dbFactory.CreateDbContextAsync();
 
-        // Single-slot identity documents (Emirates ID, Trade Licence, MOA, POA, title deed) replace the
-        // previous upload; "Other" documents accumulate.
+        // Single-slot identity documents (Emirates ID, Trade Licence, MOA, POA, title deed) supersede the
+        // previous upload — the old row is retained (IsCurrent = false) for the audit history; "Other"
+        // documents accumulate. Scope the slot to the contact where one is given.
+        var version = 1;
         if (documentType != LandlordDocumentType.Other)
         {
             var existing = await db.LandlordDocuments
-                .Where(d => d.LandlordId == landlordId && d.DocumentType == documentType).ToListAsync();
+                .Where(d => d.LandlordId == landlordId && d.DocumentType == documentType
+                    && d.ContactId == contactId && d.IsCurrent)
+                .ToListAsync();
             foreach (var old in existing)
             {
-                DeletePhysicalFile(landlordId, old.StoredFileName);
-                db.LandlordDocuments.Remove(old);
+                old.IsCurrent = false;
+                version = Math.Max(version, old.Version + 1);
             }
         }
 
@@ -64,7 +88,10 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
             FileSizeBytes = file.Size,
             UploadedBy = uploadedBy,
-            SignatoryId = signatoryId
+            ContactId = contactId,
+            SignatoryId = signatoryId,
+            Version = version,
+            IsCurrent = true
         });
         await db.SaveChangesAsync();
         return (true, null);

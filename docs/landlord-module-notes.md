@@ -135,3 +135,42 @@ status workflow + registration trace wired into the notification bell / activity
   and search, and shown as columns in the Land Register building rows (local seed fixture updated to match).
 - Landlords list now has an **Edit | Email | Review** action column. Email issues/re-sends the self-service
   invite (enabled once premises are assigned); Review is enabled only while a landlord is Under Review.
+
+---
+
+## FRD alignment (Landlord Registration / Update)
+
+Reworked the module to the full FRD. Key changes:
+
+- **Model**: `Landlord` is now a *registration* — snapshots the Property-View fields (PropertyCode,
+  CompanyName, Building, Email, LandLordCode) at initiation and always uses the view's Email as the
+  invitation address. New entities `LandlordContact` (primary + multiple secondary, contact type,
+  designation, Emirates ID) and `LandlordRegistrationComment` (correction / rejection). `LandlordDocument`
+  gained ContactId + Version/IsCurrent (re-uploads retained for audit). `LandlordEvent` enriched with
+  Old/New status + IP + actor type (audit trail). Expanded 9-state lifecycle: Draft → InvitationSent →
+  OtpVerified → InProgress → Submitted → UnderReview → CorrectionRequired / Rejected → RegistrationComplete.
+  Migration `LandlordRegistrationFrd`.
+- **Initiation from the property**: the Land Register is now the **Property List** (`/admin/land-register`)
+  — flat table PropertyCode · CompanyName · ContactName · EmailAddress · Status · Action (**Edit | Notify |
+  Review**) with Zone / Category / Status / search filters. Edit opens or initiates; Notify initiates (if
+  needed) and sends the secure link to the Property-View email; Review opens a submitted registration.
+- **Self-service wizard**: prefilled read-only Property Information + Landlord Type, Primary Contact,
+  Secondary Contacts (add/remove cards), dynamic Documents (Individual → Emirates ID mandatory; Company →
+  POA/MOA required, with file-type/size/empty validation), Signatories, Review. **Save Draft** + Submit.
+  Correction reopen shows the Business-Centre comment banner.
+- **Review workflow** (`LandlordDetail`): property info, contacts, documents (preview/download, version
+  history), signatories, review comments, audit-trail timeline. Actions: Complete (confirm → notifies
+  landlord + internal staff, link deactivated), Request Re-upload/Correction (mandatory comment, emailed),
+  Reject (mandatory reason, link deactivated), Restart (new registration linked to the rejected one).
+- **Link security**: token resolves to Valid / Expired / Closed; a completed/rejected/deactivated link
+  shows "no longer active" (FRD §26). OTP unchanged (Supplier-portal mechanism; dev surfaces the code).
+- **Notifications** (`LandlordEmailService`): invite, correction, rejection, completion (landlord + staff)
+  via Database Mail; skipped in Development.
+
+Whole FRD workflow proven end-to-end with Playwright (initiate → notify → OTP → wizard incl. upload →
+submit → review → correction → resubmit → complete → link-deactivation, plus draft, reject-with-reason and
+restart). Startup migration applies the leasing context automatically.
+
+Note: the earlier Increment-4 embedded single-contact model was replaced by `LandlordContact`; the manual
+"Add Landlord" page was removed (initiation is from the Property List). `LandlordFieldChange` table is
+retained but no longer written.

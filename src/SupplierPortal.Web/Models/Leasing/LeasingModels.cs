@@ -44,16 +44,20 @@ public class Premises
     }
 }
 
-public enum LandlordType { Individual = 0, Corporate = 1 }
+public enum LandlordType { Individual = 0, Company = 1 }
 
-/// <summary>Workflow states. Every transition notifies the landlord.</summary>
+/// <summary>Registration lifecycle (FRD §27). Every transition is audited and most notify the landlord.</summary>
 public enum LandlordStatus
 {
-    Draft = 0,
-    AwaitingLandlordResponse = 1,
-    UnderReview = 2,
-    Approved = 3,
-    Rejected = 4
+    Draft = 0,                 // registration created by Business Centre, not yet sent
+    InvitationSent = 1,        // secure link emailed to the Property View address
+    OtpVerified = 2,           // landlord passed OTP at least once
+    InProgress = 3,            // landlord has opened / saved a draft
+    Submitted = 4,             // landlord submitted for review
+    UnderReview = 5,           // Business Centre opened the review
+    CorrectionRequired = 6,    // Business Centre requested re-upload / correction
+    Rejected = 7,              // Business Centre rejected (reason recorded)
+    RegistrationComplete = 8   // Business Centre completed; link deactivated
 }
 
 public enum LandlordDocumentType
@@ -67,42 +71,55 @@ public enum LandlordDocumentType
     Other = 6
 }
 
+/// <summary>Role a contact plays for the landlord (FRD contact-type field).</summary>
+public enum ContactType
+{
+    Owner = 0,
+    AuthorisedRepresentative = 1,
+    Manager = 2,
+    Legal = 3,
+    Other = 4
+}
+
+/// <summary>Which registration comments are: a correction request or a rejection reason.</summary>
+public enum LandlordCommentType { Correction = 0, Rejection = 1, Note = 2 }
+
 /// <summary>How signatures are collected for an ownership.</summary>
 public enum SigningRule { All = 0, Any = 1 }
 
-/// <summary>The owner/landlord record — the app-owned "owner information" the landlord maintains and
-/// Leasing reviews. Scoped to one Business Unit; linked to one or more premises.</summary>
+/// <summary>A landlord registration / update request (FRD LandlordRegistration). Initiated by Business
+/// Centre from a property: the Property-View fields (Property Code / Company / Building / Email) are
+/// snapshotted read-only, and the invitation is always sent to the snapshotted <see cref="Email"/>. The
+/// landlord fills in contacts, documents and signatories; Business Centre reviews, requests correction,
+/// rejects (with reason) or completes.</summary>
 public class Landlord
 {
     public int Id { get; set; }
 
-    /// <summary>Owner is scoped to a single business unit (not a globally reusable party).</summary>
+    /// <summary>Scoped to a single business unit.</summary>
     public int BusinessUnitId { get; set; }
 
+    /// <summary>Company vs Individual — controls document / signatory rules. Set at initiation, read-only to the landlord.</summary>
     public LandlordType Type { get; set; }
 
-    [MaxLength(250)] public string LegalName { get; set; } = string.Empty;
-
-    // Business-set core contact (shown read-only to the landlord).
-    [MaxLength(150)] public string PrimaryContactName { get; set; } = string.Empty;
+    // ---- Prefilled, read-only Property Information (snapshot of the dbo.Property view at initiation) ----
+    /// <summary>= <c>dbo.Property.Id</c> of the property the registration was initiated from.</summary>
+    public int PropertyId { get; set; }
+    [MaxLength(80)] public string PropertyCode { get; set; } = string.Empty;
+    [MaxLength(200)] public string? CompanyName { get; set; }
+    [MaxLength(250)] public string? Building { get; set; }
+    /// <summary>The invitation destination — the Property-View Email column. Never changed by the landlord.</summary>
     [MaxLength(200)] public string Email { get; set; } = string.Empty;
-    [MaxLength(40)] public string Mobile { get; set; } = string.Empty;
-
-    // Landlord-updated identity fields.
-    [MaxLength(50)] public string? EmiratesId { get; set; }
-    [MaxLength(60)] public string? TradeLicenseNo { get; set; }
-    [MaxLength(30)] public string? TaxRegistrationNo { get; set; }
-
-    // Optional secondary contact.
-    [MaxLength(150)] public string? SecondaryContactName { get; set; }
-    [MaxLength(200)] public string? SecondaryContactEmail { get; set; }
-    [MaxLength(40)] public string? SecondaryContactMobile { get; set; }
+    [MaxLength(50)] public string? LandLordCode { get; set; }
 
     public SigningRule SigningRule { get; set; } = SigningRule.All;
 
     public LandlordStatus Status { get; set; } = LandlordStatus.Draft;
 
-    /// <summary>Reference issued on submission, e.g. <c>DIP-LR-2026-104882</c>.</summary>
+    /// <summary>True while the secure link may be used; set false on completion / rejection / restart.</summary>
+    public bool LinkActive { get; set; } = true;
+
+    /// <summary>Reference issued on first submission, e.g. <c>DIP-LR-2026-104882</c>.</summary>
     [MaxLength(30)] public string? Reference { get; set; }
 
     [MaxLength(100)] public string CreatedBy { get; set; } = string.Empty;
@@ -113,11 +130,58 @@ public class Landlord
     public DateTime? SubmittedAt { get; set; }
     [MaxLength(100)] public string? ReviewedBy { get; set; }
     public DateTime? ReviewedAt { get; set; }
-    [MaxLength(500)] public string? DecisionNote { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    [MaxLength(100)] public string? CompletedBy { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    [MaxLength(100)] public string? RejectedBy { get; set; }
+    [MaxLength(1000)] public string? RejectionReason { get; set; }
+
+    /// <summary>Links this registration to the one it was restarted from (audit chain).</summary>
+    public int? RestartedFromId { get; set; }
 
     public List<LandlordPremises> Premises { get; set; } = [];
+    public List<LandlordContact> Contacts { get; set; } = [];
     public List<LandlordSignatory> Signatories { get; set; } = [];
     public List<LandlordDocument> Documents { get; set; } = [];
+    public List<LandlordRegistrationComment> Comments { get; set; } = [];
+}
+
+/// <summary>A primary or secondary contact for the registration (FRD LandlordContact). Landlord-provided.</summary>
+public class LandlordContact
+{
+    public int Id { get; set; }
+    public int LandlordId { get; set; }
+    public Landlord? Landlord { get; set; }
+
+    public bool IsPrimary { get; set; }
+    public ContactType ContactType { get; set; }
+
+    [MaxLength(150)] public string FullName { get; set; } = string.Empty;
+    [MaxLength(120)] public string? Designation { get; set; }
+    [MaxLength(40)] public string? Mobile { get; set; }
+    [MaxLength(200)] public string Email { get; set; } = string.Empty;
+    [MaxLength(50)] public string? EmiratesId { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    public List<LandlordDocument> Documents { get; set; } = [];
+}
+
+/// <summary>A Business-Centre review comment — a correction request or a rejection reason (FRD
+/// LandlordRegistrationComment) — recorded against the registration and surfaced to the landlord.</summary>
+public class LandlordRegistrationComment
+{
+    public int Id { get; set; }
+    public int LandlordId { get; set; }
+    public Landlord? Landlord { get; set; }
+
+    public LandlordCommentType CommentType { get; set; }
+    [MaxLength(2000)] public string Comment { get; set; } = string.Empty;
+    [MaxLength(100)] public string CreatedBy { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>False once the landlord has addressed this correction (so the portal shows only the open one).</summary>
+    public bool IsResolved { get; set; }
 }
 
 /// <summary>Ownership link: a landlord ↔ a premises (a <c>dbo.Property</c> view row, by its Id).
@@ -169,8 +233,14 @@ public class LandlordDocument
     public long FileSizeBytes { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     [MaxLength(100)] public string UploadedBy { get; set; } = string.Empty;
+    /// <summary>Optional contact this document belongs to (e.g. a POA for a specific contact).</summary>
+    public int? ContactId { get; set; }
     /// <summary>Optional signatory this document belongs to (e.g. an authorisation letter).</summary>
     public int? SignatoryId { get; set; }
+
+    // Re-upload versioning (FRD): a replaced document is retained with IsCurrent = false for the audit history.
+    public int Version { get; set; } = 1;
+    public bool IsCurrent { get; set; } = true;
 }
 
 /// <summary>One tracked change the landlord made in self-service, for the review highlight + activity feed.</summary>
@@ -188,16 +258,21 @@ public class LandlordFieldChange
     public bool IsAcknowledged { get; set; }
 }
 
-/// <summary>Immutable registration-trace event (created → invited → verified → submitted → decision),
-/// giving the "complete trace of registration".</summary>
+/// <summary>Immutable registration audit event / history row (FRD LandlordRegistrationHistory): every
+/// significant action with the status transition, actor, and originating IP where available.</summary>
 public class LandlordEvent
 {
     public int Id { get; set; }
     public int LandlordId { get; set; }
     [MaxLength(60)] public string EventType { get; set; } = string.Empty;
-    [MaxLength(500)] public string? Detail { get; set; }
+    [MaxLength(1000)] public string? Detail { get; set; }
+    [MaxLength(40)] public string? OldStatus { get; set; }
+    [MaxLength(40)] public string? NewStatus { get; set; }
+    [MaxLength(60)] public string? Ip { get; set; }
     public DateTime At { get; set; } = DateTime.UtcNow;
     [MaxLength(150)] public string? By { get; set; }
+    /// <summary>Actor kind — "BusinessCentre", "Landlord" or "System".</summary>
+    [MaxLength(30)] public string? ByType { get; set; }
 }
 
 /// <summary>Tokenised self-service access + OTP for a landlord (mirrors the supplier access-token pattern;
