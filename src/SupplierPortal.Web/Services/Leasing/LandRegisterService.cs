@@ -80,6 +80,30 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
             TotalBuildings: premises.Count,
             AssignedBuildings: premises.Count(p => ownersByPremises.ContainsKey(p.Id)));
     }
+
+    /// <summary>Flat premises search for the owner-assignment picker: matches property code or building
+    /// within a zone, optionally excluding premises already assigned to a given landlord.</summary>
+    public async Task<List<Premises>> SearchPremisesAsync(string zone, string? term, int? excludeLandlordId = null, int take = 25)
+    {
+        zone = ResolveZone(zone);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var zonePrefix = zone + "-";
+        var query = db.Premises.AsNoTracking().Where(p => p.PropertyCode.StartsWith(zonePrefix));
+
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            var t = term.Trim();
+            query = query.Where(p => p.PropertyCode.Contains(t) || (p.BuildingName != null && p.BuildingName.Contains(t)));
+        }
+
+        if (excludeLandlordId is int lid)
+        {
+            var assigned = db.LandlordPremises.Where(lp => lp.LandlordId == lid).Select(lp => lp.PremisesId);
+            query = query.Where(p => !assigned.Contains(p.Id));
+        }
+
+        return await query.OrderBy(p => p.PropertyCode).ThenBy(p => p.BuildingName).Take(take).ToListAsync();
+    }
 }
 
 /// <summary>The Land Register for a single zone.</summary>

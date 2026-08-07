@@ -40,6 +40,7 @@ builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbCo
 builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordService>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));

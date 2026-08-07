@@ -1,0 +1,376 @@
+@page "/admin/landlords/{Id:int}"
+@attribute [Authorize(Roles = "Administrator,LeasingManager")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordService LandlordService
+@inject LandRegisterService LandRegisterService
+@inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Landlord - Supplier Portal</PageTitle>
+
+@if (landlord is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <a href="/admin/landlords" class="text-decoration-none small">&larr; Landlords</a>
+            <h1 class="mb-1">@landlord.LegalName</h1>
+            <span class="badge @StatusClass(landlord.Status)">@Label(landlord.Status)</span>
+            @if (landlord.Reference is not null)
+            {
+                <span class="text-muted ms-2">Ref @landlord.Reference</span>
+            }
+            <span class="text-muted ms-2">@(buName ?? "—")</span>
+        </div>
+        <div class="text-end">
+            <button class="btn btn-primary" @onclick="InviteAsync" disabled="@(landlord.Premises.Count == 0)">
+                @(landlord.Status == LandlordStatus.Draft ? "Invite Landlord" : "Re-send Invite")
+            </button>
+        </div>
+    </div>
+
+    @if (inviteUrl is not null)
+    {
+        <div class="alert alert-success">
+            <div class="fw-semibold mb-1">Self-service link generated</div>
+            <div class="input-group">
+                <input class="form-control" readonly value="@inviteUrl" @ref="inviteInput" />
+                <button class="btn btn-outline-secondary" @onclick="CopyInviteAsync">Copy</button>
+            </div>
+            <div class="small text-muted mt-1">Valid for 30 days. Share with @landlord.Email.</div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Core Contact <span class="text-muted small">(business-set)</span></span>
+                    @if (!editing)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="BeginEdit">Edit</button>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (editing)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label">Owner Type</label>
+                            <select class="form-select" @bind="edit.Type">
+                                <option value="@LandlordType.Individual">Individual</option>
+                                <option value="@LandlordType.Corporate">Corporate</option>
+                            </select>
+                        </div>
+                        <div class="mb-2"><label class="form-label">Legal Name</label><input class="form-control" @bind="edit.LegalName" /></div>
+                        <div class="mb-2"><label class="form-label">Contact Name</label><input class="form-control" @bind="edit.PrimaryContactName" /></div>
+                        <div class="mb-2"><label class="form-label">Email</label><input class="form-control" @bind="edit.Email" /></div>
+                        <div class="mb-2"><label class="form-label">Mobile</label><input class="form-control" @bind="edit.Mobile" /></div>
+                        <button class="btn btn-primary btn-sm" @onclick="SaveEditAsync">Save</button>
+                        <button class="btn btn-link btn-sm" @onclick="CancelEdit">Cancel</button>
+                    }
+                    else
+                    {
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Type</dt><dd class="col-sm-8">@landlord.Type</dd>
+                            <dt class="col-sm-4">Contact Name</dt><dd class="col-sm-8">@landlord.PrimaryContactName</dd>
+                            <dt class="col-sm-4">Email</dt><dd class="col-sm-8">@landlord.Email</dd>
+                            <dt class="col-sm-4">Mobile</dt><dd class="col-sm-8">@landlord.Mobile</dd>
+                        </dl>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Assigned Properties <span class="badge bg-secondary">@landlord.Premises.Count</span></div>
+                <div class="card-body">
+                    @if (landlord.Premises.Count == 0)
+                    {
+                        <p class="text-muted mb-3">No properties assigned yet. Assign at least one before inviting the landlord.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>Property Code</th><th>Building</th><th>Zone</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach (var p in landlord.Premises)
+                                {
+                                    <tr>
+                                        <td>@p.PropertyCode</td>
+                                        <td>@(string.IsNullOrWhiteSpace(p.BuildingName) ? "—" : p.BuildingName)</td>
+                                        <td>@p.Zone</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => RemovePremisesAsync(p.Id)" title="Remove">Remove</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    <div class="border-top pt-3">
+                        <div class="d-flex gap-2 mb-2">
+                            <select class="form-select form-select-sm" style="width:auto;" @bind="pickerZone" @bind:after="SearchPremisesAsync">
+                                @foreach (var z in LandRegisterService.Zones)
+                                {
+                                    <option value="@z">Zone @z</option>
+                                }
+                            </select>
+                            <input class="form-control form-control-sm" placeholder="Search property code or building…"
+                                   value="@pickerTerm" @oninput="OnPickerInput" />
+                        </div>
+                        @if (pickerResults.Count > 0)
+                        {
+                            <ul class="list-group">
+                                @foreach (var r in pickerResults)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                        <span>@r.PropertyCode <span class="text-muted">/ @(string.IsNullOrWhiteSpace(r.BuildingName) ? "—" : r.BuildingName)</span></span>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => AssignPremisesAsync(r.Id)">Assign</button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(pickerTerm))
+                        {
+                            <p class="text-muted small mb-0">No matching unassigned properties in zone @pickerZone.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (landlord.Status is LandlordStatus.UnderReview)
+            {
+                <div class="card mb-4 border-info">
+                    <div class="card-header bg-info-subtle">Review Submission</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label">Decision Note (optional)</label>
+                            <textarea class="form-control" rows="2" @bind="decisionNote"></textarea>
+                        </div>
+                        <button class="btn btn-success" @onclick="() => DecideAsync(true)">Approve</button>
+                        <button class="btn btn-danger" @onclick="() => DecideAsync(false)">Reject</button>
+                    </div>
+                </div>
+            }
+            else if (landlord.Status is LandlordStatus.Approved or LandlordStatus.Rejected && !string.IsNullOrWhiteSpace(landlord.DecisionNote))
+            {
+                <div class="alert @(landlord.Status == LandlordStatus.Approved ? "alert-success" : "alert-danger")">
+                    <strong>@Label(landlord.Status)</strong> by @landlord.ReviewedBy — @landlord.DecisionNote
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">Registration Trace</div>
+                <div class="card-body">
+                    @if (trace.Count == 0)
+                    {
+                        <p class="text-muted mb-0">No activity yet.</p>
+                    }
+                    else
+                    {
+                        <ul class="di-timeline">
+                            @foreach (var e in trace)
+                            {
+                                <li>
+                                    <div class="di-timeline-dot"></div>
+                                    <div class="di-timeline-body">
+                                        <div class="fw-semibold">@TraceLabel(e.EventType)</div>
+                                        @if (!string.IsNullOrWhiteSpace(e.Detail))
+                                        {
+                                            <div class="small">@e.Detail</div>
+                                        }
+                                        <div class="small text-muted">@e.At.ToLocalTime().ToString("g") · @(e.By ?? "—")</div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-timeline { list-style: none; padding-left: 0; margin: 0; }
+    .di-timeline li { position: relative; padding-left: 1.5rem; padding-bottom: 1rem; border-left: 2px solid var(--bs-border-color); margin-left: .35rem; }
+    .di-timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .di-timeline-dot { position: absolute; left: -0.45rem; top: .2rem; width: .8rem; height: .8rem; border-radius: 50%; background: var(--bs-primary); }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Landlord? landlord;
+    private string? buName;
+    private List<LandlordEvent> trace = [];
+    private string currentUser = "unknown";
+
+    private bool editing;
+    private EditBuffer edit = new();
+
+    private string pickerZone = "597";
+    private string pickerTerm = "";
+    private List<Premises> pickerResults = [];
+    private CancellationTokenSource? debounceCts;
+
+    private string decisionNote = "";
+    private string? inviteUrl;
+    private ElementReference inviteInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        pickerZone = LandRegisterService.Zones.FirstOrDefault() ?? "597";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        landlord = await LandlordService.GetByIdAsync(Id);
+        if (landlord is null) return;
+        buName = (await BusinessUnitService.GetByIdAsync(landlord.BusinessUnitId))?.Name;
+        trace = await LandlordService.GetTraceAsync(Id);
+    }
+
+    private void CancelEdit() => editing = false;
+
+    private void BeginEdit()
+    {
+        edit = new EditBuffer
+        {
+            Type = landlord!.Type,
+            LegalName = landlord.LegalName,
+            PrimaryContactName = landlord.PrimaryContactName,
+            Email = landlord.Email,
+            Mobile = landlord.Mobile
+        };
+        editing = true;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.UpdateBusinessFieldsAsync(
+            Id, edit.Type, edit.LegalName, edit.PrimaryContactName, edit.Email, edit.Mobile, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Update failed."); return; }
+        editing = false;
+        await LoadAsync();
+        Toast.ShowSuccess("Contact updated.");
+    }
+
+    private async Task OnPickerInput(ChangeEventArgs e)
+    {
+        pickerTerm = e.Value?.ToString() ?? "";
+        debounceCts?.Cancel();
+        debounceCts = new CancellationTokenSource();
+        var token = debounceCts.Token;
+        try
+        {
+            await Task.Delay(300, token);
+            await SearchPremisesAsync();
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task SearchPremisesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(pickerTerm)) { pickerResults = []; return; }
+        pickerResults = await LandRegisterService.SearchPremisesAsync(pickerZone, pickerTerm, excludeLandlordId: Id);
+    }
+
+    private async Task AssignPremisesAsync(int premisesId)
+    {
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.AssignPremisesAsync(Id, premisesId, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Assign failed."); return; }
+        await SearchPremisesAsync();
+        await LoadAsync();
+        Toast.ShowSuccess("Property assigned.");
+    }
+
+    private async Task RemovePremisesAsync(int landlordPremisesId)
+    {
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.RemovePremisesAsync(Id, landlordPremisesId, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Remove failed."); return; }
+        await LoadAsync();
+        await SearchPremisesAsync();
+    }
+
+    private async Task InviteAsync()
+    {
+        var (ok, err, raw) = await Loading.RunAsync(() => LandlordService.InviteAsync(Id, currentUser));
+        if (!ok || raw is null) { Toast.ShowError(err ?? "Invite failed."); return; }
+        inviteUrl = $"{Nav.BaseUri}landlord/{raw}";
+        await LoadAsync();
+        Toast.ShowSuccess("Invite link generated.");
+    }
+
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private async Task CopyInviteAsync()
+    {
+        if (inviteUrl is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", inviteUrl);
+        Toast.ShowSuccess("Link copied.");
+    }
+
+    private async Task DecideAsync(bool approve)
+    {
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.DecideAsync(Id, approve, decisionNote, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Decision failed."); return; }
+        decisionNote = "";
+        await LoadAsync();
+        Toast.ShowSuccess(approve ? "Landlord approved." : "Landlord rejected.");
+    }
+
+    private static string Label(LandlordStatus s) => s switch
+    {
+        LandlordStatus.AwaitingLandlordResponse => "Awaiting Landlord",
+        LandlordStatus.UnderReview => "Under Review",
+        _ => s.ToString()
+    };
+
+    private static string StatusClass(LandlordStatus s) => s switch
+    {
+        LandlordStatus.Approved => "bg-success",
+        LandlordStatus.UnderReview => "bg-info text-dark",
+        LandlordStatus.AwaitingLandlordResponse => "bg-primary",
+        LandlordStatus.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string TraceLabel(string eventType) => eventType switch
+    {
+        LandlordService.EventCreated => "Owner shell created",
+        LandlordService.EventPremisesAssigned => "Property assigned",
+        LandlordService.EventPremisesRemoved => "Property removed",
+        LandlordService.EventInvited => "Landlord invited",
+        LandlordService.EventSubmitted => "Landlord submitted details",
+        LandlordService.EventApproved => "Approved",
+        LandlordService.EventRejected => "Rejected",
+        _ => eventType
+    };
+
+    private sealed class EditBuffer
+    {
+        public LandlordType Type { get; set; }
+        public string LegalName { get; set; } = "";
+        public string PrimaryContactName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Mobile { get; set; } = "";
+    }
+}
