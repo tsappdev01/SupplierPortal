@@ -1,0 +1,383 @@
+@page "/landlord/{Token}/update"
+@layout Layout.PublicLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordAccessTokenService AccessTokenService
+@inject LandlordService LandlordService
+@inject LandlordDocumentService DocumentService
+@inject ToastService ToastService
+
+<PageTitle>Update Owner Information - Landlord Portal</PageTitle>
+
+<div class="di-ll-wrap">
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (landlord is null)
+    {
+        <div class="di-ll-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">Your verification session is no longer valid. Please use the link from your email again to restart.</p>
+        </div>
+    }
+    else if (submitted)
+    {
+        <div class="di-ll-card text-center">
+            <h1>Thank You</h1>
+            <p class="text-muted">Your owner information has been submitted for review.</p>
+            <p class="fs-5">Reference <strong>@reference</strong></p>
+            <p class="text-muted small">Dubai Investments Leasing will review your submission and notify you of the outcome.</p>
+        </div>
+    }
+    else
+    {
+        <div class="di-ll-card">
+            <div class="di-ll-head">
+                <h1 class="h4 mb-1">Update Owner Information</h1>
+                <div class="text-muted">@landlord.LegalName · @landlord.Type</div>
+            </div>
+
+            <ol class="di-steps">
+                @foreach (var (label, i) in stepLabels.Select((l, i) => (l, i)))
+                {
+                    <li class="@(i == step ? "active" : i < step ? "done" : "")">@label</li>
+                }
+            </ol>
+
+            @if (error is not null)
+            {
+                <div class="alert alert-danger">@error</div>
+            }
+
+            @* ---------- Step 0: Select property ---------- *@
+            @if (step == 0)
+            {
+                <p class="text-muted">These are the properties the business has assigned to you. Confirm them, then continue to update your owner details.</p>
+                @if (landlord.Premises.Count == 0)
+                {
+                    <div class="alert alert-warning">No properties are assigned yet. Please contact Dubai Investments Leasing.</div>
+                }
+                else
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th></th><th>Property Code</th><th>Building</th><th>Zone</th></tr></thead>
+                        <tbody>
+                            @foreach (var p in landlord.Premises)
+                            {
+                                <tr>
+                                    <td><input type="checkbox" checked="@selectedPremises.Contains(p.Id)" @onchange="e => TogglePremises(p.Id, e)" /></td>
+                                    <td>@p.PropertyCode</td>
+                                    <td>@(string.IsNullOrWhiteSpace(p.BuildingName) ? "—" : p.BuildingName)</td>
+                                    <td>@p.Zone</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+
+            @* ---------- Step 1: Owner details ---------- *@
+            else if (step == 1)
+            {
+                <h2 class="h6 text-muted">Core Contact (set by the business)</h2>
+                <dl class="row">
+                    <dt class="col-sm-4">Contact Name</dt><dd class="col-sm-8">@landlord.PrimaryContactName</dd>
+                    <dt class="col-sm-4">Email</dt><dd class="col-sm-8">@landlord.Email</dd>
+                    <dt class="col-sm-4">Mobile</dt><dd class="col-sm-8">@landlord.Mobile</dd>
+                </dl>
+                <hr />
+                <h2 class="h6">Owner Identity</h2>
+                @if (landlord.Type == LandlordType.Individual)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Emirates ID</label>
+                        <input class="form-control" @bind="update.EmiratesId" placeholder="784-XXXX-XXXXXXX-X" />
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Trade Licence No</label>
+                        <input class="form-control" @bind="update.TradeLicenseNo" />
+                    </div>
+                }
+                <div class="mb-3">
+                    <label class="form-label">Tax Registration No (optional)</label>
+                    <input class="form-control" @bind="update.TaxRegistrationNo" />
+                </div>
+                <hr />
+                <h2 class="h6">Secondary Contact (optional)</h2>
+                <div class="row g-2">
+                    <div class="col-md-4"><input class="form-control" placeholder="Name" @bind="update.SecondaryContactName" /></div>
+                    <div class="col-md-4"><input class="form-control" placeholder="Email" @bind="update.SecondaryContactEmail" /></div>
+                    <div class="col-md-4"><input class="form-control" placeholder="Mobile" @bind="update.SecondaryContactMobile" /></div>
+                </div>
+            }
+
+            @* ---------- Step 2: Signatories ---------- *@
+            else if (step == 2)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Signing Rule</label>
+                    <select class="form-select" @bind="update.SigningRule">
+                        <option value="@SigningRule.All">All signatories must sign</option>
+                        <option value="@SigningRule.Any">Any one signatory may sign</option>
+                    </select>
+                </div>
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th></th></tr></thead>
+                    <tbody>
+                        @for (var i = 0; i < update.Signatories.Count; i++)
+                        {
+                            var s = update.Signatories[i];
+                            var idx = i;
+                            <tr>
+                                <td><input class="form-control form-control-sm" @bind="s.Name" /></td>
+                                <td><input class="form-control form-control-sm" @bind="s.Email" /></td>
+                                <td><input class="form-control form-control-sm" @bind="s.Mobile" /></td>
+                                <td>
+                                    @if (s.IsPrimaryContact)
+                                    {
+                                        <span class="badge bg-secondary">Primary</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <button class="btn btn-sm btn-outline-primary" @onclick="AddSignatory">+ Add signatory</button>
+            }
+
+            @* ---------- Step 3: Documents ---------- *@
+            else if (step == 3)
+            {
+                <p class="text-muted">Upload the supporting documents. All documents are retained with your registration.</p>
+                <div class="mb-3">
+                    <label class="form-label">Document Type</label>
+                    <select class="form-select" @bind="uploadType">
+                        @foreach (var dt in docTypesForOwner)
+                        {
+                            <option value="@dt">@DocLabel(dt)</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <InputFile OnChange="OnUploadAsync" class="form-control" accept=".pdf,image/*" />
+                    @if (uploading)
+                    {
+                        <div class="form-text">Uploading…</div>
+                    }
+                </div>
+                @if (documents.Count > 0)
+                {
+                    <ul class="list-group">
+                        @foreach (var d in documents)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@DocLabel(d.DocumentType) — @d.FileName</span>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteDocAsync(d.Id)">Remove</button>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted small">No documents uploaded yet.</p>
+                }
+            }
+
+            @* ---------- Step 4: Review ---------- *@
+            else if (step == 4)
+            {
+                <h2 class="h6">Review &amp; Submit</h2>
+                <dl class="row">
+                    <dt class="col-sm-5">Owner Type</dt><dd class="col-sm-7">@landlord.Type</dd>
+                    @if (landlord.Type == LandlordType.Individual)
+                    {
+                        <dt class="col-sm-5">Emirates ID</dt><dd class="col-sm-7">@(update.EmiratesId ?? "—")</dd>
+                    }
+                    else
+                    {
+                        <dt class="col-sm-5">Trade Licence No</dt><dd class="col-sm-7">@(update.TradeLicenseNo ?? "—")</dd>
+                    }
+                    <dt class="col-sm-5">Tax Registration No</dt><dd class="col-sm-7">@(update.TaxRegistrationNo ?? "—")</dd>
+                    <dt class="col-sm-5">Signing Rule</dt><dd class="col-sm-7">@update.SigningRule</dd>
+                    <dt class="col-sm-5">Signatories</dt><dd class="col-sm-7">@update.Signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name))</dd>
+                    <dt class="col-sm-5">Documents</dt><dd class="col-sm-7">@documents.Count</dd>
+                    <dt class="col-sm-5">Properties</dt><dd class="col-sm-7">@selectedPremises.Count of @landlord.Premises.Count</dd>
+                </dl>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="declare" @bind="declared" />
+                    <label class="form-check-label" for="declare">I confirm the information provided is accurate.</label>
+                </div>
+            }
+
+            <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-outline-secondary" disabled="@(step == 0)" @onclick="Back">Back</button>
+                @if (step < stepLabels.Length - 1)
+                {
+                    <button class="btn btn-primary" @onclick="Next">Continue</button>
+                }
+                else
+                {
+                    <button class="btn btn-success" disabled="@(!declared || submitting)" @onclick="SubmitAsync">
+                        @(submitting ? "Submitting…" : "Submit for Review")
+                    </button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .di-ll-wrap { width: 100%; display: flex; justify-content: center; }
+    .di-ll-card { width: 100%; max-width: 720px; background: #fff; border-radius: 10px; border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 2rem; }
+    .di-ll-head { border-bottom: 1px solid #eef1f6; padding-bottom: .75rem; margin-bottom: 1rem; }
+    .di-steps { list-style: none; display: flex; gap: .5rem; padding: 0; margin: 0 0 1.25rem; flex-wrap: wrap; }
+    .di-steps li { flex: 1 1 auto; text-align: center; font-size: .8rem; padding: .4rem .3rem; border-radius: 6px; background: #f1f3f7; color: #7b8697; border: 1px solid transparent; }
+    .di-steps li.active { background: #1a2233; color: #fff; }
+    .di-steps li.done { background: #e8f0e8; color: #2e7d32; border-color: #cfe3cf; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private static readonly string[] stepLabels = ["Property", "Owner Details", "Signatories", "Documents", "Review"];
+    private static readonly LandlordDocumentType[] docTypesForOwner =
+        [LandlordDocumentType.EmiratesId, LandlordDocumentType.TradeLicense, LandlordDocumentType.Moa,
+         LandlordDocumentType.PowerOfAttorney, LandlordDocumentType.AuthorisationLetter, LandlordDocumentType.TitleDeed,
+         LandlordDocumentType.Other];
+
+    private LandlordAccessToken? accessToken;
+    private Landlord? landlord;
+    private readonly LandlordSelfUpdate update = new();
+    private readonly HashSet<int> selectedPremises = new();
+    private List<LandlordDocument> documents = [];
+    private LandlordDocumentType uploadType = LandlordDocumentType.EmiratesId;
+
+    private int step;
+    private bool loading = true;
+    private bool submitting;
+    private bool submitted;
+    private bool uploading;
+    private bool declared;
+    private string? error;
+    private string? reference;
+
+    private string ActorLabel => $"Landlord Self-Service ({landlord?.Email})";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SessionToken))
+            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+
+        if (accessToken is not null)
+        {
+            landlord = await LandlordService.GetForSelfServiceAsync(accessToken.LandlordId);
+            if (landlord is not null)
+            {
+                foreach (var p in landlord.Premises) selectedPremises.Add(p.Id);
+                SeedFromExisting();
+                documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+            }
+        }
+        loading = false;
+    }
+
+    private void SeedFromExisting()
+    {
+        update.EmiratesId = landlord!.EmiratesId;
+        update.TradeLicenseNo = landlord.TradeLicenseNo;
+        update.TaxRegistrationNo = landlord.TaxRegistrationNo;
+        update.SecondaryContactName = landlord.SecondaryContactName;
+        update.SecondaryContactEmail = landlord.SecondaryContactEmail;
+        update.SecondaryContactMobile = landlord.SecondaryContactMobile;
+        update.SigningRule = landlord.SigningRule;
+
+        if (landlord.Signatories.Count > 0)
+        {
+            update.Signatories = landlord.Signatories.OrderBy(s => s.Order)
+                .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile, IsPrimaryContact = s.IsPrimaryContact })
+                .ToList();
+        }
+        else
+        {
+            // Seed the business-set primary contact as the first (locked) signatory.
+            update.Signatories = [new SignatoryInput { Name = landlord.PrimaryContactName, Email = landlord.Email, Mobile = landlord.Mobile, IsPrimaryContact = true }];
+        }
+    }
+
+    private void TogglePremises(int id, ChangeEventArgs e)
+    {
+        if (e.Value is true) selectedPremises.Add(id); else selectedPremises.Remove(id);
+    }
+
+    private void AddSignatory() => update.Signatories.Add(new SignatoryInput());
+    private void RemoveSignatory(int idx) { if (idx >= 0 && idx < update.Signatories.Count) update.Signatories.RemoveAt(idx); }
+
+    private void Back() { error = null; if (step > 0) step--; }
+
+    private void Next()
+    {
+        error = null;
+        if (step == 0 && selectedPremises.Count == 0) { error = "Select at least one property to continue."; return; }
+        if (step == 1)
+        {
+            if (landlord!.Type == LandlordType.Individual && string.IsNullOrWhiteSpace(update.EmiratesId)) { error = "Emirates ID is required."; return; }
+            if (landlord.Type == LandlordType.Corporate && string.IsNullOrWhiteSpace(update.TradeLicenseNo)) { error = "Trade Licence No is required."; return; }
+        }
+        if (step < stepLabels.Length - 1) step++;
+    }
+
+    private async Task OnUploadAsync(InputFileChangeEventArgs e)
+    {
+        if (landlord is null) return;
+        uploading = true;
+        error = null;
+        var (ok, err) = await DocumentService.UploadAsync(landlord.Id, uploadType, e.File, ActorLabel);
+        if (!ok) error = err;
+        documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+        uploading = false;
+    }
+
+    private async Task DeleteDocAsync(int docId)
+    {
+        await DocumentService.DeleteAsync(docId);
+        documents = await DocumentService.GetDocumentsAsync(landlord!.Id);
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (landlord is null || accessToken is null) return;
+        submitting = true;
+        error = null;
+
+        var (ok, err, reason) = await LandlordService.SubmitAsync(landlord.Id, update, ActorLabel, accessToken.Id);
+        if (!ok) { error = err; submitting = false; return; }
+
+        await AccessTokenService.MarkUsedAsync(accessToken.Id);
+        reference = reason;
+        submitted = true;
+        ToastService.ShowSuccess("Submitted for review.");
+    }
+
+    private static string DocLabel(LandlordDocumentType t) => t switch
+    {
+        LandlordDocumentType.EmiratesId => "Emirates ID",
+        LandlordDocumentType.TradeLicense => "Trade Licence",
+        LandlordDocumentType.Moa => "Memorandum of Association",
+        LandlordDocumentType.PowerOfAttorney => "Power of Attorney",
+        LandlordDocumentType.AuthorisationLetter => "Authorisation Letter",
+        LandlordDocumentType.TitleDeed => "Title Deed",
+        _ => "Other"
+    };
+}

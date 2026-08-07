@@ -25,6 +25,13 @@ public static class ClaimsPrincipalExtensions
         return principal.IsInRole(Models.UserType.Administrator.ToString());
     }
 
+    /// <summary>Access to the Leasing / Landlord module: administrators and leasing managers.</summary>
+    public static bool IsLeasingUser(this ClaimsPrincipal principal)
+    {
+        return principal.IsInRole(Models.UserType.Administrator.ToString())
+            || principal.IsInRole(Models.UserType.LeasingManager.ToString());
+    }
+
     public static string GetFullName(this ClaimsPrincipal principal)
     {
         return principal.FindFirst("FullName")?.Value ?? principal.Identity?.Name ?? "";

@@ -1,0 +1,126 @@
+@page "/admin/landlords/new"
+@attribute [Authorize(Roles = "Administrator,LeasingManager")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordService LandlordService
+@inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Add Landlord - Supplier Portal</PageTitle>
+
+<h1>Add Landlord</h1>
+<p class="text-muted">Create the owner record with the core contact the business holds on file. The landlord completes and verifies the remaining details through their self-service link.</p>
+
+<EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="add-landlord" style="max-width: 560px;">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+
+    <div class="mb-3">
+        <label class="form-label">Owner Type</label>
+        <InputSelect class="form-select" @bind-Value="Input.Type">
+            <option value="@LandlordType.Individual">Individual</option>
+            <option value="@LandlordType.Corporate">Corporate</option>
+        </InputSelect>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Legal Name</label>
+        <InputText class="form-control" @bind-Value="Input.LegalName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Business Unit</label>
+        <InputSelect class="form-select" @bind-Value="Input.BusinessUnitId">
+            <option value="0">— Select —</option>
+            @foreach (var bu in businessUnits)
+            {
+                <option value="@bu.Id">@bu.Name</option>
+            }
+        </InputSelect>
+    </div>
+
+    <hr />
+    <h6 class="text-muted">Primary Contact (business-set)</h6>
+    <div class="mb-3">
+        <label class="form-label">Contact Name</label>
+        <InputText class="form-control" @bind-Value="Input.PrimaryContactName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText class="form-control" @bind-Value="Input.Email" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Mobile</label>
+        <InputText class="form-control" @bind-Value="Input.Mobile" placeholder="+9715XXXXXXXX" />
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <button type="submit" class="btn btn-primary">Save &amp; Continue</button>
+    <a class="btn btn-secondary" href="/admin/landlords">Cancel</a>
+</EditForm>
+
+@code {
+    private List<BusinessUnit> businessUnits = [];
+    private string currentUser = "unknown";
+    private string? errorMessage;
+
+    [SupplyParameterFromForm]
+    private LandlordFormModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        businessUnits = await BusinessUnitService.GetAllAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Input.BusinessUnitId <= 0)
+        {
+            errorMessage = "Please select a business unit.";
+            return;
+        }
+
+        var (success, error, id) = await Loading.RunAsync(
+            () => LandlordService.CreateAsync(Input.Type, Input.LegalName, Input.PrimaryContactName,
+                Input.Email, Input.Mobile, Input.BusinessUnitId, currentUser));
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        Nav.NavigateTo($"/admin/landlords/{id}");
+    }
+
+    private sealed class LandlordFormModel
+    {
+        public LandlordType Type { get; set; } = LandlordType.Individual;
+
+        [Required, MaxLength(250)]
+        public string LegalName { get; set; } = "";
+
+        public int BusinessUnitId { get; set; }
+
+        [Required, MaxLength(150)]
+        public string PrimaryContactName { get; set; } = "";
+
+        [Required, EmailAddress, MaxLength(200)]
+        public string Email { get; set; } = "";
+
+        [Required, MaxLength(40)]
+        public string Mobile { get; set; } = "";
+    }
+}

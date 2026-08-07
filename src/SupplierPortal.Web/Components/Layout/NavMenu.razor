@@ -46,6 +46,20 @@
                 </NavLink>
             </div>
 
+            @if (isLeasingUser)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/land-register">
+                        Land Register
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="admin/landlords">
+                        Landlords
+                    </NavLink>
+                </div>
+            }
+
             @if (isAdministrator)
             {
                 <div class="nav-item px-3">
@@ -107,6 +121,7 @@
 @code {
     private bool isAuthenticated;
     private bool isAdministrator;
+    private bool isLeasingUser;
     private int userId;
     private string fullName = "";
     private string? designation;
@@ -121,6 +136,7 @@
         if (isAuthenticated)
         {
             isAdministrator = state.User.IsAdministrator();
+            isLeasingUser = state.User.IsLeasingUser();
             userId = state.User.GetUserId();
             fullName = state.User.GetFullName();
             designation = state.User.GetDesignation();
