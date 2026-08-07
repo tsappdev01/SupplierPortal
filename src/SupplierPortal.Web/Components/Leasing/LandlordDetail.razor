@@ -304,7 +304,7 @@ else
                         <label class="form-label">Comment / reason</label>
                         <textarea class="form-control mb-3" rows="2" @bind="decisionText"
                                   placeholder="Required for correction or rejection"></textarea>
-                        <button class="btn btn-success me-1" @onclick="CompleteAsync">Complete Registration</button>
+                        <button class="btn btn-success me-1" @onclick="CompleteAsync">Approve Registration</button>
                         <button class="btn btn-warning me-1" @onclick="RequestCorrectionAsync">Request Re-upload / Correction</button>
                         <button class="btn btn-danger" @onclick="RejectAsync">Reject</button>
                     </div>
@@ -318,7 +318,7 @@ else
             }
             else if (landlord.Status == LandlordStatus.RegistrationComplete)
             {
-                <div class="alert alert-success"><strong>Registration Complete</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</div>
+                <div class="alert alert-success"><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</div>
             }
         </div>
 
