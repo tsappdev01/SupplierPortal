@@ -227,40 +227,65 @@ else
                     }
                     else
                     {
-                        <table class="table table-sm align-middle mb-3">
-                            <thead><tr><th>Type</th><th>File</th><th>Uploaded</th><th>Ver</th><th></th></tr></thead>
-                            <tbody>
-                                @foreach (var d in documents)
-                                {
-                                    <tr class="@(d.IsCurrent ? "" : "text-muted")">
-                                        <td>@DocLabel(d.DocumentType)</td>
-                                        <td>@d.FileName</td>
-                                        <td>@d.UploadedAt.ToLocalTime().ToString("g")</td>
-                                        <td>v@(d.Version)@(d.IsCurrent ? "" : " (old)")</td>
-                                        <td class="text-nowrap">
-                                            <a class="btn btn-sm btn-outline-secondary" href="/landlord-documents/@d.Id" target="_blank">Preview</a>
-                                            <a class="btn btn-sm btn-outline-secondary" href="/landlord-documents/@d.Id?download=1" download>Download</a>
-                                            @if (canEditDetails && d.IsCurrent)
-                                            {
-                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => BcDeleteDocAsync(d.Id)">Delete</button>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
+                        <div class="di-doclist">
+                            @foreach (var d in documents)
+                            {
+                                <div class="di-doc @(d.IsCurrent ? "" : "old")">
+                                    <div class="di-doc-ico">
+                                        @if (d.ContentType.StartsWith("image/"))
+                                        {
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12Zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12Z"/></svg>
+                                        }
+                                        else
+                                        {
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5Zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2Z"/></svg>
+                                        }
+                                    </div>
+                                    <div class="di-doc-meta">
+                                        <div class="di-doc-name">@d.FileName</div>
+                                        <div class="di-doc-sub">
+                                            <span class="di-doc-badge">@DocLabel(d.DocumentType)</span>
+                                            <span>@FormatSize(d.FileSizeBytes)</span>
+                                            <span>·</span>
+                                            <span>@d.UploadedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                            <span class="di-doc-ver">v@(d.Version)@(d.IsCurrent ? "" : " · superseded")</span>
+                                        </div>
+                                    </div>
+                                    <div class="di-doc-acts">
+                                        <a class="di-iconbtn" href="/landlord-documents/@d.Id" target="_blank" title="Preview" aria-label="Preview">
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8ZM1.173 8a13.1 13.1 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.1 13.1 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.1 13.1 0 0 1 1.172 8Z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z"/></svg>
+                                        </a>
+                                        <a class="di-iconbtn" href="/landlord-documents/@d.Id?download=1" download title="Download" aria-label="Download">
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5Z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3Z"/></svg>
+                                        </a>
+                                        @if (canEditDetails && d.IsCurrent)
+                                        {
+                                            <button class="di-iconbtn danger" @onclick="() => BcDeleteDocAsync(d.Id)" title="Delete" aria-label="Delete">
+                                                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/></svg>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
                     }
                     @if (canEditDetails)
                     {
-                        <div class="border-top pt-3 d-flex gap-2 align-items-end flex-wrap">
+                        <div class="di-doc-upload">
                             <div>
-                                <label class="form-label mb-1 small">Add / replace document</label>
-                                <select class="form-select form-select-sm" style="width:auto" @bind="bcUploadType">
-                                    @foreach (var dt in Enum.GetValues<LandlordDocumentType>()) { <option value="@dt">@DocLabel(dt)</option> }
-                                </select>
+                                <label class="form-label mb-1 small fw-semibold">Add / replace document</label>
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <select class="form-select form-select-sm" style="width:auto" @bind="bcUploadType">
+                                        @foreach (var dt in Enum.GetValues<LandlordDocumentType>()) { <option value="@dt">@DocLabel(dt)</option> }
+                                    </select>
+                                    <label class="btn btn-sm btn-primary mb-0">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5Z"/><path d="M5 4.854a.5.5 0 0 0 .707 0L7.5 3.06V10.5a.5.5 0 0 0 1 0V3.06l1.793 1.794A.5.5 0 1 0 11 4.146L8.354 1.5a.5.5 0 0 0-.708 0L5 4.146a.5.5 0 0 0 0 .708Z"/></svg>
+                                        Choose file
+                                        <InputFile OnChange="BcUploadAsync" style="display:none" accept=".pdf,image/*" />
+                                    </label>
+                                    @if (bcUploading) { <span class="small text-muted">Uploading…</span> }
+                                </div>
                             </div>
-                            <InputFile OnChange="BcUploadAsync" class="form-control form-control-sm" style="max-width:280px" accept=".pdf,image/*" />
-                            @if (bcUploading) { <span class="small text-muted">Uploading…</span> }
                         </div>
                     }
                 </div>
@@ -332,6 +357,24 @@ else
 }
 
 <style>
+    .di-doclist { display: flex; flex-direction: column; gap: 8px; }
+    .di-doc { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--bs-border-color); border-radius: .55rem; background: var(--bs-body-bg); transition: box-shadow .12s, border-color .12s; }
+    .di-doc:hover { border-color: #c8a24a; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .di-doc.old { opacity: .6; }
+    .di-doc-ico { flex: none; width: 38px; height: 38px; border-radius: .45rem; background: #eef2f7; color: #1a5276; display: flex; align-items: center; justify-content: center; }
+    .di-doc-ico svg { width: 20px; height: 20px; }
+    .di-doc-meta { flex: 1; min-width: 0; }
+    .di-doc-name { font-weight: 600; color: #1a2233; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .di-doc-sub { font-size: .78rem; color: var(--bs-secondary-color); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+    .di-doc-badge { background: #1a2233; color: #fff; border-radius: 999px; padding: 1px 9px; font-size: .7rem; font-weight: 600; }
+    .di-doc-ver { margin-left: auto; }
+    .di-doc-acts { flex: none; display: flex; gap: 6px; }
+    .di-iconbtn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); border-radius: .45rem; color: #1a5276; cursor: pointer; text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
+    .di-iconbtn svg { width: 16px; height: 16px; }
+    .di-iconbtn:hover { background: #eef2f7; border-color: #c8a24a; }
+    .di-iconbtn.danger { color: #c0392b; }
+    .di-iconbtn.danger:hover { background: #fdecea; border-color: #c0392b; }
+    .di-doc-upload { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--bs-border-color); }
     .di-timeline { list-style: none; padding-left: 0; margin: 0; }
     .di-timeline li { position: relative; padding-left: 1.5rem; padding-bottom: 1rem; border-left: 2px solid var(--bs-border-color); margin-left: .35rem; }
     .di-timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
@@ -521,6 +564,13 @@ else
     }
 
     private async Task<bool> Confirm(string message) => await JS.InvokeAsync<bool>("confirm", message);
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024.0):0.#} MB",
+        >= 1024 => $"{bytes / 1024.0:0} KB",
+        _ => $"{bytes} B"
+    };
 
     private static string DocLabel(LandlordDocumentType t) => t switch
     {

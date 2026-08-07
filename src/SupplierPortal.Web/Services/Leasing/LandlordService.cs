@@ -83,12 +83,17 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         var l = await db.Landlords.Include(x => x.Contacts).Include(x => x.Signatories).FirstOrDefaultAsync(x => x.Id == landlordId);
         if (l is null) return (false, "Registration not found.");
 
+        var contacts = update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+        var vErr = ValidateContacts(contacts, update.Signatories);
+        if (vErr is not null) return (false, vErr);
+
         db.LandlordContacts.RemoveRange(l.Contacts);
-        foreach (var c in update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)))
+        foreach (var c in contacts)
             l.Contacts.Add(new LandlordContact
             {
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType, FullName = c.FullName.Trim(),
-                Designation = c.Designation?.Trim(), Mobile = c.Mobile?.Trim(), Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
+                Designation = c.Designation?.Trim(), Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
             });
 
         db.LandlordSignatories.RemoveRange(l.Signatories);
@@ -234,15 +239,24 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
             .FirstOrDefaultAsync(x => x.Id == landlordId);
         if (l is null) return (false, "Registration not found.", null);
 
-        // Replace contacts with the submitted set (first primary).
-        db.LandlordContacts.RemoveRange(l.Contacts);
         var contacts = update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+
+        // On submission, enforce valid email + UAE mobile (must match the UAE Pass account) server-side.
+        if (submit)
+        {
+            var err = ValidateContacts(contacts, update.Signatories);
+            if (err is not null) return (false, err, null);
+        }
+
+        // Replace contacts with the submitted set (first primary); normalise mobiles to +9715XXXXXXXX.
+        db.LandlordContacts.RemoveRange(l.Contacts);
         foreach (var c in contacts)
         {
             l.Contacts.Add(new LandlordContact
             {
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
-                FullName = c.FullName.Trim(), Designation = c.Designation?.Trim(), Mobile = c.Mobile?.Trim(),
+                FullName = c.FullName.Trim(), Designation = c.Designation?.Trim(),
+                Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
                 Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
             });
         }
@@ -437,6 +451,21 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         });
         await db.SaveChangesAsync();
         return raw;
+    }
+
+    /// <summary>Server-side validation of contact/signatory email + UAE mobile (matches the wizard rules).</summary>
+    private static string? ValidateContacts(List<ContactInput> contacts, List<SignatoryInput> signatories)
+    {
+        if (contacts.Count == 0) return "At least a primary contact is required.";
+        foreach (var c in contacts)
+        {
+            var who = c.IsPrimary ? "Primary contact" : $"Contact '{c.FullName}'";
+            if (!ContactValidation.IsValidEmail(c.Email)) return $"{who}: a valid email address is required.";
+            if (!ContactValidation.IsValidUaeMobile(c.Mobile)) return $"{who}: a valid UAE mobile number is required.";
+        }
+        foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+            if (!ContactValidation.IsValidEmail(s.Email)) return $"Signatory '{s.Name}': a valid email address is required.";
+        return null;
     }
 
     private static async Task AddEventAsync(LeasingDbContext db, int landlordId, string type, string? detail,

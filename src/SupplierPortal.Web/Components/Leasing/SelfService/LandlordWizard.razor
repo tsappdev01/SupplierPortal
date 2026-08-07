@@ -418,10 +418,16 @@
     private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
     {
         <div class="grid2">
-            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @(isPrimary ? MarkReq() : null)</label><input type="text" placeholder="As on the Emirates ID" @bind="c.FullName" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @MarkReq()</label><input type="text" placeholder="As on the Emirates ID" @bind="c.FullName" /></div>
             <div class="field" style="margin-bottom:0"><label class="lbl">Designation</label><input type="text" @bind="c.Designation" /></div>
-            <div class="field" style="margin-bottom:0"><label class="lbl">Mobile number</label><input type="text" placeholder="+971 5X XXX XXXX" @bind="c.Mobile" /></div>
-            <div class="field" style="margin-bottom:0"><label class="lbl">Email address @(isPrimary ? MarkReq() : null)</label><input type="text" placeholder="name@company.ae" @bind="c.Email" /></div>
+            <div class="field" style="margin-bottom:0">
+                <label class="lbl">Mobile number @MarkReq()</label><input type="text" placeholder="+971 5X XXX XXXX" @bind="c.Mobile" />
+                <div class="hint">UAE mobile, must match the UAE Pass account.</div>
+            </div>
+            <div class="field" style="margin-bottom:0">
+                <label class="lbl">Email address @MarkReq()</label><input type="text" placeholder="name@company.ae" @bind="c.Email" />
+                <div class="hint">Must match the UAE Pass account.</div>
+            </div>
             <div class="field" style="margin-bottom:0"><label class="lbl">Contact type</label>
                 <select @bind="c.ContactType">@foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }</select>
             </div>
@@ -462,16 +468,31 @@
 
     private void Back() { error = null; if (step > 0) step--; }
 
+    /// <summary>Validates a contact's name / email / UAE mobile. Returns an error message or null.</summary>
+    private static string? ValidateContact(ContactInput c, string who)
+    {
+        if (string.IsNullOrWhiteSpace(c.FullName)) return $"{who}: full name is required.";
+        if (!ContactValidation.IsValidEmail(c.Email)) return $"{who}: a valid email address is required (it must match the UAE Pass account).";
+        if (!ContactValidation.IsValidUaeMobile(c.Mobile)) return $"{who}: a valid UAE mobile number is required (e.g. +9715XXXXXXXX).";
+        return null;
+    }
+
     private void Next()
     {
         error = null;
         if (step == 0)
         {
-            if (string.IsNullOrWhiteSpace(primary.FullName) || string.IsNullOrWhiteSpace(primary.Email))
-            { error = "Primary contact name and email are required."; return; }
+            error = ValidateContact(primary, "Primary contact");
+            if (error is not null) return;
         }
-        if (step == 1 && secondaries.Any(c => !string.IsNullOrWhiteSpace(c.FullName) && string.IsNullOrWhiteSpace(c.Email)))
-        { error = "Each secondary contact needs an email."; return; }
+        if (step == 1)
+        {
+            for (var i = 0; i < secondaries.Count; i++)
+            {
+                error = ValidateContact(secondaries[i], $"Secondary contact {i + 1}");
+                if (error is not null) return;
+            }
+        }
         if (step < stepLabels.Length - 1) step++;
     }
 
@@ -548,8 +569,18 @@
 
     private string? ValidateForSubmit()
     {
-        if (string.IsNullOrWhiteSpace(primary.FullName) || string.IsNullOrWhiteSpace(primary.Email))
-            return "Primary contact name and email are required.";
+        var pc = ValidateContact(primary, "Primary contact");
+        if (pc is not null) return pc;
+        for (var i = 0; i < secondaries.Count; i++)
+        {
+            var sc = ValidateContact(secondaries[i], $"Secondary contact {i + 1}");
+            if (sc is not null) return sc;
+        }
+        // Additional signatories, when named, need a valid email.
+        foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+            if (!ContactValidation.IsValidEmail(s.Email))
+                return $"Signatory '{s.Name}' needs a valid email address.";
+
         if (landlord!.Type == LandlordType.Individual)
         {
             if (!documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
@@ -565,7 +596,14 @@
     {
         if (landlord is null || accessToken is null) return;
         error = ValidateForSubmit();
-        if (error is not null) { step = error.Contains("contact") ? 0 : 2; return; }
+        if (error is not null)
+        {
+            step = error.StartsWith("Secondary") ? 1
+                 : error.StartsWith("Signatory") ? 3
+                 : error.StartsWith("Primary") ? 0
+                 : 2; // document errors
+            return;
+        }
 
         saving = true;
         var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null);

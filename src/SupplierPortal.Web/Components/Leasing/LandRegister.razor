@@ -94,32 +94,37 @@ else
                                 <span class="text-muted small">Not started</span>
                             }
                         </td>
-                        <td class="text-end text-nowrap di-actions">
-                            @if (r.RegistrationId is int rid)
+                        <td class="text-end text-nowrap di-iconacts">
+                            @{ var rid = r.RegistrationId; }
+                            @* Edit / view details *@
+                            @if (rid is int eid)
                             {
-                                <a href="/admin/landlords/@rid" target="_blank" title="View / edit all details (new tab)">Edit</a>
-                                <span class="text-muted">|</span>
-                                <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
-                                <span class="text-muted">|</span>
-                                @if (CanReview(r))
-                                {
-                                    <a href="/admin/landlords/@rid" target="_blank">Review</a>
-                                }
-                                else
-                                {
-                                    <a class="di-disabled">Review</a>
-                                }
-                                <a href="/admin/landlords/@rid" target="_blank" class="di-attach" title="View attachments (new tab)" aria-label="Attachments">
-                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3Z"/></svg>
-                                </a>
+                                <a class="btn btn-sm btn-outline-secondary" href="/admin/landlords/@eid" title="View / edit all details">@IconEdit</a>
                             }
                             else
                             {
-                                <a href="javascript:void(0)" @onclick="() => EditAsync(r)">Edit</a>
-                                <span class="text-muted">|</span>
-                                <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
-                                <span class="text-muted">|</span>
-                                <a class="di-disabled">Review</a>
+                                <button class="btn btn-sm btn-outline-secondary" title="Initiate registration" @onclick="() => EditAsync(r)">@IconEdit</button>
+                            }
+                            @* Notify / email invite *@
+                            <button class="btn btn-sm btn-outline-primary" title="Notify (send secure link)"
+                                    disabled="@(!CanNotify(r))" @onclick="() => NotifyAsync(r)">@IconMail</button>
+                            @* Attachments *@
+                            @if (rid is int aid)
+                            {
+                                <a class="btn btn-sm btn-outline-dark" href="/admin/landlords/@aid" title="View attachments">@IconClip</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-dark" title="No attachments yet" disabled>@IconClip</button>
+                            }
+                            @* Review *@
+                            @if (rid is int vid && CanReview(r))
+                            {
+                                <a class="btn btn-sm btn-outline-info" href="/admin/landlords/@vid" title="Review submission">@IconReview</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-info" title="No submission to review" disabled>@IconReview</button>
                             }
                         </td>
                     </tr>
@@ -179,11 +184,17 @@ else
     .di-actions a:hover { text-decoration: underline; }
     .di-actions a.di-disabled { color: #b7bcc4; pointer-events: none; }
     .di-actions a.di-attach { margin-left: .5rem; vertical-align: middle; }
+    .di-iconacts .btn { margin-left: 4px; }
     .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 3000; }
     .di-modal { width: 100%; max-width: 460px; background: var(--bs-body-bg); border-radius: .6rem; box-shadow: 0 12px 40px rgba(0,0,0,.3); padding: 1.25rem 1.5rem; }
 </style>
 
 @code {
+    private readonly RenderFragment IconEdit = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>;
+    private readonly RenderFragment IconMail = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z" /></svg>;
+    private readonly RenderFragment IconClip = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3Z" /></svg>;
+    private readonly RenderFragment IconReview = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z" /><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12Zm7.354 4.854-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 9.293l2.646-2.647a.5.5 0 0 1 .708.708Z" /></svg>;
+
     private string zone = "";
     private string category = "";
     private string statusText = "";
