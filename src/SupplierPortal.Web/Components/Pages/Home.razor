@@ -30,6 +30,33 @@
         </div>
     </div>
 
+    <div class="di-launch">
+        <a class="di-launch-card di-launch-supplier" href="/supplier/dashboard">
+            <span class="di-launch-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7l8 4 8-4Z"/><path d="M4 7v10l8 4 8-4V7"/><path d="m12 11 0 10"/></svg>
+            </span>
+            <span class="di-launch-body">
+                <span class="di-launch-title">Launch Supplier</span>
+                <span class="di-launch-sub">Manage suppliers, notifications and self-service.</span>
+            </span>
+            <span class="di-launch-arrow">→</span>
+        </a>
+
+        @if (isLeasingUser)
+        {
+            <a class="di-launch-card di-launch-landlord" href="/admin/land-register">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Landlord Portal</span>
+                    <span class="di-launch-sub">Property list, landlord registrations and reviews.</span>
+                </span>
+                <span class="di-launch-arrow">→</span>
+            </a>
+        }
+    </div>
+
     <h1>User Information</h1>
     <table class="table di-home-table">
         <tbody>
@@ -51,7 +78,7 @@
             </tr>
             <tr>
                 <th>Role</th>
-                <td>@(user.UserType == UserType.Administrator ? "Administrator" : "Normal User")</td>
+                <td>@(user.UserType switch { UserType.Administrator => "Administrator", UserType.LeasingManager => "Leasing Manager", _ => "Normal User" })</td>
             </tr>
         </tbody>
     </table>
@@ -94,6 +121,55 @@
 }
 
 <style>
+    .di-launch {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .di-launch-card {
+        flex: 1 1 320px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.4rem;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #fff;
+        background: linear-gradient(135deg, #1a2233 0%, #2b3855 100%);
+        box-shadow: 0 6px 18px rgba(26, 34, 51, .18);
+        transition: transform .12s ease, box-shadow .12s ease;
+    }
+
+    .di-launch-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 26px rgba(26, 34, 51, .28);
+        color: #fff;
+    }
+
+    .di-launch-landlord {
+        background: linear-gradient(135deg, #0e3a66 0%, #164a7b 100%);
+    }
+
+    .di-launch-ico {
+        flex: none;
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, .12);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #c8a24a;
+    }
+
+    .di-launch-ico svg { width: 28px; height: 28px; }
+    .di-launch-body { flex: 1; display: flex; flex-direction: column; }
+    .di-launch-title { font-size: 1.15rem; font-weight: 700; }
+    .di-launch-sub { font-size: .85rem; color: rgba(255, 255, 255, .75); margin-top: 2px; }
+    .di-launch-arrow { font-size: 1.4rem; opacity: .8; }
+
     .di-home-profile {
         display: flex;
         align-items: center;
@@ -176,6 +252,7 @@
 @code {
     private User? user;
     private bool hasPhoto;
+    private bool isLeasingUser;
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,6 +260,7 @@
         var userId = state.User.GetUserId();
         user = await UserService.GetByIdAsync(userId);
         hasPhoto = state.User.HasPhoto();
+        isLeasingUser = state.User.IsLeasingUser();
     }
 
     private static string GetInitials(string name)
