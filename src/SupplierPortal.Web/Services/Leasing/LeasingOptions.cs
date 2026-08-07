@@ -12,12 +12,7 @@ public class LeasingOptions
     /// before the first dash. Defaults to the two DIP zones.</summary>
     public string[] Zones { get; set; } = ["597", "598"];
 
-    /// <summary>SQL Server Database Mail profile used for all landlord emails (OTP + notifications).</summary>
+    /// <summary>SQL Server Database Mail profile used for all landlord emails (OTP + notifications).
+    /// Sent unconditionally in every environment, like the supplier emails.</summary>
     public string MailProfile { get; set; } = "BP";
-
-    /// <summary>Whether landlord emails are actually sent through <see cref="MailProfile"/>. When null
-    /// (the default) emails send outside Development and are skipped in Development (so the OTP is surfaced
-    /// on-screen for local testing). Set <c>true</c> to force real sends via the BP profile in any
-    /// environment, or <c>false</c> to always skip.</summary>
-    public bool? SendEmails { get; set; }
 }

@@ -29,10 +29,6 @@
             for <strong>@(token.Landlord?.CompanyName ?? token.Landlord?.PropertyCode)</strong>. Enter it below to continue.
         </p>
 
-        @if (devCode is not null)
-        {
-            <div class="alert alert-info py-2">Development mode — your code is <strong>@devCode</strong> (email delivery is disabled locally).</div>
-        }
         @if (errorMessage is not null)
         {
             <div class="alert alert-danger">@errorMessage</div>

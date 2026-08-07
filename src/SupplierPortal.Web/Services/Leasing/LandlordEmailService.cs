@@ -7,13 +7,13 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// <summary>
 /// Sends the Landlord-registration notification emails (FRD §28) through SQL Server Database Mail
 /// (<c>sp_send_dbmail</c>) using the configured profile (<c>Leasing:MailProfile</c>, default <c>BP</c>),
-/// exactly like the supplier emails. Sending is gated by <c>Leasing:SendEmails</c> (defaults to on outside
-/// Development); every send is best-effort and never blocks the workflow transition that triggered it.
+/// exactly like <c>SupplierEmailService</c>. Mail is sent unconditionally in every environment; every send
+/// is best-effort and never blocks the workflow transition that triggered it.
 /// </summary>
-public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory, IWebHostEnvironment env, IOptions<LeasingOptions> options)
+public class LandlordEmailService(
+    IDbContextFactory<LeasingDbContext> dbFactory, IOptions<LeasingOptions> options, ILogger<LandlordEmailService> logger)
 {
     private string MailProfileName => options.Value.MailProfile;
-    private bool ShouldSend => options.Value.SendEmails ?? !env.IsDevelopment();
 
     public Task SendInviteAsync(string toEmail, string legalOrCompany, string link) =>
         SendAsync(toEmail, "Landlord Registration – Action Required",
@@ -54,7 +54,7 @@ public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory,
 
     private async Task SendAsync(string toEmail, string subject, string body)
     {
-        if (!ShouldSend || string.IsNullOrWhiteSpace(toEmail)) return; // skipped in Development unless Leasing:SendEmails=true
+        if (string.IsNullOrWhiteSpace(toEmail)) { logger.LogWarning("Landlord email skipped: no recipient address."); return; }
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync();
@@ -65,10 +65,13 @@ public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory,
                     @subject = {subject},
                     @body = {body},
                     @body_format = 'HTML';");
+            logger.LogInformation("Landlord email queued via Database Mail profile '{Profile}' to {Email}: {Subject}", MailProfileName, toEmail, subject);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort: a mail outage must never block the workflow transition. The audit event still records it.
+            // Best-effort: a mail outage must never block the workflow transition — but log it so a
+            // misconfigured Database Mail profile is visible rather than silently swallowed.
+            logger.LogError(ex, "Landlord email FAILED via Database Mail profile '{Profile}' to {Email}: {Subject}", MailProfileName, toEmail, subject);
         }
     }
 }
