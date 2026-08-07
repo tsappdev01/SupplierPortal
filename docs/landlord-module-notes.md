@@ -10,13 +10,20 @@ processes reference. Business maintains the **land**; the landlord updates the *
 ## Data sourcing — IMPORTANT
 - **Land/Property/Building information is READ-ONLY, sourced from a SQL VIEW** — do **not** create,
   seed, migrate or write it.
-  - Known source view: `[BP].[dbo].[Property]` with columns **`CategoryName`, `PropertyCode`, `BuildingName`**.
-  - `PropertyCode` = `{Zone}-{rest}`, Zone ∈ {**597**, **598**} (zones fixed, from appsettings).
-    Examples: `598-115`, `598-1147W/H-8`, `597-970`, `597-184`. The `rest` part is alphanumeric.
+  - Source view: `[BP].[dbo].[Property]` with columns **`Id`, `CategoryName`, `PropertyCode`, `BuildingName`**.
+  - **`Id`** is a stable per-row key → this is the **PremisesId** the app links ownership to.
+  - `PropertyCode` = `{Zone}-{rest}`. **Zone ∈ {597, 598}** is a Dubai Municipality zone and is a required
+    part of the complete code — a PropertyCode is incomplete without it. In the UI, Zone is a **select**
+    (597/598, editable/extensible via appsettings) **combined** with the editable remainder to form the
+    complete PropertyCode. Examples: `597-1000`, `598-115`, `598-1147W/H-8`.
   - `CategoryName` = usage/category (Industrial, Warehouses, Labor Accommodation, Mixed residential and
-    Commercial, …).
-  - `BuildingName` = building/premises name.
-  - Map land as a **keyless / view-backed EF entity** (`ToView("Property")`), never a migrated table.
+    Commercial, …). `BuildingName` = building/premises name.
+  - Map land as a **view-backed EF entity** `Premises` (`ToView("Property")`, key = `Id`), never a migrated table.
+
+## Architecture — separate bounded context
+- The Landlord/Leasing module uses its **own `LeasingDbContext`** (same DB): reads the `dbo.Property` view
+  and owns the `leasing.*` tables, with its own migrations history table (`__EFLeasingMigrationsHistory`).
+  This isolates it from the Supplier `ApplicationDbContext` (no shared ModelSnapshot / migration conflicts).
 - **App-OWNED tables (EF migrations) — the only things we write:**
   - Owner/Landlord, ownership link (Owner ↔ building, per (PropertyCode, BuildingName)),
     Signatory, LandlordDocument, registration/status, field-change + audit trail.

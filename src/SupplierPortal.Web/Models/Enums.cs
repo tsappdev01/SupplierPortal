@@ -3,7 +3,8 @@ namespace SupplierPortal.Web.Models;
 public enum UserType
 {
     Administrator = 1,
-    NormalUser = 2
+    NormalUser = 2,
+    LeasingManager = 3
 }
 
 /// <summary>How a user's credentials are verified at login. Local = password hash in this database

@@ -32,6 +32,12 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Landlord / Leasing module — separate bounded context over the same DB (reads the dbo.Property view,
+// owns the leasing.* tables) with its own migrations history so it never clashes with ApplicationDbContext.
+builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)));
+
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));
 builder.Services.AddSingleton<ActiveDirectoryService>();
