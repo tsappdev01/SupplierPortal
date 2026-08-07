@@ -22,6 +22,7 @@
     <div class="col-sm-3">
         <label class="form-label small mb-0">Zone</label>
         <select class="form-select form-select-sm" @bind="zone" @bind:after="LoadAsync">
+            <option value="__all">All zones</option>
             @foreach (var z in LandRegisterService.Zones)
             {
                 <option value="@z">@z</option>
@@ -42,9 +43,10 @@
         <label class="form-label small mb-0">Status</label>
         <select class="form-select form-select-sm" @bind="statusText" @bind:after="LoadAsync">
             <option value="">All</option>
-            @foreach (var s in filterStatuses)
+            <option value="__none">Not started</option>
+            @foreach (var g in Landlords.kpiGroups)
             {
-                <option value="@s">@Landlords.Label(s)</option>
+                <option value="@g.Label">@g.Label</option>
             }
         </select>
     </div>
@@ -228,11 +230,10 @@ else
     private string currentUser = "unknown";
     private int businessUnitId;
 
-    private static readonly LandlordStatus[] filterStatuses =
-        [LandlordStatus.Draft, LandlordStatus.InvitationSent, LandlordStatus.InProgress, LandlordStatus.Submitted,
-         LandlordStatus.UnderReview, LandlordStatus.CorrectionRequired, LandlordStatus.Rejected, LandlordStatus.RegistrationComplete];
-
-    private LandlordStatus? StatusFilter => Enum.TryParse<LandlordStatus>(statusText, out var s) ? s : null;
+    // Selected status group (by label) resolved to its underlying statuses; "__none" = not-started rows.
+    private LandlordStatus[]? StatusFilter =>
+        Landlords.kpiGroups.FirstOrDefault(g => g.Label == statusText)?.Statuses;
+    private bool NotStartedOnly => statusText == "__none";
 
     protected override async Task OnInitializedAsync()
     {
@@ -250,7 +251,7 @@ else
         await Loading.RunAsync(async () =>
         {
             categories = await LandRegisterService.GetCategoriesAsync(zone);
-            rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, search, take: 100000);
+            rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, NotStartedOnly, search, take: 100000);
         });
         page = 1;
         loading = false;

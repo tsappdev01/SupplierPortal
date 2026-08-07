@@ -155,15 +155,15 @@ else
 
     private bool IsActive(LandlordStatus[] set) => statusFilter is not null && statusFilter.Length == set.Length && !set.Except(statusFilter).Any();
 
-    private sealed record Kpi(string Label, LandlordStatus Primary, LandlordStatus[] Statuses, string Color);
-    private static readonly Kpi[] kpiGroups =
+    public sealed record Kpi(string Label, LandlordStatus[] Statuses, string Color);
+    // Status groups (labels shown across the module). Shared by the KPI cards and the Property-list filter.
+    public static readonly Kpi[] kpiGroups =
     [
-        new("Invitation Sent", LandlordStatus.InvitationSent, [LandlordStatus.InvitationSent, LandlordStatus.OtpVerified], "#2563eb"),
-        new("In Progress", LandlordStatus.InProgress, [LandlordStatus.InProgress], "#0891b2"),
-        new("Under Review", LandlordStatus.UnderReview, [LandlordStatus.Submitted, LandlordStatus.UnderReview], "#b45309"),
-        new("Correction", LandlordStatus.CorrectionRequired, [LandlordStatus.CorrectionRequired], "#b8860b"),
-        new("Rejected", LandlordStatus.Rejected, [LandlordStatus.Rejected], "#b91c1c"),
-        new("Completed", LandlordStatus.RegistrationComplete, [LandlordStatus.RegistrationComplete], "#15803d"),
+        new("Unregistered", [LandlordStatus.Draft], "#64748b"),
+        new("Awaiting Response", [LandlordStatus.InvitationSent, LandlordStatus.OtpVerified, LandlordStatus.InProgress, LandlordStatus.CorrectionRequired], "#2563eb"),
+        new("Under Review", [LandlordStatus.Submitted, LandlordStatus.UnderReview], "#b45309"),
+        new("Rejected", [LandlordStatus.Rejected], "#b91c1c"),
+        new("Approved", [LandlordStatus.RegistrationComplete], "#15803d"),
     ];
 
     private const int PageSize = 50;
@@ -214,24 +214,24 @@ else
 
     private void Open(int id) => Nav.NavigateTo($"/admin/landlords/{id}");
 
+    // Grouped display labels (business terminology).
     public static string Label(LandlordStatus s) => s switch
     {
-        LandlordStatus.InvitationSent => "Invitation Sent",
-        LandlordStatus.OtpVerified => "OTP Verified",
-        LandlordStatus.InProgress => "In Progress",
-        LandlordStatus.UnderReview => "Under Review",
-        LandlordStatus.CorrectionRequired => "Correction Required",
-        LandlordStatus.RegistrationComplete => "Registration Complete",
+        LandlordStatus.Draft => "Unregistered",
+        LandlordStatus.InvitationSent or LandlordStatus.OtpVerified or LandlordStatus.InProgress
+            or LandlordStatus.CorrectionRequired => "Awaiting Response",
+        LandlordStatus.Submitted or LandlordStatus.UnderReview => "Under Review",
+        LandlordStatus.Rejected => "Rejected",
+        LandlordStatus.RegistrationComplete => "Approved",
         _ => s.ToString()
     };
 
     public static string StatusClass(LandlordStatus s) => s switch
     {
         LandlordStatus.RegistrationComplete => "bg-success",
-        LandlordStatus.UnderReview or LandlordStatus.Submitted => "bg-info text-dark",
-        LandlordStatus.CorrectionRequired => "bg-warning text-dark",
-        LandlordStatus.InvitationSent or LandlordStatus.OtpVerified or LandlordStatus.InProgress => "bg-primary",
+        LandlordStatus.Submitted or LandlordStatus.UnderReview => "bg-info text-dark",
         LandlordStatus.Rejected => "bg-danger",
-        _ => "bg-secondary"
+        LandlordStatus.Draft => "bg-secondary",
+        _ => "bg-primary" // Awaiting Response group
     };
 }

@@ -14,6 +14,9 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
 {
     private readonly LeasingOptions _options = options.Value;
 
+    /// <summary>Sentinel zone value meaning "every configured zone" (the "All zones" filter option).</summary>
+    public const string AllZones = "__all";
+
     // De-duplicate defensively (the config binder can append to defaults) and fall back to the DIP zones.
     public IReadOnlyList<string> Zones =>
         (_options.Zones is { Length: > 0 } z ? z : LeasingOptions.DefaultZones).Distinct().ToArray();
@@ -96,12 +99,15 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
     /// <summary>Distinct property categories (CategoryName) in a zone, for the Property-list filter.</summary>
     public async Task<List<string>> GetCategoriesAsync(string zone)
     {
-        zone = ResolveZone(zone);
         await using var db = await dbFactory.CreateDbContextAsync();
-        var zonePrefix = zone + "-";
-        return await db.Premises.AsNoTracking()
-            .Where(p => p.PropertyCode.StartsWith(zonePrefix) && p.CategoryName != null)
-            .Select(p => p.CategoryName!)
+        var q = db.Premises.AsNoTracking().Where(p => p.CategoryName != null);
+        if (zone != AllZones)
+        {
+            zone = ResolveZone(zone);
+            var zonePrefix = zone + "-";
+            q = q.Where(p => p.PropertyCode.StartsWith(zonePrefix));
+        }
+        return await q.Select(p => p.CategoryName!)
             .Distinct().OrderBy(c => c).ToListAsync();
     }
 
@@ -111,12 +117,16 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
     /// per property). Filterable by zone, category and registration status.
     /// </summary>
     public async Task<List<PropertyListRow>> GetPropertyListAsync(
-        string zone, string? category, LandlordStatus? status, string? search, int take = 500)
+        string zone, string? category, LandlordStatus[]? statuses, bool notStartedOnly, string? search, int take = 500)
     {
-        zone = ResolveZone(zone);
         await using var db = await dbFactory.CreateDbContextAsync();
-        var zonePrefix = zone + "-";
-        var q = db.Premises.AsNoTracking().Where(p => p.PropertyCode.StartsWith(zonePrefix));
+        var q = db.Premises.AsNoTracking();
+        if (zone != AllZones)
+        {
+            zone = ResolveZone(zone);
+            var zonePrefix = zone + "-";
+            q = q.Where(p => p.PropertyCode.StartsWith(zonePrefix));
+        }
 
         if (!string.IsNullOrWhiteSpace(category)) q = q.Where(p => p.CategoryName == category);
         if (!string.IsNullOrWhiteSpace(search))
@@ -153,7 +163,8 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
                 reg?.Id, reg?.Status, reg?.LinkActive ?? false);
         });
 
-        if (status is LandlordStatus s) rows = rows.Where(r => r.Status == s);
+        if (notStartedOnly) rows = rows.Where(r => r.Status is null);
+        else if (statuses is { Length: > 0 }) rows = rows.Where(r => r.Status is LandlordStatus s && statuses.Contains(s));
         return rows.ToList();
     }
 
