@@ -65,6 +65,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("LegacySourceId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("LinkActive")
                         .HasColumnType("bit");
 
@@ -123,6 +126,8 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BusinessUnitId");
+
+                    b.HasIndex("LegacySourceId");
 
                     b.HasIndex("Status");
 

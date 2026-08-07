@@ -15,20 +15,25 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="mb-0">Landlord Registrations</h1>
-    <a class="btn btn-outline-primary" href="/admin/land-register">Initiate from Land Register →</a>
+    <a class="btn btn-outline-primary" href="/admin/land-register">Initiate from Property List →</a>
 </div>
 
-<div class="btn-group btn-group-sm mb-3" role="group">
-    <button type="button" class="btn @(statusFilter is null ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetFilter(null)">All</button>
-    @foreach (var s in statuses)
+@* KPI cards (Manage-Supplier style) — click to filter *@
+<div class="di-kpis mb-3">
+    <button class="di-kpi @(statusFilter is null ? "sel" : "")" @onclick="() => SetFilter(null)">
+        <span class="di-kpi-n">@counts.Values.Sum()</span><span class="di-kpi-l">Total</span>
+    </button>
+    @foreach (var g in kpiGroups)
     {
-        <button type="button" class="btn @(statusFilter == s ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetFilter(s)">@Label(s)</button>
+        <button class="di-kpi @(IsActive(g.Statuses) ? "sel" : "")" style="--kpi:@g.Color" @onclick="() => SetFilter(g.Statuses)">
+            <span class="di-kpi-n">@g.Statuses.Sum(s => counts.GetValueOrDefault(s))</span><span class="di-kpi-l">@g.Label</span>
+        </button>
     }
 </div>
 
 @if (items.Count == 0)
 {
-    <div class="alert alert-light border">No landlords@(statusFilter is null ? "" : $" with status \"{Label(statusFilter.Value)}\"") yet.</div>
+    <div class="alert alert-light border">No registrations@(statusFilter is null ? "" : " for the selected filter") yet.</div>
 }
 else
 {
@@ -91,11 +96,34 @@ else
     </div>
 }
 
+<style>
+    .di-kpis { display: flex; gap: 10px; flex-wrap: wrap; }
+    .di-kpi { flex: 1 1 130px; min-width: 120px; text-align: left; background: #fff; border: 1px solid var(--bs-border-color); border-top: 3px solid var(--kpi, #64748b); border-radius: .5rem; padding: .6rem .9rem; cursor: pointer; }
+    .di-kpi:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .di-kpi.sel { outline: 2px solid var(--kpi, #1a2233); }
+    .di-kpi-n { display: block; font-size: 1.5rem; font-weight: 700; line-height: 1.1; color: #1a2233; }
+    .di-kpi-l { display: block; font-size: .78rem; color: var(--bs-secondary-color); }
+</style>
+
 @code {
     private List<LandlordListItem> items = [];
-    private LandlordStatus? statusFilter;
+    private Dictionary<LandlordStatus, int> counts = new();
+    private LandlordStatus[]? statusFilter;
     private string currentUser = "unknown";
     private int? sending;
+
+    private bool IsActive(LandlordStatus[] set) => statusFilter is not null && statusFilter.Length == set.Length && !set.Except(statusFilter).Any();
+
+    private sealed record Kpi(string Label, LandlordStatus Primary, LandlordStatus[] Statuses, string Color);
+    private static readonly Kpi[] kpiGroups =
+    [
+        new("Invitation Sent", LandlordStatus.InvitationSent, [LandlordStatus.InvitationSent, LandlordStatus.OtpVerified], "#2563eb"),
+        new("In Progress", LandlordStatus.InProgress, [LandlordStatus.InProgress], "#0891b2"),
+        new("Under Review", LandlordStatus.UnderReview, [LandlordStatus.Submitted, LandlordStatus.UnderReview], "#b45309"),
+        new("Correction", LandlordStatus.CorrectionRequired, [LandlordStatus.CorrectionRequired], "#b8860b"),
+        new("Rejected", LandlordStatus.Rejected, [LandlordStatus.Rejected], "#b91c1c"),
+        new("Completed", LandlordStatus.RegistrationComplete, [LandlordStatus.RegistrationComplete], "#15803d"),
+    ];
 
     private const int PageSize = 50;
     private int page = 1;
@@ -112,9 +140,6 @@ else
         }
     }
     private void GoTo(int p) { if (p >= 1 && p <= TotalPages) page = p; }
-    private static readonly LandlordStatus[] statuses =
-        [LandlordStatus.Draft, LandlordStatus.InvitationSent, LandlordStatus.InProgress, LandlordStatus.Submitted,
-         LandlordStatus.UnderReview, LandlordStatus.CorrectionRequired, LandlordStatus.Rejected, LandlordStatus.RegistrationComplete];
 
     protected override async Task OnInitializedAsync()
     {
@@ -125,7 +150,8 @@ else
 
     private async Task LoadAsync()
     {
-        items = await LandlordService.GetAllAsync(status: statusFilter);
+        items = await LandlordService.GetAllAsync(statuses: statusFilter);
+        counts = await LandlordService.GetStatusCountsAsync();
         page = 1;
     }
 
@@ -139,9 +165,9 @@ else
         await LoadAsync();
     }
 
-    private async Task SetFilter(LandlordStatus? s)
+    private async Task SetFilter(LandlordStatus[]? statuses)
     {
-        statusFilter = s;
+        statusFilter = statuses;
         await LoadAsync();
     }
 

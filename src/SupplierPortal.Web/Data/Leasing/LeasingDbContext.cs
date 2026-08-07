@@ -39,6 +39,7 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
             e.ToTable("Landlords", Schema);
             e.HasIndex(x => x.BusinessUnitId);
             e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.LegacySourceId);
             e.HasMany(x => x.Premises).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Contacts).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Signatories).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);

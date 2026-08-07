@@ -139,6 +139,10 @@ public class Landlord
     /// <summary>Links this registration to the one it was restarted from (audit chain).</summary>
     public int? RestartedFromId { get; set; }
 
+    /// <summary>If migrated from the legacy <c>dbo.LandlordData</c> table, its source Id — for traceability
+    /// and to make the one-time data migration idempotent (re-runs skip already-migrated rows).</summary>
+    public int? LegacySourceId { get; set; }
+
     public List<LandlordPremises> Premises { get; set; } = [];
     public List<LandlordContact> Contacts { get; set; } = [];
     public List<LandlordSignatory> Signatories { get; set; } = [];
