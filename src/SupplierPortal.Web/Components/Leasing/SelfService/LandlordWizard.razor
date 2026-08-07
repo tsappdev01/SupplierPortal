@@ -193,6 +193,9 @@
                     @* ===== Step 4: Review ===== *@
                     else if (step == 4)
                     {
+                        var namedSecondaries = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+                        var namedSignatories = signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)).ToList();
+
                         <div class="rev">
                             <h3>Property</h3>
                             <dl>
@@ -201,24 +204,74 @@
                                 <div class="r"><dt>Agreement type</dt><dd>@landlord.Type</dd></div>
                             </dl>
                         </div>
+
                         <div class="rev">
                             <h3>Primary contact<button class="link" @onclick="() => step = 0">Edit</button></h3>
                             <dl>
                                 <div class="r"><dt>Name</dt><dd>@primary.FullName</dd></div>
+                                <div class="r"><dt>Designation</dt><dd>@(string.IsNullOrWhiteSpace(primary.Designation) ? "—" : primary.Designation)</dd></div>
+                                <div class="r"><dt>Contact type</dt><dd>@primary.ContactType</dd></div>
                                 <div class="r"><dt>Email</dt><dd>@primary.Email</dd></div>
                                 <div class="r"><dt>Mobile</dt><dd>@(primary.Mobile ?? "—")</dd></div>
+                                @if (landlord.Type == LandlordType.Individual)
+                                {
+                                    <div class="r"><dt>Emirates ID</dt><dd>@(string.IsNullOrWhiteSpace(primary.EmiratesId) ? "—" : primary.EmiratesId)</dd></div>
+                                    <div class="r"><dt>Emirates ID expiry</dt><dd>@(primary.EmiratesIdExpiry is { } ex ? ex.ToString("dd MMM yyyy") : "—")</dd></div>
+                                }
                             </dl>
                         </div>
+
                         <div class="rev">
-                            <h3>Details</h3>
+                            <h3>Secondary contacts<button class="link" @onclick="() => step = 1">Edit</button></h3>
+                            @if (namedSecondaries.Count == 0)
+                            {
+                                <dl><div class="r"><dd class="muted">None added.</dd></div></dl>
+                            }
+                            else
+                            {
+                                @foreach (var (c, i) in namedSecondaries.Select((c, i) => (c, i)))
+                                {
+                                    <dl>
+                                        <div class="r"><dt>#@(i + 1) Name</dt><dd>@c.FullName</dd></div>
+                                        <div class="r"><dt>Contact type</dt><dd>@c.ContactType</dd></div>
+                                        <div class="r"><dt>Email</dt><dd>@c.Email</dd></div>
+                                        <div class="r"><dt>Mobile</dt><dd>@(c.Mobile ?? "—")</dd></div>
+                                    </dl>
+                                }
+                            }
+                        </div>
+
+                        <div class="rev">
+                            <h3>Documents<button class="link" @onclick="() => step = 2">Edit</button></h3>
+                            @if (documents.Count == 0)
+                            {
+                                <dl><div class="r"><dd class="muted">No documents uploaded.</dd></div></dl>
+                            }
+                            else
+                            {
+                                <dl>
+                                    @foreach (var d in documents)
+                                    {
+                                        <div class="r"><dt>@DocLabel(d.DocumentType)</dt><dd>@d.FileName</dd></div>
+                                    }
+                                </dl>
+                            }
+                        </div>
+
+                        <div class="rev">
+                            <h3>Authorised signatories<button class="link" @onclick="() => step = 3">Edit</button></h3>
                             <dl>
-                                <div class="r"><dt>Secondary contacts</dt><dd>@secondaries.Count(c => !string.IsNullOrWhiteSpace(c.FullName))</dd></div>
-                                <div class="r"><dt>Documents</dt><dd>@documents.Count</dd></div>
-                                <div class="r"><dt>Signatories</dt><dd>@signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name)) · @signingRule signing</dd></div>
+                                <div class="r"><dt>Signing rule</dt><dd>@(signingRule == SigningRule.All ? "All must sign" : "Any one may sign")</dd></div>
+                                <div class="r"><dt>#1 (Primary)</dt><dd>@primary.FullName — @primary.Email</dd></div>
+                                @foreach (var (s, i) in namedSignatories.Select((s, i) => (s, i)))
+                                {
+                                    <div class="r"><dt>#@(i + 2)</dt><dd>@s.Name — @s.Email@(string.IsNullOrWhiteSpace(s.Mobile) ? "" : $" · {s.Mobile}")</dd></div>
+                                }
                             </dl>
                         </div>
+
                         <div class="panel">
-                            <label class="check"><input type="checkbox" @bind="declared" /> <span>I confirm the information provided is accurate and complete.</span></label>
+                            <label class="check"><input type="checkbox" @bind="declared" /> <span>I confirm that all the information provided above — contacts, documents and signatories — is accurate and complete.</span></label>
                         </div>
                     }
                 </div>

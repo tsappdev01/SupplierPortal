@@ -561,7 +561,11 @@ else
     private async Task CompleteAsync()
     {
         if (!await Confirm("Complete this landlord registration? The secure link will be deactivated.")) return;
-        var staff = await StaffEmailsAsync();
+        var staff = (await StaffEmailsAsync()).ToList();
+        // Make sure the Business-Centre user who initiated the request is notified, even if their account
+        // no longer matches the general staff filter.
+        var initiator = await UserService.GetByUsernameAsync(landlord!.CreatedBy);
+        if (!string.IsNullOrWhiteSpace(initiator?.Email)) staff.Insert(0, initiator.Email!);
         var (ok, err) = await Loading.RunAsync(() => LandlordService.CompleteAsync(Id, currentUser, staff, null));
         if (!ok) { Toast.ShowError(err ?? "Could not complete."); return; }
         await LoadAsync();
