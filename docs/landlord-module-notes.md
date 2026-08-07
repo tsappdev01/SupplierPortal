@@ -23,10 +23,19 @@ processes reference. Business maintains the **land**; the landlord updates the *
 - Verification method is **pluggable** (email OTP now; UAE Pass later — Ejari uses UAE Pass). "Decide later."
 
 ## Model (agreed)
-- Hierarchy in the view: **Zone (code prefix) → PropertyCode → BuildingName**. (Units not in this view;
-  units/tenancy come with the later Tenant/Ejari phase.)
-- **One owner → many properties/buildings**; **each building can have a different owner**; **co-ownership**
-  allowed → ownership recorded at **building** granularity via a link.
+- **Property ↔ Building is many-to-many** — CONFIRMED from the 1,000-row `bld.xlsx` dataset:
+  668 property codes, 940 building names; 99 properties have >1 building (max 49 on `598-653`);
+  24 buildings span >1 property (FALCON HOUSE across 32 codes; `8WD` across 6).
+- Model each **view row as a "Premises" = (PropertyCode × BuildingName)** — the atomic ownable unit.
+  Property and Building are two groupings over premises; their M:N falls out of the premises rows.
+- **Ownership attaches to the Premises** (Owner ↔ Premises), which supports property→many buildings,
+  building→many properties, different owner per building, and co-ownership — all in one link table.
+- Source has **no surrogate keys** (only text columns) and **building names are not unique**
+  (FALCON HOUSE recurs across 32 codes) → the natural key of a premises is `(PropertyCode, BuildingName)`
+  unless the real `dbo.Property` view exposes a stable id.
+- **Zone** = first 3 chars of PropertyCode (`597`/`598`). Outliers exist: `598285` (no dash) and
+  `STR-597-4899...` (×3) — decide keep/exclude.
+- Units not in this view; units/tenancy come with the later Tenant/Ejari phase.
 - Owner is **scoped to one Business Unit** (not a globally reusable party).
 - Owner info + signatories + documents are captured **per property** (landlord selects the property, then updates).
 - No banking / rent-remittance fields. **Retain all documents + a complete registration trace (audit timeline).**
@@ -46,11 +55,11 @@ Separate Landlord module reusing shared infra (Business Units, roles, tokenized-
 notifications, DMZ portal/API pattern). Supplier module left untouched.
 
 ## Open questions (confirm before migration)
-1. Does the view expose a **stable unique key** per row (a Building/Property id), or do we key ownership on
-   **(PropertyCode, BuildingName)**?
-2. Is `dbo.Property` **one row per building** (PropertyCode + BuildingName)? Any separate views for units /
-   tenancies / an owner master to read?
-3. Zone derived as the `PropertyCode` prefix before the first `-` — correct?
+1. Ownership assigned at the **Premises = (PropertyCode, BuildingName)** level (recommended) — confirm.
+2. Does the real `dbo.Property` view expose a **stable id** per row (premises id)? If not we key on
+   `(PropertyCode, BuildingName)`.
+3. **Zone** = first 3 chars of PropertyCode; how to handle outliers `598285` and `STR-597-4899...` (×3) —
+   exclude, or map to a zone?
 4. Confirm the app never writes land data (read-only view) and owns only owner/registration tables.
 
 ## Design prototype
