@@ -270,3 +270,12 @@ table thead th {
 .di-action-btn.is-upload { border-color: #ecd9a6; }
 .di-action-btn.is-upload:hover,
 .di-action-btn.is-upload:focus-visible { border-color: var(--di-gold); }
+
+/* Top bar (holds the supplier-activity + notification icons) */
+.di-topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 1.5rem 0;
+}

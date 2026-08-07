@@ -138,21 +138,37 @@ public static class DbSeeder
 
     private static async Task SeedSupplierFieldSettingsAsync(ApplicationDbContext db)
     {
-        if (await db.SupplierFieldSettings.AnyAsync())
+        // Add any seed field that isn't already present, so fields introduced after the first run
+        // (e.g. the site-usage checkboxes) appear in Supplier Field Settings without wiping the
+        // administrator's existing mandatory/visibility choices for the fields already there.
+        var existingKeys = (await db.SupplierFieldSettings.Select(f => f.FieldKey).ToListAsync()).ToHashSet();
+        var nextSequence = await db.SupplierFieldSettings.AnyAsync()
+            ? await db.SupplierFieldSettings.MaxAsync(f => f.Sequence) + 1
+            : 0;
+
+        var added = false;
+        foreach (var f in SupplierFieldSettingSeedData.Fields)
         {
-            return;
+            if (existingKeys.Contains(f.FieldKey))
+            {
+                continue;
+            }
+            db.SupplierFieldSettings.Add(new SupplierFieldSetting
+            {
+                FieldKey = f.FieldKey,
+                DisplayLabel = f.DisplayLabel,
+                Step = f.Step,
+                Sequence = nextSequence++,
+                IsMandatory = f.IsMandatory,
+                IsVisibleToSupplier = true
+            });
+            added = true;
         }
 
-        var sequence = 0;
-        db.SupplierFieldSettings.AddRange(SupplierFieldSettingSeedData.Fields.Select(f => new SupplierFieldSetting
+        if (added)
         {
-            FieldKey = f.FieldKey,
-            DisplayLabel = f.DisplayLabel,
-            Step = f.Step,
-            Sequence = sequence++,
-            IsMandatory = f.IsMandatory
-        }));
-        await db.SaveChangesAsync();
+            await db.SaveChangesAsync();
+        }
     }
 
     private static async Task SeedDefaultAdminAsync(ApplicationDbContext db, IConfiguration configuration)

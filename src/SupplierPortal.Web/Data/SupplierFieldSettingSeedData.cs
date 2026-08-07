@@ -22,6 +22,7 @@ public static class SupplierFieldSettingSeedData
         ("BusinessRelationshipId", "Business Relationship", 1, false),
         ("DunsNumber", "D-U-N-S Number", 1, false),
         ("CorporateWebSite", "Corporate Web Site", 1, false),
+        ("IsOneTimeSupplier", "One-time supplier", 1, false),
 
         // Step 2: Contact Information
         ("AddressLine1", "Address Line 1", 2, false),
@@ -49,6 +50,7 @@ public static class SupplierFieldSettingSeedData
         ("AccountStartDate", "Account Start Date", 3, false),
         ("PaymentMethodCode", "Payment Method Code", 3, false),
         ("RemitAdviceEmail", "Remit Advice Email", 3, false),
+        ("AllowInternationalPayments", "Allow International Payments", 3, false),
 
         // Step 4: Site / Business Unit
         ("SupplierSiteBuId", "Supplier Site", 4, false),
@@ -61,6 +63,13 @@ public static class SupplierFieldSettingSeedData
         ("CommunicationEmail", "Communication Email", 4, false),
         ("ContactEmail", "Contact Email", 4, true),
         ("Phone", "Phone", 4, false),
-        ("RemittanceEmail", "Remittance E-mail", 4, false)
+        ("RemittanceEmail", "Remittance E-mail", 4, false),
+        // Site usages (checkboxes) — shown at the end of Step 4.
+        ("IsRfqOrBidding", "RFQ or Bidding", 4, false),
+        ("IsOrdering", "Ordering", 4, false),
+        ("IsSourcingOnly", "Sourcing only", 4, false),
+        ("IsPurchasing", "Purchasing", 4, false),
+        ("IsPay", "Pay", 4, false),
+        ("IsPrimaryPay", "Primary Pay", 4, false)
     ];
 }
