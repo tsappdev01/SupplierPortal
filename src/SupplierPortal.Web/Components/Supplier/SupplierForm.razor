@@ -140,7 +140,7 @@
                     <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
                 </div>
                 <div class="di-checkbox-row">
-                    <div class="di-checkbox-item">
+                    <div class="di-checkbox-item @FieldClass("IsOneTimeSupplier")">
                         <InputCheckbox @bind-Value="formModel.IsOneTimeSupplier" id="oneTime" />
                         <label for="oneTime" style="margin:0;">One-time supplier</label>
                     </div>
@@ -345,7 +345,7 @@
                     <InputText @bind-Value="formModel.RemitAdviceEmail" />
                 </div>
                 <div class="di-checkbox-row">
-                    <div class="di-checkbox-item">
+                    <div class="di-checkbox-item @FieldClass("AllowInternationalPayments")">
                         <InputCheckbox @bind-Value="formModel.AllowInternationalPayments" id="intlPay" />
                         <label for="intlPay" style="margin:0;">Allow International Payments</label>
                     </div>
@@ -458,14 +458,17 @@
                     <label>Remittance E-mail@(Req("RemittanceEmail"))</label>
                     <InputText @bind-Value="formModel.RemittanceEmail" />
                 </div>
-                <div class="di-hint">Site usages — select all that apply for this Business Unit assignment:</div>
+                @if (!SupplierFacing || SiteUsageKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
+                {
+                    <div class="di-hint">Site usages — select all that apply for this Business Unit assignment:</div>
+                }
                 <div class="di-checkbox-row">
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
-                    <div class="di-checkbox-item"><InputCheckbox @bind-Value="formModel.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsRfqOrBidding")"><InputCheckbox @bind-Value="formModel.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsOrdering")"><InputCheckbox @bind-Value="formModel.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsSourcingOnly")"><InputCheckbox @bind-Value="formModel.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsPurchasing")"><InputCheckbox @bind-Value="formModel.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsPay")"><InputCheckbox @bind-Value="formModel.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
+                    <div class="di-checkbox-item @FieldClass("IsPrimaryPay")"><InputCheckbox @bind-Value="formModel.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
                 </div>
             </div>
         </div>
@@ -573,6 +576,10 @@
     private string? viewerName;
     private HashSet<string> changedFieldKeys = [];
     private HashSet<string> hiddenFromSupplierKeys = [];
+
+    // Site-usage checkbox field keys (Step 4); used to hide the "Site usages" hint when all are hidden.
+    private static readonly string[] SiteUsageKeys =
+        ["IsRfqOrBidding", "IsOrdering", "IsSourcingOnly", "IsPurchasing", "IsPay", "IsPrimaryPay"];
     private int? originalBankId;
     private string? originalAccountNumber;
 

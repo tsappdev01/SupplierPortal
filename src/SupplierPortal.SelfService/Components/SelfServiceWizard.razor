@@ -108,7 +108,7 @@
                         <InputText @bind-Value="model.CorporateWebSite" placeholder="https://" />
                     </div>
                     <div class="di-checkbox-row">
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOneTimeSupplier" id="oneTime" /><label for="oneTime" style="margin:0;">One-time supplier</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsOneTimeSupplier")"><InputCheckbox @bind-Value="model.IsOneTimeSupplier" id="oneTime" /><label for="oneTime" style="margin:0;">One-time supplier</label></div>
                     </div>
 
                     <div class="di-documents-row">
@@ -166,7 +166,7 @@
                     <div class="di-field @FieldClass("AccountStartDate")"><label>Account Start Date@(Req("AccountStartDate"))</label><InputDate @bind-Value="model.AccountStartDate" /></div>
                     <div class="di-field @FieldClass("PaymentMethodCode")"><label>Payment Method Code@(Req("PaymentMethodCode"))</label><InputText @bind-Value="model.PaymentMethodCode" /></div>
                     <div class="di-field @FieldClass("RemitAdviceEmail")"><label>Remit Advice Email@(Req("RemitAdviceEmail"))</label><InputText @bind-Value="model.RemitAdviceEmail" /></div>
-                    <div class="di-checkbox-row"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AllowInternationalPayments" id="intlPay" /><label for="intlPay" style="margin:0;">Allow International Payments</label></div></div>
+                    <div class="di-checkbox-row"><div class="di-checkbox-item @FieldClass("AllowInternationalPayments")"><InputCheckbox @bind-Value="model.AllowInternationalPayments" id="intlPay" /><label for="intlPay" style="margin:0;">Allow International Payments</label></div></div>
 
                     <div class="di-documents-row">
                         <div class="di-document-slot">
@@ -194,14 +194,17 @@
                     <div class="di-field @FieldClass("ContactEmail")"><label>Contact Email@(Req("ContactEmail"))</label><InputText @bind-Value="model.ContactEmail" /></div>
                     <div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><InputText @bind-Value="model.Phone" /></div>
                     <div class="di-field di-full @FieldClass("RemittanceEmail")"><label>Remittance E-mail@(Req("RemittanceEmail"))</label><InputText @bind-Value="model.RemittanceEmail" /></div>
-                    <div class="di-hint">Site usages — select all that apply:</div>
+                    @if (SiteUsageKeys.Any(k => !hiddenKeys.Contains(k)))
+                    {
+                        <div class="di-hint">Site usages — select all that apply:</div>
+                    }
                     <div class="di-checkbox-row">
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
-                        <div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsRfqOrBidding")"><InputCheckbox @bind-Value="model.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsOrdering")"><InputCheckbox @bind-Value="model.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsSourcingOnly")"><InputCheckbox @bind-Value="model.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsPurchasing")"><InputCheckbox @bind-Value="model.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsPay")"><InputCheckbox @bind-Value="model.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
+                        <div class="di-checkbox-item @FieldClass("IsPrimaryPay")"><InputCheckbox @bind-Value="model.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
                     </div>
                 </div>
             </div>
@@ -276,6 +279,9 @@
 
     private HashSet<string> mandatoryKeys = [];
     private HashSet<string> hiddenKeys = [];
+
+    private static readonly string[] SiteUsageKeys =
+        ["IsRfqOrBidding", "IsOrdering", "IsSourcingOnly", "IsPurchasing", "IsPay", "IsPrimaryPay"];
     private HashSet<string> changedKeys = [];
     private int? originalBankId;
     private string? originalAccountNumber;
