@@ -148,6 +148,63 @@ else
                 </div>
             </div>
 
+            @if (landlord.Status is not LandlordStatus.Draft and not LandlordStatus.AwaitingLandlordResponse)
+            {
+                <div class="card mb-4">
+                    <div class="card-header">Submitted Owner Information</div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            @if (landlord.Type == LandlordType.Individual)
+                            {
+                                <dt class="col-sm-4">Emirates ID</dt><dd class="col-sm-8">@(landlord.EmiratesId ?? "—")</dd>
+                            }
+                            else
+                            {
+                                <dt class="col-sm-4">Trade Licence No</dt><dd class="col-sm-8">@(landlord.TradeLicenseNo ?? "—")</dd>
+                            }
+                            <dt class="col-sm-4">Tax Registration No</dt><dd class="col-sm-8">@(landlord.TaxRegistrationNo ?? "—")</dd>
+                            <dt class="col-sm-4">Signing Rule</dt><dd class="col-sm-8">@landlord.SigningRule</dd>
+                        </dl>
+
+                        @if (landlord.Signatories.Count > 0)
+                        {
+                            <h6 class="mt-3">Signatories</h6>
+                            <ul class="mb-0">
+                                @foreach (var s in landlord.Signatories.OrderBy(s => s.Order))
+                                {
+                                    <li>@s.Name — @s.Email @(s.IsPrimaryContact ? "(primary)" : "")</li>
+                                }
+                            </ul>
+                        }
+
+                        @if (landlord.Documents.Count > 0)
+                        {
+                            <h6 class="mt-3">Documents</h6>
+                            <ul class="mb-0">
+                                @foreach (var d in landlord.Documents)
+                                {
+                                    <li><a href="/landlord-documents/@d.Id" target="_blank">@d.DocumentType — @d.FileName</a></li>
+                                }
+                            </ul>
+                        }
+
+                        @if (changes.Count > 0)
+                        {
+                            <h6 class="mt-3">Changed Fields</h6>
+                            <table class="table table-sm mb-0">
+                                <thead><tr><th>Field</th><th>Old</th><th>New</th></tr></thead>
+                                <tbody>
+                                    @foreach (var c in changes)
+                                    {
+                                        <tr><td>@c.DisplayLabel</td><td class="text-muted">@(c.OldValue ?? "—")</td><td class="fw-semibold">@(c.NewValue ?? "—")</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+            }
+
             @if (landlord.Status is LandlordStatus.UnderReview)
             {
                 <div class="card mb-4 border-info">
@@ -216,6 +273,7 @@ else
     private Landlord? landlord;
     private string? buName;
     private List<LandlordEvent> trace = [];
+    private List<LandlordFieldChange> changes = [];
     private string currentUser = "unknown";
 
     private bool editing;
@@ -244,6 +302,7 @@ else
         if (landlord is null) return;
         buName = (await BusinessUnitService.GetByIdAsync(landlord.BusinessUnitId))?.Name;
         trace = await LandlordService.GetTraceAsync(Id);
+        changes = await LandlordService.GetFieldChangesAsync(Id);
     }
 
     private void CancelEdit() => editing = false;

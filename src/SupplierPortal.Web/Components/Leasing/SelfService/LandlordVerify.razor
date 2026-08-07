@@ -1,0 +1,117 @@
+@page "/landlord/{Token}"
+@layout Layout.PublicLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordAccessTokenService AccessTokenService
+@inject ToastService ToastService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Verify Your Identity - Landlord Portal</PageTitle>
+
+<div class="di-otp-card">
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (token is null)
+    {
+        <h1>Link Not Available</h1>
+        <p class="text-muted">This link is invalid or has expired. Please contact Dubai Investments Leasing for a new link.</p>
+    }
+    else
+    {
+        <h1>Verify Your Identity</h1>
+        <p class="text-muted">
+            We've sent a 4-digit verification code to <strong>@LandlordAccessTokenService.MaskEmail(token.Landlord?.Email)</strong>
+            for <strong>@token.Landlord?.LegalName</strong>. Enter it below to continue.
+        </p>
+
+        @if (devCode is not null)
+        {
+            <div class="alert alert-info py-2">Development mode — your code is <strong>@devCode</strong> (email delivery is disabled locally).</div>
+        }
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Verification Code</label>
+            <input class="form-control di-otp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                   @bind="enteredCode" @bind:event="oninput" placeholder="0000" />
+        </div>
+
+        <button class="btn btn-primary w-100 mb-2" disabled="@(verifying || enteredCode.Length != 4)" @onclick="VerifyAsync">
+            @(verifying ? "Verifying…" : "Verify Code")
+        </button>
+        <button class="btn btn-link w-100" disabled="@resending" @onclick="ResendAsync">
+            @(resending ? "Sending…" : "Resend code")
+        </button>
+    }
+</div>
+
+<style>
+    .di-otp-card {
+        width: 100%; max-width: 420px; background: #fff; border-radius: 8px;
+        border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 2rem;
+    }
+    .di-otp-input { font-size: 1.5rem; letter-spacing: 0.5rem; text-align: center; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private LandlordAccessToken? token;
+    private bool loading = true;
+    private bool verifying;
+    private bool resending;
+    private string enteredCode = "";
+    private string? errorMessage;
+    private string? devCode;
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = await AccessTokenService.GetValidTokenAsync(Token);
+        if (token is not null && LandlordAccessTokenService.NeedsFreshOtp(token))
+        {
+            var (success, error, code) = await AccessTokenService.IssueOtpAsync(token.Id);
+            if (!success) errorMessage = error;
+            devCode = code;
+        }
+        loading = false;
+    }
+
+    private async Task VerifyAsync()
+    {
+        if (token is null) return;
+        verifying = true;
+        errorMessage = null;
+
+        var (success, error, sessionToken) = await AccessTokenService.VerifyOtpAsync(token.Id, enteredCode);
+        if (success && sessionToken is not null)
+        {
+            NavigationManager.NavigateTo($"/landlord/{Token}/update?s={sessionToken}");
+            return;
+        }
+        errorMessage = error;
+        verifying = false;
+    }
+
+    private async Task ResendAsync()
+    {
+        if (token is null) return;
+        resending = true;
+        errorMessage = null;
+
+        var (success, error, code) = await AccessTokenService.IssueOtpAsync(token.Id);
+        if (success)
+        {
+            devCode = code;
+            ToastService.ShowSuccess("A new verification code has been sent.");
+        }
+        else errorMessage = error;
+        resending = false;
+    }
+}

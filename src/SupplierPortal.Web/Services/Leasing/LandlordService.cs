@@ -50,6 +50,15 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
             .FirstOrDefaultAsync(l => l.Id == id);
     }
 
+    public async Task<List<LandlordFieldChange>> GetFieldChangesAsync(int landlordId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.LandlordFieldChanges.AsNoTracking()
+            .Where(c => c.LandlordId == landlordId)
+            .OrderByDescending(c => c.ChangedAt)
+            .ToListAsync();
+    }
+
     public async Task<List<LandlordEvent>> GetTraceAsync(int landlordId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -180,6 +189,79 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
         return (true, null, raw);
     }
 
+    /// <summary>Loads the landlord for the self-service session (premises + signatories + documents).</summary>
+    public async Task<Landlord?> GetForSelfServiceAsync(int landlordId) => await GetByIdAsync(landlordId);
+
+    /// <summary>
+    /// Applies the landlord's self-service update: identity fields, secondary contact, signing rule and
+    /// signatories. Records a field-change row per changed value (for the review highlight / trace), moves
+    /// the record to <see cref="LandlordStatus.UnderReview"/>, stamps a reference on first submission, and
+    /// writes the Submitted trace event. The business-set core contact is never overwritten here.
+    /// </summary>
+    public async Task<(bool Success, string? Error, string? Reference)> SubmitAsync(int landlordId, LandlordSelfUpdate update, string actor, int? accessTokenId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.Include(x => x.Signatories).FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Landlord not found.", null);
+
+        var changes = new List<LandlordFieldChange>();
+        void Track(string key, string label, string? oldVal, string? newVal)
+        {
+            if ((oldVal ?? "") == (newVal ?? "")) return;
+            changes.Add(new LandlordFieldChange
+            {
+                LandlordId = landlordId, LandlordAccessTokenId = accessTokenId,
+                FieldKey = key, DisplayLabel = label, OldValue = oldVal, NewValue = newVal,
+                ChangedBy = actor
+            });
+        }
+
+        Track(nameof(l.EmiratesId), "Emirates ID", l.EmiratesId, update.EmiratesId);
+        Track(nameof(l.TradeLicenseNo), "Trade Licence No", l.TradeLicenseNo, update.TradeLicenseNo);
+        Track(nameof(l.TaxRegistrationNo), "Tax Registration No", l.TaxRegistrationNo, update.TaxRegistrationNo);
+        Track(nameof(l.SecondaryContactName), "Secondary Contact Name", l.SecondaryContactName, update.SecondaryContactName);
+        Track(nameof(l.SecondaryContactEmail), "Secondary Contact Email", l.SecondaryContactEmail, update.SecondaryContactEmail);
+        Track(nameof(l.SecondaryContactMobile), "Secondary Contact Mobile", l.SecondaryContactMobile, update.SecondaryContactMobile);
+        Track(nameof(l.SigningRule), "Signing Rule", l.SigningRule.ToString(), update.SigningRule.ToString());
+
+        l.EmiratesId = update.EmiratesId?.Trim();
+        l.TradeLicenseNo = update.TradeLicenseNo?.Trim();
+        l.TaxRegistrationNo = update.TaxRegistrationNo?.Trim();
+        l.SecondaryContactName = update.SecondaryContactName?.Trim();
+        l.SecondaryContactEmail = update.SecondaryContactEmail?.Trim();
+        l.SecondaryContactMobile = update.SecondaryContactMobile?.Trim();
+        l.SigningRule = update.SigningRule;
+
+        // Replace signatories with the submitted set (primary contact is kept as the ordered first entry).
+        db.LandlordSignatories.RemoveRange(l.Signatories);
+        var order = 0;
+        foreach (var s in update.Signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+        {
+            l.Signatories.Add(new LandlordSignatory
+            {
+                LandlordId = landlordId,
+                Name = s.Name.Trim(),
+                Email = s.Email.Trim(),
+                Mobile = s.Mobile?.Trim(),
+                Order = order++,
+                IsPrimaryContact = s.IsPrimaryContact
+            });
+        }
+
+        l.Status = LandlordStatus.UnderReview;
+        l.SubmittedAt = DateTime.UtcNow;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        l.Reference ??= $"DIP-LR-{DateTime.UtcNow:yyyy}-{100000 + landlordId}";
+
+        db.LandlordFieldChanges.AddRange(changes);
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, landlordId, EventSubmitted,
+            $"{changes.Count} field{(changes.Count == 1 ? "" : "s")} updated; reference {l.Reference}", actor);
+        return (true, null, l.Reference);
+    }
+
     /// <summary>Records a leasing-manager decision (Approve / Reject) with a note.</summary>
     public async Task<(bool Success, string? Error)> DecideAsync(int landlordId, bool approve, string? note, string actor)
     {
@@ -215,3 +297,24 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
 public record LandlordListItem(
     int Id, string LegalName, LandlordType Type, LandlordStatus Status, int BusinessUnitId,
     string? Reference, int PremisesCount, DateTime UpdatedAt);
+
+/// <summary>The landlord-updated fields captured in the self-service wizard.</summary>
+public class LandlordSelfUpdate
+{
+    public string? EmiratesId { get; set; }
+    public string? TradeLicenseNo { get; set; }
+    public string? TaxRegistrationNo { get; set; }
+    public string? SecondaryContactName { get; set; }
+    public string? SecondaryContactEmail { get; set; }
+    public string? SecondaryContactMobile { get; set; }
+    public SigningRule SigningRule { get; set; } = SigningRule.All;
+    public List<SignatoryInput> Signatories { get; set; } = [];
+}
+
+public class SignatoryInput
+{
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string? Mobile { get; set; }
+    public bool IsPrimaryContact { get; set; }
+}

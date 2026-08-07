@@ -41,6 +41,8 @@ builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordDocumentService>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));
@@ -309,6 +311,13 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentServi
     var file = await documentService.GetFileAsync(id);
     return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
 }).RequireAuthorization();
+
+// Landlord document download for leasing reviewers (Administrator / LeasingManager only).
+app.MapGet("/landlord-documents/{id:int}", async (int id, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
+{
+    var file = await documentService.GetFileAsync(id);
+    return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
+}).RequireAuthorization(policy => policy.RequireRole(SupplierPortal.Web.Models.UserType.Administrator.ToString(), SupplierPortal.Web.Models.UserType.LeasingManager.ToString()));
 
 // Combine a supplier's attached images into a single PDF / Excel workbook.
 app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, SupplierDocumentService documentService, ExportService exportService) =>

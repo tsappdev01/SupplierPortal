@@ -102,3 +102,29 @@ schema, reads `dbo.Property` view via `ToView`), design-time factory, `LeasingIn
 Create owner shell scoped to a BU (business-set Name / Primary Contact / Email / Mobile) → assign premises
 from the Land Register → invite (tokenized link + OTP). Then Increment 4: landlord self-service wizard +
 status workflow + registration trace wired into the notification bell / activity feed.
+
+### Increment 4 — Landlord self-service + review (done)
+- `LandlordAccessTokenService` — link-token validation + 4-digit OTP (SHA-256 link hash, salted OTP hash,
+  10-min validity, 5-attempt / 5-send caps), session issue/validate. **Verification is pluggable (OTP now,
+  UAE Pass later).** In Development (no Database Mail profile) the OTP is surfaced on-screen so the flow is
+  testable locally; Production sends via `sp_send_dbmail`.
+- `LandlordDocumentService` — landlord documents stored under `doc/landlord/{id}` (content root, not
+  wwwroot), metadata in `leasing.LandlordDocuments`; single-slot identity docs replace, "Other" accumulate.
+- `LandlordService.SubmitAsync` — applies landlord-updated fields + signatories, records a
+  `LandlordFieldChange` per changed value, moves Draft/Awaiting → **Under Review**, stamps reference
+  `DIP-LR-{yyyy}-{100000+id}`, writes the Submitted trace event. Business-set core contact never overwritten.
+- Pages (public layout, `prerender:false`): `/landlord/{token}` (LandlordVerify — OTP) →
+  `/landlord/{token}/update?s=…` (LandlordWizard — Property → Owner Details → Signatories → Documents →
+  Review → Submit). Owner-type-aware identity (Emirates ID vs Trade Licence); primary contact auto-seeded
+  as locked first signatory.
+- Admin review: LandlordDetail now shows Submitted Owner Information (identity, signatories, documents with
+  download links via `/landlord-documents/{id}`, changed-fields table) and Approve/Reject with note.
+- **Workflow proven end to end (Playwright):** create → assign → invite → OTP verify → wizard submit
+  (ref DIP-LR-2026-100002) → admin sees Under Review → Approve. Every transition writes a trace event.
+
+### Deferred to a follow-up
+- Global top-bar notification bell currently covers suppliers only; landlord submissions surface via the
+  Landlords list "Under Review" filter + the per-landlord registration trace. Folding landlords into the
+  shared bell is a small follow-up (the bell/ActivityService are supplier-typed today).
+- Landlord self-service is served from the intranet Web app for v1; moving it behind the DMZ portal + REST
+  API (as done for suppliers) is the eventual hardening step. UAE Pass verification replaces OTP later.
