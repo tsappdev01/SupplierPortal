@@ -167,6 +167,13 @@ using (var scope = app.Services.CreateScope())
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
     await using var db = await dbFactory.CreateDbContextAsync();
     await DbSeeder.SeedAsync(db, app.Configuration);
+
+    // Apply the Leasing bounded-context migrations (leasing.* tables) with their own history table, so a
+    // deployment that already has the supplier schema also gets the Landlord module tables created.
+    var leasingFactory = scope.ServiceProvider
+        .GetRequiredService<IDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>>();
+    await using var leasingDb = await leasingFactory.CreateDbContextAsync();
+    await leasingDb.Database.MigrateAsync();
 }
 
 // Configure the HTTP request pipeline.
