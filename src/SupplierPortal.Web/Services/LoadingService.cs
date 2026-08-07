@@ -2,7 +2,7 @@ namespace SupplierPortal.Web.Services;
 
 /// <summary>
 /// App-wide progress indicator. A slim animated bar at the top of the page is shown automatically
-/// whenever a tracked operation runs longer than <see cref="DefaultThresholdMs"/> (3 seconds); quick
+/// whenever a tracked operation runs longer than <see cref="DefaultThresholdMs"/> (2 seconds); quick
 /// operations never flash the bar. Mirrors the <see cref="ToastService"/> event pattern — a
 /// layout-level <c>LoadingBar</c> component subscribes to <see cref="OnChange"/> and re-renders.
 /// Scoped, so each Blazor Server circuit gets its own instance.
@@ -10,7 +10,7 @@ namespace SupplierPortal.Web.Services;
 public class LoadingService
 {
     /// <summary>Processing must exceed this many milliseconds before the bar appears.</summary>
-    public const int DefaultThresholdMs = 3000;
+    public const int DefaultThresholdMs = 2000;
 
     private int visibleCount;
 

@@ -189,12 +189,12 @@ else
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync() => await Loading.RunAsync(async () =>
     {
         items = await LandlordService.GetAllAsync(statuses: statusFilter);
         counts = await LandlordService.GetStatusCountsAsync();
         page = 1;
-    }
+    });
 
     private async Task EmailAsync(int id)
     {
