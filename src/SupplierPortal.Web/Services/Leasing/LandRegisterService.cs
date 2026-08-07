@@ -37,7 +37,12 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(p => p.PropertyCode.Contains(term) || (p.BuildingName != null && p.BuildingName.Contains(term)));
+            query = query.Where(p =>
+                p.PropertyCode.Contains(term)
+                || (p.BuildingName != null && p.BuildingName.Contains(term))
+                || (p.CompanyName != null && p.CompanyName.Contains(term))
+                || (p.LandLordCode != null && p.LandLordCode.Contains(term))
+                || (p.LeaseNo != null && p.LeaseNo.Contains(term)));
         }
 
         var premises = await query
@@ -69,6 +74,11 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
                 Buildings: g.Select(p => new LandRegisterBuilding(
                         PremisesId: p.Id,
                         BuildingName: p.BuildingName,
+                        LeaseNo: p.LeaseNo,
+                        LandLordCode: p.LandLordCode,
+                        CompanyName: p.CompanyName,
+                        ContactName: p.ContactName,
+                        EmailAddress: p.EmailAddress,
                         Owners: ownersByPremises.TryGetValue(p.Id, out var o) ? o : []))
                     .ToList()))
             .OrderBy(p => p.PropertyCode)
@@ -118,6 +128,8 @@ public record LandRegisterProperty(string PropertyCode, string Zone, string? Cat
     public int AssignedCount => Buildings.Count(b => b.Owners.Count > 0);
 }
 
-public record LandRegisterBuilding(int PremisesId, string? BuildingName, List<PremisesOwner> Owners);
+public record LandRegisterBuilding(
+    int PremisesId, string? BuildingName, string? LeaseNo, string? LandLordCode,
+    string? CompanyName, string? ContactName, string? EmailAddress, List<PremisesOwner> Owners);
 
 public record PremisesOwner(int LandlordId, string LegalName, LandlordStatus Status);

@@ -7,6 +7,9 @@
 @using SupplierPortal.Web.Services.Leasing
 @inject LandlordService LandlordService
 @inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Nav
 
 <PageTitle>Landlords - Supplier Portal</PageTitle>
@@ -45,6 +48,7 @@ else
                 <th>Status</th>
                 <th>Reference</th>
                 <th>Updated</th>
+                <th class="text-end">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -58,6 +62,19 @@ else
                     <td><span class="badge @StatusClass(l.Status)">@Label(l.Status)</span></td>
                     <td>@(l.Reference ?? "—")</td>
                     <td>@l.UpdatedAt.ToLocalTime().ToString("g")</td>
+                    <td class="text-end text-nowrap" @onclick:stopPropagation="true">
+                        <button class="btn btn-sm btn-outline-secondary me-1" title="Edit" @onclick="() => Open(l.Id)">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary me-1" title="Email invite"
+                                disabled="@(l.PremisesCount == 0 || sending == l.Id)" @onclick="() => EmailAsync(l.Id)">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z" /></svg>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" title="Review"
+                                disabled="@(l.Status != LandlordStatus.UnderReview)" @onclick="() => Open(l.Id)">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z" /><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12Zm7.354 4.854-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 9.293l2.646-2.647a.5.5 0 0 1 .708.708Z" /></svg>
+                        </button>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -68,16 +85,30 @@ else
     private List<LandlordListItem> items = [];
     private Dictionary<int, string> buNames = new();
     private LandlordStatus? statusFilter;
+    private string currentUser = "unknown";
+    private int? sending;
     private static readonly LandlordStatus[] statuses =
         [LandlordStatus.Draft, LandlordStatus.AwaitingLandlordResponse, LandlordStatus.UnderReview, LandlordStatus.Approved, LandlordStatus.Rejected];
 
     protected override async Task OnInitializedAsync()
     {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
         buNames = (await BusinessUnitService.GetAllAsync()).ToDictionary(b => b.Id, b => b.Name);
         await LoadAsync();
     }
 
     private async Task LoadAsync() => items = await LandlordService.GetAllAsync(status: statusFilter);
+
+    private async Task EmailAsync(int id)
+    {
+        sending = id;
+        var (ok, error, _) = await Loading.RunAsync(() => LandlordService.InviteAsync(id, currentUser));
+        sending = null;
+        if (!ok) { Toast.ShowError(error ?? "Could not send the invite."); return; }
+        Toast.ShowSuccess("Invite email sent to the landlord.");
+        await LoadAsync();
+    }
 
     private async Task SetFilter(LandlordStatus? s)
     {

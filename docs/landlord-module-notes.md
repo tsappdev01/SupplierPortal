@@ -128,3 +128,10 @@ status workflow + registration trace wired into the notification bell / activity
   shared bell is a small follow-up (the bell/ActivityService are supplier-typed today).
 - Landlord self-service is served from the intranet Web app for v1; moving it behind the DMZ portal + REST
   API (as done for suppliers) is the eventual hardening step. UAE Pass verification replaces OTP later.
+
+### Update — Property view extra columns + Landlords row actions
+- The `dbo.Property` view gained `LeaseNo, LandLordCode, CompanyName, ContactName, EmailAddress` (source-
+  system lease/owner data, read-only). Added to the `Premises` entity, the `LandRegisterService` projection
+  and search, and shown as columns in the Land Register building rows (local seed fixture updated to match).
+- Landlords list now has an **Edit | Email | Review** action column. Email issues/re-sends the self-service
+  invite (enabled once premises are assigned); Review is enabled only while a landlord is Under Review.

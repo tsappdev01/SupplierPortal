@@ -23,6 +23,13 @@ public class Premises
     public string PropertyCode { get; set; } = string.Empty;
     public string? BuildingName { get; set; }
 
+    // Source-system lease / owner columns exposed by the view (read-only, maintained by the business).
+    public string? LeaseNo { get; set; }
+    public string? LandLordCode { get; set; }
+    public string? CompanyName { get; set; }
+    public string? ContactName { get; set; }
+    public string? EmailAddress { get; set; }
+
     /// <summary>Dubai Municipality zone — the segment of the property code before the first dash
     /// (e.g. <c>597-1000</c> → <c>597</c>). Not stored; derived for grouping/filtering.</summary>
     [NotMapped]
