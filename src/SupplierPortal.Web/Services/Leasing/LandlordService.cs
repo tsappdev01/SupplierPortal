@@ -74,11 +74,13 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     public async Task<Landlord?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        // NOTE: LandlordDocuments is intentionally NOT included — its ContentBase64 blobs are large and the
+        // screens load document metadata via LandlordDocumentService instead. Including it here made the
+        // detail page slow to open.
         return await db.Landlords
             .Include(l => l.Premises)
             .Include(l => l.Contacts)
             .Include(l => l.Signatories)
-            .Include(l => l.Documents)
             .Include(l => l.Comments)
             .FirstOrDefaultAsync(l => l.Id == id);
     }

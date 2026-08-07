@@ -423,14 +423,14 @@ else
         }
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync() => await Loading.RunAsync(async () =>
     {
         landlord = await LandlordService.GetByIdAsync(Id);
         if (landlord is null) return;
         buName = (await BusinessUnitService.GetByIdAsync(landlord.BusinessUnitId))?.Name;
         trace = await LandlordService.GetTraceAsync(Id);
         documents = await DocumentService.GetAllVersionsAsync(Id);
-    }
+    });
 
     private void BeginEditProperty()
     {

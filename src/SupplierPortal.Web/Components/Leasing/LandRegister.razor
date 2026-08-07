@@ -247,8 +247,11 @@ else
     private async Task LoadAsync()
     {
         loading = true;
-        categories = await LandRegisterService.GetCategoriesAsync(zone);
-        rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, search, take: 100000);
+        await Loading.RunAsync(async () =>
+        {
+            categories = await LandRegisterService.GetCategoriesAsync(zone);
+            rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, search, take: 100000);
+        });
         page = 1;
         loading = false;
     }
