@@ -14,6 +14,7 @@
 @inject LoadingService Loading
 @inject IDocumentOcrService Ocr
 @inject IWebHostEnvironment Env
+@inject IUaePassService UaePass
 @inject NavigationManager Nav
 
 <PageTitle>Landlord Registration</PageTitle>
@@ -445,8 +446,9 @@
 
         if (accessToken is not null)
         {
-            // UAE Pass identity verification is mandatory before the form opens.
-            if (accessToken.UaePassVerifiedAt is null)
+            // When UAE Pass is enabled, identity verification is mandatory before the form opens; if the
+            // session hasn't been through it, bounce back to the UAE Pass step. When disabled, skip it entirely.
+            if (UaePass.Enabled && accessToken.UaePassVerifiedAt is null)
             {
                 if (!string.IsNullOrWhiteSpace(Token))
                     Nav.NavigateTo($"/landlord/{Token}/uaepass?s={SessionToken}");

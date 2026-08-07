@@ -6,6 +6,7 @@
 @using SupplierPortal.Web.Services.Leasing
 @inject LandlordAccessTokenService AccessTokenService
 @inject LandlordService LandlordService
+@inject IUaePassService UaePass
 @inject ToastService ToastService
 @inject NavigationManager NavigationManager
 
@@ -99,8 +100,10 @@
         if (success && sessionToken is not null)
         {
             await LandlordService.MarkOtpVerifiedAsync(token.LandlordId, $"Landlord ({token.Landlord?.Email})", null);
-            // UAE Pass identity verification is required immediately after OTP, before the form opens.
-            NavigationManager.NavigateTo($"/landlord/{Token}/uaepass?s={sessionToken}");
+            // When UAE Pass is enabled, verify identity before the form; otherwise go straight to the form.
+            NavigationManager.NavigateTo(UaePass.Enabled
+                ? $"/landlord/{Token}/uaepass?s={sessionToken}"
+                : $"/landlord/{Token}/update?s={sessionToken}");
             return;
         }
         errorMessage = error;
