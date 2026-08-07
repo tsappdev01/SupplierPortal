@@ -16,14 +16,13 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// to the caller instead of emailed so the flow is testable locally.
 /// </summary>
 public class LandlordAccessTokenService(
-    IDbContextFactory<LeasingDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
+    IDbContextFactory<LeasingDbContext> dbFactory, IPasswordHasher<User> hasher,
     Microsoft.Extensions.Options.IOptions<LeasingOptions> options)
 {
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
     private const int MaxOtpAttempts = 5;
     private const int MaxOtpSends = 5;
     private string MailProfileName => options.Value.MailProfile;
-    private bool ShouldSend => options.Value.SendEmails ?? !env.IsDevelopment();
 
     private static readonly User HasherContext = new();
 
@@ -60,9 +59,9 @@ public class LandlordAccessTokenService(
     public static bool NeedsFreshOtp(LandlordAccessToken t) =>
         t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
 
-    /// <summary>Generates, persists and (in Production) emails a fresh OTP. Returns the plaintext code only
-    /// so a Development caller can display it locally where no mail profile exists; never surface it in
-    /// Production.</summary>
+    /// <summary>Generates, persists and emails a fresh OTP via SQL Server Database Mail (profile
+    /// <c>Leasing:MailProfile</c>, default <c>BP</c>) — unconditionally, in every environment, exactly like
+    /// the supplier OTP. The <c>DevCode</c> element is always null (the code is only ever delivered by email).</summary>
     public async Task<(bool Success, string? Error, string? DevCode)> IssueOtpAsync(int tokenId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -80,13 +79,6 @@ public class LandlordAccessTokenService(
         token.OtpAttemptCount = 0;
         token.OtpSendCount++;
         await db.SaveChangesAsync();
-
-        if (!ShouldSend)
-        {
-            // Development (or Leasing:SendEmails=false): no Database Mail — surface the code so the flow
-            // can be exercised locally. When sending is enabled the OTP goes out via the BP profile below.
-            return (true, null, code);
-        }
 
         var body = $"<p>Dear Landlord ({token.Landlord.CompanyName ?? token.Landlord.PropertyCode}),</p>" +
                    $"<p>Your verification code is <strong>{code}</strong>. It expires in {(int)OtpValidity.TotalMinutes} minutes.</p>" +

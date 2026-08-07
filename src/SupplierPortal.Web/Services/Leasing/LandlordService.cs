@@ -36,12 +36,12 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
 
     // ---------------------------------------------------------------- queries
 
-    public async Task<List<LandlordListItem>> GetAllAsync(int? businessUnitId = null, LandlordStatus? status = null)
+    public async Task<List<LandlordListItem>> GetAllAsync(int? businessUnitId = null, LandlordStatus[]? statuses = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = db.Landlords.AsNoTracking().AsQueryable();
         if (businessUnitId is int bu) query = query.Where(l => l.BusinessUnitId == bu);
-        if (status is LandlordStatus s) query = query.Where(l => l.Status == s);
+        if (statuses is { Length: > 0 }) query = query.Where(l => statuses.Contains(l.Status));
 
         return await query
             .OrderByDescending(l => l.UpdatedAt ?? l.CreatedAt)
@@ -64,6 +64,49 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     }
 
     public async Task<Landlord?> GetForSelfServiceAsync(int landlordId) => await GetByIdAsync(landlordId);
+
+    /// <summary>Registration counts per status (for the dashboard KPI cards), optionally scoped to a BU.</summary>
+    public async Task<Dictionary<LandlordStatus, int>> GetStatusCountsAsync(int? businessUnitId = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var q = db.Landlords.AsNoTracking().AsQueryable();
+        if (businessUnitId is int bu) q = q.Where(l => l.BusinessUnitId == bu);
+        return await q.GroupBy(l => l.Status).Select(g => new { g.Key, C = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.C);
+    }
+
+    /// <summary>Business-Centre edit of the landlord-provided details (contacts, signatories) without a
+    /// status change — "modify any information" on the review screen. Documents are edited separately.</summary>
+    public async Task<(bool Success, string? Error)> UpdateDetailsAsync(int landlordId, LandlordSelfUpdate update, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.Include(x => x.Contacts).Include(x => x.Signatories).FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+
+        db.LandlordContacts.RemoveRange(l.Contacts);
+        foreach (var c in update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)))
+            l.Contacts.Add(new LandlordContact
+            {
+                LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType, FullName = c.FullName.Trim(),
+                Designation = c.Designation?.Trim(), Mobile = c.Mobile?.Trim(), Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
+            });
+
+        db.LandlordSignatories.RemoveRange(l.Signatories);
+        var order = 0;
+        foreach (var s in update.Signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+            l.Signatories.Add(new LandlordSignatory
+            {
+                LandlordId = landlordId, Name = s.Name.Trim(), Email = s.Email.Trim(), Mobile = s.Mobile?.Trim(),
+                Order = order++, IsPrimaryContact = s.IsPrimaryContact
+            });
+        l.SigningRule = update.SigningRule;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, landlordId, "InformationUpdated", "Business Centre edited the registration details", actor, ActorBusinessCentre, l.Status, l.Status);
+        return (true, null);
+    }
 
     public async Task<List<LandlordEvent>> GetTraceAsync(int landlordId)
     {

@@ -9,15 +9,14 @@ public class LeasingOptions
 
     /// <summary>Dubai Municipality zones exposed as the fixed list of values in the Land Register.
     /// A property code is incomplete without its zone (e.g. <c>597-1000</c>); the zone is the segment
-    /// before the first dash. Defaults to the two DIP zones.</summary>
-    public string[] Zones { get; set; } = ["597", "598"];
+    /// before the first dash. Left empty here on purpose — the configuration binder <b>appends</b> bound
+    /// values to a non-empty default (which duplicated the zones); the service falls back to
+    /// <see cref="DefaultZones"/> when config supplies none.</summary>
+    public string[] Zones { get; set; } = [];
 
-    /// <summary>SQL Server Database Mail profile used for all landlord emails (OTP + notifications).</summary>
+    public static readonly string[] DefaultZones = ["597", "598"];
+
+    /// <summary>SQL Server Database Mail profile used for all landlord emails (OTP + notifications).
+    /// Sent unconditionally in every environment, like the supplier emails.</summary>
     public string MailProfile { get; set; } = "BP";
-
-    /// <summary>Whether landlord emails are actually sent through <see cref="MailProfile"/>. When null
-    /// (the default) emails send outside Development and are skipped in Development (so the OTP is surfaced
-    /// on-screen for local testing). Set <c>true</c> to force real sends via the BP profile in any
-    /// environment, or <c>false</c> to always skip.</summary>
-    public bool? SendEmails { get; set; }
 }
