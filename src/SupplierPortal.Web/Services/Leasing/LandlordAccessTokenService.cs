@@ -25,13 +25,34 @@ public class LandlordAccessTokenService(
 
     private static readonly User HasherContext = new();
 
-    public async Task<LandlordAccessToken?> GetValidTokenAsync(string rawToken)
+    /// <summary>Statuses in which the secure link may still be used. A completed or rejected registration —
+    /// or one whose link has been explicitly deactivated — is closed (FRD §26).</summary>
+    public static readonly LandlordStatus[] LinkUsableStatuses =
+    [
+        LandlordStatus.InvitationSent, LandlordStatus.OtpVerified, LandlordStatus.InProgress,
+        LandlordStatus.Submitted, LandlordStatus.UnderReview, LandlordStatus.CorrectionRequired
+    ];
+
+    /// <summary>Outcome of resolving a link: the token when usable, or a reason it is not (expired vs closed).</summary>
+    public enum LinkState { Valid, NotFound, Expired, Closed }
+
+    public async Task<(LinkState State, LandlordAccessToken? Token)> ResolveTokenAsync(string rawToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var hash = Hash(rawToken);
         var token = await db.LandlordAccessTokens.Include(t => t.Landlord)
             .FirstOrDefaultAsync(t => t.TokenHash == hash);
-        return token is null || token.ExpiresAt < DateTime.UtcNow ? null : token;
+        if (token is null) return (LinkState.NotFound, null);
+        if (token.ExpiresAt < DateTime.UtcNow) return (LinkState.Expired, null);
+        if (token.Landlord is null || !token.Landlord.LinkActive || !LinkUsableStatuses.Contains(token.Landlord.Status))
+            return (LinkState.Closed, null);
+        return (LinkState.Valid, token);
+    }
+
+    public async Task<LandlordAccessToken?> GetValidTokenAsync(string rawToken)
+    {
+        var (state, token) = await ResolveTokenAsync(rawToken);
+        return state == LinkState.Valid ? token : null;
     }
 
     public static bool NeedsFreshOtp(LandlordAccessToken t) =>
@@ -64,7 +85,7 @@ public class LandlordAccessTokenService(
             return (true, null, code);
         }
 
-        var body = $"<p>Dear {token.Landlord.PrimaryContactName},</p>" +
+        var body = $"<p>Dear Landlord ({token.Landlord.CompanyName ?? token.Landlord.PropertyCode}),</p>" +
                    $"<p>Your verification code is <strong>{code}</strong>. It expires in {(int)OtpValidity.TotalMinutes} minutes.</p>" +
                    "<p>Dubai Investments — Leasing</p>";
         try

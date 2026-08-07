@@ -7,23 +7,34 @@ using SupplierPortal.Web.Models.Leasing;
 namespace SupplierPortal.Web.Services.Leasing;
 
 /// <summary>
-/// Admin/leasing-manager side of the Landlord module: creates the owner "shell" (business-set core
-/// contact), assigns premises from the read-only land view, issues the tokenised self-service invite,
-/// and records the immutable registration trace. The landlord-updated fields and the review workflow
-/// are exercised through <see cref="LandlordSelfService"/> / the review screen.
+/// Business-Centre + workflow side of the Landlord Registration module (FRD). Initiates a registration from
+/// a property (snapshotting the read-only Property-View fields and pulling the invitation email from the
+/// view), issues the secure invite, and drives the review lifecycle: submit → review → correction / reject
+/// (with mandatory reason) / complete, plus restart-after-rejection. Every transition writes an audit event.
 /// </summary>
-public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
+public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, LandlordEmailService email)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(30);
 
-    // ---- Registration-trace event types (kept as constants so the timeline and code can't drift) ----
-    public const string EventCreated = "Created";
-    public const string EventPremisesAssigned = "PremisesAssigned";
-    public const string EventPremisesRemoved = "PremisesRemoved";
-    public const string EventInvited = "Invited";
-    public const string EventSubmitted = "Submitted";
-    public const string EventApproved = "Approved";
-    public const string EventRejected = "Rejected";
+    // Registration-trace / audit event types (FRD §29).
+    public const string EventCreated = "RegistrationCreated";
+    public const string EventInvited = "InvitationSent";
+    public const string EventOtpVerified = "OtpVerified";
+    public const string EventDraftSaved = "DraftSaved";
+    public const string EventSubmitted = "RegistrationSubmitted";
+    public const string EventReviewStarted = "ReviewStarted";
+    public const string EventCorrectionRequested = "CorrectionRequested";
+    public const string EventResubmitted = "RegistrationResubmitted";
+    public const string EventRejected = "RegistrationRejected";
+    public const string EventRestarted = "RegistrationRestarted";
+    public const string EventCompleted = "RegistrationCompleted";
+    public const string EventLinkDeactivated = "LinkDeactivated";
+
+    public const string ActorBusinessCentre = "BusinessCentre";
+    public const string ActorLandlord = "Landlord";
+    public const string ActorSystem = "System";
+
+    // ---------------------------------------------------------------- queries
 
     public async Task<List<LandlordListItem>> GetAllAsync(int? businessUnitId = null, LandlordStatus? status = null)
     {
@@ -35,8 +46,8 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
         return await query
             .OrderByDescending(l => l.UpdatedAt ?? l.CreatedAt)
             .Select(l => new LandlordListItem(
-                l.Id, l.LegalName, l.Type, l.Status, l.BusinessUnitId,
-                l.Reference, l.Premises.Count, l.UpdatedAt ?? l.CreatedAt))
+                l.Id, l.CompanyName ?? l.PropertyCode, l.PropertyCode, l.Type, l.Status, l.BusinessUnitId,
+                l.Email, l.Reference, l.Premises.Count, l.LinkActive, l.UpdatedAt ?? l.CreatedAt))
             .ToListAsync();
     }
 
@@ -45,19 +56,14 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Landlords
             .Include(l => l.Premises)
+            .Include(l => l.Contacts)
             .Include(l => l.Signatories)
             .Include(l => l.Documents)
+            .Include(l => l.Comments)
             .FirstOrDefaultAsync(l => l.Id == id);
     }
 
-    public async Task<List<LandlordFieldChange>> GetFieldChangesAsync(int landlordId)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.LandlordFieldChanges.AsNoTracking()
-            .Where(c => c.LandlordId == landlordId)
-            .OrderByDescending(c => c.ChangedAt)
-            .ToListAsync();
-    }
+    public async Task<Landlord?> GetForSelfServiceAsync(int landlordId) => await GetByIdAsync(landlordId);
 
     public async Task<List<LandlordEvent>> GetTraceAsync(int landlordId)
     {
@@ -68,225 +74,336 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
             .ToListAsync();
     }
 
-    public async Task<(bool Success, string? Error, int Id)> CreateAsync(
-        LandlordType type, string legalName, string primaryContactName, string email, string mobile,
-        int businessUnitId, string actor)
+    /// <summary>The current open correction comment, if the landlord has an outstanding correction to address.</summary>
+    public async Task<LandlordRegistrationComment?> GetOpenCorrectionAsync(int landlordId)
     {
-        legalName = legalName.Trim();
-        email = email.Trim();
-        if (string.IsNullOrWhiteSpace(legalName)) return (false, "Legal name is required.", 0);
-        if (string.IsNullOrWhiteSpace(email)) return (false, "Primary contact email is required.", 0);
-
         await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.LandlordComments.AsNoTracking()
+            .Where(c => c.LandlordId == landlordId && c.CommentType == LandlordCommentType.Correction && !c.IsResolved)
+            .OrderByDescending(c => c.CreatedAt)
+            .FirstOrDefaultAsync();
+    }
+
+    // ---------------------------------------------------------------- initiation
+
+    /// <summary>Initiates a registration from a property (FRD §3): snapshots the Property-View fields and,
+    /// crucially, the invitation email from the view's Email column. Fails if the property has no email.</summary>
+    public async Task<(bool Success, string? Error, int Id)> InitiateFromPropertyAsync(
+        int premisesId, LandlordType type, int businessUnitId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var premises = await db.Premises.AsNoTracking().FirstOrDefaultAsync(p => p.Id == premisesId);
+        if (premises is null) return (false, "Property not found in the land register.", 0);
+        if (string.IsNullOrWhiteSpace(premises.EmailAddress))
+            return (false, "This property has no email on file in the Property View; a registration cannot be initiated.", 0);
+
         var landlord = new Landlord
         {
-            Type = type,
-            LegalName = legalName,
-            PrimaryContactName = primaryContactName.Trim(),
-            Email = email,
-            Mobile = mobile.Trim(),
             BusinessUnitId = businessUnitId,
+            Type = type,
+            PropertyId = premises.Id,
+            PropertyCode = premises.PropertyCode,
+            CompanyName = premises.CompanyName,
+            Building = premises.BuildingName,
+            Email = premises.EmailAddress!.Trim(),
+            LandLordCode = premises.LandLordCode,
             Status = LandlordStatus.Draft,
+            LinkActive = true,
             CreatedBy = actor,
             CreatedAt = DateTime.UtcNow
         };
+        landlord.Premises.Add(new LandlordPremises
+        {
+            PremisesId = premises.Id, PropertyCode = premises.PropertyCode,
+            BuildingName = premises.BuildingName, Zone = premises.Zone, LinkedBy = actor
+        });
         db.Landlords.Add(landlord);
         await db.SaveChangesAsync();
 
-        await AddEventAsync(db, landlord.Id, EventCreated, $"Owner shell created for {legalName}", actor);
+        await AddEventAsync(db, landlord.Id, EventCreated,
+            $"Registration initiated for {premises.PropertyCode} ({premises.CompanyName}); invite email {landlord.Email}",
+            actor, ActorBusinessCentre, null, LandlordStatus.Draft);
         return (true, null, landlord.Id);
     }
 
-    public async Task<(bool Success, string? Error)> UpdateBusinessFieldsAsync(
-        int id, LandlordType type, string legalName, string primaryContactName, string email, string mobile, string actor)
+    /// <summary>Business Centre may correct the read-only Property Information / type before sending the invite.</summary>
+    public async Task<(bool Success, string? Error)> UpdatePropertyInfoAsync(
+        int id, LandlordType type, string? companyName, string? building, string email, string actor)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == id);
-        if (l is null) return (false, "Landlord not found.");
+        if (l is null) return (false, "Registration not found.");
+        if (string.IsNullOrWhiteSpace(email)) return (false, "Invitation email is required.");
 
         l.Type = type;
-        l.LegalName = legalName.Trim();
-        l.PrimaryContactName = primaryContactName.Trim();
+        l.CompanyName = companyName?.Trim();
+        l.Building = building?.Trim();
         l.Email = email.Trim();
-        l.Mobile = mobile.Trim();
         l.UpdatedBy = actor;
         l.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return (true, null);
     }
 
-    /// <summary>Assigns a premises (a <c>dbo.Property</c> view row, by Id) to the landlord, snapshotting the
-    /// code/building/zone. Idempotent on the unique (LandlordId, PremisesId) index.</summary>
-    public async Task<(bool Success, string? Error)> AssignPremisesAsync(int landlordId, int premisesId, string actor)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var landlord = await db.Landlords.FirstOrDefaultAsync(l => l.Id == landlordId);
-        if (landlord is null) return (false, "Landlord not found.");
+    // ---------------------------------------------------------------- invite
 
-        if (await db.LandlordPremises.AnyAsync(p => p.LandlordId == landlordId && p.PremisesId == premisesId))
-            return (false, "That property is already assigned to this landlord.");
-
-        var premises = await db.Premises.AsNoTracking().FirstOrDefaultAsync(p => p.Id == premisesId);
-        if (premises is null) return (false, "Property not found in the land register.");
-
-        db.LandlordPremises.Add(new LandlordPremises
-        {
-            LandlordId = landlordId,
-            PremisesId = premisesId,
-            PropertyCode = premises.PropertyCode,
-            BuildingName = premises.BuildingName,
-            Zone = premises.Zone,
-            LinkedBy = actor
-        });
-        landlord.UpdatedBy = actor;
-        landlord.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-
-        await AddEventAsync(db, landlordId, EventPremisesAssigned,
-            $"Assigned {premises.PropertyCode}{(string.IsNullOrWhiteSpace(premises.BuildingName) ? "" : $" / {premises.BuildingName}")}", actor);
-        return (true, null);
-    }
-
-    public async Task<(bool Success, string? Error)> RemovePremisesAsync(int landlordId, int landlordPremisesId, string actor)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var link = await db.LandlordPremises.FirstOrDefaultAsync(p => p.Id == landlordPremisesId && p.LandlordId == landlordId);
-        if (link is null) return (false, "Assignment not found.");
-
-        db.LandlordPremises.Remove(link);
-        await db.SaveChangesAsync();
-        await AddEventAsync(db, landlordId, EventPremisesRemoved, $"Removed {link.PropertyCode}", actor);
-        return (true, null);
-    }
-
-    /// <summary>Issues a fresh self-service invite link and moves the landlord to
-    /// <see cref="LandlordStatus.AwaitingLandlordResponse"/>. Returns the raw (unhashed) token to embed in the URL.</summary>
-    public async Task<(bool Success, string? Error, string? RawToken)> InviteAsync(int landlordId, string actor)
+    /// <summary>Issues a fresh secure link, activates it, moves Draft/CorrectionRequired → InvitationSent
+    /// and sends the invitation email to the Property-View address. Returns the raw token for the URL.</summary>
+    public async Task<(bool Success, string? Error, string? RawToken)> InviteAsync(int landlordId, string actor, string? baseUrl = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var landlord = await db.Landlords.Include(l => l.Premises).FirstOrDefaultAsync(l => l.Id == landlordId);
-        if (landlord is null) return (false, "Landlord not found.", null);
-        if (string.IsNullOrWhiteSpace(landlord.Email)) return (false, "This landlord has no primary contact email.", null);
-        if (landlord.Premises.Count == 0) return (false, "Assign at least one property before inviting the landlord.", null);
+        if (landlord is null) return (false, "Registration not found.", null);
+        if (string.IsNullOrWhiteSpace(landlord.Email)) return (false, "This registration has no invitation email.", null);
+        if (landlord.Status is LandlordStatus.RegistrationComplete or LandlordStatus.Rejected)
+            return (false, "This registration is closed; restart it to issue a new link.", null);
 
         var raw = GenerateRawToken();
         db.LandlordAccessTokens.Add(new LandlordAccessToken
         {
-            LandlordId = landlordId,
-            TokenHash = Hash(raw),
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.Add(LinkValidity),
-            CreatedBy = actor
+            LandlordId = landlordId, TokenHash = Hash(raw),
+            CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.Add(LinkValidity), CreatedBy = actor
         });
 
-        if (landlord.Status is LandlordStatus.Draft)
-            landlord.Status = LandlordStatus.AwaitingLandlordResponse;
+        var old = landlord.Status;
+        if (landlord.Status is LandlordStatus.Draft) landlord.Status = LandlordStatus.InvitationSent;
+        landlord.LinkActive = true;
         landlord.UpdatedBy = actor;
         landlord.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        await AddEventAsync(db, landlordId, EventInvited, $"Invite link issued to {landlord.Email}", actor);
+        await AddEventAsync(db, landlordId, EventInvited, $"Invite link issued to {landlord.Email}", actor, ActorBusinessCentre, old, landlord.Status);
+
+        if (baseUrl is not null)
+            await email.SendInviteAsync(landlord.Email, landlord.CompanyName ?? landlord.PropertyCode, $"{baseUrl}landlord/{raw}");
         return (true, null, raw);
     }
 
-    /// <summary>Loads the landlord for the self-service session (premises + signatories + documents).</summary>
-    public async Task<Landlord?> GetForSelfServiceAsync(int landlordId) => await GetByIdAsync(landlordId);
+    // ---------------------------------------------------------------- landlord self-service
 
-    /// <summary>
-    /// Applies the landlord's self-service update: identity fields, secondary contact, signing rule and
-    /// signatories. Records a field-change row per changed value (for the review highlight / trace), moves
-    /// the record to <see cref="LandlordStatus.UnderReview"/>, stamps a reference on first submission, and
-    /// writes the Submitted trace event. The business-set core contact is never overwritten here.
-    /// </summary>
-    public async Task<(bool Success, string? Error, string? Reference)> SubmitAsync(int landlordId, LandlordSelfUpdate update, string actor, int? accessTokenId)
+    /// <summary>Persists the landlord's contacts / signatories (documents are handled by
+    /// <see cref="LandlordDocumentService"/>) either as a draft (InProgress) or as a submission.</summary>
+    public async Task<(bool Success, string? Error, string? Reference)> SaveAsync(
+        int landlordId, LandlordSelfUpdate update, bool submit, string actor, int? accessTokenId, string? ip)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var l = await db.Landlords.Include(x => x.Signatories).FirstOrDefaultAsync(x => x.Id == landlordId);
-        if (l is null) return (false, "Landlord not found.", null);
+        var l = await db.Landlords.Include(x => x.Contacts).Include(x => x.Signatories).Include(x => x.Comments)
+            .FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.", null);
 
-        var changes = new List<LandlordFieldChange>();
-        void Track(string key, string label, string? oldVal, string? newVal)
+        // Replace contacts with the submitted set (first primary).
+        db.LandlordContacts.RemoveRange(l.Contacts);
+        var contacts = update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+        foreach (var c in contacts)
         {
-            if ((oldVal ?? "") == (newVal ?? "")) return;
-            changes.Add(new LandlordFieldChange
+            l.Contacts.Add(new LandlordContact
             {
-                LandlordId = landlordId, LandlordAccessTokenId = accessTokenId,
-                FieldKey = key, DisplayLabel = label, OldValue = oldVal, NewValue = newVal,
-                ChangedBy = actor
+                LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
+                FullName = c.FullName.Trim(), Designation = c.Designation?.Trim(), Mobile = c.Mobile?.Trim(),
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
             });
         }
 
-        Track(nameof(l.EmiratesId), "Emirates ID", l.EmiratesId, update.EmiratesId);
-        Track(nameof(l.TradeLicenseNo), "Trade Licence No", l.TradeLicenseNo, update.TradeLicenseNo);
-        Track(nameof(l.TaxRegistrationNo), "Tax Registration No", l.TaxRegistrationNo, update.TaxRegistrationNo);
-        Track(nameof(l.SecondaryContactName), "Secondary Contact Name", l.SecondaryContactName, update.SecondaryContactName);
-        Track(nameof(l.SecondaryContactEmail), "Secondary Contact Email", l.SecondaryContactEmail, update.SecondaryContactEmail);
-        Track(nameof(l.SecondaryContactMobile), "Secondary Contact Mobile", l.SecondaryContactMobile, update.SecondaryContactMobile);
-        Track(nameof(l.SigningRule), "Signing Rule", l.SigningRule.ToString(), update.SigningRule.ToString());
-
-        l.EmiratesId = update.EmiratesId?.Trim();
-        l.TradeLicenseNo = update.TradeLicenseNo?.Trim();
-        l.TaxRegistrationNo = update.TaxRegistrationNo?.Trim();
-        l.SecondaryContactName = update.SecondaryContactName?.Trim();
-        l.SecondaryContactEmail = update.SecondaryContactEmail?.Trim();
-        l.SecondaryContactMobile = update.SecondaryContactMobile?.Trim();
-        l.SigningRule = update.SigningRule;
-
-        // Replace signatories with the submitted set (primary contact is kept as the ordered first entry).
         db.LandlordSignatories.RemoveRange(l.Signatories);
         var order = 0;
         foreach (var s in update.Signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
         {
             l.Signatories.Add(new LandlordSignatory
             {
-                LandlordId = landlordId,
-                Name = s.Name.Trim(),
-                Email = s.Email.Trim(),
-                Mobile = s.Mobile?.Trim(),
-                Order = order++,
-                IsPrimaryContact = s.IsPrimaryContact
+                LandlordId = landlordId, Name = s.Name.Trim(), Email = s.Email.Trim(),
+                Mobile = s.Mobile?.Trim(), Order = order++, IsPrimaryContact = s.IsPrimaryContact
             });
         }
+        l.SigningRule = update.SigningRule;
 
-        l.Status = LandlordStatus.UnderReview;
-        l.SubmittedAt = DateTime.UtcNow;
+        var old = l.Status;
+        if (submit)
+        {
+            l.Status = LandlordStatus.Submitted;
+            l.SubmittedAt = DateTime.UtcNow;
+            l.Reference ??= $"DIP-LR-{DateTime.UtcNow:yyyy}-{100000 + landlordId}";
+            // Resolve any open correction now that the landlord has resubmitted.
+            foreach (var open in l.Comments.Where(c => c.CommentType == LandlordCommentType.Correction && !c.IsResolved))
+                open.IsResolved = true;
+        }
+        else if (l.Status is LandlordStatus.InvitationSent or LandlordStatus.OtpVerified)
+        {
+            l.Status = LandlordStatus.InProgress;
+        }
         l.UpdatedBy = actor;
         l.UpdatedAt = DateTime.UtcNow;
-        l.Reference ??= $"DIP-LR-{DateTime.UtcNow:yyyy}-{100000 + landlordId}";
-
-        db.LandlordFieldChanges.AddRange(changes);
         await db.SaveChangesAsync();
 
-        await AddEventAsync(db, landlordId, EventSubmitted,
-            $"{changes.Count} field{(changes.Count == 1 ? "" : "s")} updated; reference {l.Reference}", actor);
+        var wasResubmit = submit && old == LandlordStatus.CorrectionRequired;
+        await AddEventAsync(db, landlordId,
+            submit ? (wasResubmit ? EventResubmitted : EventSubmitted) : EventDraftSaved,
+            submit ? $"Submitted; reference {l.Reference}" : "Draft saved",
+            actor, ActorLandlord, old, l.Status, ip);
+
         return (true, null, l.Reference);
     }
 
-    /// <summary>Records a leasing-manager decision (Approve / Reject) with a note.</summary>
-    public async Task<(bool Success, string? Error)> DecideAsync(int landlordId, bool approve, string? note, string actor)
+    /// <summary>Records that the landlord passed OTP (once), moving InvitationSent → OtpVerified.</summary>
+    public async Task MarkOtpVerifiedAsync(int landlordId, string actor, string? ip)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var landlord = await db.Landlords.FirstOrDefaultAsync(l => l.Id == landlordId);
-        if (landlord is null) return (false, "Landlord not found.");
-        if (landlord.Status != LandlordStatus.UnderReview)
-            return (false, "Only submissions under review can be approved or rejected.");
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return;
+        var old = l.Status;
+        if (l.Status is LandlordStatus.InvitationSent) l.Status = LandlordStatus.OtpVerified;
+        await db.SaveChangesAsync();
+        await AddEventAsync(db, landlordId, EventOtpVerified, "OTP verified", actor, ActorLandlord, old, l.Status, ip);
+    }
 
-        landlord.Status = approve ? LandlordStatus.Approved : LandlordStatus.Rejected;
-        landlord.ReviewedBy = actor;
-        landlord.ReviewedAt = DateTime.UtcNow;
-        landlord.DecisionNote = note?.Trim();
-        landlord.UpdatedBy = actor;
-        landlord.UpdatedAt = DateTime.UtcNow;
+    // ---------------------------------------------------------------- business-centre review
+
+    public async Task StartReviewAsync(int landlordId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null || l.Status != LandlordStatus.Submitted) return;
+        l.Status = LandlordStatus.UnderReview;
+        l.ReviewedBy = actor;
+        l.ReviewedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await AddEventAsync(db, landlordId, EventReviewStarted, null, actor, ActorBusinessCentre, LandlordStatus.Submitted, LandlordStatus.UnderReview);
+    }
+
+    /// <summary>Request re-upload / correction (FRD §18). Comment is mandatory, recorded, and emailed to the landlord.</summary>
+    public async Task<(bool Success, string? Error)> RequestCorrectionAsync(int landlordId, string comment, string actor, string? baseUrl, string? ip)
+    {
+        if (string.IsNullOrWhiteSpace(comment)) return (false, "A correction comment is required.");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+        if (l.Status is not (LandlordStatus.Submitted or LandlordStatus.UnderReview))
+            return (false, "Only a submitted registration can be sent back for correction.");
+
+        var old = l.Status;
+        l.Status = LandlordStatus.CorrectionRequired;
+        l.LinkActive = true;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        db.LandlordComments.Add(new LandlordRegistrationComment
+        {
+            LandlordId = landlordId, CommentType = LandlordCommentType.Correction, Comment = comment.Trim(), CreatedBy = actor
+        });
         await db.SaveChangesAsync();
 
-        await AddEventAsync(db, landlordId, approve ? EventApproved : EventRejected,
-            string.IsNullOrWhiteSpace(note) ? null : note, actor);
+        await AddEventAsync(db, landlordId, EventCorrectionRequested, comment.Trim(), actor, ActorBusinessCentre, old, l.Status, ip);
+
+        var raw = await ReissueTokenIfNeededAsync(db, landlordId, actor);
+        if (baseUrl is not null && raw is not null)
+            await email.SendCorrectionAsync(l.Email, l.PropertyCode, comment.Trim(), $"{baseUrl}landlord/{raw}");
         return (true, null);
     }
 
-    private static async Task AddEventAsync(LeasingDbContext db, int landlordId, string type, string? detail, string actor)
+    /// <summary>Reject (FRD §21). Reason is mandatory; the link is deactivated.</summary>
+    public async Task<(bool Success, string? Error)> RejectAsync(int landlordId, string reason, string actor, string? ip)
     {
-        db.LandlordEvents.Add(new LandlordEvent { LandlordId = landlordId, EventType = type, Detail = detail, By = actor });
+        if (string.IsNullOrWhiteSpace(reason)) return (false, "A rejection reason is required.");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+        if (l.Status is not (LandlordStatus.Submitted or LandlordStatus.UnderReview))
+            return (false, "Only a submitted registration can be rejected.");
+
+        var old = l.Status;
+        l.Status = LandlordStatus.Rejected;
+        l.RejectionReason = reason.Trim();
+        l.RejectedBy = actor;
+        l.RejectedAt = DateTime.UtcNow;
+        l.LinkActive = false;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        db.LandlordComments.Add(new LandlordRegistrationComment
+        {
+            LandlordId = landlordId, CommentType = LandlordCommentType.Rejection, Comment = reason.Trim(), CreatedBy = actor
+        });
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, landlordId, EventRejected, reason.Trim(), actor, ActorBusinessCentre, old, l.Status, ip);
+        await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
+        await email.SendRejectionAsync(l.Email, l.PropertyCode, reason.Trim());
+        return (true, null);
+    }
+
+    /// <summary>Restart after rejection (FRD §23): a new registration copying the property snapshot + type,
+    /// linked back to the rejected one which is retained as history. Returns the new registration id.</summary>
+    public async Task<(bool Success, string? Error, int Id)> RestartAsync(int landlordId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var old = await db.Landlords.Include(l => l.Premises).FirstOrDefaultAsync(l => l.Id == landlordId);
+        if (old is null) return (false, "Registration not found.", 0);
+        if (old.Status != LandlordStatus.Rejected)
+            return (false, "Only a rejected registration can be restarted.", 0);
+
+        var fresh = new Landlord
+        {
+            BusinessUnitId = old.BusinessUnitId, Type = old.Type, PropertyId = old.PropertyId,
+            PropertyCode = old.PropertyCode, CompanyName = old.CompanyName, Building = old.Building,
+            Email = old.Email, LandLordCode = old.LandLordCode, Status = LandlordStatus.Draft,
+            LinkActive = true, CreatedBy = actor, CreatedAt = DateTime.UtcNow, RestartedFromId = old.Id
+        };
+        foreach (var p in old.Premises)
+            fresh.Premises.Add(new LandlordPremises { PremisesId = p.PremisesId, PropertyCode = p.PropertyCode, BuildingName = p.BuildingName, Zone = p.Zone, LinkedBy = actor });
+        db.Landlords.Add(fresh);
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, old.Id, EventRestarted, $"Restarted as registration #{fresh.Id}", actor, ActorBusinessCentre, LandlordStatus.Rejected, LandlordStatus.Rejected);
+        await AddEventAsync(db, fresh.Id, EventCreated, $"Restarted from rejected registration #{old.Id}", actor, ActorBusinessCentre, null, LandlordStatus.Draft);
+        return (true, null, fresh.Id);
+    }
+
+    /// <summary>Complete / approve (FRD §24): status → RegistrationComplete, link deactivated, and completion
+    /// notifications sent to the landlord and internal staff.</summary>
+    public async Task<(bool Success, string? Error)> CompleteAsync(int landlordId, string actor, IEnumerable<string> staffEmails, string? ip)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+        if (l.Status is not (LandlordStatus.Submitted or LandlordStatus.UnderReview))
+            return (false, "Only a submitted registration can be completed.");
+
+        var old = l.Status;
+        l.Status = LandlordStatus.RegistrationComplete;
+        l.CompletedBy = actor;
+        l.CompletedAt = DateTime.UtcNow;
+        l.LinkActive = false;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, landlordId, EventCompleted, "Registration completed", actor, ActorBusinessCentre, old, l.Status, ip);
+        await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
+
+        await email.SendCompletionToLandlordAsync(l.Email, l.PropertyCode);
+        await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value);
+        return (true, null);
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    private static async Task<string?> ReissueTokenIfNeededAsync(LeasingDbContext db, int landlordId, string actor)
+    {
+        var raw = GenerateRawToken();
+        db.LandlordAccessTokens.Add(new LandlordAccessToken
+        {
+            LandlordId = landlordId, TokenHash = Hash(raw),
+            CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.Add(LinkValidity), CreatedBy = actor
+        });
+        await db.SaveChangesAsync();
+        return raw;
+    }
+
+    private static async Task AddEventAsync(LeasingDbContext db, int landlordId, string type, string? detail,
+        string actor, string actorType, LandlordStatus? oldStatus = null, LandlordStatus? newStatus = null, string? ip = null)
+    {
+        db.LandlordEvents.Add(new LandlordEvent
+        {
+            LandlordId = landlordId, EventType = type, Detail = detail, By = actor, ByType = actorType,
+            OldStatus = oldStatus?.ToString(), NewStatus = newStatus?.ToString(), Ip = ip
+        });
         await db.SaveChangesAsync();
     }
 
@@ -295,20 +412,27 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory)
 }
 
 public record LandlordListItem(
-    int Id, string LegalName, LandlordType Type, LandlordStatus Status, int BusinessUnitId,
-    string? Reference, int PremisesCount, DateTime UpdatedAt);
+    int Id, string DisplayName, string PropertyCode, LandlordType Type, LandlordStatus Status, int BusinessUnitId,
+    string Email, string? Reference, int PremisesCount, bool LinkActive, DateTime UpdatedAt);
 
-/// <summary>The landlord-updated fields captured in the self-service wizard.</summary>
+/// <summary>The landlord-provided data captured in the self-service form.</summary>
 public class LandlordSelfUpdate
 {
-    public string? EmiratesId { get; set; }
-    public string? TradeLicenseNo { get; set; }
-    public string? TaxRegistrationNo { get; set; }
-    public string? SecondaryContactName { get; set; }
-    public string? SecondaryContactEmail { get; set; }
-    public string? SecondaryContactMobile { get; set; }
     public SigningRule SigningRule { get; set; } = SigningRule.All;
+    public List<ContactInput> Contacts { get; set; } = [];
     public List<SignatoryInput> Signatories { get; set; } = [];
+}
+
+public class ContactInput
+{
+    public int? Id { get; set; }
+    public bool IsPrimary { get; set; }
+    public ContactType ContactType { get; set; } = ContactType.Owner;
+    public string FullName { get; set; } = "";
+    public string? Designation { get; set; }
+    public string? Mobile { get; set; }
+    public string Email { get; set; } = "";
+    public string? EmiratesId { get; set; }
 }
 
 public class SignatoryInput

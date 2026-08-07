@@ -16,8 +16,10 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
     public DbSet<Premises> Premises => Set<Premises>();
     public DbSet<Landlord> Landlords => Set<Landlord>();
     public DbSet<LandlordPremises> LandlordPremises => Set<LandlordPremises>();
+    public DbSet<LandlordContact> LandlordContacts => Set<LandlordContact>();
     public DbSet<LandlordSignatory> LandlordSignatories => Set<LandlordSignatory>();
     public DbSet<LandlordDocument> LandlordDocuments => Set<LandlordDocument>();
+    public DbSet<LandlordRegistrationComment> LandlordComments => Set<LandlordRegistrationComment>();
     public DbSet<LandlordFieldChange> LandlordFieldChanges => Set<LandlordFieldChange>();
     public DbSet<LandlordEvent> LandlordEvents => Set<LandlordEvent>();
     public DbSet<LandlordAccessToken> LandlordAccessTokens => Set<LandlordAccessToken>();
@@ -38,8 +40,22 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
             e.HasIndex(x => x.BusinessUnitId);
             e.HasIndex(x => x.Status);
             e.HasMany(x => x.Premises).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Contacts).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Signatories).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
             e.HasMany(x => x.Documents).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Comments).WithOne(x => x.Landlord!).HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LandlordContact>(e =>
+        {
+            e.ToTable("LandlordContacts", Schema);
+            e.HasIndex(x => x.LandlordId);
+        });
+
+        b.Entity<LandlordRegistrationComment>(e =>
+        {
+            e.ToTable("LandlordComments", Schema);
+            e.HasIndex(x => new { x.LandlordId, x.IsResolved });
         });
 
         b.Entity<LandlordPremises>(e =>

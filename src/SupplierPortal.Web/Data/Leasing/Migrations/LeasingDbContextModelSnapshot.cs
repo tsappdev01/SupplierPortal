@@ -30,8 +30,23 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Building")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
                     b.Property<int>("BusinessUnitId")
                         .HasColumnType("int");
+
+                    b.Property<string>("CompanyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CompletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -41,37 +56,43 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("DecisionNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("EmiratesId")
+                    b.Property<string>("LandLordCode")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("LegalName")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)");
+                    b.Property<bool>("LinkActive")
+                        .HasColumnType("bit");
 
-                    b.Property<string>("Mobile")
+                    b.Property<string>("PropertyCode")
                         .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
 
-                    b.Property<string>("PrimaryContactName")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                    b.Property<int>("PropertyId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Reference")
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RejectedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int?>("RestartedFromId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("ReviewedAt")
                         .HasColumnType("datetime2");
@@ -79,18 +100,6 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<string>("ReviewedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SecondaryContactEmail")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("SecondaryContactMobile")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("SecondaryContactName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
 
                     b.Property<int>("SigningRule")
                         .HasColumnType("int");
@@ -100,14 +109,6 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
                     b.Property<DateTime?>("SubmittedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("TaxRegistrationNo")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("TradeLicenseNo")
-                        .HasMaxLength(60)
-                        .HasColumnType("nvarchar(60)");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -193,6 +194,58 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.ToTable("LandlordAccessTokens", "leasing");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordContact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ContactType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Designation")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("EmiratesId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LandlordId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LandlordId");
+
+                    b.ToTable("LandlordContacts", "leasing");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordDocument", b =>
                 {
                     b.Property<int>("Id")
@@ -200,6 +253,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ContactId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
@@ -216,6 +272,12 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
                     b.Property<long>("FileSizeBytes")
                         .HasColumnType("bigint");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("LandlordContactId")
+                        .HasColumnType("int");
 
                     b.Property<int>("LandlordId")
                         .HasColumnType("int");
@@ -236,7 +298,12 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("Version")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("LandlordContactId");
 
                     b.HasIndex("LandlordId");
 
@@ -258,17 +325,33 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("ByType")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Detail")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("nvarchar(60)");
 
+                    b.Property<string>("Ip")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
                     b.Property<int>("LandlordId")
                         .HasColumnType("int");
+
+                    b.Property<string>("NewStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("OldStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.HasKey("Id");
 
@@ -371,6 +454,43 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.ToTable("LandlordPremises", "leasing");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordRegistrationComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("CommentType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LandlordId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LandlordId", "IsResolved");
+
+                    b.ToTable("LandlordComments", "leasing");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordSignatory", b =>
                 {
                     b.Property<int>("Id")
@@ -420,6 +540,21 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<string>("CategoryName")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CompanyName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContactName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmailAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LandLordCode")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LeaseNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PropertyCode")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -442,8 +577,23 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Navigation("Landlord");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordContact", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Leasing.Landlord", "Landlord")
+                        .WithMany("Contacts")
+                        .HasForeignKey("LandlordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Landlord");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordDocument", b =>
                 {
+                    b.HasOne("SupplierPortal.Web.Models.Leasing.LandlordContact", null)
+                        .WithMany("Documents")
+                        .HasForeignKey("LandlordContactId");
+
                     b.HasOne("SupplierPortal.Web.Models.Leasing.Landlord", "Landlord")
                         .WithMany("Documents")
                         .HasForeignKey("LandlordId")
@@ -464,6 +614,17 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Navigation("Landlord");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordRegistrationComment", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Leasing.Landlord", "Landlord")
+                        .WithMany("Comments")
+                        .HasForeignKey("LandlordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Landlord");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordSignatory", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Leasing.Landlord", "Landlord")
@@ -477,11 +638,20 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.Landlord", b =>
                 {
+                    b.Navigation("Comments");
+
+                    b.Navigation("Contacts");
+
                     b.Navigation("Documents");
 
                     b.Navigation("Premises");
 
                     b.Navigation("Signatories");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.LandlordContact", b =>
+                {
+                    b.Navigation("Documents");
                 });
 #pragma warning restore 612, 618
         }

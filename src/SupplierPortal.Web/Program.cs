@@ -41,6 +41,7 @@ builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordEmailService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordDocumentService>();
 
@@ -319,11 +320,15 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentServi
     return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
 }).RequireAuthorization();
 
-// Landlord document download for leasing reviewers (Administrator / LeasingManager only).
-app.MapGet("/landlord-documents/{id:int}", async (int id, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
+// Landlord document preview/download for leasing reviewers (Administrator / LeasingManager only).
+// Without ?download=1 the file is served inline (preview); with it, as an attachment.
+app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
 {
     var file = await documentService.GetFileAsync(id);
-    return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
+    if (file is null) return Results.NotFound();
+    return download == true
+        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
+        : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization(policy => policy.RequireRole(SupplierPortal.Web.Models.UserType.Administrator.ToString(), SupplierPortal.Web.Models.UserType.LeasingManager.ToString()));
 
 // Combine a supplier's attached images into a single PDF / Excel workbook.
