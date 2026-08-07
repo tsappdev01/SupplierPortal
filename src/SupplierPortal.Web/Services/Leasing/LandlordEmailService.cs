@@ -1,17 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SupplierPortal.Web.Data.Leasing;
 
 namespace SupplierPortal.Web.Services.Leasing;
 
 /// <summary>
-/// Sends the Landlord-registration notification emails (FRD §28). Uses SQL Server Database Mail
-/// (<c>sp_send_dbmail</c>, profile <c>BP</c>) exactly like the supplier emails. In Development — where no
-/// mail profile exists — sends are skipped so the flow stays testable; every send is best-effort and never
-/// blocks the workflow transition that triggered it.
+/// Sends the Landlord-registration notification emails (FRD §28) through SQL Server Database Mail
+/// (<c>sp_send_dbmail</c>) using the configured profile (<c>Leasing:MailProfile</c>, default <c>BP</c>),
+/// exactly like the supplier emails. Sending is gated by <c>Leasing:SendEmails</c> (defaults to on outside
+/// Development); every send is best-effort and never blocks the workflow transition that triggered it.
 /// </summary>
-public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory, IWebHostEnvironment env)
+public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory, IWebHostEnvironment env, IOptions<LeasingOptions> options)
 {
-    private const string MailProfileName = "BP";
+    private string MailProfileName => options.Value.MailProfile;
+    private bool ShouldSend => options.Value.SendEmails ?? !env.IsDevelopment();
 
     public Task SendInviteAsync(string toEmail, string legalOrCompany, string link) =>
         SendAsync(toEmail, "Landlord Registration – Action Required",
@@ -52,7 +54,7 @@ public class LandlordEmailService(IDbContextFactory<LeasingDbContext> dbFactory,
 
     private async Task SendAsync(string toEmail, string subject, string body)
     {
-        if (env.IsDevelopment() || string.IsNullOrWhiteSpace(toEmail)) return; // no Database Mail locally
+        if (!ShouldSend || string.IsNullOrWhiteSpace(toEmail)) return; // skipped in Development unless Leasing:SendEmails=true
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync();

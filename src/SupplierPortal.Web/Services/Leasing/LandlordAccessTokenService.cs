@@ -16,12 +16,14 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// to the caller instead of emailed so the flow is testable locally.
 /// </summary>
 public class LandlordAccessTokenService(
-    IDbContextFactory<LeasingDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env)
+    IDbContextFactory<LeasingDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
+    Microsoft.Extensions.Options.IOptions<LeasingOptions> options)
 {
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
     private const int MaxOtpAttempts = 5;
     private const int MaxOtpSends = 5;
-    private const string MailProfileName = "BP";
+    private string MailProfileName => options.Value.MailProfile;
+    private bool ShouldSend => options.Value.SendEmails ?? !env.IsDevelopment();
 
     private static readonly User HasherContext = new();
 
@@ -79,9 +81,10 @@ public class LandlordAccessTokenService(
         token.OtpSendCount++;
         await db.SaveChangesAsync();
 
-        if (env.IsDevelopment())
+        if (!ShouldSend)
         {
-            // No Database Mail locally — surface the code so the flow can be exercised end to end.
+            // Development (or Leasing:SendEmails=false): no Database Mail — surface the code so the flow
+            // can be exercised locally. When sending is enabled the OTP goes out via the BP profile below.
             return (true, null, code);
         }
 
