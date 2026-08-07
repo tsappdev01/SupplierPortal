@@ -9,6 +9,9 @@
 @inject LandlordService LandlordService
 @inject LandlordDocumentService DocumentService
 @inject ToastService ToastService
+@inject LoadingService Loading
+@inject IDocumentOcrService Ocr
+@inject IWebHostEnvironment Env
 
 <PageTitle>Landlord Registration</PageTitle>
 
@@ -100,6 +103,10 @@
                         @if (landlord.Type == LandlordType.Individual)
                         {
                             @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
+                            @if (eidExtractNote is not null)
+                            {
+                                <div class="hint" style="color:var(--ok)">@eidExtractNote</div>
+                            }
                         }
                     }
 
@@ -124,31 +131,18 @@
                     @* ===== Step 2: Documents ===== *@
                     else if (step == 2)
                     {
-                        <p class="muted mb-3">
-                            @(landlord.Type == LandlordType.Individual
-                                ? "Emirates ID is mandatory for an individual landlord."
-                                : "Provide at least one of Power of Attorney (POA) or Memorandum of Association (MOA).")
-                        </p>
-                        @foreach (var dt in PrimaryDocTypes)
+                        @if (landlord.Type == LandlordType.Individual)
                         {
-                            @UploadField(dt, DocLabel(dt), required: false)
+                            <p class="muted mb-3">Your Emirates ID was captured with the primary contact. You may add a title deed if available.</p>
+                            @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
+                            @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
                         }
-                        <div class="subhead">Other documents</div>
-                        <div class="up">
-                            <span class="name empty">Attach a supporting document (optional)</span>
-                            <label class="btn ghost" style="padding:7px 13px;font-size:13px;margin:0">
-                                Choose file
-                                <InputFile OnChange="@(e => UploadAsync(e, LandlordDocumentType.Other))" style="display:none" accept=".pdf,image/*" />
-                            </label>
-                        </div>
-                        @if (OtherDocs.Any())
+                        else
                         {
-                            <ul class="olist mt-2">
-                                @foreach (var d in OtherDocs)
-                                {
-                                    <li><span class="n">•</span><span style="flex:1">@d.FileName</span><button class="link danger" @onclick="() => DeleteDocAsync(d.Id)">Remove</button></li>
-                                }
-                            </ul>
+                            <p class="muted mb-3">Upload the company's MOA or POA (one document). Trade licence and title deed are optional.</p>
+                            @UploadField(LandlordDocumentType.MoaOrPoa, "MOA / POA", required: true)
+                            @UploadField(LandlordDocumentType.TradeLicense, "Trade Licence", required: false)
+                            @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
                         }
                     }
 
@@ -168,26 +162,30 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="hint mb-2">Signatory details are optional for an individual landlord.</div>
+                        <div class="hint mb-2">The primary contact is always the first authorised signatory and cannot be removed.</div>
+                        @* Locked primary signatory (mirrors the primary contact) *@
+                        <div class="sig open">
+                            <div class="sig-hd">
+                                <span class="seq">1</span>
+                                <div class="sig-id">
+                                    <b>@(string.IsNullOrWhiteSpace(primary.FullName) ? "Primary contact" : primary.FullName)</b>
+                                    <span>@primary.Email</span>
+                                </div>
+                                <span class="tagx">Primary</span>
+                            </div>
+                        </div>
                         @for (var i = 0; i < signatories.Count; i++)
                         {
                             var idx = i;
                             <div class="sig open">
                                 <div class="sig-hd">
-                                    <span class="seq">@(idx + 1)</span>
+                                    <span class="seq">@(idx + 2)</span>
                                     <div class="sig-id" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
                                         <input class="di-in" placeholder="Name" @bind="signatories[idx].Name" />
                                         <input class="di-in" placeholder="Email" @bind="signatories[idx].Email" />
                                         <input class="di-in" placeholder="Mobile" @bind="signatories[idx].Mobile" />
                                     </div>
-                                    @if (signatories[idx].IsPrimaryContact)
-                                    {
-                                        <span class="tagx">Primary</span>
-                                    }
-                                    else
-                                    {
-                                        <button class="link danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
-                                    }
+                                    <button class="link danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
                                 </div>
                             </div>
                         }
@@ -350,9 +348,6 @@
     [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
 
     private static readonly string[] stepLabels = ["Primary Contact", "Secondary Contacts", "Documents", "Signatories", "Review"];
-    private static readonly LandlordDocumentType[] PrimaryDocTypes =
-        [LandlordDocumentType.PowerOfAttorney, LandlordDocumentType.Moa, LandlordDocumentType.TradeLicense,
-         LandlordDocumentType.AuthorisationLetter, LandlordDocumentType.TitleDeed];
 
     private LandlordAccessToken? accessToken;
     private Landlord? landlord;
@@ -369,7 +364,7 @@
     private string? error, reference;
 
     private string ActorLabel => $"Landlord Self-Service ({landlord?.Email})";
-    private IEnumerable<LandlordDocument> OtherDocs => documents.Where(d => d.DocumentType == LandlordDocumentType.Other);
+    private string? eidExtractNote;
 
     private string StepHeading => step switch
     {
@@ -409,9 +404,9 @@
         if (ep is not null) CopyInto(primary, ep);
         foreach (var c in landlord.Contacts.Where(c => !c.IsPrimary)) { var s = new ContactInput(); CopyInto(s, c); secondaries.Add(s); }
         signingRule = landlord.SigningRule;
-        if (landlord.Signatories.Count > 0)
-            signatories.AddRange(landlord.Signatories.OrderBy(s => s.Order)
-                .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile, IsPrimaryContact = s.IsPrimaryContact }));
+        // The primary contact is rendered as the locked signatory #1, so only load the ADDITIONAL ones here.
+        signatories.AddRange(landlord.Signatories.Where(s => !s.IsPrimaryContact).OrderBy(s => s.Order)
+            .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile }));
     }
 
     private static void CopyInto(ContactInput t, LandlordContact c)
@@ -484,16 +479,55 @@
     {
         var contacts = new List<ContactInput> { primary };
         contacts.AddRange(secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)));
-        return new LandlordSelfUpdate { SigningRule = signingRule, Contacts = contacts, Signatories = signatories };
+
+        // Primary contact is always the first authorised signatory and is not user-editable/removable.
+        var sigs = new List<SignatoryInput>
+        {
+            new() { Name = primary.FullName, Email = primary.Email, Mobile = primary.Mobile, IsPrimaryContact = true }
+        };
+        sigs.AddRange(signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)));
+        return new LandlordSelfUpdate { SigningRule = signingRule, Contacts = contacts, Signatories = sigs };
     }
 
     private async Task UploadAsync(InputFileChangeEventArgs e, LandlordDocumentType type)
     {
         if (landlord is null) return;
         error = null;
-        var (ok, err) = await DocumentService.UploadAsync(landlord.Id, type, e.File, ActorLabel);
+        // Show the global progress bar while the file uploads (and, for an Emirates ID, is OCR-scanned).
+        var (ok, err) = await Loading.RunAsync(async () =>
+        {
+            var res = await DocumentService.UploadAsync(landlord.Id, type, e.File, ActorLabel);
+            if (res.Success && type == LandlordDocumentType.EmiratesId)
+                await TryExtractEmiratesIdAsync(e.File);
+            return res;
+        });
         if (!ok) error = err;
         documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+    }
+
+    /// <summary>Best-effort OCR of an uploaded Emirates ID: extracts the ID number, expiry and name and
+    /// prefills the primary contact. Never blocks the upload — a disabled/failed OCR is silently ignored.</summary>
+    private async Task TryExtractEmiratesIdAsync(IBrowserFile file)
+    {
+        eidExtractNote = null;
+        if (!Ocr.IsEnabled) return;
+        string? temp = null;
+        try
+        {
+            temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(file.Name)}");
+            await using (var fs = new FileStream(temp, FileMode.Create))
+            await using (var src = file.OpenReadStream(10 * 1024 * 1024))
+                await src.CopyToAsync(fs);
+
+            var text = await Ocr.ExtractTextAsync(temp);
+            var r = EmiratesIdExtractor.Parse(text);
+            if (r.Number is not null) primary.EmiratesId = r.Number;
+            if (r.Name is not null && string.IsNullOrWhiteSpace(primary.FullName)) primary.FullName = r.Name;
+            if (r.Number is not null || r.Name is not null || r.Expiry is not null)
+                eidExtractNote = $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}";
+        }
+        catch { /* OCR is best-effort enrichment */ }
+        finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
     }
 
     private async Task DeleteDocAsync(int docId)
@@ -521,8 +555,9 @@
             if (!documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
                 return "Emirates ID document is mandatory for an individual landlord.";
         }
-        else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))
-            return "At least one of POA or MOA must be uploaded.";
+        else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.MoaOrPoa
+                     or LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))
+            return "The MOA / POA document is required for a company.";
         return null;
     }
 
@@ -547,6 +582,7 @@
         LandlordDocumentType.TradeLicense => "Trade Licence",
         LandlordDocumentType.Moa => "Memorandum of Association (MOA)",
         LandlordDocumentType.PowerOfAttorney => "Power of Attorney (POA)",
+        LandlordDocumentType.MoaOrPoa => "MOA / POA",
         LandlordDocumentType.AuthorisationLetter => "Authorisation Letter",
         LandlordDocumentType.TitleDeed => "Title Deed",
         _ => "Other"

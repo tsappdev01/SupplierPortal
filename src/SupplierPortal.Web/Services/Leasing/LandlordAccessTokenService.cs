@@ -80,9 +80,25 @@ public class LandlordAccessTokenService(
         token.OtpSendCount++;
         await db.SaveChangesAsync();
 
-        var body = $"<p>Dear Landlord ({token.Landlord.CompanyName ?? token.Landlord.PropertyCode}),</p>" +
-                   $"<p>Your verification code is <strong>{code}</strong>. It expires in {(int)OtpValidity.TotalMinutes} minutes.</p>" +
-                   "<p>Dubai Investments — Leasing</p>";
+        var who = System.Net.WebUtility.HtmlEncode(token.Landlord.CompanyName ?? token.Landlord.PropertyCode);
+        var body =
+$@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Segoe UI,Arial,sans-serif"">
+  <table role=""presentation"" width=""100%"" style=""background:#06213D;padding:24px 0""><tr><td align=""center"">
+    <table role=""presentation"" width=""600"" style=""max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden"">
+      <tr><td style=""background:#092F56;padding:20px 28px"">
+        <div style=""color:#fff;font-size:18px;font-weight:700"">Dubai Investments</div>
+        <div style=""color:#9DB3C8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px"">Business Centre · Leasing</div>
+      </td></tr>
+      <tr><td style=""padding:24px 28px 8px"">
+        <h1 style=""margin:0 0 10px;font-size:20px;color:#092F56"">Your verification code</h1>
+        <p style=""margin:0 0 16px;color:#20262D"">Use this code to continue the landlord registration for <strong>{who}</strong>.</p>
+        <div style=""font-family:Consolas,monospace;font-size:34px;letter-spacing:.4em;font-weight:700;color:#092F56;background:#F6F3EF;border-radius:6px;padding:16px 0;text-align:center"">{code}</div>
+        <p style=""margin:14px 0 0;color:#8A929A;font-size:12px"">The code expires in {(int)OtpValidity.TotalMinutes} minutes. If you didn't request it, you can ignore this email.</p>
+      </td></tr>
+      <tr><td style=""padding:20px 28px;color:#8A929A;font-size:12px;border-top:1px solid #E2DCD4"">Automated message from Dubai Investments Business Centre — please do not reply.</td></tr>
+    </table>
+  </td></tr></table>
+</body></html>";
         try
         {
             await db.Database.ExecuteSqlInterpolatedAsync($@"

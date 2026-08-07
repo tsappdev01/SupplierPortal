@@ -68,7 +68,9 @@ public enum LandlordDocumentType
     PowerOfAttorney = 3,
     AuthorisationLetter = 4,
     TitleDeed = 5,
-    Other = 6
+    Other = 6,
+    /// <summary>Combined MOA/POA slot — a company provides one document that is either its MOA or a POA.</summary>
+    MoaOrPoa = 7
 }
 
 /// <summary>Role a contact plays for the landlord (FRD contact-type field).</summary>
