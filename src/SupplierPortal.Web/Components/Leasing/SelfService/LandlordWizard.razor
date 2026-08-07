@@ -1,6 +1,7 @@
 @page "/landlord/{Token}/update"
 @layout Layout.PublicLayout
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
 @using Microsoft.AspNetCore.Components.Forms
 @using SupplierPortal.Web.Models.Leasing
 @using SupplierPortal.Web.Services
@@ -99,15 +100,6 @@
                         </div>
 
                         @ContactFields(primary, isPrimary: true)
-
-                        @if (landlord.Type == LandlordType.Individual)
-                        {
-                            @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
-                            @if (eidExtractNote is not null)
-                            {
-                                <div class="hint" style="color:var(--ok)">@eidExtractNote</div>
-                            }
-                        }
                     }
 
                     @* ===== Step 1: Secondary Contacts ===== *@
@@ -133,13 +125,17 @@
                     {
                         @if (landlord.Type == LandlordType.Individual)
                         {
-                            <p class="muted mb-3">Your Emirates ID was captured with the primary contact. You may add a title deed if available.</p>
+                            <p class="muted mb-3">Upload your Emirates ID (required). Its number, name and expiry are read from the card and can be corrected below. A title deed is optional.</p>
                             @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
+                            @if (documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
+                            {
+                                @EmiratesIdDetails()
+                            }
                             @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
                         }
                         else
                         {
-                            <p class="muted mb-3">Upload the company's MOA or POA (one document). Trade licence and title deed are optional.</p>
+                            <p class="muted mb-3">Upload the company's MOA or POA (one document, required). Trade licence and title deed are optional.</p>
                             @UploadField(LandlordDocumentType.MoaOrPoa, "MOA / POA", required: true)
                             @UploadField(LandlordDocumentType.TradeLicense, "Trade Licence", required: false)
                             @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
@@ -413,6 +409,7 @@
     {
         t.Id = c.Id; t.IsPrimary = c.IsPrimary; t.ContactType = c.ContactType; t.FullName = c.FullName;
         t.Designation = c.Designation; t.Mobile = c.Mobile; t.Email = c.Email; t.EmiratesId = c.EmiratesId;
+        t.EmiratesIdExpiry = c.EmiratesIdExpiry;
     }
 
     private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
@@ -431,7 +428,6 @@
             <div class="field" style="margin-bottom:0"><label class="lbl">Contact type</label>
                 <select @bind="c.ContactType">@foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }</select>
             </div>
-            <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID</label><input type="text" @bind="c.EmiratesId" /></div>
         </div>
     };
 
@@ -456,6 +452,24 @@
                     </label>
                 }
             </div>
+        </div>
+    };
+
+    /// <summary>Editable Emirates ID details shown once the card is uploaded — prefilled from OCR, correctable
+    /// by the landlord, and saved onto the primary contact.</summary>
+    private RenderFragment EmiratesIdDetails() => __builder =>
+    {
+        <div class="panel mb-3">
+            @if (eidExtractNote is not null)
+            {
+                <p style="color:var(--ok);margin:0 0 10px">@eidExtractNote</p>
+            }
+            <div class="grid2">
+                <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID number @MarkReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="primary.EmiratesId" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Name (as on card) @MarkReq()</label><input type="text" @bind="primary.FullName" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Expiry date @MarkReq()</label><input type="date" @bind="primary.EmiratesIdExpiry" /></div>
+            </div>
+            <div class="hint">Read automatically from the uploaded card — please check and correct if needed.</div>
         </div>
     };
 
@@ -544,6 +558,10 @@
             var r = EmiratesIdExtractor.Parse(text);
             if (r.Number is not null) primary.EmiratesId = r.Number;
             if (r.Name is not null && string.IsNullOrWhiteSpace(primary.FullName)) primary.FullName = r.Name;
+            if (r.Expiry is not null && primary.EmiratesIdExpiry is null
+                && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
+                primary.EmiratesIdExpiry = exp;
             if (r.Number is not null || r.Name is not null || r.Expiry is not null)
                 eidExtractNote = $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}";
         }
@@ -585,6 +603,10 @@
         {
             if (!documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
                 return "Emirates ID document is mandatory for an individual landlord.";
+            if (string.IsNullOrWhiteSpace(primary.EmiratesId))
+                return "The Emirates ID number is required — check the Documents step.";
+            if (primary.EmiratesIdExpiry is null)
+                return "The Emirates ID expiry date is required — check the Documents step.";
         }
         else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.MoaOrPoa
                      or LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))

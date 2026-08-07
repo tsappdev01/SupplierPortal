@@ -167,6 +167,8 @@ public class LandlordContact
     [MaxLength(40)] public string? Mobile { get; set; }
     [MaxLength(200)] public string Email { get; set; } = string.Empty;
     [MaxLength(50)] public string? EmiratesId { get; set; }
+    /// <summary>Emirates ID expiry date, captured (or OCR-extracted) alongside the Emirates ID document.</summary>
+    public DateTime? EmiratesIdExpiry { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

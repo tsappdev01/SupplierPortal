@@ -119,7 +119,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
             {
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType, FullName = c.FullName.Trim(),
                 Designation = c.Designation?.Trim(), Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
-                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
             });
 
         db.LandlordSignatories.RemoveRange(l.Signatories);
@@ -274,6 +274,12 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
             if (err is not null) return (false, err, null);
         }
 
+        // Snapshot the pre-save state so we can record exactly what the landlord changed (review highlight).
+        var oldPrimary = l.Contacts.FirstOrDefault(c => c.IsPrimary);
+        var oldSigningRule = l.SigningRule;
+        var oldSecondaryCount = l.Contacts.Count(c => !c.IsPrimary);
+        var oldSignatoryCount = l.Signatories.Count;
+
         // Replace contacts with the submitted set (first primary); normalise mobiles to +9715XXXXXXXX.
         db.LandlordContacts.RemoveRange(l.Contacts);
         foreach (var c in contacts)
@@ -283,9 +289,16 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
                 FullName = c.FullName.Trim(), Designation = c.Designation?.Trim(),
                 Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
-                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim()
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
             });
         }
+
+        // Record field-level changes made by the landlord (surfaced + highlighted to Business Centre).
+        RecordFieldChanges(db, landlordId, accessTokenId, actor,
+            oldPrimary, contacts.FirstOrDefault(c => c.IsPrimary),
+            oldSigningRule, update.SigningRule,
+            oldSecondaryCount, contacts.Count(c => !c.IsPrimary),
+            oldSignatoryCount, update.Signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name)));
 
         db.LandlordSignatories.RemoveRange(l.Signatories);
         var order = 0;
@@ -373,6 +386,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         });
         await db.SaveChangesAsync();
 
+        await AcknowledgeFieldChangesAsync(db, landlordId);
         await AddEventAsync(db, landlordId, EventCorrectionRequested, comment.Trim(), actor, ActorBusinessCentre, old, l.Status, ip);
 
         var raw = await ReissueTokenIfNeededAsync(db, landlordId, actor);
@@ -405,6 +419,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         });
         await db.SaveChangesAsync();
 
+        await AcknowledgeFieldChangesAsync(db, landlordId);
         await AddEventAsync(db, landlordId, EventRejected, reason.Trim(), actor, ActorBusinessCentre, old, l.Status, ip);
         await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
         await email.SendRejectionAsync(l.Email, l.PropertyCode, reason.Trim());
@@ -457,6 +472,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         l.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
+        await AcknowledgeFieldChangesAsync(db, landlordId);
         await AddEventAsync(db, landlordId, EventCompleted, "Registration completed", actor, ActorBusinessCentre, old, l.Status, ip);
         await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
 
@@ -466,6 +482,64 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>The landlord's latest change per field (unacknowledged), for the review-screen highlight.</summary>
+    public async Task<List<LandlordFieldChange>> GetFieldChangesAsync(int landlordId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var all = await db.LandlordFieldChanges.AsNoTracking()
+            .Where(f => f.LandlordId == landlordId && !f.IsAcknowledged)
+            .OrderByDescending(f => f.ChangedAt)
+            .ToListAsync();
+        return all.GroupBy(f => f.FieldKey).Select(g => g.First()).ToList();
+    }
+
+    /// <summary>Marks the landlord's tracked changes as reviewed (clears the highlight after a review action).</summary>
+    private static async Task AcknowledgeFieldChangesAsync(LeasingDbContext db, int landlordId)
+    {
+        var open = await db.LandlordFieldChanges.Where(f => f.LandlordId == landlordId && !f.IsAcknowledged).ToListAsync();
+        foreach (var f in open) f.IsAcknowledged = true;
+        if (open.Count > 0) await db.SaveChangesAsync();
+    }
+
+    /// <summary>Records the field-level differences the landlord introduced in a self-service save. A null
+    /// <paramref name="oldPrimary"/> (first fill) means every provided value is a new change — which is exactly
+    /// what Business Centre wants highlighted.</summary>
+    private static void RecordFieldChanges(
+        LeasingDbContext db, int landlordId, int? tokenId, string actor,
+        LandlordContact? oldPrimary, ContactInput? newPrimary,
+        SigningRule oldRule, SigningRule newRule,
+        int oldSecondaryCount, int newSecondaryCount,
+        int oldSignatoryCount, int newSignatoryCount)
+    {
+        void Add(string key, string label, string? oldV, string? newV)
+        {
+            var o = oldV?.Trim() ?? "";
+            var n = newV?.Trim() ?? "";
+            if (string.Equals(o, n, StringComparison.Ordinal)) return;
+            db.LandlordFieldChanges.Add(new LandlordFieldChange
+            {
+                LandlordId = landlordId, LandlordAccessTokenId = tokenId, FieldKey = key, DisplayLabel = label,
+                OldValue = o.Length > 1000 ? o[..1000] : o, NewValue = n.Length > 1000 ? n[..1000] : n,
+                ChangedBy = actor, ChangedAt = DateTime.UtcNow
+            });
+        }
+
+        Add("Contact.Primary.FullName", "Primary contact — Name", oldPrimary?.FullName, newPrimary?.FullName);
+        Add("Contact.Primary.Email", "Primary contact — Email", oldPrimary?.Email, newPrimary?.Email);
+        Add("Contact.Primary.Mobile", "Primary contact — Mobile", oldPrimary?.Mobile, newPrimary?.Mobile);
+        Add("Contact.Primary.EmiratesId", "Primary contact — Emirates ID", oldPrimary?.EmiratesId, newPrimary?.EmiratesId);
+        Add("Contact.Primary.EmiratesIdExpiry", "Primary contact — Emirates ID expiry",
+            oldPrimary?.EmiratesIdExpiry?.ToString("yyyy-MM-dd"), newPrimary?.EmiratesIdExpiry?.ToString("yyyy-MM-dd"));
+        Add("Contact.Primary.Designation", "Primary contact — Designation", oldPrimary?.Designation, newPrimary?.Designation);
+        Add("Contact.Primary.ContactType", "Primary contact — Type",
+            oldPrimary?.ContactType.ToString(), newPrimary?.ContactType.ToString());
+        Add("SigningRule", "Signing rule", oldRule.ToString(), newRule.ToString());
+        if (oldSecondaryCount != newSecondaryCount)
+            Add("SecondaryContacts", "Secondary contacts", oldSecondaryCount.ToString(), newSecondaryCount.ToString());
+        if (oldSignatoryCount != newSignatoryCount)
+            Add("Signatories", "Signatories", oldSignatoryCount.ToString(), newSignatoryCount.ToString());
+    }
 
     private static async Task<string?> ReissueTokenIfNeededAsync(LeasingDbContext db, int landlordId, string actor)
     {
@@ -534,6 +608,7 @@ public class ContactInput
     public string? Mobile { get; set; }
     public string Email { get; set; } = "";
     public string? EmiratesId { get; set; }
+    public DateTime? EmiratesIdExpiry { get; set; }
 }
 
 public class SignatoryInput
