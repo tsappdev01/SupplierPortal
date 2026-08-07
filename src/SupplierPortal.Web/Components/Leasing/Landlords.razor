@@ -15,7 +15,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="mb-0">Landlord Registrations</h1>
-    <a class="btn btn-outline-primary" href="/admin/land-register">Initiate from Property List →</a>
+    <a class="btn btn-primary di-initiate" href="/admin/land-register">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z"/></svg>
+        New Registration
+    </a>
 </div>
 
 @* KPI cards (Manage-Supplier style) — click to filter *@
@@ -54,7 +57,17 @@ else
             @foreach (var l in PageItems)
             {
                 <tr style="cursor:pointer;" @onclick="() => Open(l.Id)">
-                    <td>@l.DisplayName</td>
+                    <td>
+                        @l.DisplayName
+                        @if (l.VersionCount > 1)
+                        {
+                            <button class="di-verchip" @onclick:stopPropagation="true" @onclick="() => ToggleHistory(l.Id)"
+                                    title="@l.VersionCount registrations for this property — show history">
+                                v@(l.VersionCount) history
+                                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" class="@(expanded.Contains(l.Id) ? "di-rot" : "")"><path d="M4.646 6.146a.5.5 0 0 1 .708 0L8 8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708Z"/></svg>
+                            </button>
+                        }
+                    </td>
                     <td>@l.PropertyCode</td>
                     <td>@l.Type</td>
                     <td>@l.Email</td>
@@ -78,6 +91,22 @@ else
                         </a>
                     </td>
                 </tr>
+                @if (expanded.Contains(l.Id) && l.Older.Count > 0)
+                {
+                    @foreach (var v in l.Older)
+                    {
+                        <tr class="di-histrow" @onclick="() => Open(v.Id)" style="cursor:pointer;">
+                            <td class="ps-4"><span class="text-muted small">↳ version @v.Version</span></td>
+                            <td class="text-muted small">@l.PropertyCode</td>
+                            <td></td>
+                            <td></td>
+                            <td><span class="badge @StatusClass(v.Status)">@Label(v.Status)</span></td>
+                            <td class="text-muted small">@(v.Reference ?? "—")</td>
+                            <td class="text-muted small">@v.UpdatedAt.ToLocalTime().ToString("g")</td>
+                            <td class="text-end"><a class="small" href="/admin/landlords/@v.Id" @onclick:stopPropagation="true">View</a></td>
+                        </tr>
+                    }
+                }
             }
         </tbody>
     </table>
@@ -106,6 +135,12 @@ else
     .di-kpi.sel { outline: 2px solid var(--kpi, #1a2233); }
     .di-kpi-n { display: block; font-size: 1.5rem; font-weight: 700; line-height: 1.1; color: #1a2233; }
     .di-kpi-l { display: block; font-size: .78rem; color: var(--bs-secondary-color); }
+    .di-initiate { display: inline-flex; align-items: center; gap: 6px; }
+    .di-verchip { border: 1px solid var(--bs-border-color); background: #f4f6f9; color: #46618f; border-radius: 999px; font-size: .68rem; font-weight: 600; padding: 1px 8px; margin-left: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+    .di-verchip:hover { background: #e9eef5; }
+    .di-verchip svg.di-rot { transform: rotate(180deg); }
+    .di-histrow { background: #fafbfc; }
+    .di-histrow:hover { background: #f1f4f8; }
 </style>
 
 @code {
@@ -114,6 +149,9 @@ else
     private LandlordStatus[]? statusFilter;
     private string currentUser = "unknown";
     private int? sending;
+    private readonly HashSet<int> expanded = new();
+
+    private void ToggleHistory(int id) { if (!expanded.Add(id)) expanded.Remove(id); }
 
     private bool IsActive(LandlordStatus[] set) => statusFilter is not null && statusFilter.Length == set.Length && !set.Except(statusFilter).Any();
 
