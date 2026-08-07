@@ -95,11 +95,32 @@ else
                             }
                         </td>
                         <td class="text-end text-nowrap di-actions">
-                            <a href="javascript:void(0)" @onclick="() => EditAsync(r)">Edit</a>
-                            <span class="text-muted">|</span>
-                            <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
-                            <span class="text-muted">|</span>
-                            <a href="javascript:void(0)" class="@(CanReview(r) ? "" : "di-disabled")" @onclick="() => ReviewAsync(r)">Review</a>
+                            @if (r.RegistrationId is int rid)
+                            {
+                                <a href="/admin/landlords/@rid" target="_blank" title="View / edit all details (new tab)">Edit</a>
+                                <span class="text-muted">|</span>
+                                <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
+                                <span class="text-muted">|</span>
+                                @if (CanReview(r))
+                                {
+                                    <a href="/admin/landlords/@rid" target="_blank">Review</a>
+                                }
+                                else
+                                {
+                                    <a class="di-disabled">Review</a>
+                                }
+                                <a href="/admin/landlords/@rid" target="_blank" class="di-attach" title="View attachments (new tab)" aria-label="Attachments">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3Z"/></svg>
+                                </a>
+                            }
+                            else
+                            {
+                                <a href="javascript:void(0)" @onclick="() => EditAsync(r)">Edit</a>
+                                <span class="text-muted">|</span>
+                                <a href="javascript:void(0)" class="@(CanNotify(r) ? "" : "di-disabled")" @onclick="() => NotifyAsync(r)">Notify</a>
+                                <span class="text-muted">|</span>
+                                <a class="di-disabled">Review</a>
+                            }
                         </td>
                     </tr>
                 }
@@ -157,6 +178,7 @@ else
     .di-actions a { color: #b8860b; font-weight: 600; text-decoration: none; margin: 0 .15rem; }
     .di-actions a:hover { text-decoration: underline; }
     .di-actions a.di-disabled { color: #b7bcc4; pointer-events: none; }
+    .di-actions a.di-attach { margin-left: .5rem; vertical-align: middle; }
     .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 3000; }
     .di-modal { width: 100%; max-width: 460px; background: var(--bs-body-bg); border-radius: .6rem; box-shadow: 0 12px 40px rgba(0,0,0,.3); padding: 1.25rem 1.5rem; }
 </style>
