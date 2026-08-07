@@ -151,6 +151,68 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
         return token.SessionTokenHash == Hash(rawSession) ? token : null;
     }
 
+    // ----------------------------------------------------------------- UAE Pass
+
+    /// <summary>Begins a UAE Pass round-trip: stores a fresh anti-forgery <c>state</c> on the token and returns it.</summary>
+    public async Task<string?> StartUaePassAsync(int tokenId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.LandlordAccessTokens.FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null) return null;
+        var state = GenerateRawToken();
+        token.UaePassState = state;
+        await db.SaveChangesAsync();
+        return state;
+    }
+
+    /// <summary>Resolves the token a UAE Pass callback belongs to, by the <c>state</c> we issued.</summary>
+    public async Task<LandlordAccessToken?> ResolveByUaePassStateAsync(string state)
+    {
+        if (string.IsNullOrWhiteSpace(state)) return null;
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.LandlordAccessTokens.Include(t => t.Landlord)
+            .FirstOrDefaultAsync(t => t.UaePassState == state);
+    }
+
+    /// <summary>Stores the verified UAE Pass profile on the token, marks it verified, clears the state and
+    /// issues a fresh self-service session. Returns the raw session token for the continuation URL.</summary>
+    public async Task<string?> StoreUaePassProfileAsync(int tokenId, UaePassProfile profile)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.LandlordAccessTokens.FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null) return null;
+
+        token.UaePassVerifiedAt = DateTime.UtcNow;
+        token.UaePassSub = profile.Sub;
+        token.UaePassFullName = profile.FullName;
+        token.UaePassEmail = profile.Email;
+        token.UaePassMobile = profile.Mobile;
+        token.UaePassEmiratesId = profile.EmiratesId;
+        token.UaePassState = null;
+
+        var sessionRaw = GenerateRawToken();
+        token.OtpVerifiedAt ??= DateTime.UtcNow;
+        token.SessionTokenHash = Hash(sessionRaw);
+        token.SessionExpiresAt = token.ExpiresAt;
+        await db.SaveChangesAsync();
+        return sessionRaw;
+    }
+
+    /// <summary>Validates a self-service session by the token's numeric id (used for the post-UAE-Pass
+    /// continuation URL, which carries the non-secret id + the secret session token — never the link token).</summary>
+    public async Task<LandlordAccessToken?> ValidateSessionByIdAsync(int tokenId, string rawSession)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.LandlordAccessTokens.Include(t => t.Landlord).FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null || token.ExpiresAt < DateTime.UtcNow) return null;
+        if (token.Landlord is null || !token.Landlord.LinkActive || !LinkUsableStatuses.Contains(token.Landlord.Status))
+            return null;
+        if (token.OtpVerifiedAt is null || token.SessionTokenHash is null
+            || token.SessionExpiresAt is null || token.SessionExpiresAt < DateTime.UtcNow)
+            return null;
+        return token.SessionTokenHash == Hash(rawSession) ? token : null;
+    }
+
     public async Task MarkUsedAsync(int tokenId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

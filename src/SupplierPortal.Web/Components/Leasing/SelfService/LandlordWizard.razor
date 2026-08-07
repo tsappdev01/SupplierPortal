@@ -1,4 +1,5 @@
 @page "/landlord/{Token}/update"
+@page "/landlord/continue/{TokenId:int}"
 @layout Layout.PublicLayout
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Globalization
@@ -13,6 +14,7 @@
 @inject LoadingService Loading
 @inject IDocumentOcrService Ocr
 @inject IWebHostEnvironment Env
+@inject NavigationManager Nav
 
 <PageTitle>Landlord Registration</PageTitle>
 
@@ -275,6 +277,8 @@
         width:100%;padding:10px 12px;font:inherit;font-size:14.5px;color:var(--ink);border:1px solid var(--line-strong);border-radius:var(--r);background:#fff}
     .di-llw .di-in:focus,.di-llw input:focus,.di-llw select:focus{outline:2px solid var(--taupe-lt);outline-offset:1px;border-color:var(--navy)}
     .di-llw .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .di-llw input[readonly]{background:#F2F4F7;color:#5C6670;cursor:not-allowed}
+    .di-llw .uaep-note{background:var(--ok-bg);border:1px solid #BFE3D4;color:var(--ok);border-radius:var(--r);padding:9px 12px;font-size:12.5px;margin-bottom:14px;font-weight:500}
 
     .di-llw .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .di-llw .choice{border:1px solid var(--line-strong);border-radius:var(--r);padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;background:#fff}
@@ -340,8 +344,11 @@
 </style>
 
 @code {
-    [Parameter] public string Token { get; set; } = "";
+    [Parameter] public string? Token { get; set; }
+    [Parameter] public int? TokenId { get; set; }
     [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private bool uaePassLocked;
 
     private static readonly string[] stepLabels = ["Primary Contact", "Secondary Contacts", "Documents", "Signatories", "Review"];
 
@@ -379,15 +386,27 @@
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrWhiteSpace(SessionToken))
-            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+            accessToken = TokenId is int tid
+                ? await AccessTokenService.ValidateSessionByIdAsync(tid, SessionToken)
+                : await AccessTokenService.ValidateSessionAsync(Token ?? "", SessionToken);
 
         if (accessToken is not null)
         {
+            // UAE Pass identity verification is mandatory before the form opens.
+            if (accessToken.UaePassVerifiedAt is null)
+            {
+                if (!string.IsNullOrWhiteSpace(Token))
+                    Nav.NavigateTo($"/landlord/{Token}/uaepass?s={SessionToken}");
+                loading = false;
+                return;
+            }
+
             landlord = await LandlordService.GetForSelfServiceAsync(accessToken.LandlordId);
             if (landlord is not null)
             {
                 correction = await LandlordService.GetOpenCorrectionAsync(landlord.Id);
                 SeedFromExisting();
+                ApplyUaePass();
                 documents = await DocumentService.GetDocumentsAsync(landlord.Id);
             }
         }
@@ -405,6 +424,19 @@
             .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile }));
     }
 
+    /// <summary>Overwrites the primary contact's name / email / mobile with the UAE Pass identity and locks
+    /// them in the UI. Emirates ID number is prefilled when UAE Pass exposes it, but stays editable.</summary>
+    private void ApplyUaePass()
+    {
+        if (accessToken?.UaePassVerifiedAt is null) return;
+        if (!string.IsNullOrWhiteSpace(accessToken.UaePassFullName)) primary.FullName = accessToken.UaePassFullName!;
+        if (!string.IsNullOrWhiteSpace(accessToken.UaePassEmail)) primary.Email = accessToken.UaePassEmail!;
+        if (!string.IsNullOrWhiteSpace(accessToken.UaePassMobile)) primary.Mobile = accessToken.UaePassMobile!;
+        if (!string.IsNullOrWhiteSpace(accessToken.UaePassEmiratesId) && string.IsNullOrWhiteSpace(primary.EmiratesId))
+            primary.EmiratesId = accessToken.UaePassEmiratesId;
+        uaePassLocked = true;
+    }
+
     private static void CopyInto(ContactInput t, LandlordContact c)
     {
         t.Id = c.Id; t.IsPrimary = c.IsPrimary; t.ContactType = c.ContactType; t.FullName = c.FullName;
@@ -414,16 +446,21 @@
 
     private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
     {
+        var locked = isPrimary && uaePassLocked;
+        @if (locked)
+        {
+            <div class="uaep-note">✔ Verified by UAE Pass — name, email and mobile are taken from your UAE Pass account and cannot be changed.</div>
+        }
         <div class="grid2">
-            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @MarkReq()</label><input type="text" placeholder="As on the Emirates ID" @bind="c.FullName" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @MarkReq()</label><input type="text" placeholder="As on the Emirates ID" readonly="@locked" @bind="c.FullName" /></div>
             <div class="field" style="margin-bottom:0"><label class="lbl">Designation</label><input type="text" @bind="c.Designation" /></div>
             <div class="field" style="margin-bottom:0">
-                <label class="lbl">Mobile number @MarkReq()</label><input type="text" placeholder="+971 5X XXX XXXX" @bind="c.Mobile" />
-                <div class="hint">UAE mobile, must match the UAE Pass account.</div>
+                <label class="lbl">Mobile number @MarkReq()</label><input type="text" placeholder="+971 5X XXX XXXX" readonly="@locked" @bind="c.Mobile" />
+                <div class="hint">@(locked ? "From your UAE Pass account." : "UAE mobile, must match the UAE Pass account.")</div>
             </div>
             <div class="field" style="margin-bottom:0">
-                <label class="lbl">Email address @MarkReq()</label><input type="text" placeholder="name@company.ae" @bind="c.Email" />
-                <div class="hint">Must match the UAE Pass account.</div>
+                <label class="lbl">Email address @MarkReq()</label><input type="text" placeholder="name@company.ae" readonly="@locked" @bind="c.Email" />
+                <div class="hint">@(locked ? "From your UAE Pass account." : "Must match the UAE Pass account.")</div>
             </div>
             <div class="field" style="margin-bottom:0"><label class="lbl">Contact type</label>
                 <select @bind="c.ContactType">@foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }</select>

@@ -129,6 +129,23 @@ status workflow + registration trace wired into the notification bell / activity
 - Landlord self-service is served from the intranet Web app for v1; moving it behind the DMZ portal + REST
   API (as done for suppliers) is the eventual hardening step. UAE Pass verification replaces OTP later.
 
+### Update — UAE Pass identity verification (after OTP)
+- Flow is now: `/landlord/{token}` (OTP) → `/landlord/{token}/uaepass` (UAE Pass step) → `/landlord/continue/{tokenId}?s=…`
+  (wizard). The UAE Pass step gates the form; the wizard bounces back to it if the session isn't UAE-Pass-verified.
+- `IUaePassService` / `UaePassService` run the OIDC authorization-code flow: `idshub/authorize` → `idshub/token`
+  → `idshub/userinfo`, mapping `fullnameEN`/`email`/`mobile`/`idn`. Config is `Leasing:UaePass` (`UaePassOptions`,
+  matches the UAE Pass integration pack: `BaseUrl`, `ClientId/Secret`, `Endpoints.*`). `sandbox_stage` creds are
+  in appsettings but **`Enabled:false`** → the app runs in **simulation mode** (profile derived locally) so the
+  journey is demonstrable before a client with our `redirect_uri` (`{portal}/landlord/uaepass/callback`) is
+  registered with UAE Pass. Flip `Enabled:true` once that redirect URI is whitelisted.
+- Real-mode round-trip: the anti-forgery `state` is stored on the access-token row (`UaePassState`); the callback
+  resolves the token by `state`, exchanges the code, stores the profile + issues a fresh session, and continues by
+  the token's numeric id (never the secret link token) via `ValidateSessionByIdAsync`.
+- The UAE Pass **name, email and mobile auto-populate the primary contact and are read-only** in the wizard;
+  `SaveAsync` re-forces them from the token server-side so the locked fields can't be tampered with. Emirates ID
+  number is prefilled from `idn` when present (still editable — the card upload/OCR remains the source of record).
+- The `trustedx-*` (e-signature) endpoints are carried in config for a future signatory e-sign feature; not used here.
+
 ### Update — Property view extra columns + Landlords row actions
 - The `dbo.Property` view gained `LeaseNo, LandLordCode, CompanyName, ContactName, EmailAddress` (source-
   system lease/owner data, read-only). Added to the `Premises` entity, the `LandRegisterService` projection

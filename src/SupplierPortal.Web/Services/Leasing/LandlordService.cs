@@ -267,6 +267,19 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
 
         var contacts = update.Contacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
 
+        // UAE Pass is authoritative: the primary contact's name / email / mobile are forced to the verified
+        // values regardless of anything posted, so the locked fields cannot be tampered with client-side.
+        if (accessTokenId is int atid)
+        {
+            var at = await db.LandlordAccessTokens.AsNoTracking().FirstOrDefaultAsync(t => t.Id == atid);
+            if (at?.UaePassVerifiedAt is not null && contacts.FirstOrDefault(c => c.IsPrimary) is { } p)
+            {
+                if (!string.IsNullOrWhiteSpace(at.UaePassFullName)) p.FullName = at.UaePassFullName!;
+                if (!string.IsNullOrWhiteSpace(at.UaePassEmail)) p.Email = at.UaePassEmail!;
+                if (!string.IsNullOrWhiteSpace(at.UaePassMobile)) p.Mobile = at.UaePassMobile!;
+            }
+        }
+
         // On submission, enforce valid email + UAE mobile (must match the UAE Pass account) server-side.
         if (submit)
         {
