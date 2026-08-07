@@ -1,0 +1,156 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserService UserService
+
+<PageTitle>Supplier Portal</PageTitle>
+
+@if (user is not null)
+{
+    <div class="di-home-profile">
+        @if (hasPhoto)
+        {
+            <img src="/users/@user.Id/photo" alt="" class="di-home-photo" />
+        }
+        else
+        {
+            <span class="di-home-photo di-home-initials">@GetInitials(user.FullName ?? user.Username)</span>
+        }
+        <div>
+            <div class="di-home-name">@(user.FullName ?? user.Username)</div>
+            @if (user.Designation is { } designation)
+            {
+                <div class="di-home-designation">@designation</div>
+            }
+        </div>
+    </div>
+
+    <h1>User Information</h1>
+    <table class="table di-home-table">
+        <tbody>
+            <tr>
+                <th>Username</th>
+                <td>@user.Username</td>
+            </tr>
+            <tr>
+                <th>Full Name</th>
+                <td>@(user.FullName ?? "-")</td>
+            </tr>
+            <tr>
+                <th>Email</th>
+                <td>@user.Email</td>
+            </tr>
+            <tr>
+                <th>Designation</th>
+                <td>@(user.Designation ?? "-")</td>
+            </tr>
+            <tr>
+                <th>Role</th>
+                <td>@(user.UserType == UserType.Administrator ? "Administrator" : "Normal User")</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Business Unit</h2>
+    @if (user.BusinessUnits.Count == 0)
+    {
+        <p class="text-muted">No Business Unit assigned.</p>
+    }
+    else
+    {
+        <table class="table di-home-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var businessUnit in user.BusinessUnits)
+                {
+                    <tr>
+                        <td>@businessUnit.Name</td>
+                        <td>@businessUnit.Code</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+<style>
+    .di-home-profile {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .di-home-photo {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .di-home-initials {
+        background: #1a2233;
+        color: #b5892f;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .di-home-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #1a2233;
+    }
+
+    .di-home-designation {
+        font-size: 0.9rem;
+        color: #7b8697;
+    }
+
+    .di-home-table {
+        max-width: 640px;
+        background: #fff;
+        border: 1px solid #e2e5ea;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .di-home-table th {
+        width: 200px;
+        color: #1a2233;
+        background: #f4f6f9;
+    }
+</style>
+
+@code {
+    private User? user;
+    private bool hasPhoto;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = state.User.GetUserId();
+        user = await UserService.GetByIdAsync(userId);
+        hasPhoto = state.User.HasPhoto();
+    }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2 ? name[..2].ToUpperInvariant() : name.ToUpperInvariant();
+    }
+}

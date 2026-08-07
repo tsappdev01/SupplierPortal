@@ -1,0 +1,10 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio user-specific files
+*.user
+.vs/
+
+# Local configuration (may hold real UAT credentials — see Program.cs)
+**/appsettings.Local.json

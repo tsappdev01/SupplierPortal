@@ -1,0 +1,117 @@
+using Microsoft.EntityFrameworkCore;
+using SupplierPortal.Web.Data;
+using SupplierPortal.Web.Models;
+
+namespace SupplierPortal.Web.Services;
+
+/// <summary>Sends supplier notification emails via SQL Server Database Mail (sp_send_dbmail),
+/// using the "CGS" Database Mail profile configured on the SQL Server instance.</summary>
+public class SupplierEmailService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
+    SupplierAccessTokenService accessTokenService, UserService userService)
+{
+    private const string MailProfileName = "BP";
+    private const string TemplateRelativePath = "doc/supplier_update_notification.html";
+    private const string SubmissionTemplateRelativePath = "doc/supplier_submission_notification.html";
+
+    /// <summary>Takes the supplier's id/name/email as primitives (rather than a full Supplier
+    /// entity) so callers - including bulk sends over the dashboard's lightweight list projection -
+    /// don't need to load the full ~20-navigation-property Supplier graph just to send a link.</summary>
+    public async Task<(bool Success, string? Error)> NotifySupplierAsync(
+        int supplierId, string supplierName, string? contactEmail, string actorUsername, string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(contactEmail))
+        {
+            return (false, "This supplier has no Contact Email on file.");
+        }
+
+        var templatePath = Path.Combine(env.WebRootPath, "doc", "supplier_update_notification.html");
+        if (!File.Exists(templatePath))
+        {
+            return (false, $"Email template not found at wwwroot/{TemplateRelativePath}.");
+        }
+
+        // The link is a secure, opaque, single-supplier-scoped token, not the raw authenticated
+        // edit URL - it carries no supplier id/number and is further protected by an emailed OTP
+        // once opened (see SupplierAccessTokenService).
+        var rawToken = await accessTokenService.CreateTokenAsync(supplierId, actorUsername);
+        var link = $"{baseUrl.TrimEnd('/')}/supplier/self-service/{rawToken}";
+
+        var body = await File.ReadAllTextAsync(templatePath);
+        body = body
+            .Replace("{Supplier Name}", supplierName)
+            .Replace("{Link}", link);
+
+        var subject = $"Supplier Information Update - {supplierName}";
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync($@"
+                EXEC msdb.dbo.sp_send_dbmail
+                    @profile_name = {MailProfileName},
+                    @recipients = {contactEmail},
+                    @subject = {subject},
+                    @body = {body},
+                    @body_format = 'HTML';");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Database Mail send failed: {ex.Message}");
+        }
+
+        await auditService.LogAsync(
+            actorUsername, AuditAction.Notify, "Supplier", supplierId,
+            $"Sent update notification email to {contactEmail}");
+
+        return (true, null);
+    }
+
+    /// <summary>Emails the internal user who originally sent the self-service link (<paramref name="requestedByUsername"/>,
+    /// from <see cref="Models.SupplierAccessToken.CreatedBy"/>) once the supplier submits their update, so the
+    /// requestor doesn't have to keep checking back. Best-effort: a missing user/email or a mail-send
+    /// failure is swallowed rather than surfaced to the supplier completing the public form.</summary>
+    public async Task NotifyRequestorOfSubmissionAsync(Supplier supplier, string requestedByUsername, string baseUrl)
+    {
+        var requestor = await userService.GetByUsernameAsync(requestedByUsername);
+        if (requestor is null || string.IsNullOrWhiteSpace(requestor.Email))
+        {
+            return;
+        }
+
+        var templatePath = Path.Combine(env.WebRootPath, "doc", "supplier_submission_notification.html");
+        if (!File.Exists(templatePath))
+        {
+            return;
+        }
+
+        var link = $"{baseUrl.TrimEnd('/')}/supplier/edit/{supplier.Id}";
+        var body = await File.ReadAllTextAsync(templatePath);
+        body = body
+            .Replace("{Supplier Name}", supplier.SupplierName)
+            .Replace("{Link}", link);
+
+        var subject = $"Supplier Update Submitted - {supplier.SupplierName}";
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync($@"
+                EXEC msdb.dbo.sp_send_dbmail
+                    @profile_name = {MailProfileName},
+                    @recipients = {requestor.Email},
+                    @subject = {subject},
+                    @body = {body},
+                    @body_format = 'HTML';");
+
+            await auditService.LogAsync(
+                "Supplier Self-Service", AuditAction.Notify, "Supplier", supplier.Id,
+                $"Notified {requestor.Email} that {supplier.SupplierName} submitted an update");
+        }
+        catch
+        {
+            // Best-effort: the supplier's submission has already been saved successfully by this
+            // point, so a failed courtesy email to the requestor must not surface as an error to them.
+        }
+    }
+}

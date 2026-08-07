@@ -1,0 +1,78 @@
+@page "/account/register"
+@using System.ComponentModel.DataAnnotations
+@using SupplierPortal.Web.Services
+@layout Layout.AccountLayout
+@inject AuthService AuthService
+
+<PageTitle>Register - Supplier Portal</PageTitle>
+
+<h1>Register</h1>
+
+@if (registered)
+{
+    <div class="alert alert-success">
+        Registration received. An administrator will link your account with a company before you can log in.
+    </div>
+    <p><a href="/account/login">Back to login</a></p>
+}
+else
+{
+    <EditForm Model="Input" method="post" OnValidSubmit="RegisterAsync" FormName="register">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <InputText id="email" class="form-control" @bind-Value="Input.Email" autocomplete="username" />
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <InputText id="password" type="password" class="form-control" @bind-Value="Input.Password" autocomplete="new-password" />
+        </div>
+        <div class="mb-3">
+            <label for="confirmPassword" class="form-label">Confirm Password</label>
+            <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="Input.ConfirmPassword" autocomplete="new-password" />
+        </div>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <button type="submit" class="btn btn-primary">Register</button>
+    </EditForm>
+
+    <p class="mt-3">Already have an account? <a href="/account/login">Log in</a></p>
+}
+
+@code {
+    [SupplyParameterFromForm]
+    private RegisterModel Input { get; set; } = new();
+
+    private string? errorMessage;
+    private bool registered;
+
+    private async Task RegisterAsync()
+    {
+        var (success, error) = await AuthService.RegisterAsync(Input.Email, Input.Password);
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        registered = true;
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required, MinLength(6)]
+        public string Password { get; set; } = "";
+
+        [Required, Compare(nameof(Password))]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

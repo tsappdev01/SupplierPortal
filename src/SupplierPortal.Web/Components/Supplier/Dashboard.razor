@@ -1,0 +1,433 @@
+@page "/supplier/dashboard"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierService SupplierService
+@inject BusinessUnitService BusinessUnitService
+@inject SupplierEmailService SupplierEmailService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Manage Supplier - Supplier Portal</PageTitle>
+
+<h1>Manage Supplier</h1>
+
+@if (notifyMessage is not null)
+{
+    <div class="alert @(notifySuccess ? "alert-success" : "alert-danger") no-print" role="alert">
+        @notifyMessage
+    </div>
+}
+
+<div class="di-stat-row no-print">
+    <div class="di-stat-tile">
+        <div class="di-stat-value">@suppliers.Count</div>
+        <div class="di-stat-label">Total Suppliers</div>
+    </div>
+    <div class="di-stat-tile">
+        <div class="di-stat-value">@suppliers.Count(s => s.IsActive)</div>
+        <div class="di-stat-label">Active</div>
+    </div>
+    <div class="di-stat-tile">
+        <div class="di-stat-value">@suppliers.Count(s => !s.IsActive)</div>
+        <div class="di-stat-label">Inactive</div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 mb-3 no-print">
+    <a class="btn btn-outline-secondary" href="@ExportUrl("csv")">Export to CSV</a>
+    <a class="btn btn-outline-secondary" href="@ExportUrl("pdf")">Export to PDF</a>
+    <button class="btn btn-outline-secondary" @onclick="PrintAsync">Print</button>
+    <a class="btn btn-primary ms-auto" href="/supplier/register">Register Supplier</a>
+    <a class="btn btn-primary" href="/supplier/upload">Upload Supplier Data</a>
+</div>
+
+<div class="row g-2 mb-3 no-print">
+    @if (businessUnits.Count > 1 || isAdministrator)
+    {
+        <div class="col-auto" style="min-width: 240px;">
+            <label class="form-label">Business Unit</label>
+            <select class="form-select" @bind="filterBusinessUnitId" @bind:after="ReloadAsync">
+                <option value="0">@(isAdministrator ? "All Business Units" : "All My Business Units")</option>
+                @foreach (var businessUnit in businessUnits)
+                {
+                    <option value="@businessUnit.Id">@businessUnit.Name</option>
+                }
+            </select>
+        </div>
+    }
+    <div class="col-auto" style="min-width: 240px;">
+        <label class="form-label">Supplier Name</label>
+        <input class="form-control" @bind="supplierNameFilter" @bind:event="oninput" @bind:after="ReloadAsync" placeholder="Search by name..." />
+    </div>
+</div>
+
+<ul class="nav nav-tabs no-print mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == SupplierTab.RecentlyUpdated ? "active" : "")" @onclick="() => SetTab(SupplierTab.RecentlyUpdated)">
+            Recently Updated (@suppliers.Count(IsRecentlyUpdated))
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == SupplierTab.UpdatedLastWeek ? "active" : "")" @onclick="() => SetTab(SupplierTab.UpdatedLastWeek)">
+            Updated Last Week (@suppliers.Count(IsUpdatedLastWeek))
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == SupplierTab.EverythingElse ? "active" : "")" @onclick="() => SetTab(SupplierTab.EverythingElse)">
+            Everything Else (@suppliers.Count(IsEverythingElse))
+        </button>
+    </li>
+</ul>
+
+@if (selectedIds.Count > 0)
+{
+    <div class="di-bulk-bar no-print">
+        <span>@selectedIds.Count selected</span>
+        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="BulkNotifyAsync">
+            @if (bulkSending)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <text> Sending...</text>
+            }
+            else
+            {
+                <text>Send Notification to Selected</text>
+            }
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="ClearSelection">Clear Selection</button>
+    </div>
+}
+
+<div style="overflow-x: auto;">
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
+            <th>Supplier Number</th>
+            <th>Supplier Name</th>
+            <th>Tax Organization Type</th>
+            <th>First Name</th>
+            <th>Supplier Type</th>
+            <th>Tax Registration Number</th>
+            <th>Trade License Number</th>
+            <th>Contact Email</th>
+            <th>Status</th>
+            <th class="no-print">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var supplier in PagedSuppliers)
+        {
+            <tr>
+                <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(supplier.Id)" @onchange="() => ToggleSelected(supplier.Id)" /></td>
+                <td>@supplier.SupplierNumber</td>
+                <td>
+                    @supplier.SupplierName
+                    @if (supplier.PendingSupplierChangeCount > 0)
+                    {
+                        <a href="/supplier/edit/@supplier.Id" class="di-bell" title="@($"{supplier.PendingSupplierChangeCount} change(s) submitted by the supplier awaiting review")">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2ZM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.375 3.632-.116.687-.257 1.382-.42 1.941-.169.588-.107 1.045.109 1.376.204.313.606.593 1.36.783C7.19 15.24 9.786 15.24 12.326 13.732c.754-.19 1.156-.47 1.36-.783.216-.331.278-.788.109-1.376a13.24 13.24 0 0 1-.42-1.94C13.134 8.196 13 6.628 13 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917Z" />
+                            </svg>
+                            @supplier.PendingSupplierChangeCount
+                        </a>
+                    }
+                </td>
+                <td>@supplier.TaxOrganizationTypeName</td>
+                <td>@supplier.FirstName</td>
+                <td>@supplier.SupplierTypeName</td>
+                <td>@supplier.TaxRegistrationNumber</td>
+                <td>@supplier.TradeLicenseNumber</td>
+                <td>@supplier.ContactEmail</td>
+                <td>
+                    @if (supplier.IsDraft)
+                    {
+                        <span class="badge bg-warning text-dark">Draft</span>
+                    }
+                    else
+                    {
+                        <span class="badge @(supplier.IsActive ? "bg-success" : "bg-secondary")">
+                            @(supplier.IsActive ? "Active" : "Inactive")
+                        </span>
+                    }
+                </td>
+                <td class="no-print">
+                    <a class="btn btn-sm btn-outline-primary" href="/supplier/edit/@supplier.Id">@(supplier.IsDraft ? "Continue" : "Edit")</a>
+                    @if (!supplier.IsDraft)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" title="Notify supplier via email"
+                                disabled="@(notifyingSupplierId == supplier.Id)" @onclick="() => NotifyAsync(supplier)">
+                            @if (notifyingSupplierId == supplier.Id)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            }
+                            else
+                            {
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z" />
+                                </svg>
+                            }
+                        </button>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@if (suppliers.Count == 0)
+{
+    <p><em>No supplier data yet. Use "Register Supplier" or "Upload Supplier Data" to add records.</em></p>
+}
+else if (TotalPages > 1)
+{
+    <div class="d-flex align-items-center gap-2 no-print">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == 1)" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+        <span>Page @currentPage of @TotalPages (@TabFilteredSuppliers.Count() suppliers)</span>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+    </div>
+}
+
+<style>
+    @@media print {
+        .no-print { display: none !important; }
+    }
+
+    .di-stat-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+        flex-wrap: wrap;
+    }
+
+    .di-stat-tile {
+        background: #fff;
+        border: 1px solid #e2e5ea;
+        border-radius: 10px;
+        padding: 1.1rem 1.4rem;
+        min-width: 160px;
+    }
+
+    .di-stat-value {
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: #1a2233;
+        line-height: 1.2;
+    }
+
+    .di-stat-label {
+        font-size: 0.8rem;
+        color: #7b8697;
+        margin-top: 0.15rem;
+    }
+
+    .di-bulk-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #eef1ff;
+        border: 1px solid #c7d0f7;
+        border-radius: 8px;
+        padding: 10px 16px;
+        margin-bottom: 12px;
+    }
+
+    .di-bell {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        margin-left: 6px;
+        color: #b5892f;
+        text-decoration: none;
+        font-size: 0.85em;
+        font-weight: 700;
+    }
+
+    .di-bell:hover {
+        color: #8a6a1f;
+    }
+</style>
+
+@code {
+    private enum SupplierTab { RecentlyUpdated, UpdatedLastWeek, EverythingElse }
+
+    private const int PageSize = 50;
+
+    private List<SupplierListItem> suppliers = [];
+    private List<BusinessUnit> businessUnits = [];
+    private bool isAdministrator;
+    private List<int> userBusinessUnitIds = [];
+    private int filterBusinessUnitId;
+    private string supplierNameFilter = "";
+    private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
+    private string currentUser = "unknown";
+    private int? notifyingSupplierId;
+    private string? notifyMessage;
+    private bool notifySuccess;
+    private int currentPage = 1;
+    private HashSet<int> selectedIds = [];
+    private bool bulkSending;
+
+    private IEnumerable<SupplierListItem> TabFilteredSuppliers => activeTab switch
+    {
+        SupplierTab.RecentlyUpdated => suppliers.Where(IsRecentlyUpdated),
+        SupplierTab.UpdatedLastWeek => suppliers.Where(IsUpdatedLastWeek),
+        _ => suppliers.Where(IsEverythingElse)
+    };
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFilteredSuppliers.Count() / (double)PageSize));
+
+    private List<SupplierListItem> PagedSuppliers =>
+        TabFilteredSuppliers.Skip((currentPage - 1) * PageSize).Take(PageSize).ToList();
+
+    private bool AllOnPageSelected => PagedSuppliers.Count > 0 && PagedSuppliers.All(s => selectedIds.Contains(s.Id));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdministrator = state.User.IsAdministrator();
+        userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        var allBusinessUnits = await BusinessUnitService.GetAllAsync();
+        businessUnits = isAdministrator
+            ? allBusinessUnits
+            : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
+
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        List<int>? businessUnitIds;
+        if (filterBusinessUnitId != 0)
+        {
+            businessUnitIds = [filterBusinessUnitId];
+        }
+        else
+        {
+            businessUnitIds = isAdministrator ? null : userBusinessUnitIds;
+        }
+
+        suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter);
+        currentPage = 1;
+        selectedIds.Clear();
+    }
+
+    private void SetTab(SupplierTab tab)
+    {
+        activeTab = tab;
+        currentPage = 1;
+    }
+
+    private void GoToPage(int newPage)
+    {
+        currentPage = Math.Clamp(newPage, 1, TotalPages);
+    }
+
+    private void ToggleSelected(int supplierId)
+    {
+        if (!selectedIds.Add(supplierId))
+        {
+            selectedIds.Remove(supplierId);
+        }
+    }
+
+    private void ToggleSelectAllOnPage()
+    {
+        if (AllOnPageSelected)
+        {
+            foreach (var supplier in PagedSuppliers)
+            {
+                selectedIds.Remove(supplier.Id);
+            }
+        }
+        else
+        {
+            foreach (var supplier in PagedSuppliers)
+            {
+                selectedIds.Add(supplier.Id);
+            }
+        }
+    }
+
+    private void ClearSelection() => selectedIds.Clear();
+
+    private async Task BulkNotifyAsync()
+    {
+        bulkSending = true;
+        notifyMessage = null;
+        StateHasChanged();
+
+        var targets = suppliers.Where(s => selectedIds.Contains(s.Id) && !s.IsDraft).ToList();
+        var sent = 0;
+        var failed = 0;
+        foreach (var supplier in targets)
+        {
+            var (success, _) = await SupplierEmailService.NotifySupplierAsync(
+                supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
+            if (success)
+            {
+                sent++;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        notifySuccess = failed == 0;
+        notifyMessage = failed == 0
+            ? $"Notification email sent to {sent} supplier(s)."
+            : $"Sent {sent} notification(s); {failed} failed (e.g. missing Contact Email).";
+
+        selectedIds.Clear();
+        bulkSending = false;
+    }
+
+    private async Task NotifyAsync(SupplierListItem supplier)
+    {
+        notifyingSupplierId = supplier.Id;
+        notifyMessage = null;
+        StateHasChanged();
+
+        var (success, error) = await SupplierEmailService.NotifySupplierAsync(
+            supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, NavigationManager.BaseUri);
+        notifySuccess = success;
+        notifyMessage = success
+            ? $"Notification email sent to {supplier.ContactEmail}."
+            : $"Could not send notification: {error}";
+
+        notifyingSupplierId = null;
+    }
+
+    private async Task PrintAsync()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+
+    private string ExportUrl(string format)
+    {
+        return filterBusinessUnitId != 0
+            ? $"/export/{format}?businessUnitId={filterBusinessUnitId}"
+            : $"/export/{format}";
+    }
+
+    private static DateTime EffectiveUpdated(SupplierListItem supplier) => supplier.UpdatedAt ?? supplier.CreatedAt;
+
+    private static bool IsRecentlyUpdated(SupplierListItem supplier) => EffectiveUpdated(supplier) >= DateTime.UtcNow.AddDays(-3);
+
+    private static bool IsUpdatedLastWeek(SupplierListItem supplier)
+    {
+        var updated = EffectiveUpdated(supplier);
+        return updated < DateTime.UtcNow.AddDays(-3) && updated >= DateTime.UtcNow.AddDays(-7);
+    }
+
+    private static bool IsEverythingElse(SupplierListItem supplier) => EffectiveUpdated(supplier) < DateTime.UtcNow.AddDays(-7);
+}

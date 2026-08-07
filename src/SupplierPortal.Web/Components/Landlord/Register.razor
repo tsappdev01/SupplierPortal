@@ -1,0 +1,878 @@
+@page "/landlord/register"
+@layout Layout.BlankLayout
+@rendermode InteractiveServer
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject LandlordRegistrationService RegistrationService
+
+<PageTitle>Landlord Registration — Dubai Investments Park</PageTitle>
+
+<HeadContent>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="landlord.css" />
+</HeadContent>
+
+<div class="dip">
+    <header class="appbar">
+        <img src="images/dip-logo.png" alt="Dubai Investments Park" />
+        <div class="divider"></div>
+        <div>
+            <h1>Landlord Registration</h1>
+            <div class="sub">UAE Pass &amp; Ejari</div>
+        </div>
+        <div class="right">Need help? 800 347</div>
+    </header>
+
+    <div class="ribbon">
+        <div class="steps" role="list">
+            @for (var i = 0; i < Steps.Length; i++)
+            {
+                <div class="step @StepClass(i)" role="listitem">
+                    <span class="n">@(i + 1)</span><span class="chev-label">@Steps[i]</span>
+                </div>
+            }
+        </div>
+        <div class="mstep">
+            <div class="row"><span>@MobileLabel()</span><span>@MobileCount()</span></div>
+            <div class="bar"><i style="width:@BarPct()%"></i></div>
+        </div>
+    </div>
+
+    <main class="wrap">
+        <div class="card">
+            @if (screen == "gate") { @GateScreen }
+            else if (screen == "primary") { @PrimaryScreen }
+            else if (screen == "secondary") { @SecondaryScreen }
+            else if (screen == "signatories") { @SignatoriesScreen }
+            else if (screen == "review") { @ReviewScreen }
+            else if (screen == "submit") { @SubmitScreen }
+            else if (screen == "done") { @DoneScreen }
+        </div>
+    </main>
+
+    @if (passOpen)
+    {
+        <div class="mask">
+            <div class="sheet" role="dialog" aria-modal="true" aria-label="UAE Pass">
+                <div class="top">
+                    <div class="brand">UAE PASS</div>
+                    <div class="tag">Simulated sign-in — prototype only</div>
+                </div>
+                <div class="bd">
+                    @if (passMismatch)
+                    {
+                        <div class="panel bad" style="margin-bottom:16px">
+                            <h3>Email doesn't match</h3>
+                            <p>
+                                Your UAE Pass account uses <b>@OtherPassEmail</b>, but the primary email on this form
+                                is <b>@email</b>. The primary email must be the UAE Pass email.
+                            </p>
+                            <div class="stack">
+                                <button class="btn" @onclick="() => ApprovePass(OtherPassEmail, adopt: true)">Use @OtherPassEmail as the primary email</button>
+                                <button class="btn ghost" @onclick="ClosePass">Go back and edit the form</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p>Dubai Investments Park is requesting your identity to sign a landlord registration.</p>
+                        <div class="who"><b>Requested</b><br />Full name, Emirates ID number, registered email and mobile</div>
+                        <div class="stack">
+                            <button class="btn taupe" @onclick="() => ApprovePass(email, adopt: false)">Approve as @email</button>
+                            <button class="btn ghost" @onclick="ClosePass">Cancel</button>
+                        </div>
+                        <div class="sim">
+                            <div class="k">Prototype controls</div>
+                            <button class="link" @onclick="() => passMismatch = true">Sign in with a different UAE Pass account</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ---- constants mirrored from the approved design ----
+    private static readonly string[] Steps = ["Primary contact", "Secondary contact", "Signatories", "Review", "Verify & submit"];
+    private static readonly string[] Plots = ["597", "598", "599", "601", "602", "608", "610", "611", "624", "630"];
+    private const int MaxSig = 10;
+    private const long MaxFileBytes = 5 * 1024 * 1024;
+    private const string OtherPassEmail = "a.almansoori@uaepass.ae";
+
+    // ---- wizard state ----
+    private string screen = "gate";
+    private bool human;
+
+    private string type = "";            // "corporate" | "individual"
+    private string plot = "";
+    private string unit = "";
+    private string name = "";
+    private string mobile = "";
+    private string email = "";
+
+    private bool hasSec;
+    private string sName = "";
+    private string sMobile = "";
+    private string sEmail = "";
+
+    private string sigRule = "all";       // "all" | "any"
+    private readonly List<SigVm> extraSigs = [];
+    private string? openSig;
+    private int sigSeq;
+
+    private bool agree;
+    private PassInfo? verified;
+    private string reference = "";
+
+    private bool passOpen;
+    private bool passMismatch;
+
+    private readonly Dictionary<string, FileVm> files = [];
+    private readonly Dictionary<string, string> errors = [];
+
+    private sealed class SigVm { public string Id = ""; public string Name = ""; public string Mobile = ""; public string Email = ""; }
+    private sealed class FileVm { public string Name = ""; public string ContentType = ""; public byte[] Bytes = []; }
+    private sealed record PassInfo(string Name, string Email, string At);
+    private sealed record SigRow(string Id, string? Source, string Name, string? Mobile, string? Email, bool Locked, string EidSlot, string PoaSlot);
+
+    // ---- inline SVG icons (verbatim from the design) ----
+    private static readonly MarkupString ChevR = new(@"<svg width=""14"" height=""14"" viewBox=""0 0 16 16"" fill=""none""><path d=""M6 3l5 5-5 5"" stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString ChevL = new(@"<svg width=""14"" height=""14"" viewBox=""0 0 16 16"" fill=""none""><path d=""M10 3L5 8l5 5"" stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString Tick = new(@"<svg class=""tick"" viewBox=""0 0 20 20"" fill=""none""><circle cx=""10"" cy=""10"" r=""9"" fill=""#1D6F53""/><path d=""M6 10.5l2.6 2.6L14 7.7"" stroke=""#fff"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString IcoUp = new(@"<svg width=""12"" height=""12"" viewBox=""0 0 16 16"" fill=""none""><path d=""M3 10l5-5 5 5"" stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString IcoDown = new(@"<svg width=""12"" height=""12"" viewBox=""0 0 16 16"" fill=""none""><path d=""M3 6l5 5 5-5"" stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString IcoPencil = new(@"<svg width=""13"" height=""13"" viewBox=""0 0 16 16"" fill=""none""><path d=""M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z"" stroke=""currentColor"" stroke-width=""1.5"" stroke-linejoin=""round""/></svg>");
+    private static readonly MarkupString IcoX = new(@"<svg width=""12"" height=""12"" viewBox=""0 0 16 16"" fill=""none""><path d=""M4 4l8 8M12 4l-8 8"" stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round""/></svg>");
+
+    // ================= reusable field render helpers =================
+    private RenderFragment UploadField(string label, string slot, bool required) => @<text>
+        @{ var has = files.TryGetValue(slot, out var f); }
+        <div class="field">
+            <label class="lbl">
+                @label
+                @if (required) { <span class="req">*</span> } else { <span class="opt">(optional)</span> }
+            </label>
+            <div class="up @(has ? "filled" : "")">
+                <span class="name @(has ? "" : "empty")">@(has ? f!.Name : "No file chosen")</span>
+                @if (has)
+                {
+                    <button class="link danger" @onclick="() => ClearFile(slot)">Remove</button>
+                }
+                else
+                {
+                    <label class="btn ghost" style="padding:7px 13px;font-size:13px">
+                        Choose file
+                        <InputFile OnChange="@(e => OnFilePicked(slot, e))" style="display:none" accept=".pdf,.jpg,.jpeg,.png" />
+                    </label>
+                }
+            </div>
+            <div class="hint">PDF, JPG or PNG · up to 5 MB</div>
+            @if (Err(slot) is { } m) { <div class="err on">@m</div> }
+        </div>
+    </text>;
+
+    private RenderFragment Row(string label, string? value, bool mono = false) => @<div class="r">
+        <dt>@label</dt>
+        <dd class="@(mono ? "mono" : "")">
+            @if (string.IsNullOrEmpty(value)) { <span class="muted">Not provided</span> } else { @value }
+        </dd>
+    </div>;
+
+    // ================= screens =================
+    private RenderFragment GateScreen => @<text>
+        <div class="card-hd">
+            <div class="eyebrow">Before you start</div>
+            <h2>Confirm you're a person</h2>
+            <p>This keeps automated submissions out of the landlord register.</p>
+        </div>
+        <div class="card-bd">
+            <div class="panel">
+                <label class="check"><input type="checkbox" @bind="human" /> <span>I'm not a robot</span></label>
+                <p style="margin-top:12px">In the live portal this is Google reCAPTCHA. Your session is checked again at submission.</p>
+            </div>
+            @if (Err("human") is { } m) { <div class="err on" style="margin-top:10px">@m</div> }
+        </div>
+        <div class="card-ft">
+            <div class="spacer"></div>
+            <button class="btn" @onclick='() => GoTo("primary")'>Continue @ChevR</button>
+        </div>
+    </text>;
+
+    private RenderFragment PrimaryScreen => @<text>
+        @{ var corp = type == "corporate"; }
+        <div class="card-hd">
+            <div class="eyebrow">Step 1 of 5</div>
+            <h2>Primary contact details</h2>
+            <p>This is the person DIP will deal with on the tenancy. Their email must match the UAE&nbsp;Pass account used to sign the submission.</p>
+        </div>
+        <div class="card-bd">
+            <div class="field">
+                <label class="lbl">Agreement type <span class="req">*</span></label>
+                <div class="choices">
+                    <label class="choice @(corp ? "sel" : "")">
+                        <input type="radio" name="type" checked="@corp" @onchange='() => SetType("corporate")' />
+                        <span><b>Corporate</b><span>Registered company holding the plot</span></span>
+                    </label>
+                    <label class="choice @(type == "individual" ? "sel" : "")">
+                        <input type="radio" name="type" checked="@(type == "individual")" @onchange='() => SetType("individual")' />
+                        <span><b>Individual</b><span>Person holding the plot in their own name</span></span>
+                    </label>
+                </div>
+                @if (Err("type") is { } mt) { <div class="err on">@mt</div> }
+            </div>
+
+            <div class="field">
+                <label class="lbl" for="plot">Property code <span class="req">*</span></label>
+                <div class="plot">
+                    <select id="plot" @bind="plot">
+                        <option value="">Plot</option>
+                        @foreach (var p in Plots) { <option value="@p">@p</option> }
+                    </select>
+                    <span class="dash">–</span>
+                    <input type="text" @bind="unit" @bind:event="oninput" placeholder="Unit no. e.g. 1000" inputmode="numeric" maxlength="6" />
+                </div>
+                <div class="code">
+                    <span class="k">Property code</span>
+                    <span class="v">@if (string.IsNullOrEmpty(plot)) { <em>___</em> } else { @plot }<em>-</em>@if (string.IsNullOrEmpty(unit)) { <em>____</em> } else { @unit }</span>
+                </div>
+                <div class="hint">Pick the plot from the DIP master list, then type the unit number. Together they form the property code held on your lease.</div>
+                @if (Err("plot") is { } mp) { <div class="err on">@mp</div> }
+            </div>
+
+            <div class="field">
+                <label class="lbl" for="name">@(corp ? "Company name" : "Full name") <span class="req">*</span></label>
+                <input type="text" id="name" @bind="name" placeholder="@(corp ? "As on the trade licence" : "As on the Emirates ID")" />
+                @if (Err("name") is { } mn) { <div class="err on">@mn</div> }
+            </div>
+
+            <div class="field">
+                <label class="lbl" for="mobile">Mobile number <span class="req">*</span></label>
+                <input type="text" id="mobile" @bind="mobile" placeholder="+971 5X XXX XXXX" />
+                <div class="hint">Must match the number registered to the UAE Pass account.</div>
+                @if (Err("mobile") is { } mm) { <div class="err on">@mm</div> }
+            </div>
+
+            <div class="field">
+                <label class="lbl" for="email">Email address <span class="req">*</span></label>
+                <input type="text" id="email" @bind="email" placeholder="name@@company.ae" />
+                <div class="hint">Verified against UAE Pass at the final step.</div>
+                @if (Err("email") is { } me) { <div class="err on">@me</div> }
+            </div>
+
+            @if (corp) { @UploadField("Power of attorney or MOA", "primary-poa", true) }
+            @UploadField("Emirates ID", "primary-eid", true)
+        </div>
+        <div class="card-ft">
+            <div class="spacer"></div>
+            <button class="btn" @onclick='() => GoTo("secondary")'>Continue @ChevR</button>
+        </div>
+    </text>;
+
+    private RenderFragment SecondaryScreen => @<text>
+        @if (!hasSec)
+        {
+            <div class="card-hd">
+                <div class="eyebrow">Step 2 of 5</div>
+                <h2>Secondary contact</h2>
+                <p>Optional. Add someone DIP can reach if the primary contact is unavailable.</p>
+            </div>
+            <div class="card-bd">
+                <div class="panel">
+                    <h3>No secondary contact added</h3>
+                    <p>You can skip this and add one later from your landlord dashboard.</p>
+                    <button class="btn ghost" @onclick="() => hasSec = true">Add a secondary contact</button>
+                </div>
+            </div>
+            <div class="card-ft">
+                <button class="btn ghost" @onclick='() => GoTo("primary")'>@ChevL Back</button>
+                <div class="spacer"></div>
+                <button class="btn" @onclick='() => GoTo("signatories")'>Skip and continue @ChevR</button>
+            </div>
+        }
+        else
+        {
+            <div class="card-hd">
+                <div class="eyebrow">Step 2 of 5</div>
+                <h2>Secondary contact</h2>
+                <p>Reached only when the primary contact doesn't respond within 5 working days.</p>
+            </div>
+            <div class="card-bd">
+                <div class="field">
+                    <label class="lbl" for="sName">Full name <span class="req">*</span></label>
+                    <input type="text" id="sName" @bind="sName" placeholder="As on the Emirates ID" />
+                    @if (Err("sName") is { } m1) { <div class="err on">@m1</div> }
+                </div>
+                <div class="field">
+                    <label class="lbl" for="sMobile">Mobile number <span class="req">*</span></label>
+                    <input type="text" id="sMobile" @bind="sMobile" placeholder="+971 5X XXX XXXX" />
+                    @if (Err("sMobile") is { } m2) { <div class="err on">@m2</div> }
+                </div>
+                <div class="field">
+                    <label class="lbl" for="sEmail">Email address <span class="req">*</span></label>
+                    <input type="text" id="sEmail" @bind="sEmail" placeholder="name@@company.ae" />
+                    @if (Err("sEmail") is { } m3) { <div class="err on">@m3</div> }
+                </div>
+                @UploadField("Emirates ID", "secondary-eid", true)
+                @if (type == "corporate") { @UploadField("Power of attorney or MOA", "secondary-poa", false) }
+                <button class="link danger" @onclick="() => hasSec = false" style="margin-top:4px">Remove secondary contact</button>
+            </div>
+            <div class="card-ft">
+                <button class="btn ghost" @onclick='() => GoTo("primary")'>@ChevL Back</button>
+                <div class="spacer"></div>
+                <button class="btn" @onclick='() => GoTo("signatories")'>Continue @ChevR</button>
+            </div>
+        }
+    </text>;
+
+    private RenderFragment SignatoriesScreen => @<text>
+        @{
+            var all = sigRule == "all";
+            var rows = BuildSigs();
+            var n = rows.Count;
+            var room = MaxSig - n;
+            var baseCount = LinkedCount();
+        }
+        <div class="card-hd">
+            <div class="eyebrow">Step 3 of 5</div>
+            <h2>Authorised signatories</h2>
+            <p>The people who can sign on behalf of this registration. The primary contact is always first, followed by the secondary contact if you added one.</p>
+        </div>
+        <div class="card-bd">
+            <div class="field">
+                <label class="lbl">Signing rule <span class="req">*</span></label>
+                <div class="choices">
+                    <label class="choice @(all ? "sel" : "")">
+                        <input type="radio" name="sigrule" checked="@all" @onchange='() => sigRule = "all"' />
+                        <span><b>All must sign</b><span>Every signatory signs, in the order below</span></span>
+                    </label>
+                    <label class="choice @(!all ? "sel" : "")">
+                        <input type="radio" name="sigrule" checked="@(!all)" @onchange='() => sigRule = "any"' />
+                        <span><b>Any one can sign</b><span>A single signature completes it</span></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="subhead">
+                @(all ? "Order of signing" : "Signatories")
+                <span class="count" style="float:right;text-transform:none;letter-spacing:0">@n of @MaxSig</span>
+            </div>
+
+            @for (var i = 0; i < rows.Count; i++)
+            {
+                var r = rows[i];
+                var seq = (i + 1).ToString("D2");
+                var summary = string.Join(" · ", new[] { r.Email, r.Mobile }.Where(x => !string.IsNullOrEmpty(x)));
+                if (string.IsNullOrEmpty(summary)) { summary = "Details not added yet"; }
+                var open = openSig == r.Id && !r.Locked;
+                var canMove = !r.Locked && all;
+                var extraIndex = i - baseCount;
+                var editLabel = open ? "Collapse" : "Edit";
+                <div class="sig @(open ? "open" : "") @(r.Locked ? "linked" : "")">
+                    <div class="sig-hd">
+                        <span class="seq">@seq</span>
+                        <div class="sig-id">
+                            <b>@(string.IsNullOrEmpty(r.Name) ? "New signatory" : r.Name)</b>
+                            <span>@summary</span>
+                        </div>
+                        @if (r.Locked) { <span class="tagx">@r.Source</span> }
+                        <div class="sig-act">
+                            @if (canMove)
+                            {
+                                <button class="ico" @onclick="() => MoveSig(r.Id, -1)" disabled="@(extraIndex <= 0)" aria-label="Move earlier">@IcoUp</button>
+                                <button class="ico" @onclick="() => MoveSig(r.Id, 1)" disabled="@(extraIndex >= extraSigs.Count - 1)" aria-label="Move later">@IcoDown</button>
+                            }
+                            @if (r.Locked)
+                            {
+                                <button class="ico" @onclick='() => GoTo(r.Id == "lp" ? "primary" : "secondary")' aria-label="Edit in earlier step">@IcoPencil</button>
+                            }
+                            else
+                            {
+                                <button class="ico" @onclick="() => ToggleSig(r.Id)" aria-label="@editLabel">@(open ? IcoX : IcoPencil)</button>
+                                <button class="ico" @onclick="() => DeleteSig(r.Id)" aria-label="Remove signatory">@IcoX</button>
+                            }
+                        </div>
+                    </div>
+                    @if (open)
+                    {
+                        var sv = extraSigs.First(x => x.Id == r.Id);
+                        <div class="sig-bd">
+                            <div class="field">
+                                <label class="lbl">Full name <span class="req">*</span></label>
+                                <input type="text" @bind="sv.Name" @bind:event="oninput" placeholder="As on the Emirates ID" />
+                                @if (Err($"sig-{r.Id}-name") is { } e1) { <div class="err on">@e1</div> }
+                            </div>
+                            <div class="field">
+                                <label class="lbl">Mobile number <span class="req">*</span></label>
+                                <input type="text" @bind="sv.Mobile" placeholder="+971 5X XXX XXXX" />
+                                @if (Err($"sig-{r.Id}-mobile") is { } e2) { <div class="err on">@e2</div> }
+                            </div>
+                            <div class="field">
+                                <label class="lbl">Email address <span class="req">*</span></label>
+                                <input type="text" @bind="sv.Email" placeholder="name@@company.ae" />
+                                @if (Err($"sig-{r.Id}-email") is { } e3) { <div class="err on">@e3</div> }
+                            </div>
+                            @UploadField("Emirates ID", r.EidSlot, false)
+                            @UploadField("Authorisation letter or board resolution", r.PoaSlot, false)
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="hint">
+                @(all
+                    ? "Each signatory receives a UAE Pass request only after the one above them has signed."
+                    : "Order is not applied — the first signature received completes the registration.")
+            </div>
+            <div class="addrow">
+                <button class="btn ghost" @onclick="AddSignatory" disabled="@(room <= 0)">Add signatory @ChevR</button>
+                <span class="count">@(room > 0 ? $"{room} remaining" : "Maximum of 10 reached")</span>
+            </div>
+        </div>
+        <div class="card-ft">
+            <button class="btn ghost" @onclick='() => GoTo("secondary")'>@ChevL Back</button>
+            <div class="spacer"></div>
+            <button class="btn" @onclick='() => GoTo("review")'>Continue @ChevR</button>
+        </div>
+    </text>;
+
+    private RenderFragment ReviewScreen => @<text>
+        @{
+            var corp = type == "corporate";
+            var propCode = (!string.IsNullOrEmpty(plot) && !string.IsNullOrEmpty(unit)) ? $"{plot}-{unit}" : "";
+            var rows = BuildSigs();
+        }
+        <div class="card-hd">
+            <div class="eyebrow">Step 4 of 5</div>
+            <h2>Check your details</h2>
+            <p>Once submitted, changes need a request to the DIP leasing team.</p>
+        </div>
+        <div class="card-bd">
+            <div class="rev">
+                <h3>Primary contact <button class="link" @onclick='() => GoTo("primary")'>Edit</button></h3>
+                <dl>
+                    @Row("Agreement type", corp ? "Corporate" : "Individual")
+                    @Row("Property code", propCode, true)
+                    @Row(corp ? "Company name" : "Full name", name)
+                    @Row("Mobile", mobile, true)
+                    @Row("Email", email)
+                    @if (corp) { @Row("Power of attorney / MOA", files.TryGetValue("primary-poa", out var pp) ? pp.Name : null) }
+                    @Row("Emirates ID", files.TryGetValue("primary-eid", out var pe) ? pe.Name : null)
+                </dl>
+            </div>
+            <div class="rev">
+                <h3>Secondary contact <button class="link" @onclick='() => GoTo("secondary")'>Edit</button></h3>
+                <dl>
+                    @if (hasSec)
+                    {
+                        @Row("Full name", sName)
+                        @Row("Mobile", sMobile, true)
+                        @Row("Email", sEmail)
+                        @Row("Emirates ID", files.TryGetValue("secondary-eid", out var se) ? se.Name : null)
+                        @if (corp) { @Row("Power of attorney / MOA", files.TryGetValue("secondary-poa", out var sp) ? sp.Name : null) }
+                    }
+                    else
+                    {
+                        <div class="r"><dd class="muted">None added — optional</dd></div>
+                    }
+                </dl>
+            </div>
+            <div class="rev">
+                <h3>Authorised signatories <button class="link" @onclick='() => GoTo("signatories")'>Edit</button></h3>
+                <dl>
+                    @Row("Signing rule", sigRule == "all" ? "All must sign, in order" : "Any one can sign")
+                    <div class="r">
+                        <dt>@(sigRule == "all" ? "Order of signing" : "Signatories")</dt>
+                        <dd>
+                            <ol class="olist">
+                                @for (var i = 0; i < rows.Count; i++)
+                                {
+                                    var r = rows[i];
+                                    <li>
+                                        <span class="n">@((i + 1).ToString("D2"))</span>
+                                        <span>
+                                            @(string.IsNullOrEmpty(r.Name) ? "Unnamed" : r.Name)<br />
+                                            <span class="muted" style="font-size:13px">@r.Email</span>
+                                        </span>
+                                    </li>
+                                }
+                            </ol>
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+        <div class="card-ft">
+            <button class="btn ghost" @onclick='() => GoTo("signatories")'>@ChevL Back</button>
+            <div class="spacer"></div>
+            <button class="btn" @onclick='() => GoTo("submit")'>Continue @ChevR</button>
+        </div>
+    </text>;
+
+    private RenderFragment SubmitScreen => @<text>
+        @{
+            var others = BuildSigs().Count - 1;
+            string chain;
+            if (sigRule == "all")
+            {
+                chain = others > 0
+                    ? $"You sign first. The remaining {others} signator{(others > 1 ? "ies" : "y")} then receive a UAE Pass request in the order you set, one after the other."
+                    : "You are the only signatory, so your signature completes the registration.";
+            }
+            else
+            {
+                chain = "Any one signature completes the registration, so no further requests are sent once you sign.";
+            }
+        }
+        <div class="card-hd">
+            <div class="eyebrow">Step 5 of 5</div>
+            <h2>Verify and submit</h2>
+            <p>Two things left: agree to the declaration, then sign the submission with UAE&nbsp;Pass.</p>
+        </div>
+        <div class="card-bd">
+            <div class="field">
+                <div class="panel">
+                    <label class="check">
+                        <input type="checkbox" @bind="agree" />
+                        <span>I am solely responsible for the accuracy and authenticity of the information and documents provided, and confirm they are complete, correct and current for official and legal use. DIP is not responsible for discrepancies arising from the information provided.</span>
+                    </label>
+                </div>
+                @if (Err("agree") is { } ma) { <div class="err on">@ma</div> }
+            </div>
+
+            @if (verified is not null)
+            {
+                <div class="panel ok">
+                    <div style="display:flex;gap:11px;align-items:flex-start">
+                        @Tick
+                        <div>
+                            <h3>Verified with UAE Pass</h3>
+                            <p style="margin:2px 0 0">@verified.Name · @verified.Email<br />Signed @verified.At</p>
+                        </div>
+                    </div>
+                    <p style="margin-top:12px"><button class="link" @onclick="ResetPass">Sign in as a different account</button></p>
+                </div>
+            }
+            else
+            {
+                <div class="panel">
+                    <h3>Verify with UAE Pass</h3>
+                    <p>You'll be taken to UAE Pass to sign in. We check that the account's email matches the primary email you entered — <b>@(string.IsNullOrEmpty(email) ? "—" : email)</b> — and return you here.</p>
+                    <button class="btn taupe" @onclick="StartPass">Verify with UAE Pass @ChevR</button>
+                </div>
+            }
+
+            <div class="hint" style="margin-top:10px">@chain</div>
+            @if (Err("pass") is { } mpass) { <div class="err on">@mpass</div> }
+        </div>
+        <div class="card-ft">
+            <button class="btn ghost" @onclick='() => GoTo("review")'>@ChevL Back</button>
+            <div class="spacer"></div>
+            <button class="btn" @onclick="SubmitAsync" disabled="@(!(agree && verified is not null))">Submit registration</button>
+        </div>
+    </text>;
+
+    private RenderFragment DoneScreen => @<text>
+        <div class="card-bd">
+            <div class="done-wrap">
+                @Tick
+                <h2 style="font-family:Archivo;color:var(--navy);margin:12px 0 4px;font-size:23px">Registration submitted</h2>
+                <p class="muted" style="margin:0">Signed with UAE Pass by @(verified?.Name)</p>
+                <div class="ref">@reference</div>
+                <p class="muted" style="margin:0;font-size:13px">Quote this reference in any follow-up</p>
+                <p style="margin:20px 0 0;font-size:14px">
+                    A confirmation has gone to <b>@email</b>@if (hasSec) { <text> and <b>@sEmail</b></text> }.
+                    DIP leasing reviews submissions within 3 working days.
+                </p>
+            </div>
+        </div>
+        <div class="card-ft">
+            <div class="spacer"></div>
+            <button class="btn ghost" @onclick="Restart">Start another registration</button>
+        </div>
+    </text>;
+
+    // ================= ribbon helpers =================
+    private int? CurrentIndex() => screen switch
+    {
+        "primary" => 0, "secondary" => 1, "signatories" => 2, "review" => 3, "submit" => 4, _ => null
+    };
+
+    private string StepClass(int i)
+    {
+        var cur = CurrentIndex();
+        if (cur is null) return "";
+        return i < cur ? "done" : i == cur ? "current" : "";
+    }
+
+    private string MobileLabel()
+    {
+        var cur = CurrentIndex();
+        return cur is null ? (screen == "done" ? "Submitted" : "Getting started") : Steps[cur.Value];
+    }
+
+    private string MobileCount()
+    {
+        var cur = CurrentIndex();
+        return cur is null ? "" : $"{cur.Value + 1} / 5";
+    }
+
+    private double BarPct()
+    {
+        var cur = CurrentIndex();
+        var c = cur ?? (screen == "done" ? 5 : 0);
+        return c / 5.0 * 100;
+    }
+
+    // ================= signatory model =================
+    private int LinkedCount() => 1 + (hasSec ? 1 : 0);
+
+    private List<SigRow> BuildSigs()
+    {
+        var list = new List<SigRow>
+        {
+            new("lp", "Primary contact", name, mobile, email, true, "primary-eid", "primary-poa")
+        };
+        if (hasSec)
+        {
+            list.Add(new SigRow("ls", "Secondary contact", sName, sMobile, sEmail, true, "secondary-eid", "secondary-poa"));
+        }
+        foreach (var e in extraSigs)
+        {
+            list.Add(new SigRow(e.Id, null, e.Name, e.Mobile, e.Email, false, $"sig-{e.Id}-eid", $"sig-{e.Id}-poa"));
+        }
+        return list.Take(MaxSig).ToList();
+    }
+
+    // ================= navigation =================
+    private void GoTo(string target)
+    {
+        var here = CurrentIndex();
+        var to = target switch { "primary" => 0, "secondary" => 1, "signatories" => 2, "review" => 3, "submit" => 4, _ => (int?)null };
+        var backward = here is not null && to is not null && to < here;
+        if (!backward && !Validate())
+        {
+            return;
+        }
+        screen = target;
+    }
+
+    // ================= validation =================
+    private void Fail(string key, string msg) => errors[key] = msg;
+
+    private bool Validate()
+    {
+        errors.Clear();
+
+        switch (screen)
+        {
+            case "gate":
+                if (!human) Fail("human", "Tick the box to continue.");
+                break;
+
+            case "primary":
+                if (string.IsNullOrEmpty(type)) Fail("type", "Choose an agreement type.");
+                if (string.IsNullOrEmpty(plot) || string.IsNullOrEmpty(unit))
+                    Fail("plot", "Pick a plot and enter a unit number — both make up the property code.");
+                else if (!Regex.IsMatch(unit, @"^\d{1,6}$"))
+                    Fail("plot", "The unit number should be digits only, e.g. 1000.");
+                if (string.IsNullOrWhiteSpace(name)) Fail("name", "Enter the name exactly as it appears on the document.");
+                if (!MobileOk(mobile)) Fail("mobile", "Use the UAE format, e.g. +971 52 989 3884.");
+                if (!EmailOk(email)) Fail("email", "Enter a valid email address.");
+                if (type == "corporate" && !files.ContainsKey("primary-poa")) Fail("primary-poa", "Attach the power of attorney or MOA.");
+                if (!files.ContainsKey("primary-eid")) Fail("primary-eid", "Attach the Emirates ID.");
+                break;
+
+            case "secondary":
+                if (hasSec)
+                {
+                    if (string.IsNullOrWhiteSpace(sName)) Fail("sName", "Enter the contact’s name.");
+                    if (!MobileOk(sMobile)) Fail("sMobile", "Use the UAE format, e.g. +971 52 989 3884.");
+                    if (!EmailOk(sEmail)) Fail("sEmail", "Enter a valid email address.");
+                    if (!files.ContainsKey("secondary-eid")) Fail("secondary-eid", "Attach the Emirates ID.");
+                }
+                break;
+
+            case "signatories":
+                var bad = extraSigs.FirstOrDefault(s => string.IsNullOrWhiteSpace(s.Name) || !MobileOk(s.Mobile) || !EmailOk(s.Email));
+                if (bad is not null)
+                {
+                    openSig = bad.Id;
+                    if (string.IsNullOrWhiteSpace(bad.Name)) Fail($"sig-{bad.Id}-name", "Enter the signatory’s full name.");
+                    if (!MobileOk(bad.Mobile)) Fail($"sig-{bad.Id}-mobile", "Use the UAE format, e.g. +971 52 989 3884.");
+                    if (!EmailOk(bad.Email)) Fail($"sig-{bad.Id}-email", "Enter a valid email address.");
+                }
+                break;
+        }
+
+        return errors.Count == 0;
+    }
+
+    private static bool EmailOk(string? v) =>
+        !string.IsNullOrWhiteSpace(v) && Regex.IsMatch(v.Trim(), @"^[^\s@]+@[^\s@]+\.[a-z]{2,}$", RegexOptions.IgnoreCase);
+
+    private static bool MobileOk(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) return false;
+        var d = Regex.Replace(v, @"[\s()\-]", "");
+        d = Regex.Replace(d, @"^00971", "+971");
+        d = Regex.Replace(d, @"^971", "+971");
+        d = Regex.Replace(d, @"^0(?=5)", "+971");
+        return Regex.IsMatch(d, @"^\+9715\d{8}$");
+    }
+
+    private string? Err(string key) => errors.TryGetValue(key, out var m) ? m : null;
+
+    // ================= file handling =================
+    private async Task OnFilePicked(string slot, InputFileChangeEventArgs e)
+    {
+        errors.Remove(slot);
+        var file = e.File;
+        if (file.Size > MaxFileBytes)
+        {
+            Fail(slot, "File exceeds the 5 MB size limit.");
+            return;
+        }
+
+        using var ms = new MemoryStream();
+        await using (var stream = file.OpenReadStream(MaxFileBytes))
+        {
+            await stream.CopyToAsync(ms);
+        }
+
+        files[slot] = new FileVm
+        {
+            Name = file.Name,
+            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            Bytes = ms.ToArray()
+        };
+    }
+
+    private void ClearFile(string slot) => files.Remove(slot);
+
+    // ================= signatory actions =================
+    private void SetType(string value) { type = value; }
+
+    private void AddSignatory()
+    {
+        if (BuildSigs().Count >= MaxSig) return;
+        var id = "x" + (++sigSeq);
+        extraSigs.Add(new SigVm { Id = id });
+        openSig = id;
+    }
+
+    private void ToggleSig(string id) => openSig = openSig == id ? null : id;
+
+    private void DeleteSig(string id)
+    {
+        extraSigs.RemoveAll(s => s.Id == id);
+        files.Remove($"sig-{id}-eid");
+        files.Remove($"sig-{id}-poa");
+        if (openSig == id) openSig = null;
+    }
+
+    private void MoveSig(string id, int direction)
+    {
+        var i = extraSigs.FindIndex(s => s.Id == id);
+        var j = i + direction;
+        if (i < 0 || j < 0 || j >= extraSigs.Count) return;
+        (extraSigs[i], extraSigs[j]) = (extraSigs[j], extraSigs[i]);
+    }
+
+    // ================= UAE Pass (simulated) =================
+    private void StartPass()
+    {
+        errors.Clear();
+        if (!EmailOk(email))
+        {
+            Fail("pass", "Add a valid primary email before verifying.");
+            return;
+        }
+        passMismatch = false;
+        passOpen = true;
+    }
+
+    private void ClosePass() { passOpen = false; passMismatch = false; }
+
+    private void ApprovePass(string withEmail, bool adopt)
+    {
+        if (adopt) email = withEmail;
+        verified = new PassInfo("Ahmed Al Mansoori", withEmail,
+            DateTime.Now.ToString("dd MMM yyyy, HH:mm", CultureInfo.InvariantCulture));
+        ClosePass();
+    }
+
+    private void ResetPass() => verified = null;
+
+    // ================= submit =================
+    private async Task SubmitAsync()
+    {
+        if (!agree || verified is null) return;
+
+        var rows = BuildSigs();
+        var registration = new LandlordRegistration
+        {
+            AgreementType = type == "corporate" ? AgreementType.Corporate : AgreementType.Individual,
+            Plot = plot,
+            Unit = unit,
+            PrimaryName = name,
+            PrimaryMobile = mobile,
+            PrimaryEmail = email,
+            HasSecondaryContact = hasSec,
+            SecondaryName = hasSec ? sName : null,
+            SecondaryMobile = hasSec ? sMobile : null,
+            SecondaryEmail = hasSec ? sEmail : null,
+            SigningRule = sigRule == "all" ? SigningRule.AllMustSign : SigningRule.AnyOneCanSign,
+            DeclarationAccepted = agree,
+            VerifiedName = verified.Name,
+            VerifiedEmail = verified.Email,
+            VerifiedAt = DateTime.UtcNow
+        };
+
+        var seq = 1;
+        var pending = new List<LandlordRegistrationService.PendingDocument>();
+        foreach (var r in rows)
+        {
+            var source = r.Source switch
+            {
+                "Primary contact" => SignatorySource.Primary,
+                "Secondary contact" => SignatorySource.Secondary,
+                _ => SignatorySource.Added
+            };
+            registration.Signatories.Add(new LandlordSignatory
+            {
+                Sequence = seq,
+                Source = source,
+                Name = r.Name,
+                Mobile = r.Mobile,
+                Email = r.Email
+            });
+
+            if (files.TryGetValue(r.EidSlot, out var eid))
+                pending.Add(new(($"signatory:{seq}:eid"), eid.Name, eid.ContentType, eid.Bytes));
+            if (files.TryGetValue(r.PoaSlot, out var poa))
+                pending.Add(new(($"signatory:{seq}:poa"), poa.Name, poa.ContentType, poa.Bytes));
+
+            seq++;
+        }
+
+        reference = await RegistrationService.CreateAsync(registration, pending);
+        screen = "done";
+    }
+
+    private void Restart()
+    {
+        screen = "gate";
+        human = false;
+        type = plot = unit = name = mobile = email = "";
+        hasSec = false; sName = sMobile = sEmail = "";
+        sigRule = "all"; extraSigs.Clear(); openSig = null; sigSeq = 0;
+        agree = false; verified = null; reference = "";
+        files.Clear(); errors.Clear();
+    }
+}

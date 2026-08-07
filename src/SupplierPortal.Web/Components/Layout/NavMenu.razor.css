@@ -1,0 +1,213 @@
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 3.5rem;
+    height: 2.5rem;
+    color: #fff;
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.08);
+}
+
+.navbar-toggler:checked {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.di-sidebar-brand {
+    min-height: 4rem;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+}
+
+.di-brand-logo {
+    height: 2.25rem;
+    width: auto;
+    border-radius: 4px;
+}
+
+.di-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 1rem 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 0.5rem;
+}
+
+.di-profile-photo {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.di-profile-initials {
+    background: #b5892f;
+    color: #10192a;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.di-profile-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.di-profile-name {
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.di-profile-designation {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.76rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nav-item {
+    font-size: 0.88rem;
+    padding-bottom: 0.25rem;
+}
+
+    .nav-item ::deep .nav-link {
+        color: rgba(255, 255, 255, 0.7);
+        background: none;
+        border: none;
+        border-radius: 6px;
+        height: 2.75rem;
+        display: flex;
+        align-items: center;
+        line-height: 2.75rem;
+        width: 100%;
+        padding-left: 0.75rem;
+    }
+
+.nav-item ::deep a.active {
+    background-color: #b5892f;
+    color: #10192a;
+    font-weight: 700;
+}
+
+.nav-item ::deep .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.nav-item ::deep a.active:hover {
+    background-color: #b5892f;
+    color: #10192a;
+}
+
+.di-group-toggle {
+    color: rgba(255, 255, 255, 0.7);
+    background: none;
+    border: none;
+    border-radius: 6px;
+    height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 0.75rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.di-group-toggle:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.di-chevron {
+    transition: transform 0.15s ease;
+}
+
+.di-chevron-open {
+    transform: rotate(180deg);
+}
+
+.di-sub-item ::deep .nav-link {
+    padding-left: 1.75rem;
+    font-size: 0.84rem;
+}
+
+.di-nav-divider {
+    margin: 0.75rem 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.di-nav-spacer {
+    flex: 1;
+}
+
+.di-nav-logout {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.di-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.di-logout-btn:hover {
+    background: #b5892f;
+    color: #10192a;
+}
+
+.nav-scrollable {
+    display: none;
+}
+
+.navbar-toggler:checked ~ .nav-scrollable {
+    display: block;
+}
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        /* Never collapse the sidebar for wide screens */
+        display: flex;
+        flex-direction: column;
+
+        /* Allow sidebar to scroll for tall menus */
+        height: calc(100vh - 3.5rem);
+        overflow-y: auto;
+    }
+
+    .nav-scrollable nav.flex-column {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+}

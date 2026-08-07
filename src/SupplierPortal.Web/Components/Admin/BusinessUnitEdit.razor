@@ -1,0 +1,132 @@
+@page "/admin/business-units/edit/{Id:int}"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Services
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Business Unit - Supplier Portal</PageTitle>
+
+<h1>Edit Business Unit</h1>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">Business unit not found.</div>
+}
+else if (Input is null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="edit-business-unit" style="max-width: 480px;">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="mb-3">
+            <label class="form-label">Business Unit Name</label>
+            <InputText class="form-control" @bind-Value="Input.Name" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Business Unit Code</label>
+            <InputText class="form-control" @bind-Value="Input.Code" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Logo</label>
+            <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
+            @if (logoPreview is not null)
+            {
+                <img src="@logoPreview" alt="Preview" class="mt-2" style="max-width: 120px; max-height: 80px; object-fit: contain;" />
+            }
+            else if (hasExistingLogo)
+            {
+                <img src="/business-units/@Id/logo" alt="Current logo" class="mt-2" style="max-width: 120px; max-height: 80px; object-fit: contain;" />
+            }
+        </div>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-secondary" href="/admin/business-units">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    private const long MaxLogoSize = 2 * 1024 * 1024;
+
+    [Parameter] public int Id { get; set; }
+
+    private string currentUser = "unknown";
+    private bool notFound;
+    private bool hasExistingLogo;
+    private string? errorMessage;
+    private string? logoPreview;
+    private byte[]? logoBytes;
+    private string? logoContentType;
+
+    private BusinessUnitModel? Input { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        var businessUnit = await BusinessUnitService.GetByIdAsync(Id);
+        if (businessUnit is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        hasExistingLogo = businessUnit.Logo is not null;
+        Input = new BusinessUnitModel
+        {
+            Name = businessUnit.Name,
+            Code = businessUnit.Code
+        };
+    }
+
+    private async Task OnLogoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxLogoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        logoBytes = memoryStream.ToArray();
+        logoContentType = file.ContentType;
+        logoPreview = $"data:{logoContentType};base64,{Convert.ToBase64String(logoBytes)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Input is null)
+        {
+            return;
+        }
+
+        var (success, error) = await BusinessUnitService.UpdateAsync(Id, Input.Name, Input.Code, logoBytes, logoContentType, currentUser);
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin/business-units");
+    }
+
+    private sealed class BusinessUnitModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Code { get; set; } = "";
+    }
+}

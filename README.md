@@ -24,8 +24,42 @@ src/SupplierPortal.Web/
     Account/                Login, Register, AccessDenied (static SSR pages)
     Admin/                  BusinessUnits, Users (Administrator only)
     Supplier/                Upload, Dashboard, Register, Edit, SupplierForm (shared 5-section UI)
-    Layout/                  MainLayout, NavMenu (sidebar, role-aware), AccountLayout
+    Landlord/                Register (public wizard), Registrations + RegistrationDetail (staff review)
+    Layout/                  MainLayout, NavMenu (sidebar, role-aware), AccountLayout, BlankLayout, PublicLayout
 ```
+
+## Landlord Registration (public wizard)
+
+**Landlord Registration** (`/landlord/register`) is a public, multi-step wizard
+for Dubai Investments Park (DIP) plot landlords, built to the approved
+`diplandlordregistration` mockup. It renders with its own DIP/UAE Pass branding
+via `BlankLayout` (no portal sidebar) and its scoped stylesheet
+`wwwroot/landlord.css`, so its generic class names never collide with the
+globally-loaded Bootstrap.
+
+Steps: **bot check → Primary contact → Secondary contact (optional) →
+Authorised signatories → Review → Verify & submit → confirmation**.
+
+- **Agreement type** (Corporate/Individual) toggles a Power of Attorney / MOA
+  upload and the name label (Company vs. Full name).
+- **Property code** is assembled from a plot picked off the DIP master list plus
+  a typed unit number (`{Plot}-{Unit}`), with a live preview.
+- **Signatories** carry a signing rule (*All must sign, in order* / *Any one can
+  sign*); the primary and secondary contacts are auto-linked as the first
+  (locked) signatories, and up to 10 total can be ordered.
+- **UAE Pass** verification is a simulated handshake (as labelled in the mockup —
+  no live UAE Pass integration), including the email-mismatch path; the resulting
+  identity is persisted with the submission.
+- **Uploads** (Emirates ID, POA/MOA, authorisation letters) are real files, held
+  in memory during the wizard then written under the content root at
+  `doc/landlord/{RegistrationId}/` — never wwwroot, so downloads only go through
+  the authenticated `/landlord/documents/{id}` endpoint.
+- On submit the whole aggregate (`LandlordRegistration` + `LandlordSignatory` +
+  `LandlordDocument`) is saved via `LandlordRegistrationService`, and a reference
+  `DIP-LR-{year}-{6-digit sequence}` is generated and shown.
+
+Staff review submissions at **Landlord Registrations** (`/landlord/registrations`,
+authenticated) with a per-record detail page at `/landlord/registrations/{id}`.
 
 ## Business Units
 

@@ -1,0 +1,58 @@
+@page "/landlord/registrations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject LandlordRegistrationService RegistrationService
+
+<PageTitle>Landlord Registrations - Supplier Portal</PageTitle>
+
+<h1>Landlord Registrations</h1>
+<p class="text-muted">Submissions received through the public landlord registration wizard.</p>
+
+<div style="overflow-x: auto;">
+    <table class="table table-striped table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Reference</th>
+                <th>Property</th>
+                <th>Type</th>
+                <th>Primary contact</th>
+                <th>Signing rule</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in registrations)
+            {
+                <tr>
+                    <td class="font-monospace">@r.ReferenceNumber</td>
+                    <td class="font-monospace">@r.PropertyCode</td>
+                    <td>@(r.AgreementType == AgreementType.Corporate ? "Corporate" : "Individual")</td>
+                    <td>@r.PrimaryName<br /><span class="text-muted small">@r.PrimaryEmail</span></td>
+                    <td>@(r.SigningRule == SigningRule.AllMustSign ? "All must sign" : "Any one")</td>
+                    <td><span class="badge bg-secondary">@r.Status</span></td>
+                    <td>@r.SubmittedAt.ToLocalTime().ToString("g")</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="/landlord/registrations/@r.Id">View</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (registrations.Count == 0)
+{
+    <p><em>No landlord registrations submitted yet.</em></p>
+}
+
+@code {
+    private List<LandlordRegistration> registrations = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        registrations = await RegistrationService.GetAllAsync();
+    }
+}

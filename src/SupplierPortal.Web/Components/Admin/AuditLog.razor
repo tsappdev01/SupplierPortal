@@ -1,0 +1,51 @@
+@page "/admin/audit-log"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Services
+@inject AuditService AuditService
+
+<PageTitle>Audit Log - Supplier Portal</PageTitle>
+
+<h1>Audit Log</h1>
+<p class="text-muted">Most recent @entries.Count system activity events.</p>
+
+<div style="overflow-x: auto;">
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Entity</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var entry in entries)
+        {
+            <tr>
+                <td>@entry.Timestamp.ToLocalTime().ToString("g")</td>
+                <td>@entry.ActorUsername</td>
+                <td>@entry.Action</td>
+                <td>@entry.EntityType@(entry.EntityId.HasValue ? $" #{entry.EntityId}" : "")</td>
+                <td>@entry.Details</td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@if (entries.Count == 0)
+{
+    <p><em>No activity recorded yet.</em></p>
+}
+
+@code {
+    private List<Models.AuditLog> entries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        entries = await AuditService.GetRecentAsync();
+    }
+}

@@ -1,0 +1,138 @@
+@page "/landlord/registrations/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject LandlordRegistrationService RegistrationService
+
+<PageTitle>Landlord Registration - Supplier Portal</PageTitle>
+
+@if (registration is null)
+{
+    <h1>Landlord Registration</h1>
+    <p><em>Registration not found.</em></p>
+    <a href="/landlord/registrations">Back to registrations</a>
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-2">
+        <h1 class="mb-0">@registration.ReferenceNumber</h1>
+        <span class="badge bg-secondary">@registration.Status</span>
+    </div>
+    <p class="text-muted">Submitted @registration.SubmittedAt.ToLocalTime().ToString("f")</p>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <h5>Primary contact</h5>
+            <dl class="row">
+                <dt class="col-sm-4">Agreement type</dt>
+                <dd class="col-sm-8">@(registration.AgreementType == AgreementType.Corporate ? "Corporate" : "Individual")</dd>
+                <dt class="col-sm-4">Property code</dt>
+                <dd class="col-sm-8 font-monospace">@registration.PropertyCode</dd>
+                <dt class="col-sm-4">@(registration.AgreementType == AgreementType.Corporate ? "Company name" : "Full name")</dt>
+                <dd class="col-sm-8">@registration.PrimaryName</dd>
+                <dt class="col-sm-4">Mobile</dt>
+                <dd class="col-sm-8 font-monospace">@registration.PrimaryMobile</dd>
+                <dt class="col-sm-4">Email</dt>
+                <dd class="col-sm-8">@registration.PrimaryEmail</dd>
+            </dl>
+        </div>
+        <div class="col-md-6">
+            <h5>Secondary contact</h5>
+            @if (registration.HasSecondaryContact)
+            {
+                <dl class="row">
+                    <dt class="col-sm-4">Full name</dt>
+                    <dd class="col-sm-8">@registration.SecondaryName</dd>
+                    <dt class="col-sm-4">Mobile</dt>
+                    <dd class="col-sm-8 font-monospace">@registration.SecondaryMobile</dd>
+                    <dt class="col-sm-4">Email</dt>
+                    <dd class="col-sm-8">@registration.SecondaryEmail</dd>
+                </dl>
+            }
+            else
+            {
+                <p class="text-muted">None added.</p>
+            }
+
+            <h5 class="mt-3">UAE Pass verification</h5>
+            @if (registration.VerifiedAt.HasValue)
+            {
+                <dl class="row">
+                    <dt class="col-sm-4">Signed by</dt>
+                    <dd class="col-sm-8">@registration.VerifiedName</dd>
+                    <dt class="col-sm-4">Account email</dt>
+                    <dd class="col-sm-8">@registration.VerifiedEmail</dd>
+                    <dt class="col-sm-4">Signed at</dt>
+                    <dd class="col-sm-8">@registration.VerifiedAt.Value.ToLocalTime().ToString("f")</dd>
+                </dl>
+            }
+            else
+            {
+                <p class="text-muted">Not verified.</p>
+            }
+        </div>
+    </div>
+
+    <h5 class="mt-2">Authorised signatories</h5>
+    <p class="text-muted small">
+        Signing rule: @(registration.SigningRule == SigningRule.AllMustSign ? "All must sign, in order" : "Any one can sign")
+    </p>
+    <table class="table table-sm align-middle" style="max-width: 720px;">
+        <thead>
+            <tr><th>#</th><th>Name</th><th>Source</th><th>Mobile</th><th>Email</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var s in registration.Signatories.OrderBy(x => x.Sequence))
+            {
+                <tr>
+                    <td class="font-monospace">@s.Sequence.ToString("D2")</td>
+                    <td>@s.Name</td>
+                    <td>@s.Source</td>
+                    <td class="font-monospace">@s.Mobile</td>
+                    <td>@s.Email</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h5 class="mt-2">Documents</h5>
+    @if (registration.Documents.Count == 0)
+    {
+        <p class="text-muted">No documents uploaded.</p>
+    }
+    else
+    {
+        <ul class="list-unstyled">
+            @foreach (var d in registration.Documents.OrderBy(x => x.Slot))
+            {
+                <li class="mb-1">
+                    <span class="text-muted small font-monospace me-2">@d.Slot</span>
+                    <a href="/landlord/documents/@d.Id" target="_blank">@d.FileName</a>
+                    <span class="text-muted small">(@FormatSize(d.FileSizeBytes))</span>
+                </li>
+            }
+        </ul>
+    }
+
+    <a class="btn btn-outline-secondary btn-sm mt-2" href="/landlord/registrations">Back to registrations</a>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private LandlordRegistration? registration;
+
+    protected override async Task OnInitializedAsync()
+    {
+        registration = await RegistrationService.GetByIdAsync(Id);
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):0.0} MB";
+        if (bytes >= 1024) return $"{bytes / 1024.0:0.0} KB";
+        return $"{bytes} B";
+    }
+}
