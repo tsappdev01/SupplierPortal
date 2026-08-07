@@ -46,7 +46,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var l in items)
+            @foreach (var l in PageItems)
             {
                 <tr style="cursor:pointer;" @onclick="() => Open(l.Id)">
                     <td>@l.DisplayName</td>
@@ -73,6 +73,22 @@ else
             }
         </tbody>
     </table>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Showing @(items.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, items.Count) of @items.Count</span>
+        @if (TotalPages > 1)
+        {
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(page == 1 ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page - 1)">Prev</button></li>
+                    @foreach (var pg in PageWindow)
+                    {
+                        <li class="page-item @(pg == page ? "active" : "")"><button class="page-link" @onclick="() => GoTo(pg)">@pg</button></li>
+                    }
+                    <li class="page-item @(page == TotalPages ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page + 1)">Next</button></li>
+                </ul>
+            </nav>
+        }
+    </div>
 }
 
 @code {
@@ -80,6 +96,22 @@ else
     private LandlordStatus? statusFilter;
     private string currentUser = "unknown";
     private int? sending;
+
+    private const int PageSize = 50;
+    private int page = 1;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(items.Count / (double)PageSize));
+    private IEnumerable<LandlordListItem> PageItems => items.Skip((page - 1) * PageSize).Take(PageSize);
+    private IEnumerable<int> PageWindow
+    {
+        get
+        {
+            var start = Math.Max(1, page - 2);
+            var end = Math.Min(TotalPages, start + 4);
+            start = Math.Max(1, end - 4);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+    private void GoTo(int p) { if (p >= 1 && p <= TotalPages) page = p; }
     private static readonly LandlordStatus[] statuses =
         [LandlordStatus.Draft, LandlordStatus.InvitationSent, LandlordStatus.InProgress, LandlordStatus.Submitted,
          LandlordStatus.UnderReview, LandlordStatus.CorrectionRequired, LandlordStatus.Rejected, LandlordStatus.RegistrationComplete];
@@ -91,7 +123,11 @@ else
         await LoadAsync();
     }
 
-    private async Task LoadAsync() => items = await LandlordService.GetAllAsync(status: statusFilter);
+    private async Task LoadAsync()
+    {
+        items = await LandlordService.GetAllAsync(status: statusFilter);
+        page = 1;
+    }
 
     private async Task EmailAsync(int id)
     {
