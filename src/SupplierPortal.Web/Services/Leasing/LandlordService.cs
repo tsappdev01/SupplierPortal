@@ -39,17 +39,37 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     public async Task<List<LandlordListItem>> GetAllAsync(int? businessUnitId = null, LandlordStatus[]? statuses = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var query = db.Landlords.AsNoTracking().AsQueryable();
-        if (businessUnitId is int bu) query = query.Where(l => l.BusinessUnitId == bu);
-        if (statuses is { Length: > 0 }) query = query.Where(l => statuses.Contains(l.Status));
+        var q = db.Landlords.AsNoTracking().AsQueryable();
+        if (businessUnitId is int bu) q = q.Where(l => l.BusinessUnitId == bu);
 
-        return await query
-            .OrderByDescending(l => l.UpdatedAt ?? l.CreatedAt)
-            .Select(l => new LandlordListItem(
-                l.Id, l.CompanyName ?? l.PropertyCode, l.PropertyCode, l.Type, l.Status, l.BusinessUnitId,
-                l.Email, l.Reference, l.Premises.Count, l.LinkActive, l.UpdatedAt ?? l.CreatedAt))
+        var all = await q.Select(l => new RegRow(
+                l.Id, l.CompanyName, l.PropertyCode, l.Type, l.Status, l.BusinessUnitId,
+                l.Email, l.Reference, l.LinkActive, l.UpdatedAt ?? l.CreatedAt))
             .ToListAsync();
+
+        // One row per property = the latest registration; earlier registrations become versioned history.
+        var items = new List<LandlordListItem>();
+        foreach (var g in all.GroupBy(r => r.PropertyCode))
+        {
+            var chain = g.OrderBy(r => r.Id).ToList();          // oldest → newest
+            var current = chain[^1];
+            var older = chain.Take(chain.Count - 1)
+                .Select((r, i) => new LandlordVersionInfo(r.Id, r.Status, r.Reference, r.UpdatedAt, i + 1))
+                .OrderByDescending(v => v.Version)
+                .ToList();
+            items.Add(new LandlordListItem(
+                current.Id, current.CompanyName ?? current.PropertyCode, current.PropertyCode, current.Type,
+                current.Status, current.BusinessUnitId, current.Email, current.Reference, current.LinkActive,
+                current.UpdatedAt, chain.Count, older));
+        }
+
+        IEnumerable<LandlordListItem> result = items;
+        if (statuses is { Length: > 0 }) result = result.Where(i => statuses.Contains(i.Status));
+        return result.OrderByDescending(i => i.UpdatedAt).ToList();
     }
+
+    private record RegRow(int Id, string? CompanyName, string PropertyCode, LandlordType Type, LandlordStatus Status,
+        int BusinessUnitId, string Email, string? Reference, bool LinkActive, DateTime UpdatedAt);
 
     public async Task<Landlord?> GetByIdAsync(int id)
     {
@@ -71,8 +91,12 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         await using var db = await dbFactory.CreateDbContextAsync();
         var q = db.Landlords.AsNoTracking().AsQueryable();
         if (businessUnitId is int bu) q = q.Where(l => l.BusinessUnitId == bu);
-        return await q.GroupBy(l => l.Status).Select(g => new { g.Key, C = g.Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.C);
+        // Count the latest registration per property so the cards match the (deduplicated) list.
+        var all = await q.Select(l => new { l.Id, l.PropertyCode, l.Status }).ToListAsync();
+        return all.GroupBy(x => x.PropertyCode)
+            .Select(g => g.OrderByDescending(x => x.Id).First().Status)
+            .GroupBy(s => s)
+            .ToDictionary(g => g.Key, g => g.Count());
     }
 
     /// <summary>Business-Centre edit of the landlord-provided details (contacts, signatories) without a
@@ -485,7 +509,10 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
 
 public record LandlordListItem(
     int Id, string DisplayName, string PropertyCode, LandlordType Type, LandlordStatus Status, int BusinessUnitId,
-    string Email, string? Reference, int PremisesCount, bool LinkActive, DateTime UpdatedAt);
+    string Email, string? Reference, bool LinkActive, DateTime UpdatedAt, int VersionCount, List<LandlordVersionInfo> Older);
+
+/// <summary>A prior registration for the same property, retained as history.</summary>
+public record LandlordVersionInfo(int Id, LandlordStatus Status, string? Reference, DateTime UpdatedAt, int Version);
 
 /// <summary>The landlord-provided data captured in the self-service form.</summary>
 public class LandlordSelfUpdate
