@@ -10,208 +10,234 @@
 @inject LandlordDocumentService DocumentService
 @inject ToastService ToastService
 
-<PageTitle>Landlord Registration - Landlord Portal</PageTitle>
+<PageTitle>Landlord Registration</PageTitle>
 
-<div class="di-ll-wrap">
+<div class="di-llw">
     @if (loading)
     {
-        <p><em>Loading…</em></p>
+        <div class="di-llw-shell"><div class="card"><div class="card-bd"><p><em>Loading…</em></p></div></div></div>
     }
     else if (landlord is null)
     {
-        <div class="di-ll-card">
-            <h1>Session Expired</h1>
-            <p class="text-muted">Your verification session is no longer valid. Please use the link from your email again to restart.</p>
-        </div>
+        <div class="di-llw-shell"><div class="card"><div class="card-bd">
+            <h2 class="di-h">Session expired</h2>
+            <p class="muted">Your verification session is no longer valid. Please use the link from your email again to restart.</p>
+        </div></div></div>
     }
     else if (submitted)
     {
-        <div class="di-ll-card text-center">
-            <h1>Registration Submitted</h1>
-            <p class="text-muted">Your registration has been submitted to Business Centre for review.</p>
-            <p class="fs-5">Reference <strong>@reference</strong></p>
-        </div>
+        <div class="di-llw-shell"><div class="card"><div class="card-bd done-wrap">
+            <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="#1D6F53" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
+            <h2 class="di-h mt-2">Registration submitted</h2>
+            <p class="muted">Your registration has been submitted to Business Centre for review.</p>
+            <div class="ref">@reference</div>
+        </div></div></div>
     }
     else
     {
-        <div class="di-ll-card">
-            <div class="di-ll-head">
-                <h1 class="h4 mb-1">Landlord Registration</h1>
-                <div class="text-muted">@(landlord.CompanyName ?? landlord.PropertyCode) · @landlord.Type</div>
-            </div>
-
-            @if (correction is not null)
-            {
-                <div class="alert alert-warning">
-                    <div class="fw-semibold">Correction requested by Business Centre</div>
-                    <div>@correction.Comment</div>
-                </div>
-            }
-
-            <ol class="di-steps">
+        @* -------- chevron step ribbon -------- *@
+        <div class="ribbon">
+            <div class="steps">
                 @foreach (var (label, i) in stepLabels.Select((l, i) => (l, i)))
                 {
-                    <li class="@(i == step ? "active" : i < step ? "done" : "")">@label</li>
+                    <div class="step @(i == step ? "cur" : i < step ? "done" : "")">
+                        <span class="n">@(i + 1)</span><span class="chev-label">@label</span>
+                    </div>
                 }
-            </ol>
+            </div>
+            <div class="mstep">Step @(step + 1) of @stepLabels.Length · @stepLabels[step]</div>
+        </div>
 
-            @if (error is not null)
-            {
-                <div class="alert alert-danger">@error</div>
-            }
-
-            @* ---------- Step 0: Property Information (prefilled, read-only) ---------- *@
-            @if (step == 0)
-            {
-                <p class="text-muted">This information is maintained by Business Centre and cannot be changed here.</p>
-                <dl class="row">
-                    <dt class="col-sm-4">Property Code 🔒</dt><dd class="col-sm-8">@landlord.PropertyCode</dd>
-                    <dt class="col-sm-4">Company Name 🔒</dt><dd class="col-sm-8">@(landlord.CompanyName ?? "—")</dd>
-                    <dt class="col-sm-4">Building 🔒</dt><dd class="col-sm-8">@(landlord.Building ?? "—")</dd>
-                    <dt class="col-sm-4">Email 🔒</dt><dd class="col-sm-8">@landlord.Email</dd>
-                    <dt class="col-sm-4">Landlord Type 🔒</dt><dd class="col-sm-8">@landlord.Type</dd>
-                </dl>
-            }
-
-            @* ---------- Step 1: Primary Contact ---------- *@
-            else if (step == 1)
-            {
-                <h2 class="h6">Primary Contact</h2>
-                @ContactEditor(primary, isPrimary: true)
-            }
-
-            @* ---------- Step 2: Secondary Contacts ---------- *@
-            else if (step == 2)
-            {
-                <h2 class="h6">Secondary Contacts</h2>
-                @if (secondaries.Count == 0)
-                {
-                    <p class="text-muted">No secondary contacts added.</p>
-                }
-                @for (var i = 0; i < secondaries.Count; i++)
-                {
-                    var idx = i;
-                    <div class="border rounded p-3 mb-3">
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-semibold">Secondary Contact @(idx + 1)</span>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSecondary(idx)">Delete</button>
+        <div class="di-llw-shell">
+            <div class="card">
+                <div class="card-hd">
+                    <div class="eyebrow">Step @(step + 1) of @stepLabels.Length</div>
+                    <h2>@StepHeading</h2>
+                    <p>@StepSubtitle</p>
+                </div>
+                <div class="card-bd">
+                    @if (correction is not null)
+                    {
+                        <div class="panel bad mb-3">
+                            <h3>Correction requested by Business Centre</h3>
+                            <p>@correction.Comment</p>
                         </div>
-                        @ContactEditor(secondaries[idx], isPrimary: false)
-                    </div>
-                }
-                <button class="btn btn-sm btn-outline-primary" @onclick="AddSecondary">+ Add Secondary Contact</button>
-            }
+                    }
+                    @if (error is not null)
+                    {
+                        <div class="panel bad mb-3"><p style="color:var(--danger);margin:0">@error</p></div>
+                    }
 
-            @* ---------- Step 3: Documents ---------- *@
-            else if (step == 3)
-            {
-                <p class="text-muted">
-                    @if (landlord.Type == LandlordType.Individual)
+                    @* ===== Step 0: Primary Contact ===== *@
+                    @if (step == 0)
                     {
-                        <span><strong>Emirates ID</strong> is mandatory for an individual landlord.</span>
-                    }
-                    else
-                    {
-                        <span>Provide at least one of <strong>POA</strong> or <strong>MOA</strong>.</span>
-                    }
-                </p>
-                <div class="row g-2 mb-3">
-                    <div class="col-sm-6">
-                        <label class="form-label">Document Type</label>
-                        <select class="form-select" @bind="uploadType">
-                            @foreach (var dt in DocTypes)
-                            {
-                                <option value="@dt">@DocLabel(dt)</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="form-label">File (PDF or image, max 10 MB)</label>
-                        <InputFile OnChange="OnUploadAsync" class="form-control" accept=".pdf,image/*" />
-                    </div>
-                </div>
-                @if (uploading) { <div class="form-text mb-2">Uploading…</div> }
-                @if (documents.Count > 0)
-                {
-                    <ul class="list-group">
-                        @foreach (var d in documents)
+                        <div class="field">
+                            <label class="lbl">Agreement type <span class="req">*</span></label>
+                            <div class="choices">
+                                <label class="choice @(landlord.Type == LandlordType.Company ? "sel" : "")">
+                                    <input type="radio" checked="@(landlord.Type == LandlordType.Company)" disabled />
+                                    <span><b>Company</b><span>Registered company holding the plot</span></span>
+                                </label>
+                                <label class="choice @(landlord.Type == LandlordType.Individual ? "sel" : "")">
+                                    <input type="radio" checked="@(landlord.Type == LandlordType.Individual)" disabled />
+                                    <span><b>Individual</b><span>Person holding the plot in their own name</span></span>
+                                </label>
+                            </div>
+                            <div class="hint">Set by Business Centre for this property — read-only.</div>
+                        </div>
+
+                        <div class="field">
+                            <label class="lbl">Property code <span class="req">*</span></label>
+                            <div class="code">
+                                <span class="k">Property code</span>
+                                <span class="v">@FormatCode(landlord.PropertyCode)</span>
+                            </div>
+                            <div class="hint">@(landlord.CompanyName ?? "—") @(string.IsNullOrWhiteSpace(landlord.Building) ? "" : "· " + landlord.Building) · issued by Dubai Municipality (read-only).</div>
+                        </div>
+
+                        @ContactFields(primary, isPrimary: true)
+
+                        @if (landlord.Type == LandlordType.Individual)
                         {
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span>@DocLabel(d.DocumentType) — @d.FileName</span>
-                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteDocAsync(d.Id)">Remove</button>
-                            </li>
+                            @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
                         }
-                    </ul>
-                }
-            }
+                    }
 
-            @* ---------- Step 4: Signatories ---------- *@
-            else if (step == 4)
-            {
-                <div class="mb-3">
-                    <label class="form-label">Signing Rule</label>
-                    <select class="form-select" @bind="signingRule">
-                        <option value="@SigningRule.All">All signatories must sign</option>
-                        <option value="@SigningRule.Any">Any one signatory may sign</option>
-                    </select>
-                </div>
-                <p class="text-muted small">Signatory details are optional for an individual landlord.</p>
-                <table class="table table-sm align-middle">
-                    <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th></th></tr></thead>
-                    <tbody>
+                    @* ===== Step 1: Secondary Contacts ===== *@
+                    else if (step == 1)
+                    {
+                        @if (secondaries.Count == 0)
+                        {
+                            <p class="muted">No secondary contacts added. These are optional.</p>
+                        }
+                        @for (var i = 0; i < secondaries.Count; i++)
+                        {
+                            var idx = i;
+                            <div class="rev">
+                                <h3>Secondary contact @(idx + 1)<button class="link danger" @onclick="() => RemoveSecondary(idx)">Remove</button></h3>
+                                <div style="padding:14px 16px">@ContactFields(secondaries[idx], isPrimary: false)</div>
+                            </div>
+                        }
+                        <div class="addrow"><button class="btn ghost" @onclick="AddSecondary">+ Add secondary contact</button></div>
+                    }
+
+                    @* ===== Step 2: Documents ===== *@
+                    else if (step == 2)
+                    {
+                        <p class="muted mb-3">
+                            @(landlord.Type == LandlordType.Individual
+                                ? "Emirates ID is mandatory for an individual landlord."
+                                : "Provide at least one of Power of Attorney (POA) or Memorandum of Association (MOA).")
+                        </p>
+                        @foreach (var dt in PrimaryDocTypes)
+                        {
+                            @UploadField(dt, DocLabel(dt), required: false)
+                        }
+                        <div class="subhead">Other documents</div>
+                        <div class="up">
+                            <span class="name empty">Attach a supporting document (optional)</span>
+                            <label class="btn ghost" style="padding:7px 13px;font-size:13px;margin:0">
+                                Choose file
+                                <InputFile OnChange="@(e => UploadAsync(e, LandlordDocumentType.Other))" style="display:none" accept=".pdf,image/*" />
+                            </label>
+                        </div>
+                        @if (OtherDocs.Any())
+                        {
+                            <ul class="olist mt-2">
+                                @foreach (var d in OtherDocs)
+                                {
+                                    <li><span class="n">•</span><span style="flex:1">@d.FileName</span><button class="link danger" @onclick="() => DeleteDocAsync(d.Id)">Remove</button></li>
+                                }
+                            </ul>
+                        }
+                    }
+
+                    @* ===== Step 3: Signatories ===== *@
+                    else if (step == 3)
+                    {
+                        <div class="field">
+                            <label class="lbl">Signing rule</label>
+                            <div class="choices">
+                                <label class="choice @(signingRule == SigningRule.All ? "sel" : "")">
+                                    <input type="radio" name="sr" checked="@(signingRule == SigningRule.All)" @onchange="@(() => signingRule = SigningRule.All)" />
+                                    <span><b>All must sign</b><span>Every signatory signs</span></span>
+                                </label>
+                                <label class="choice @(signingRule == SigningRule.Any ? "sel" : "")">
+                                    <input type="radio" name="sr" checked="@(signingRule == SigningRule.Any)" @onchange="@(() => signingRule = SigningRule.Any)" />
+                                    <span><b>Any one may sign</b><span>A single signatory suffices</span></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hint mb-2">Signatory details are optional for an individual landlord.</div>
                         @for (var i = 0; i < signatories.Count; i++)
                         {
                             var idx = i;
-                            <tr>
-                                <td><input class="form-control form-control-sm" @bind="signatories[idx].Name" /></td>
-                                <td><input class="form-control form-control-sm" @bind="signatories[idx].Email" /></td>
-                                <td><input class="form-control form-control-sm" @bind="signatories[idx].Mobile" /></td>
-                                <td>
+                            <div class="sig open">
+                                <div class="sig-hd">
+                                    <span class="seq">@(idx + 1)</span>
+                                    <div class="sig-id" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                                        <input class="di-in" placeholder="Name" @bind="signatories[idx].Name" />
+                                        <input class="di-in" placeholder="Email" @bind="signatories[idx].Email" />
+                                        <input class="di-in" placeholder="Mobile" @bind="signatories[idx].Mobile" />
+                                    </div>
                                     @if (signatories[idx].IsPrimaryContact)
                                     {
-                                        <span class="badge bg-secondary">Primary</span>
+                                        <span class="tagx">Primary</span>
                                     }
                                     else
                                     {
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
+                                        <button class="link danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
                                     }
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
                         }
-                    </tbody>
-                </table>
-                <button class="btn btn-sm btn-outline-primary" @onclick="AddSignatory">+ Add signatory</button>
-            }
+                        <div class="addrow"><button class="btn ghost" @onclick="AddSignatory">+ Add signatory</button></div>
+                    }
 
-            @* ---------- Step 5: Review ---------- *@
-            else if (step == 5)
-            {
-                <h2 class="h6">Review &amp; Submit</h2>
-                <dl class="row">
-                    <dt class="col-sm-5">Primary Contact</dt><dd class="col-sm-7">@primary.FullName (@primary.Email)</dd>
-                    <dt class="col-sm-5">Secondary Contacts</dt><dd class="col-sm-7">@secondaries.Count(c => !string.IsNullOrWhiteSpace(c.FullName))</dd>
-                    <dt class="col-sm-5">Documents</dt><dd class="col-sm-7">@documents.Count</dd>
-                    <dt class="col-sm-5">Signatories</dt><dd class="col-sm-7">@signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name))</dd>
-                </dl>
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="declare" @bind="declared" />
-                    <label class="form-check-label" for="declare">I confirm the information provided is accurate.</label>
+                    @* ===== Step 4: Review ===== *@
+                    else if (step == 4)
+                    {
+                        <div class="rev">
+                            <h3>Property</h3>
+                            <dl>
+                                <div class="r"><dt>Property code</dt><dd class="mono">@FormatCode(landlord.PropertyCode)</dd></div>
+                                <div class="r"><dt>Company</dt><dd>@(landlord.CompanyName ?? "—")</dd></div>
+                                <div class="r"><dt>Agreement type</dt><dd>@landlord.Type</dd></div>
+                            </dl>
+                        </div>
+                        <div class="rev">
+                            <h3>Primary contact<button class="link" @onclick="() => step = 0">Edit</button></h3>
+                            <dl>
+                                <div class="r"><dt>Name</dt><dd>@primary.FullName</dd></div>
+                                <div class="r"><dt>Email</dt><dd>@primary.Email</dd></div>
+                                <div class="r"><dt>Mobile</dt><dd>@(primary.Mobile ?? "—")</dd></div>
+                            </dl>
+                        </div>
+                        <div class="rev">
+                            <h3>Details</h3>
+                            <dl>
+                                <div class="r"><dt>Secondary contacts</dt><dd>@secondaries.Count(c => !string.IsNullOrWhiteSpace(c.FullName))</dd></div>
+                                <div class="r"><dt>Documents</dt><dd>@documents.Count</dd></div>
+                                <div class="r"><dt>Signatories</dt><dd>@signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name)) · @signingRule signing</dd></div>
+                            </dl>
+                        </div>
+                        <div class="panel">
+                            <label class="check"><input type="checkbox" @bind="declared" /> <span>I confirm the information provided is accurate and complete.</span></label>
+                        </div>
+                    }
                 </div>
-            }
 
-            <div class="d-flex justify-content-between align-items-center mt-4">
-                <button class="btn btn-outline-secondary" disabled="@(step == 0)" @onclick="Back">Back</button>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" disabled="@saving" @onclick="SaveDraftAsync">@(saving ? "Saving…" : "Save Draft")</button>
+                <div class="card-ft">
+                    <button class="btn ghost" disabled="@(step == 0)" @onclick="Back">Back</button>
+                    <button class="btn taupe" disabled="@saving" @onclick="SaveDraftAsync">@(saving ? "Saving…" : "Save draft")</button>
+                    <div class="spacer"></div>
                     @if (step < stepLabels.Length - 1)
                     {
-                        <button class="btn btn-primary" @onclick="Next">Continue</button>
+                        <button class="btn" @onclick="Next">Continue <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 6 6 6-6 6"/></svg></button>
                     }
                     else
                     {
-                        <button class="btn btn-success" disabled="@(!declared || saving)" @onclick="SubmitAsync">
-                            @(saving ? "Submitting…" : "Submit Registration")
-                        </button>
+                        <button class="btn" disabled="@(!declared || saving)" @onclick="SubmitAsync">@(saving ? "Submitting…" : "Submit registration")</button>
                     }
                 </div>
             </div>
@@ -220,24 +246,113 @@
 </div>
 
 <style>
-    .di-ll-wrap { width: 100%; display: flex; justify-content: center; }
-    .di-ll-card { width: 100%; max-width: 760px; background: #fff; border-radius: 10px; border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,.06); padding: 2rem; }
-    .di-ll-head { border-bottom: 1px solid #eef1f6; padding-bottom: .75rem; margin-bottom: 1rem; }
-    .di-steps { list-style: none; display: flex; gap: .4rem; padding: 0; margin: 0 0 1.25rem; flex-wrap: wrap; }
-    .di-steps li { flex: 1 1 auto; text-align: center; font-size: .78rem; padding: .4rem .3rem; border-radius: 6px; background: #f1f3f7; color: #7b8697; }
-    .di-steps li.active { background: #1a2233; color: #fff; }
-    .di-steps li.done { background: #e8f0e8; color: #2e7d32; }
+    .di-llw{--navy:#092F56;--navy-deep:#06213D;--navy-mid:#164A7B;--navy-soft:#0E3A66;--taupe:#706259;--taupe-lt:#B4A79C;--sand:#F6F3EF;--line:#E2DCD4;--line-strong:#CFC5BA;--ink:#20262D;--ink-soft:#5C6670;--danger:#A32B24;--danger-bg:#FBF0EF;--ok:#1D6F53;--ok-bg:#EFF6F2;--r:4px;
+        background:var(--navy-deep);min-height:100vh;color:var(--ink);font-size:15px;line-height:1.55}
+    .di-llw-shell{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+    .di-llw h2.di-h,.di-llw .card-hd h2{font-size:23px;color:var(--navy);letter-spacing:-.015em;font-weight:600;margin:6px 0 4px}
+    .di-llw .muted{color:var(--ink-soft)}
+    .di-llw .mt-2{margin-top:.5rem}.di-llw .mb-2{margin-bottom:.5rem}.di-llw .mb-3{margin-bottom:1rem}
+
+    .di-llw .ribbon{background:var(--navy);padding:14px 20px}
+    .di-llw .steps{max-width:980px;margin:0 auto;display:flex;gap:2px}
+    .di-llw .mstep{display:none;color:#cdd9e6;text-align:center;font-size:13px}
+    .di-llw .step{flex:1;background:var(--navy-soft);color:#9DB3C8;padding:9px 10px 9px 28px;font-size:12.5px;
+        clip-path:polygon(0 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,0 100%,13px 50%);display:flex;align-items:center;gap:8px;min-width:0}
+    .di-llw .step:first-child{clip-path:polygon(0 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,0 100%);padding-left:16px}
+    .di-llw .step:last-child{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,13px 50%)}
+    .di-llw .step.cur{background:#fff;color:var(--navy)}
+    .di-llw .step.done{background:var(--navy-mid);color:#dbe6f2}
+    .di-llw .step .n{font-family:monospace;font-size:11px;opacity:.85;flex:none}
+    .di-llw .chev-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+
+    .di-llw .card{background:#fff;border-radius:var(--r);border:1px solid var(--line);overflow:hidden}
+    .di-llw .card-hd{padding:22px 28px 0}
+    .di-llw .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--taupe);font-weight:600}
+    .di-llw .card-hd p{margin:0;color:var(--ink-soft);font-size:14px}
+    .di-llw .card-bd{padding:22px 28px}
+    .di-llw .card-ft{padding:16px 28px;background:var(--sand);border-top:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .di-llw .card-ft .spacer{flex:1}
+
+    .di-llw .field{margin-bottom:20px}
+    .di-llw label.lbl{display:block;font-weight:600;font-size:13.5px;color:var(--navy);margin-bottom:6px}
+    .di-llw .req{color:var(--danger)}
+    .di-llw .hint{font-size:12.5px;color:var(--ink-soft);margin-top:6px}
+    .di-llw .di-in,.di-llw input[type=text],.di-llw input[type=email],.di-llw input[type=tel],.di-llw select,.di-llw input:not([type]){
+        width:100%;padding:10px 12px;font:inherit;font-size:14.5px;color:var(--ink);border:1px solid var(--line-strong);border-radius:var(--r);background:#fff}
+    .di-llw .di-in:focus,.di-llw input:focus,.di-llw select:focus{outline:2px solid var(--taupe-lt);outline-offset:1px;border-color:var(--navy)}
+    .di-llw .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+    .di-llw .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .di-llw .choice{border:1px solid var(--line-strong);border-radius:var(--r);padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;background:#fff}
+    .di-llw .choice:hover{border-color:var(--taupe-lt);background:var(--sand)}
+    .di-llw .choice input{margin:3px 0 0;accent-color:var(--navy);width:auto}
+    .di-llw .choice b{display:block;font-size:14px;color:var(--navy);font-weight:600}
+    .di-llw .choice span span,.di-llw .choice > span > span{font-size:12.5px;color:var(--ink-soft);font-weight:400}
+    .di-llw .choice.sel{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
+
+    .di-llw .code{background:var(--navy);border-radius:var(--r);padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .di-llw .code .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9DB3C8;font-weight:600}
+    .di-llw .code .v{font-family:monospace;font-size:21px;color:#fff;letter-spacing:.06em}
+
+    .di-llw .up{border:1px dashed var(--line-strong);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:12px;background:var(--sand);flex-wrap:wrap;margin-bottom:12px}
+    .di-llw .up.filled{border-style:solid;border-color:var(--ok);background:var(--ok-bg)}
+    .di-llw .up .name{font-size:13.5px;flex:1;min-width:120px;word-break:break-all}
+    .di-llw .up .name.empty{color:var(--ink-soft)}
+    .di-llw .link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--navy);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+    .di-llw .link.danger{color:var(--danger)}
+
+    .di-llw .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:var(--r);border:1px solid transparent;font-size:14.5px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff}
+    .di-llw .btn:hover{background:var(--navy-mid)}
+    .di-llw .btn.ghost{background:#fff;color:var(--navy);border-color:var(--line-strong)}
+    .di-llw .btn.ghost:hover{background:var(--sand);border-color:var(--taupe-lt)}
+    .di-llw .btn.taupe{background:var(--taupe);color:#fff}
+    .di-llw .btn.taupe:hover{background:#8A7A6F}
+    .di-llw .btn:disabled{opacity:.45;cursor:not-allowed}
+
+    .di-llw .rev{border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px}
+    .di-llw .rev h3{margin:0;padding:11px 16px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--navy);background:var(--sand);border-bottom:1px solid var(--line);display:flex;align-items:center;font-weight:600}
+    .di-llw .rev h3 .link{margin-left:auto;text-transform:none;letter-spacing:0}
+    .di-llw .rev dl{margin:0;padding:6px 16px 12px}
+    .di-llw .rev .r{display:flex;gap:14px;padding:7px 0;border-bottom:1px solid #F1EDE7;font-size:14px}
+    .di-llw .rev .r:last-child{border:0}
+    .di-llw .rev dt{flex:0 0 42%;color:var(--ink-soft);margin:0}
+    .di-llw .rev dd{margin:0;flex:1;word-break:break-word}
+    .di-llw .rev dd.mono{font-family:monospace}
+
+    .di-llw .panel{border:1px solid var(--line-strong);border-radius:var(--r);padding:16px 18px;background:var(--sand)}
+    .di-llw .panel.bad{border-color:var(--danger);background:var(--danger-bg)}
+    .di-llw .panel h3{margin:0 0 6px;font-size:15px;color:var(--navy);font-weight:600}
+    .di-llw .panel p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+    .di-llw .check{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.6}
+    .di-llw .check input{margin:3px 0 0;accent-color:var(--navy);width:17px;height:17px;flex:none}
+    .di-llw .tick{width:44px;height:44px}
+    .di-llw .done-wrap{text-align:center;padding:14px 0 6px}
+    .di-llw .done-wrap .ref{font-family:monospace;font-size:24px;color:var(--navy);letter-spacing:.05em;margin:14px 0 4px}
+    .di-llw .subhead{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--taupe);font-weight:600;margin:22px 0 10px}
+    .di-llw .sig{border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;background:#fff}
+    .di-llw .sig-hd{display:flex;align-items:center;gap:12px;padding:11px 14px}
+    .di-llw .seq{font-family:monospace;font-size:13px;color:#fff;background:var(--navy);width:26px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none}
+    .di-llw .tagx{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;color:var(--taupe);border:1px solid var(--line-strong);border-radius:99px;padding:3px 9px;white-space:nowrap;flex:none}
+    .di-llw .addrow{margin-top:12px}
+    .di-llw .olist{margin:0;padding:0;list-style:none}
+    .di-llw .olist li{display:flex;gap:10px;padding:6px 0;font-size:14px;align-items:baseline}
+    .di-llw .olist .n{color:var(--taupe);flex:none}
+    @@media (max-width:720px){
+        .di-llw .steps{display:none}.di-llw .mstep{display:block}
+        .di-llw .choices,.di-llw .grid2{grid-template-columns:1fr}
+        .di-llw .card-hd,.di-llw .card-bd,.di-llw .card-ft{padding-left:18px;padding-right:18px}
+        .di-llw .sig-id{grid-template-columns:1fr!important}
+    }
 </style>
 
 @code {
     [Parameter] public string Token { get; set; } = "";
     [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
 
-    private static readonly string[] stepLabels = ["Property", "Primary Contact", "Secondary Contacts", "Documents", "Signatories", "Review"];
-    private static readonly LandlordDocumentType[] DocTypes =
-        [LandlordDocumentType.EmiratesId, LandlordDocumentType.PowerOfAttorney, LandlordDocumentType.Moa,
-         LandlordDocumentType.TradeLicense, LandlordDocumentType.AuthorisationLetter, LandlordDocumentType.TitleDeed,
-         LandlordDocumentType.Other];
+    private static readonly string[] stepLabels = ["Primary Contact", "Secondary Contacts", "Documents", "Signatories", "Review"];
+    private static readonly LandlordDocumentType[] PrimaryDocTypes =
+        [LandlordDocumentType.PowerOfAttorney, LandlordDocumentType.Moa, LandlordDocumentType.TradeLicense,
+         LandlordDocumentType.AuthorisationLetter, LandlordDocumentType.TitleDeed];
 
     private LandlordAccessToken? accessToken;
     private Landlord? landlord;
@@ -248,18 +363,27 @@
     private readonly List<SignatoryInput> signatories = new();
     private SigningRule signingRule = SigningRule.All;
     private List<LandlordDocument> documents = [];
-    private LandlordDocumentType uploadType = LandlordDocumentType.EmiratesId;
 
     private int step;
-    private bool loading = true;
-    private bool saving;
-    private bool submitted;
-    private bool uploading;
-    private bool declared;
-    private string? error;
-    private string? reference;
+    private bool loading = true, saving, submitted, declared;
+    private string? error, reference;
 
     private string ActorLabel => $"Landlord Self-Service ({landlord?.Email})";
+    private IEnumerable<LandlordDocument> OtherDocs => documents.Where(d => d.DocumentType == LandlordDocumentType.Other);
+
+    private string StepHeading => step switch
+    {
+        0 => "Primary contact details", 1 => "Secondary contacts", 2 => "Supporting documents",
+        3 => "Authorised signatories", _ => "Review & submit"
+    };
+    private string StepSubtitle => step switch
+    {
+        0 => "The person DIP will deal with on the tenancy. Property details are set by Business Centre and cannot be changed.",
+        1 => "Add any additional contacts for this landlord (optional).",
+        2 => "Upload the required documents. All documents are retained with your registration.",
+        3 => "Who is authorised to sign on behalf of the landlord.",
+        _ => "Check everything below, then submit for Business Centre review."
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -274,7 +398,6 @@
                 correction = await LandlordService.GetOpenCorrectionAsync(landlord.Id);
                 SeedFromExisting();
                 documents = await DocumentService.GetDocumentsAsync(landlord.Id);
-                uploadType = landlord.Type == LandlordType.Individual ? LandlordDocumentType.EmiratesId : LandlordDocumentType.PowerOfAttorney;
             }
         }
         loading = false;
@@ -282,50 +405,60 @@
 
     private void SeedFromExisting()
     {
-        var existingPrimary = landlord!.Contacts.FirstOrDefault(c => c.IsPrimary);
-        if (existingPrimary is not null) CopyInto(primary, existingPrimary);
-
-        foreach (var c in landlord.Contacts.Where(c => !c.IsPrimary))
-        {
-            var s = new ContactInput();
-            CopyInto(s, c);
-            secondaries.Add(s);
-        }
-
+        var ep = landlord!.Contacts.FirstOrDefault(c => c.IsPrimary);
+        if (ep is not null) CopyInto(primary, ep);
+        foreach (var c in landlord.Contacts.Where(c => !c.IsPrimary)) { var s = new ContactInput(); CopyInto(s, c); secondaries.Add(s); }
         signingRule = landlord.SigningRule;
         if (landlord.Signatories.Count > 0)
-        {
             signatories.AddRange(landlord.Signatories.OrderBy(s => s.Order)
                 .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile, IsPrimaryContact = s.IsPrimaryContact }));
-        }
     }
 
-    private static void CopyInto(ContactInput target, LandlordContact c)
+    private static void CopyInto(ContactInput t, LandlordContact c)
     {
-        target.Id = c.Id; target.IsPrimary = c.IsPrimary; target.ContactType = c.ContactType;
-        target.FullName = c.FullName; target.Designation = c.Designation; target.Mobile = c.Mobile;
-        target.Email = c.Email; target.EmiratesId = c.EmiratesId;
+        t.Id = c.Id; t.IsPrimary = c.IsPrimary; t.ContactType = c.ContactType; t.FullName = c.FullName;
+        t.Designation = c.Designation; t.Mobile = c.Mobile; t.Email = c.Email; t.EmiratesId = c.EmiratesId;
     }
 
-    private RenderFragment ContactEditor(ContactInput c, bool isPrimary) => __builder =>
+    private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
     {
-        <div class="row g-2">
-            <div class="col-md-6"><label class="form-label">Full Name @(isPrimary ? "*" : "")</label><input class="form-control" @bind="c.FullName" /></div>
-            <div class="col-md-6"><label class="form-label">Designation</label><input class="form-control" @bind="c.Designation" /></div>
-            <div class="col-md-6"><label class="form-label">Email @(isPrimary ? "*" : "")</label><input class="form-control" @bind="c.Email" /></div>
-            <div class="col-md-6"><label class="form-label">Mobile</label><input class="form-control" @bind="c.Mobile" /></div>
-            <div class="col-md-6">
-                <label class="form-label">Contact Type</label>
-                <select class="form-select" @bind="c.ContactType">
-                    @foreach (var t in Enum.GetValues<ContactType>())
-                    {
-                        <option value="@t">@t</option>
-                    }
-                </select>
+        <div class="grid2">
+            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @(isPrimary ? MarkReq() : null)</label><input type="text" placeholder="As on the Emirates ID" @bind="c.FullName" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Designation</label><input type="text" @bind="c.Designation" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Mobile number</label><input type="text" placeholder="+971 5X XXX XXXX" @bind="c.Mobile" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Email address @(isPrimary ? MarkReq() : null)</label><input type="text" placeholder="name@company.ae" @bind="c.Email" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Contact type</label>
+                <select @bind="c.ContactType">@foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }</select>
             </div>
-            <div class="col-md-6"><label class="form-label">Emirates ID @(landlord!.Type == LandlordType.Individual && isPrimary ? "*" : "")</label><input class="form-control" @bind="c.EmiratesId" /></div>
+            <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID</label><input type="text" @bind="c.EmiratesId" /></div>
         </div>
     };
+
+    private RenderFragment MarkReq() => __builder => { <span class="req">*</span> };
+
+    private RenderFragment UploadField(LandlordDocumentType type, string label, bool required) => __builder =>
+    {
+        var doc = documents.FirstOrDefault(d => d.DocumentType == type);
+        <div class="field">
+            <label class="lbl">@label @(required ? MarkReq() : null)</label>
+            <div class="up @(doc is not null ? "filled" : "")">
+                <span class="name @(doc is null ? "empty" : "")">@(doc?.FileName ?? "No file chosen — PDF, JPG or PNG up to 10 MB")</span>
+                @if (doc is not null)
+                {
+                    <button class="link danger" @onclick="() => DeleteDocAsync(doc.Id)">Replace / remove</button>
+                }
+                else
+                {
+                    <label class="btn ghost" style="padding:7px 13px;font-size:13px;margin:0">
+                        Choose file
+                        <InputFile OnChange="@(e => UploadAsync(e, type))" style="display:none" accept=".pdf,image/*" />
+                    </label>
+                }
+            </div>
+        </div>
+    };
+
+    private static string FormatCode(string code) => code;
 
     private void AddSecondary() => secondaries.Add(new ContactInput { ContactType = ContactType.AuthorisedRepresentative });
     private void RemoveSecondary(int i) { if (i >= 0 && i < secondaries.Count) secondaries.RemoveAt(i); }
@@ -337,9 +470,12 @@
     private void Next()
     {
         error = null;
-        if (step == 1 && (string.IsNullOrWhiteSpace(primary.FullName) || string.IsNullOrWhiteSpace(primary.Email)))
-        { error = "Primary contact name and email are required."; return; }
-        if (step == 2 && secondaries.Any(c => !string.IsNullOrWhiteSpace(c.FullName) && string.IsNullOrWhiteSpace(c.Email)))
+        if (step == 0)
+        {
+            if (string.IsNullOrWhiteSpace(primary.FullName) || string.IsNullOrWhiteSpace(primary.Email))
+            { error = "Primary contact name and email are required."; return; }
+        }
+        if (step == 1 && secondaries.Any(c => !string.IsNullOrWhiteSpace(c.FullName) && string.IsNullOrWhiteSpace(c.Email)))
         { error = "Each secondary contact needs an email."; return; }
         if (step < stepLabels.Length - 1) step++;
     }
@@ -351,14 +487,13 @@
         return new LandlordSelfUpdate { SigningRule = signingRule, Contacts = contacts, Signatories = signatories };
     }
 
-    private async Task OnUploadAsync(InputFileChangeEventArgs e)
+    private async Task UploadAsync(InputFileChangeEventArgs e, LandlordDocumentType type)
     {
         if (landlord is null) return;
-        uploading = true; error = null;
-        var (ok, err) = await DocumentService.UploadAsync(landlord.Id, uploadType, e.File, ActorLabel);
+        error = null;
+        var (ok, err) = await DocumentService.UploadAsync(landlord.Id, type, e.File, ActorLabel);
         if (!ok) error = err;
         documents = await DocumentService.GetDocumentsAsync(landlord.Id);
-        uploading = false;
     }
 
     private async Task DeleteDocAsync(int docId)
@@ -386,11 +521,8 @@
             if (!documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
                 return "Emirates ID document is mandatory for an individual landlord.";
         }
-        else
-        {
-            if (!documents.Any(d => d.DocumentType is LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))
-                return "At least one of POA or MOA must be uploaded.";
-        }
+        else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))
+            return "At least one of POA or MOA must be uploaded.";
         return null;
     }
 
@@ -398,7 +530,7 @@
     {
         if (landlord is null || accessToken is null) return;
         error = ValidateForSubmit();
-        if (error is not null) { step = error.Contains("document") || error.Contains("POA") || error.Contains("Emirates") ? 3 : 1; return; }
+        if (error is not null) { step = error.Contains("contact") ? 0 : 2; return; }
 
         saving = true;
         var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null);

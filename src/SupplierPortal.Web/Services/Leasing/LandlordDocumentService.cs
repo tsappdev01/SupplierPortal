@@ -5,36 +5,36 @@ using SupplierPortal.Web.Models.Leasing;
 
 namespace SupplierPortal.Web.Services.Leasing;
 
-/// <summary>Stores landlord-uploaded documents (Emirates ID, Trade Licence, MOA, POA, title deed, …) as
-/// physical files under the content root — not wwwroot, so they are never directly web-servable — with only
-/// their metadata in the database. All documents are retained for the complete registration trace.</summary>
-public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFactory, IWebHostEnvironment env)
+/// <summary>Stores landlord-uploaded documents entirely in the database as Base64 strings
+/// (<c>leasing.LandlordDocuments.ContentBase64</c>) — nothing is written to the server file system. All
+/// documents are retained for the complete registration trace; single-slot identity documents keep their
+/// superseded versions (IsCurrent = false).</summary>
+public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFactory)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
     /// <summary>Accepted upload types (FRD §12 — supported file type).</summary>
     private static readonly string[] AllowedExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".tif", ".tiff"];
 
-    private string DocumentsDirectory(int landlordId) =>
-        Path.Combine(env.ContentRootPath, "doc", "landlord", landlordId.ToString());
-
-    /// <summary>Current (live) documents only — replaced versions are hidden here but kept for the audit trail.</summary>
+    /// <summary>Current (live) documents only — metadata, without the (large) Base64 content.</summary>
     public async Task<List<LandlordDocument>> GetDocumentsAsync(int landlordId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.LandlordDocuments
             .Where(d => d.LandlordId == landlordId && d.IsCurrent)
             .OrderBy(d => d.DocumentType).ThenBy(d => d.UploadedAt)
+            .Select(d => Meta(d))
             .ToListAsync();
     }
 
-    /// <summary>Every document ever uploaded, including superseded versions, for the review history.</summary>
+    /// <summary>Every document ever uploaded, including superseded versions (metadata only).</summary>
     public async Task<List<LandlordDocument>> GetAllVersionsAsync(int landlordId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.LandlordDocuments
             .Where(d => d.LandlordId == landlordId)
             .OrderBy(d => d.DocumentType).ThenByDescending(d => d.UploadedAt)
+            .Select(d => Meta(d))
             .ToListAsync();
     }
 
@@ -49,22 +49,18 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         if (!AllowedExtensions.Contains(ext))
             return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
 
-        var directory = DocumentsDirectory(landlordId);
-        Directory.CreateDirectory(directory);
-        var storedFileName = $"{Guid.NewGuid():N}{ext}";
-        var fullPath = Path.Combine(directory, storedFileName);
-
+        // Read the whole file into memory and Base64-encode it for in-table storage.
+        using var ms = new MemoryStream();
         await using (var source = file.OpenReadStream(MaxFileSizeBytes))
-        await using (var destination = new FileStream(fullPath, FileMode.Create))
         {
-            await source.CopyToAsync(destination);
+            await source.CopyToAsync(ms);
         }
+        var base64 = Convert.ToBase64String(ms.ToArray());
 
         await using var db = await dbFactory.CreateDbContextAsync();
 
-        // Single-slot identity documents (Emirates ID, Trade Licence, MOA, POA, title deed) supersede the
-        // previous upload — the old row is retained (IsCurrent = false) for the audit history; "Other"
-        // documents accumulate. Scope the slot to the contact where one is given.
+        // Single-slot identity documents supersede the previous upload (kept with IsCurrent = false for
+        // the audit history); "Other" documents accumulate. Slot scoped to the contact when given.
         var version = 1;
         if (documentType != LandlordDocumentType.Other)
         {
@@ -84,9 +80,10 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
             LandlordId = landlordId,
             DocumentType = documentType,
             FileName = file.Name,
-            StoredFileName = storedFileName,
+            StoredFileName = $"{Guid.NewGuid():N}{ext}",   // logical name only; no file on disk
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
             FileSizeBytes = file.Size,
+            ContentBase64 = base64,
             UploadedBy = uploadedBy,
             ContactId = contactId,
             SignatoryId = signatoryId,
@@ -102,25 +99,29 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         await using var db = await dbFactory.CreateDbContextAsync();
         var doc = await db.LandlordDocuments.FirstOrDefaultAsync(d => d.Id == documentId);
         if (doc is null) return (false, "Document not found.");
-        DeletePhysicalFile(doc.LandlordId, doc.StoredFileName);
         db.LandlordDocuments.Remove(doc);
         await db.SaveChangesAsync();
         return (true, null);
     }
 
+    /// <summary>Decodes a document's Base64 content back to bytes for preview / download.</summary>
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var doc = await db.LandlordDocuments.FirstOrDefaultAsync(d => d.Id == documentId);
-        if (doc is null) return null;
-        var fullPath = Path.Combine(DocumentsDirectory(doc.LandlordId), doc.StoredFileName);
-        if (!File.Exists(fullPath)) return null;
-        return (await File.ReadAllBytesAsync(fullPath), doc.ContentType, doc.FileName);
+        var doc = await db.LandlordDocuments
+            .Where(d => d.Id == documentId)
+            .Select(d => new { d.ContentBase64, d.ContentType, d.FileName })
+            .FirstOrDefaultAsync();
+        if (doc?.ContentBase64 is null) return null;
+        return (Convert.FromBase64String(doc.ContentBase64), doc.ContentType, doc.FileName);
     }
 
-    private void DeletePhysicalFile(int landlordId, string storedFileName)
+    /// <summary>Projects metadata without the heavy Base64 blob, for list views.</summary>
+    private static LandlordDocument Meta(LandlordDocument d) => new()
     {
-        var path = Path.Combine(DocumentsDirectory(landlordId), storedFileName);
-        if (File.Exists(path)) File.Delete(path);
-    }
+        Id = d.Id, LandlordId = d.LandlordId, DocumentType = d.DocumentType, FileName = d.FileName,
+        StoredFileName = d.StoredFileName, ContentType = d.ContentType, FileSizeBytes = d.FileSizeBytes,
+        UploadedAt = d.UploadedAt, UploadedBy = d.UploadedBy, ContactId = d.ContactId,
+        SignatoryId = d.SignatoryId, Version = d.Version, IsCurrent = d.IsCurrent
+    };
 }

@@ -257,6 +257,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<int?>("ContactId")
                         .HasColumnType("int");
 
+                    b.Property<string>("ContentBase64")
+                        .HasColumnType("varchar(max)");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(120)

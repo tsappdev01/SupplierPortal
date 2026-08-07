@@ -231,6 +231,10 @@ public class LandlordDocument
     [MaxLength(260)] public string StoredFileName { get; set; } = string.Empty;
     [MaxLength(120)] public string ContentType { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
+
+    /// <summary>The document content itself, Base64-encoded and stored in the table — no file is written to
+    /// the server file system. Mapped as <c>varchar(max)</c>.</summary>
+    public string? ContentBase64 { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     [MaxLength(100)] public string UploadedBy { get; set; } = string.Empty;
     /// <summary>Optional contact this document belongs to (e.g. a POA for a specific contact).</summary>

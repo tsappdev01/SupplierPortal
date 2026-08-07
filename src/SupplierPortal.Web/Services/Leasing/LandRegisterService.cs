@@ -14,7 +14,9 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
 {
     private readonly LeasingOptions _options = options.Value;
 
-    public IReadOnlyList<string> Zones => _options.Zones;
+    // De-duplicate defensively (the config binder can append to defaults) and fall back to the DIP zones.
+    public IReadOnlyList<string> Zones =>
+        (_options.Zones is { Length: > 0 } z ? z : LeasingOptions.DefaultZones).Distinct().ToArray();
 
     /// <summary>Resolves the caller's requested zone to a configured one, defaulting to the first.</summary>
     public string ResolveZone(string? requested) =>

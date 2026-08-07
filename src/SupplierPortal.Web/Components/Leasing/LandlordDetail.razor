@@ -77,7 +77,7 @@ else
                     @if (editingProperty)
                     {
                         <div class="mb-2">
-                            <label class="form-label">Landlord Type</label>
+                            <label class="form-label">Agreement Type</label>
                             <select class="form-select" @bind="edit.Type">
                                 <option value="@LandlordType.Company">Company</option>
                                 <option value="@LandlordType.Individual">Individual</option>
@@ -96,7 +96,7 @@ else
                             <dt class="col-sm-4">Company Name 🔒</dt><dd class="col-sm-8">@(landlord.CompanyName ?? "—")</dd>
                             <dt class="col-sm-4">Building 🔒</dt><dd class="col-sm-8">@(landlord.Building ?? "—")</dd>
                             <dt class="col-sm-4">Email 🔒</dt><dd class="col-sm-8">@landlord.Email</dd>
-                            <dt class="col-sm-4">Landlord Type 🔒</dt><dd class="col-sm-8">@landlord.Type</dd>
+                            <dt class="col-sm-4">Agreement Type 🔒</dt><dd class="col-sm-8">@landlord.Type</dd>
                         </dl>
                     }
                 </div>

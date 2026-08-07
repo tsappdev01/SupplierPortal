@@ -75,6 +75,8 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
         {
             e.ToTable("LandlordDocuments", Schema);
             e.HasIndex(x => x.LandlordId);
+            // Base64 content stored in-row as varchar(max) (ASCII) rather than on the file system.
+            e.Property(x => x.ContentBase64).HasColumnType("varchar(max)");
         });
 
         b.Entity<LandlordFieldChange>(e =>
