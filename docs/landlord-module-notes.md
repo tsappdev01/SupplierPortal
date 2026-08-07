@@ -73,3 +73,32 @@ notifications, DMZ portal/API pattern). Supplier module left untouched.
 Approved. Artifact: Business Partner Portal — Leasing & Landlord (navy/taupe DIP language).
 Landlord flow: Verify → **select property** → Update owner info wizard (owner details → signatories →
 documents → review → submit).
+
+---
+
+## Build progress
+
+### Increment 1 — data foundation (done)
+`Models/Leasing/LeasingModels.cs`, `Data/Leasing/LeasingDbContext.cs` (separate bounded context, `leasing`
+schema, reads `dbo.Property` view via `ToView`), design-time factory, `LeasingInitial` migration (7
+`leasing.*` tables; view excluded). `LeasingManager` added to `UserType`. Ownership keyed on the view's
+`Id` column (resolved open question 2 — the real view now exposes `Id`).
+
+### Increment 2 — Admin Land Register (done)
+- `Services/Leasing/LeasingOptions.cs` — `Leasing:Zones` config (fixed LOV `597`, `598`).
+- `Services/Leasing/LandRegisterService.cs` — reads the `Premises` view for a zone, overlays owner
+  assignments from `leasing.LandlordPremises`. **Zone filter = `PropertyCode.StartsWith("{zone}-")`** so
+  look-alikes like `598285-…` and non-zone codes (`STR-…`, resolves open question 3 by excluding them) are
+  left out. Never writes land data (resolves open question 4).
+- `Components/Leasing/LandRegister.razor` — page `/admin/land-register` (Administrator + LeasingManager):
+  Zone tabs, summary cards (property codes / buildings / assigned / unassigned), debounced search over
+  code + building, accordion of property code → buildings with owner chips coloured by landlord status.
+- Nav entry "Land Register" gated by `ClaimsPrincipal.IsLeasingUser()`.
+- **Local test fixture:** `scripts/local/seed-property-view.sql` stands up `dbo.Property` from `bld.xlsx`
+  (1000 rows, synthesized `Id`) — DEV ONLY; the real view lives on the DIP server. Verified counts:
+  Zone 597 = 336 codes / 435 buildings; Zone 598 = 328 codes / 559 buildings. Playwright-tested end to end.
+
+### Next — Increment 3: Admin Landlords
+Create owner shell scoped to a BU (business-set Name / Primary Contact / Email / Mobile) → assign premises
+from the Land Register → invite (tokenized link + OTP). Then Increment 4: landlord self-service wizard +
+status workflow + registration trace wired into the notification bell / activity feed.
