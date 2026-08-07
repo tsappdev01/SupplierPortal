@@ -92,11 +92,16 @@ else
                 </h2>
                 @if (isOpen)
                 {
-                    <div class="accordion-body p-0">
+                    <div class="accordion-body p-0 table-responsive">
                         <table class="table table-sm mb-0 align-middle">
                             <thead>
                                 <tr>
-                                    <th style="width: 45%;">Building</th>
+                                    <th>Building</th>
+                                    <th>Lease No</th>
+                                    <th>Landlord Code</th>
+                                    <th>Company</th>
+                                    <th>Contact</th>
+                                    <th>Email</th>
                                     <th>Owner(s)</th>
                                 </tr>
                             </thead>
@@ -105,6 +110,11 @@ else
                                 {
                                     <tr>
                                         <td>@(string.IsNullOrWhiteSpace(b.BuildingName) ? "—" : b.BuildingName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(b.LeaseNo) ? "—" : b.LeaseNo)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(b.LandLordCode) ? "—" : b.LandLordCode)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(b.CompanyName) ? "—" : b.CompanyName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(b.ContactName) ? "—" : b.ContactName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(b.EmailAddress) ? "—" : b.EmailAddress)</td>
                                         <td>
                                             @if (b.Owners.Count == 0)
                                             {
