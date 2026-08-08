@@ -72,16 +72,16 @@
 
         @if (canCustomer)
         {
-            <div class="di-launch-card di-launch-customer di-launch-soon" role="button" aria-disabled="true">
+            <a class="di-launch-card di-launch-customer" href="/customer">
                 <span class="di-launch-ico">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 </span>
                 <span class="di-launch-body">
                     <span class="di-launch-title">Customer Portal</span>
-                    <span class="di-launch-sub">Customer accounts, requests and statements.</span>
+                    <span class="di-launch-sub">Customer accounts &amp; onboarding — managed by Business Relation.</span>
                 </span>
-                <span class="di-launch-badge">Coming soon</span>
-            </div>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
+            </a>
         }
 
         @if (isAdministrator)
