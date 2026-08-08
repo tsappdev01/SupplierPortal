@@ -717,34 +717,53 @@
     {
         if (landlord is null) return;
         error = null;
+        var file = e.File;
+        var fileName = file.Name;
+        var contentType = file.ContentType;
 
-        // Show an inline "Uploading…" indicator on this document's card for the whole operation (the file
-        // streaming to the server over SignalR, then — for an Emirates ID — the OCR scan).
+        // 1) Read the browser file to bytes FIRST — before any re-render. Showing the "Uploading…" indicator
+        //    re-renders and swaps out the <InputFile> element, which invalidates the browser file handle and
+        //    was causing "Could not read the selected file". So capture the bytes before touching the UI.
+        //    The stream can be opened only once, so the same bytes serve both the upload and the OCR.
+        byte[] bytes;
+        try
+        {
+            using var ms = new MemoryStream();
+            await using (var src = file.OpenReadStream(10 * 1024 * 1024))
+                await src.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+        catch
+        {
+            error = "Could not read the selected file. Please choose the file again.";
+            return;
+        }
+        if (bytes.Length == 0)
+        {
+            error = "The selected file is empty. Please choose a different file.";
+            return;
+        }
+
+        // 2) Now show the inline indicator while the file is stored and (for an Emirates ID) OCR-scanned.
         uploadingType = type;
-        uploadingName = e.File.Name;
+        uploadingName = fileName;
         await InvokeAsync(StateHasChanged);
         try
         {
-            // Read the browser file ONCE — its stream can only be opened a single time, so we reuse the same
-            // bytes for both the upload and the Emirates-ID OCR (opening it twice silently broke extraction).
-            byte[] bytes;
-            try
+            var res = await DocumentService.UploadBytesAsync(landlord.Id, type, fileName, contentType, bytes, ActorLabel);
+            if (!res.Success)
             {
-                using var ms = new MemoryStream();
-                await using (var src = e.File.OpenReadStream(10 * 1024 * 1024))
-                    await src.CopyToAsync(ms);
-                bytes = ms.ToArray();
-            }
-            catch
-            {
-                error = "Could not read the selected file. Please try again.";
+                error = res.Error ?? "The document could not be saved. Please try again.";
                 return;
             }
 
-            var res = await DocumentService.UploadBytesAsync(landlord.Id, type, e.File.Name, e.File.ContentType, bytes, ActorLabel);
-            if (!res.Success) error = res.Error;
-            else if (type == LandlordDocumentType.EmiratesId)
-                await TryExtractEmiratesIdAsync(bytes, e.File.Name);
+            // Emirates-ID auto-read is best-effort — it must never fail the upload. On any problem we just
+            // leave a note asking the user to enter the details manually.
+            if (type == LandlordDocumentType.EmiratesId)
+            {
+                try { await TryExtractEmiratesIdAsync(bytes, fileName); }
+                catch { eidExtractNote = "Document uploaded. We couldn't auto-read the Emirates ID — please enter the number, name and expiry below."; }
+            }
 
             documents = await LoadLandlordDocumentsAsync(landlord.Id);
         }
