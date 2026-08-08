@@ -61,6 +61,50 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
         .Where(p => !string.IsNullOrWhiteSpace(p))
         .Distinct(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>A way of encoding the file in the upload request body. Circularo versions differ on whether
+    /// they want multipart (and under which field) or a JSON envelope with base64 content.</summary>
+    private sealed record UploadStrategy(string Name, Func<byte[], string, string, HttpContent> Build);
+
+    private static IEnumerable<UploadStrategy> UploadStrategies()
+    {
+        // multipart/form-data with the configured field name (default "file")
+        yield return new UploadStrategy("multipart:file", (pdf, name, field) =>
+        {
+            var form = new MultipartFormDataContent();
+            var fc = new ByteArrayContent(pdf);
+            fc.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(fc, string.IsNullOrWhiteSpace(field) ? "file" : field, name);
+            form.Add(new StringContent(name), "name");
+            return form;
+        });
+        // multipart/form-data under the alternate "files" field
+        yield return new UploadStrategy("multipart:files", (pdf, name, _) =>
+        {
+            var form = new MultipartFormDataContent();
+            var fc = new ByteArrayContent(pdf);
+            fc.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(fc, "files", name);
+            form.Add(new StringContent(name), "name");
+            return form;
+        });
+        // JSON envelope carrying the file as base64 (several likely key names — extras are ignored server-side)
+        yield return new UploadStrategy("json:base64", (pdf, name, _) =>
+        {
+            var b64 = Convert.ToBase64String(pdf);
+            var body = new Dictionary<string, object?>
+            {
+                ["name"] = name,
+                ["fileName"] = name,
+                ["docType"] = "pdf",
+                ["contentType"] = "application/pdf",
+                ["data"] = b64,
+                ["file"] = b64,
+                ["content"] = b64
+            };
+            return new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        });
+    }
+
     private void Authorize(HttpRequestMessage req)
     {
         if (!UseHeaderToken || string.IsNullOrWhiteSpace(_o.ApiKey)) return;
@@ -76,33 +120,59 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
         try
         {
-            // 1) Upload the document (multipart/form-data). The exact path varies by Circularo version, so try
-            // the configured candidates in order until one returns 2xx; log the winner so it can be pinned.
+            // 1) Upload the document. The exact path AND body format vary by Circularo version, so probe each
+            // candidate path with several body strategies (multipart field "file", multipart field "files",
+            // and JSON+base64) until one returns 2xx. A 404 means the route doesn't exist (skip other strategies
+            // for that path); a 400/415/422 means the route exists but the body was wrong — keep that response
+            // body, it's Circularo's own validation message and pins down what the endpoint actually wants.
             string? documentId = null;
             var tried = new List<string>();
+            string? bestHint = null; // most-informative (non-404) server response, surfaced to the UI
+
             foreach (var path in UploadPaths())
             {
-                using var form = new MultipartFormDataContent();
-                var fileContent = new ByteArrayContent(pdf);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-                form.Add(fileContent, _o.UploadFileField, fileName);
-
-                using var upReq = new HttpRequestMessage(HttpMethod.Post, Url(path)) { Content = form };
-                Authorize(upReq);
-                using var upResp = await http.SendAsync(upReq, ct);
-                var upBody = await upResp.Content.ReadAsStringAsync(ct);
-                tried.Add($"{path}→{(int)upResp.StatusCode}");
-                if (!upResp.IsSuccessStatusCode)
+                var routeMissing = false;
+                foreach (var strategy in UploadStrategies())
                 {
-                    logger.LogWarning("Circularo upload via '{Path}' failed {Status}: {Body}", path, upResp.StatusCode, Trunc(upBody));
-                    continue;
+                    using var upReq = new HttpRequestMessage(HttpMethod.Post, Url(path))
+                    {
+                        Content = strategy.Build(pdf, fileName, _o.UploadFileField)
+                    };
+                    Authorize(upReq);
+                    using var upResp = await http.SendAsync(upReq, ct);
+                    var upBody = await upResp.Content.ReadAsStringAsync(ct);
+                    tried.Add($"{path}[{strategy.Name}]→{(int)upResp.StatusCode}");
+
+                    if (upResp.IsSuccessStatusCode)
+                    {
+                        documentId = ExtractId(upBody);
+                        logger.LogInformation("Circularo upload succeeded via '{Path}' [{Strategy}], document {DocId}.",
+                            path, strategy.Name, documentId);
+                        break;
+                    }
+
+                    logger.LogWarning("Circularo upload via '{Path}' [{Strategy}] failed {Status}: {Body}",
+                        path, strategy.Name, upResp.StatusCode, Trunc(upBody));
+
+                    if (upResp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        routeMissing = true; // route doesn't exist — no point trying other body shapes here
+                        break;
+                    }
+                    // Route exists but body was rejected: remember the server's explanation for the UI.
+                    if (!string.IsNullOrWhiteSpace(upBody))
+                        bestHint = $"{path}[{strategy.Name}] {(int)upResp.StatusCode}: {Trunc(upBody)}";
                 }
-                documentId = ExtractId(upBody);
-                logger.LogInformation("Circularo upload succeeded via '{Path}', document {DocId}.", path, documentId);
-                break;
+                if (documentId is not null) break;
+                if (routeMissing) continue;
             }
             if (string.IsNullOrWhiteSpace(documentId))
-                return new(false, null, null, $"Upload failed. Tried: {string.Join(", ", tried)}");
+            {
+                var detail = bestHint is not null
+                    ? $"Upload failed — {bestHint}"
+                    : $"Upload failed. Tried: {string.Join(", ", tried)}";
+                return new(false, null, null, detail);
+            }
 
             // 2) Create the signature workflow addressed to the signer (Circularo emails them). The
             // "sign here" box printed on the last page of the summary is the visual anchor for the field.
