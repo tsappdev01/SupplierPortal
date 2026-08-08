@@ -23,4 +23,18 @@ public static class LocalPdfText
             return null;
         }
     }
+
+    /// <summary>Number of pages in the PDF, or 1 if it can't be read.</summary>
+    public static int PageCount(byte[] bytes)
+    {
+        try
+        {
+            using var doc = PdfDocument.Open(bytes);
+            return doc.NumberOfPages;
+        }
+        catch
+        {
+            return 1;
+        }
+    }
 }
