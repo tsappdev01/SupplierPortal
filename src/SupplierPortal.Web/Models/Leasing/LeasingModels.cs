@@ -73,7 +73,9 @@ public enum LandlordDocumentType
     MoaOrPoa = 7,
     /// <summary>System-generated PDF summary of the whole registration, produced on submission and later used
     /// as the document sent to authorised signatories (e.g. via Circularo) for e-signature.</summary>
-    RegistrationSummary = 8
+    RegistrationSummary = 8,
+    /// <summary>The signed copy of the summary returned by Circularo once the primary contact has signed.</summary>
+    SignedDocument = 9
 }
 
 /// <summary>Role a contact plays for the landlord (FRD contact-type field).</summary>

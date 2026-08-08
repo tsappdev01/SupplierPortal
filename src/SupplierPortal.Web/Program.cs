@@ -340,6 +340,65 @@ app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, Suppli
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization(policy => policy.RequireRole(SupplierPortal.Web.Models.UserType.Administrator.ToString(), SupplierPortal.Web.Models.UserType.LeasingManager.ToString()));
 
+// Circularo signature callback: Circularo POSTs here when a document's signing status changes. Validated by
+// a shared secret (X-Webhook-Secret header or ?secret=). Best-effort parsing of the document id + status.
+app.MapPost("/api/leasing/circularo/webhook", async (
+    HttpContext ctx,
+    Microsoft.Extensions.Options.IOptions<SupplierPortal.Web.Services.Leasing.CircularoOptions> opts,
+    SupplierPortal.Web.Services.Leasing.LandlordService landlordService,
+    SupplierPortal.Web.Services.Leasing.ICircularoService circularo) =>
+{
+    var secret = opts.Value.WebhookSecret;
+    if (!string.IsNullOrWhiteSpace(secret))
+    {
+        var provided = ctx.Request.Headers["X-Webhook-Secret"].ToString();
+        if (provided != secret && ctx.Request.Query["secret"].ToString() != secret) return Results.Unauthorized();
+    }
+
+    using var reader = new StreamReader(ctx.Request.Body);
+    var body = await reader.ReadToEndAsync();
+    string? docId = null, status = null, signedB64 = null;
+    try
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
+        string? Find(params string[] names)
+        {
+            string? Walk(System.Text.Json.JsonElement el)
+            {
+                if (el.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    foreach (var p in el.EnumerateObject())
+                        if (names.Contains(p.Name, StringComparer.OrdinalIgnoreCase) && p.Value.ValueKind is System.Text.Json.JsonValueKind.String or System.Text.Json.JsonValueKind.Number)
+                            return p.Value.ToString();
+                    foreach (var p in el.EnumerateObject()) { var n = Walk(p.Value); if (n is not null) return n; }
+                }
+                else if (el.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    foreach (var it in el.EnumerateArray()) { var n = Walk(it); if (n is not null) return n; }
+                return null;
+            }
+            return Walk(doc.RootElement);
+        }
+        docId = Find("documentId", "docId", "_id", "id");
+        status = Find("status", "state", "event", "action");
+        signedB64 = Find("signedDocument", "fileBase64", "contentBase64");
+    }
+    catch { /* fall through to query-string fallback */ }
+
+    docId ??= ctx.Request.Query["documentId"].ToString();
+    if (string.IsNullOrWhiteSpace(status)) status = ctx.Request.Query["status"].ToString();
+    if (string.IsNullOrWhiteSpace(docId)) return Results.BadRequest("Missing document id.");
+
+    byte[]? signed = null;
+    if (!string.IsNullOrWhiteSpace(signedB64))
+    {
+        try { signed = Convert.FromBase64String(signedB64); } catch { /* ignore */ }
+    }
+    signed ??= await circularo.DownloadSignedAsync(docId);
+
+    var ok = await landlordService.HandleSignatureCallbackAsync(docId, status, signed, null);
+    return ok ? Results.Ok(new { handled = true }) : Results.NotFound();
+}).AllowAnonymous();
+
 // Combine a supplier's attached images into a single PDF / Excel workbook.
 app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
 {

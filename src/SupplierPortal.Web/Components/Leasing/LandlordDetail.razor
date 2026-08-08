@@ -351,18 +351,45 @@ else
             else if (landlord.Status == LandlordStatus.RegistrationComplete)
             {
                 <div class="alert alert-success"><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</div>
-                @if (landlord.SignatureStatus is not null)
-                {
-                    <div class="alert @(landlord.SignatureStatus == "Signed" ? "alert-success" : landlord.SignatureStatus == "Failed" ? "alert-warning" : "alert-info")">
-                        <strong>E-signature (Circularo):</strong> @landlord.SignatureStatus
-                        @if (!string.IsNullOrWhiteSpace(landlord.SignatureSentTo)) { <text> — sent to @landlord.SignatureSentTo</text> }
-                        @if (landlord.SignatureSentAt is { } sa) { <text> on @sa.ToLocalTime().ToString("g")</text> }
-                        @if (!string.IsNullOrWhiteSpace(landlord.CircularoSigningUrl))
+
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>E-signature <span class="text-muted small">(Circularo)</span></span>
+                        @if (landlord.SignatureStatus is string ss)
                         {
-                            <text> · </text><a href="@landlord.CircularoSigningUrl" target="_blank" rel="noopener">Open in Circularo</a>
+                            <span class="badge @(ss == "Signed" ? "bg-success" : ss is "Failed" or "Declined" ? "bg-danger" : "bg-info text-dark")">@ss</span>
                         }
                     </div>
-                }
+                    <div class="card-body">
+                        @if (landlord.SignatureStatus == "Signed")
+                        {
+                            <p class="mb-2">Signed by <strong>@landlord.SignatureSentTo</strong>@(landlord.SignatureSignedAt is { } sg ? $" on {sg.ToLocalTime():g}" : "").</p>
+                            var signedDoc = documents.FirstOrDefault(d => d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent);
+                            @if (signedDoc is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-primary" href="/landlord-documents/@signedDoc.Id?download=1" download>Download signed document</a>
+                            }
+                        }
+                        else
+                        {
+                            @if (landlord.SignatureStatus is null)
+                            {
+                                <p class="text-muted mb-2">The registration summary has not been sent for signature yet. Send it to the primary contact (<strong>@(landlord.Contacts.FirstOrDefault(c => c.IsPrimary)?.Email ?? "—")</strong>) to sign via Circularo.</p>
+                            }
+                            else
+                            {
+                                <p class="mb-2">Status: <strong>@landlord.SignatureStatus</strong>@(string.IsNullOrWhiteSpace(landlord.SignatureSentTo) ? "" : $" · sent to {landlord.SignatureSentTo}")@(landlord.SignatureSentAt is { } sa ? $" on {sa.ToLocalTime():g}" : "").</p>
+                            }
+                            <button class="btn btn-primary btn-sm" @onclick="SendForSignatureAsync" disabled="@signatureBusy">
+                                @(signatureBusy ? "Sending…" : landlord.SignatureStatus is null ? "Send for signature" : "Resend for signature")
+                            </button>
+                            @if (!string.IsNullOrWhiteSpace(landlord.CircularoSigningUrl))
+                            {
+                                <a class="btn btn-outline-secondary btn-sm ms-1" href="@landlord.CircularoSigningUrl" target="_blank" rel="noopener">Open in Circularo</a>
+                            }
+                        }
+                    </div>
+                </div>
             }
         </div>
 
@@ -459,6 +486,7 @@ else
     private SigningRule editSigningRule = SigningRule.All;
     private LandlordDocumentType bcUploadType = LandlordDocumentType.EmiratesId;
     private bool bcUploading;
+    private bool signatureBusy;
 
     protected override async Task OnInitializedAsync()
     {
@@ -546,6 +574,16 @@ else
         if (!ok) { Toast.ShowError(err ?? "Upload failed."); return; }
         await LoadAsync();
         Toast.ShowSuccess("Document uploaded.");
+    }
+
+    private async Task SendForSignatureAsync()
+    {
+        signatureBusy = true;
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.SendForSignatureManualAsync(Id, currentUser));
+        signatureBusy = false;
+        if (!ok) { Toast.ShowError(err ?? "Could not send for signature."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess("Sent to the primary contact for signature via Circularo.");
     }
 
     private async Task BcDeleteDocAsync(int docId)
@@ -638,6 +676,8 @@ else
         LandlordDocumentType.PowerOfAttorney => "POA",
         LandlordDocumentType.AuthorisationLetter => "Authorisation Letter",
         LandlordDocumentType.TitleDeed => "Title Deed",
+        LandlordDocumentType.RegistrationSummary => "Registration Summary",
+        LandlordDocumentType.SignedDocument => "Signed Document",
         _ => "Other"
     };
 
@@ -655,6 +695,7 @@ else
         LandlordService.EventRestarted => "Restarted",
         LandlordService.EventCompleted => "Registration completed",
         LandlordService.EventSignatureRequested => "Sent for signature",
+        LandlordService.EventSignatureCompleted => "Signature completed",
         LandlordService.EventLinkDeactivated => "Link deactivated",
         _ => t
     };

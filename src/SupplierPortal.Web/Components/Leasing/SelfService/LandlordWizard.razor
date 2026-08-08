@@ -33,12 +33,37 @@
     }
     else if (submitted)
     {
-        <div class="di-llw-shell"><div class="card"><div class="card-bd done-wrap">
-            <svg class="tick" viewBox="0 0 24 24" fill="none" stroke="#1D6F53" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
-            <h2 class="di-h mt-2">Registration submitted</h2>
-            <p class="muted">Your registration has been submitted to Business Centre for review.</p>
-            <div class="ref">@reference</div>
-        </div></div></div>
+        <div class="di-llw-shell">
+            <div class="done-card">
+                <div class="done-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+                </div>
+                <h2 class="done-title">Registration submitted</h2>
+                <p class="done-sub">Thank you — your landlord registration has been sent to Dubai Investments Business Centre for review.</p>
+
+                <div class="done-ref">
+                    <span class="done-ref-label">Reference number</span>
+                    <span class="done-ref-value">@reference</span>
+                </div>
+
+                <div class="done-steps">
+                    <div class="done-step">
+                        <span class="done-step-ico">1</span>
+                        <div class="done-step-txt"><b>Review</b><span>Business Centre verifies your details and documents.</span></div>
+                    </div>
+                    <div class="done-step">
+                        <span class="done-step-ico">2</span>
+                        <div class="done-step-txt"><b>Notification</b><span>You'll be emailed if a correction is needed, or once it's approved.</span></div>
+                    </div>
+                    <div class="done-step">
+                        <span class="done-step-ico">3</span>
+                        <div class="done-step-txt"><b>Signature</b><span>On approval, the primary contact receives the document to sign.</span></div>
+                    </div>
+                </div>
+
+                <p class="done-foot">You can safely close this window. Please keep your reference number for any follow-up.</p>
+            </div>
+        </div>
     }
     else
     {
@@ -405,6 +430,21 @@
     .di-llw .tick{width:44px;height:44px}
     .di-llw .done-wrap{text-align:center;padding:14px 0 6px}
     .di-llw .done-wrap .ref{font-family:monospace;font-size:24px;color:var(--navy);letter-spacing:.05em;margin:14px 0 4px}
+
+    .di-llw .done-card{background:#fff;border-radius:12px;border:1px solid var(--line);max-width:560px;margin:0 auto;padding:38px 34px 30px;text-align:center;box-shadow:0 16px 48px rgba(6,33,61,.28)}
+    .di-llw .done-badge{width:78px;height:78px;border-radius:50%;background:linear-gradient(135deg,#1D6F53,#25936c);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 8px 20px rgba(29,111,83,.38)}
+    .di-llw .done-badge svg{width:40px;height:40px}
+    .di-llw .done-title{font-size:24px;color:var(--navy);font-weight:700;margin:0 0 8px}
+    .di-llw .done-sub{color:var(--ink-soft);font-size:14.5px;margin:0 auto 22px;max-width:430px;line-height:1.6}
+    .di-llw .done-ref{background:var(--sand);border:1px dashed var(--line-strong);border-radius:8px;padding:12px 22px;display:inline-flex;flex-direction:column;gap:3px;margin-bottom:26px}
+    .di-llw .done-ref-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--taupe);font-weight:600}
+    .di-llw .done-ref-value{font-family:monospace;font-size:24px;color:var(--navy);letter-spacing:.06em;font-weight:700}
+    .di-llw .done-steps{text-align:left;display:flex;flex-direction:column;gap:16px;max-width:420px;margin:0 auto 24px}
+    .di-llw .done-step{display:flex;gap:14px;align-items:flex-start}
+    .di-llw .done-step-ico{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+    .di-llw .done-step-txt b{display:block;color:var(--navy);font-size:14.5px;margin-bottom:1px}
+    .di-llw .done-step-txt span{font-size:13px;color:var(--ink-soft);line-height:1.5}
+    .di-llw .done-foot{color:var(--ink-soft);font-size:12.5px;margin:0;border-top:1px solid var(--line);padding-top:16px}
     .di-llw .subhead{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--taupe);font-weight:600;margin:22px 0 10px}
     .di-llw .sig{border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;background:#fff}
     .di-llw .sig-hd{display:flex;align-items:center;gap:12px;padding:11px 14px}
@@ -655,12 +695,29 @@
     {
         if (landlord is null) return;
         error = null;
+
+        // Read the browser file ONCE — its stream can only be opened a single time, so we reuse the same
+        // bytes for both the upload and the Emirates-ID OCR (opening it twice silently broke extraction).
+        byte[] bytes;
+        try
+        {
+            using var ms = new MemoryStream();
+            await using (var src = e.File.OpenReadStream(10 * 1024 * 1024))
+                await src.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+        catch
+        {
+            error = "Could not read the selected file. Please try again.";
+            return;
+        }
+
         // Show the global progress bar while the file uploads (and, for an Emirates ID, is OCR-scanned).
         var (ok, err) = await Loading.RunAsync(async () =>
         {
-            var res = await DocumentService.UploadAsync(landlord.Id, type, e.File, ActorLabel);
+            var res = await DocumentService.UploadBytesAsync(landlord.Id, type, e.File.Name, e.File.ContentType, bytes, ActorLabel);
             if (res.Success && type == LandlordDocumentType.EmiratesId)
-                await TryExtractEmiratesIdAsync(e.File);
+                await TryExtractEmiratesIdAsync(bytes, e.File.Name);
             return res;
         });
         if (!ok) error = err;
@@ -668,18 +725,20 @@
     }
 
     /// <summary>Best-effort OCR of an uploaded Emirates ID: extracts the ID number, expiry and name and
-    /// prefills the primary contact. Never blocks the upload — a disabled/failed OCR is silently ignored.</summary>
-    private async Task TryExtractEmiratesIdAsync(IBrowserFile file)
+    /// prefills the primary contact. Never blocks the upload; always leaves a note so the user knows whether
+    /// to check/enter the details manually.</summary>
+    private async Task TryExtractEmiratesIdAsync(byte[] bytes, string fileName)
     {
-        eidExtractNote = null;
-        if (!Ocr.IsEnabled) return;
+        if (!Ocr.IsEnabled)
+        {
+            eidExtractNote = "Automatic reading is unavailable — please enter the Emirates ID details below.";
+            return;
+        }
         string? temp = null;
         try
         {
-            temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(file.Name)}");
-            await using (var fs = new FileStream(temp, FileMode.Create))
-            await using (var src = file.OpenReadStream(10 * 1024 * 1024))
-                await src.CopyToAsync(fs);
+            temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(fileName)}");
+            await File.WriteAllBytesAsync(temp, bytes);
 
             var text = await Ocr.ExtractTextAsync(temp);
             var r = EmiratesIdExtractor.Parse(text);
@@ -689,17 +748,21 @@
                 && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
                     CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
                 primary.EmiratesIdExpiry = exp;
-            if (r.Number is not null || r.Name is not null || r.Expiry is not null)
-                eidExtractNote = $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}";
+            eidExtractNote = (r.Number is not null || r.Name is not null || r.Expiry is not null)
+                ? $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}. Please check and correct if needed."
+                : "We couldn't read the card automatically — please enter the Emirates ID details below.";
         }
-        catch { /* OCR is best-effort enrichment */ }
+        catch
+        {
+            eidExtractNote = "We couldn't read the card automatically — please enter the Emirates ID details below.";
+        }
         finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
     }
 
     // Landlord-facing document list — excludes the system-generated registration-summary PDF.
     private async Task<List<LandlordDocument>> LoadLandlordDocumentsAsync(int landlordId) =>
         (await DocumentService.GetDocumentsAsync(landlordId))
-            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .Where(d => d.DocumentType is not (LandlordDocumentType.RegistrationSummary or LandlordDocumentType.SignedDocument))
             .ToList();
 
     private async Task DeleteDocAsync(int docId)

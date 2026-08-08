@@ -42,20 +42,34 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         int landlordId, LandlordDocumentType documentType, IBrowserFile file, string uploadedBy,
         int? contactId = null, int? signatoryId = null)
     {
-        // FRD §12 validation: not empty, supported type, within the size limit.
+        // FRD §12 validation: not empty, within the size limit (type checked in the bytes overload).
         if (file.Size == 0) return (false, "The selected file is empty.");
         if (file.Size > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
-        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(ext))
-            return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
 
-        // Read the whole file into memory and Base64-encode it for in-table storage.
+        // Read the whole file into memory ONCE. A Blazor IBrowserFile stream can only be opened a single
+        // time, so callers that also need the bytes (e.g. OCR) must reuse them via the bytes overload.
         using var ms = new MemoryStream();
         await using (var source = file.OpenReadStream(MaxFileSizeBytes))
         {
             await source.CopyToAsync(ms);
         }
-        var base64 = Convert.ToBase64String(ms.ToArray());
+        return await UploadBytesAsync(landlordId, documentType, file.Name, file.ContentType, ms.ToArray(),
+            uploadedBy, contactId, signatoryId);
+    }
+
+    /// <summary>Stores a document from raw bytes (already read) — used when the caller needs the same bytes
+    /// for something else (e.g. OCR), since a browser file stream can only be opened once.</summary>
+    public async Task<(bool Success, string? Error)> UploadBytesAsync(
+        int landlordId, LandlordDocumentType documentType, string fileName, string? contentType, byte[] bytes,
+        string uploadedBy, int? contactId = null, int? signatoryId = null)
+    {
+        if (bytes is null || bytes.Length == 0) return (false, "The selected file is empty.");
+        if (bytes.LongLength > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (!AllowedExtensions.Contains(ext))
+            return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
+
+        var base64 = Convert.ToBase64String(bytes);
 
         await using var db = await dbFactory.CreateDbContextAsync();
 
@@ -79,10 +93,10 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         {
             LandlordId = landlordId,
             DocumentType = documentType,
-            FileName = file.Name,
+            FileName = fileName,
             StoredFileName = $"{Guid.NewGuid():N}{ext}",   // logical name only; no file on disk
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
-            FileSizeBytes = file.Size,
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            FileSizeBytes = bytes.LongLength,
             ContentBase64 = base64,
             UploadedBy = uploadedBy,
             ContactId = contactId,
