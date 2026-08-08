@@ -33,6 +33,13 @@ public class CircularoOptions
     /// <summary>Query-string parameter name carrying the token when <see cref="AuthMode"/> includes the query mode.</summary>
     public string TokenQueryParam { get; set; } = "token";
 
+    /// <summary>File-storage endpoint (relative to <see cref="BaseUrl"/>). Circularo stores the raw file first
+    /// and returns a file id that the document then references. Discovered from the web app: <c>files/saveFile</c>.</summary>
+    public string FileUploadPath { get; set; } = "files/saveFile";
+
+    /// <summary>Form field name for the file in the <see cref="FileUploadPath"/> multipart request.</summary>
+    public string FileUploadField { get; set; } = "file";
+
     /// <summary>Document-creation endpoint (relative to <see cref="BaseUrl"/>). Circularo's <c>POST documents</c>
     /// creates the document together with its signing workflow (it validates <c>definitionType</c> + <c>workflow</c>).</summary>
     public string UploadPath { get; set; } = "documents";

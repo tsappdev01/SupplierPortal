@@ -91,9 +91,42 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
     private void Authorize(HttpRequestMessage req)
     {
+        req.Headers.TryAddWithoutValidation("lang", "en");
         if (!UseHeaderToken || string.IsNullOrWhiteSpace(_o.ApiKey)) return;
         req.Headers.TryAddWithoutValidation("Authorization",
             string.IsNullOrWhiteSpace(_o.AuthScheme) ? _o.ApiKey : $"{_o.AuthScheme} {_o.ApiKey}");
+    }
+
+    /// <summary>Stores the raw file in Circularo (POST files/saveFile) and returns its file id, which the
+    /// document then references. Returns (null, hint) on failure — hint carries the server's response for the UI.</summary>
+    private async Task<(string? fileId, string? hint)> UploadFileAsync(byte[] pdf, string fileName, CancellationToken ct)
+    {
+        string? hint = null;
+        foreach (var field in new[] { _o.FileUploadField, "files", "upload" }.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            using var form = new MultipartFormDataContent();
+            var fc = new ByteArrayContent(pdf);
+            fc.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            form.Add(fc, string.IsNullOrWhiteSpace(field) ? "file" : field, fileName);
+            // extra form fields the web app sends alongside the file
+            form.Add(new StringContent("true"), "checkPassword");
+            form.Add(new StringContent("false"), "usePdfA");
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, Url(_o.FileUploadPath)) { Content = form };
+            Authorize(req);
+            using var resp = await http.SendAsync(req, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            if (resp.IsSuccessStatusCode)
+            {
+                var id = ExtractId(body);
+                logger.LogInformation("Circularo saveFile succeeded [field={Field}], file {FileId}.", field, id);
+                return (id, null);
+            }
+            logger.LogWarning("Circularo saveFile via field '{Field}' failed {Status}: {Body}", field, resp.StatusCode, Trunc(body));
+            if (!string.IsNullOrWhiteSpace(body)) hint = $"saveFile[{field}] {(int)resp.StatusCode}: {Trunc(body)}";
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) break; // route missing — other fields won't help
+        }
+        return (null, hint);
     }
 
     public async Task<CircularoResult> SendForSignatureAsync(
@@ -104,6 +137,13 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
         try
         {
+            // 0) Store the raw file first — Circularo returns a file id the document references (files/saveFile).
+            var (fileId, fileHint) = await UploadFileAsync(pdf, fileName, ct);
+            if (fileId is not null)
+                logger.LogInformation("Circularo file stored, id {FileId}.", fileId);
+            else
+                logger.LogWarning("Circularo file store returned no id ({Hint}); falling back to inline file content.", fileHint);
+
             // Build the signer / signing workflow. Circularo's POST documents creates the document together
             // with its workflow (it validates that both "definitionType" and "workflow" are present), so the
             // file, the document type and the workflow all go in one create call. The exact field shapes vary
@@ -122,7 +162,6 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
             var workflow = new[] { signer };
 
             var title = Path.GetFileNameWithoutExtension(fileName);
-            var b64 = Convert.ToBase64String(pdf);
             var createBody = new Dictionary<string, object?>
             {
                 ["definitionType"] = _o.DefinitionType,
@@ -130,14 +169,24 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
                 ["name"] = fileName,
                 ["workflow"] = workflow,
                 ["subject"] = _o.RequestSubject,
-                ["message"] = _o.RequestMessage,
-                // the file carried under a few likely keys (extras are ignored server-side)
-                ["fileName"] = fileName,
-                ["contentType"] = "application/pdf",
-                ["data"] = b64,
-                ["file"] = b64,
-                ["content"] = b64
+                ["message"] = _o.RequestMessage
             };
+            if (fileId is not null)
+            {
+                // reference the stored file by id (Circularo's model: document -> files[])
+                createBody["files"] = new[] { new Dictionary<string, object?> { ["_id"] = fileId, ["fileId"] = fileId, ["name"] = fileName } };
+                createBody["fileId"] = fileId;
+            }
+            else
+            {
+                // no file id (saveFile unavailable): fall back to inline base64 under a few likely keys
+                var b64 = Convert.ToBase64String(pdf);
+                createBody["fileName"] = fileName;
+                createBody["contentType"] = "application/pdf";
+                createBody["data"] = b64;
+                createBody["file"] = b64;
+                createBody["content"] = b64;
+            }
             if (_o.RequireUaePassSignature) createBody["signatureProvider"] = _o.SignatureProvider;
 
             // The create-document JSON body (carries the workflow) is tried first; multipart uploads are kept
@@ -277,7 +326,7 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
     // ---- response helpers (Circularo returns JSON; ids/urls appear under a few possible keys) ----
 
     private static string? ExtractId(string json) =>
-        ExtractString(json, "_id", "docId", "documentId", "id");
+        ExtractString(json, "_id", "fileId", "docId", "documentId", "id");
 
     private static string? ExtractString(string json, params string[] names)
     {
