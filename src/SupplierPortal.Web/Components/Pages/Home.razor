@@ -22,11 +22,8 @@
             <span class="di-home-photo di-home-initials">@GetInitials(user.FullName ?? user.Username)</span>
         }
         <div>
-            <div class="di-home-name">@(user.FullName ?? user.Username)</div>
-            @if (user.Designation is { } designation)
-            {
-                <div class="di-home-designation">@designation</div>
-            }
+            <div class="di-home-name">Welcome, @(user.FullName ?? user.Username)</div>
+            <div class="di-home-designation">Choose an application to continue</div>
         </div>
     </div>
 
@@ -36,10 +33,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7l8 4 8-4Z"/><path d="M4 7v10l8 4 8-4V7"/><path d="m12 11 0 10"/></svg>
             </span>
             <span class="di-launch-body">
-                <span class="di-launch-title">Launch Supplier</span>
+                <span class="di-launch-title">Supplier Portal</span>
                 <span class="di-launch-sub">Manage suppliers, notifications and self-service.</span>
             </span>
-            <span class="di-launch-arrow">→</span>
+            <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
         </a>
 
         @if (isLeasingUser)
@@ -52,72 +49,32 @@
                     <span class="di-launch-title">Landlord Portal</span>
                     <span class="di-launch-sub">Property list, landlord registrations and reviews.</span>
                 </span>
-                <span class="di-launch-arrow">→</span>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
             </a>
         }
+
+        <div class="di-launch-card di-launch-broker di-launch-soon" role="button" aria-disabled="true">
+            <span class="di-launch-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <span class="di-launch-body">
+                <span class="di-launch-title">Broker Portal</span>
+                <span class="di-launch-sub">Broker onboarding, listings and commissions.</span>
+            </span>
+            <span class="di-launch-badge">Coming soon</span>
+        </div>
+
+        <div class="di-launch-card di-launch-customer di-launch-soon" role="button" aria-disabled="true">
+            <span class="di-launch-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <span class="di-launch-body">
+                <span class="di-launch-title">Customer Portal</span>
+                <span class="di-launch-sub">Customer accounts, requests and statements.</span>
+            </span>
+            <span class="di-launch-badge">Coming soon</span>
+        </div>
     </div>
-
-    <h1>User Information</h1>
-    <table class="table di-home-table">
-        <tbody>
-            <tr>
-                <th>Username</th>
-                <td>@user.Username</td>
-            </tr>
-            <tr>
-                <th>Full Name</th>
-                <td>@(user.FullName ?? "-")</td>
-            </tr>
-            <tr>
-                <th>Email</th>
-                <td>@user.Email</td>
-            </tr>
-            <tr>
-                <th>Designation</th>
-                <td>@(user.Designation ?? "-")</td>
-            </tr>
-            <tr>
-                <th>Role</th>
-                <td>@(user.UserType switch { UserType.Administrator => "Administrator", UserType.LeasingManager => "Leasing Manager", _ => "Normal User" })</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <h2>Business Unit</h2>
-    @if (user.BusinessUnits.Count == 0)
-    {
-        <p class="text-muted">No Business Unit assigned.</p>
-    }
-    else
-    {
-        <table class="table di-home-table">
-            <thead>
-                <tr>
-                    <th>Business Unit</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var businessUnit in user.BusinessUnits)
-                {
-                    <tr>
-                        <td>
-                            <span class="di-home-bu">
-                                @if (businessUnit.Logo is not null)
-                                {
-                                    <img src="/business-units/@businessUnit.Id/logo" alt="" class="di-home-bu-logo" />
-                                }
-                                else
-                                {
-                                    <span class="di-home-bu-logo di-home-bu-placeholder">@GetInitials(businessUnit.Name)</span>
-                                }
-                                <span>@businessUnit.Name</span>
-                            </span>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
 }
 
 <style>
@@ -150,6 +107,46 @@
 
     .di-launch-landlord {
         background: linear-gradient(135deg, #0e3a66 0%, #164a7b 100%);
+    }
+
+    .di-launch-broker {
+        background: linear-gradient(135deg, #3d2c56 0%, #5a4080 100%);
+    }
+
+    .di-launch-customer {
+        background: linear-gradient(135deg, #14504a 0%, #1f7a70 100%);
+    }
+
+    .di-launch-soon {
+        cursor: default;
+        opacity: .8;
+    }
+
+    .di-launch-soon:hover {
+        transform: none;
+        box-shadow: 0 6px 18px rgba(26, 34, 51, .18);
+    }
+
+    .di-launch-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        font-size: .95rem;
+        white-space: nowrap;
+    }
+
+    .di-launch-badge {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        background: rgba(255, 255, 255, .18);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, .35);
+        border-radius: 999px;
+        padding: 4px 10px;
+        white-space: nowrap;
     }
 
     .di-launch-ico {
@@ -203,49 +200,6 @@
     .di-home-designation {
         font-size: 0.9rem;
         color: #7b8697;
-    }
-
-    .di-home-table {
-        max-width: 640px;
-        background: #fff;
-        border: 1px solid #e2e5ea;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-
-    .di-home-table th {
-        width: 200px;
-        color: #1a2233;
-        background: #f4f6f9;
-    }
-
-    .di-home-bu {
-        display: inline-flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .di-home-bu-logo {
-        height: 32px;
-        max-width: 110px;
-        object-fit: contain;
-        border: 1px solid #e2e5ea;
-        border-radius: 4px;
-        background: #fff;
-        padding: 2px 5px;
-    }
-
-    .di-home-bu-placeholder {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 32px;
-        background: #1a2233;
-        color: #c8a24a;
-        font-size: 0.72rem;
-        font-weight: 700;
-        padding: 0;
     }
 </style>
 
