@@ -490,7 +490,8 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
 
         await email.SendCompletionToLandlordAsync(l.Email, l.PropertyCode);
-        await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value);
+        // Notify Business-Centre staff, and in particular the user who initiated the request (l.CreatedBy).
+        await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy);
         return (true, null);
     }
 

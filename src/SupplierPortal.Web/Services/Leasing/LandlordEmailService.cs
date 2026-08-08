@@ -56,15 +56,18 @@ public class LandlordEmailService(
                 "<p style=\"margin:0\">No further action is required. Thank you for registering with Dubai Investments.</p>",
                 null, null, null));
 
-    public Task SendCompletionToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string completedBy, DateTime completedAt)
+    public Task SendCompletionToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string completedBy, DateTime completedAt, string? initiatedBy = null)
     {
+        var initiatedRow = string.IsNullOrWhiteSpace(initiatedBy) ? ""
+            : $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Initiated By</td><td style=\"padding:4px 0\">{E(initiatedBy)}</td></tr>";
         var rows =
             $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
             $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            initiatedRow +
             $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Completed By</td><td style=\"padding:4px 0\">{E(completedBy)}</td></tr>" +
             $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Completion Date</td><td style=\"padding:4px 0\">{completedAt:yyyy-MM-dd HH:mm} UTC</td></tr>";
         var body = Wrap("Landlord Registration Completed",
-            "<p style=\"margin:0 0 14px\">A landlord registration has been completed:</p>" +
+            "<p style=\"margin:0 0 14px\">A landlord registration you are responsible for has been completed:</p>" +
             $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>", null, null, null);
         return Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
             .Select(e => SendAsync(e, $"Landlord Registration Completed – {propertyCode}", body)));
