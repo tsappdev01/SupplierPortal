@@ -76,7 +76,10 @@ public class AzureDocumentIntelligenceOcrService(
                 {
                     if (root.TryGetProperty("analyzeResult", out var ar) && ar.TryGetProperty("content", out var c))
                     {
-                        return c.GetString();
+                        var ocrContent = c.GetString();
+                        logger.LogInformation("Azure OCR succeeded for {File}: {Length} chars extracted.",
+                            Path.GetFileName(filePath), ocrContent?.Length ?? 0);
+                        return ocrContent;
                     }
                     return null;
                 }
