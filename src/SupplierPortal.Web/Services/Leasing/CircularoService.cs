@@ -36,6 +36,13 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
     private string Url(string relative) => $"{_o.BaseUrl.TrimEnd('/')}/{relative.TrimStart('/')}";
 
+    private IEnumerable<string> UploadPaths() =>
+        (_o.UploadPathCandidates is { Length: > 0 } c
+            ? c
+            : new[] { _o.UploadPath, "document/upload", "documents", "document", "documents/upload", "file/upload", "file", "upload" })
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
     private void Authorize(HttpRequestMessage req) =>
         req.Headers.TryAddWithoutValidation("Authorization",
             string.IsNullOrWhiteSpace(_o.AuthScheme) ? _o.ApiKey : $"{_o.AuthScheme} {_o.ApiKey}");
@@ -48,27 +55,33 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
         try
         {
-            // 1) Upload the document (multipart/form-data).
-            string? documentId;
-            using (var form = new MultipartFormDataContent())
+            // 1) Upload the document (multipart/form-data). The exact path varies by Circularo version, so try
+            // the configured candidates in order until one returns 2xx; log the winner so it can be pinned.
+            string? documentId = null;
+            var tried = new List<string>();
+            foreach (var path in UploadPaths())
             {
+                using var form = new MultipartFormDataContent();
                 var fileContent = new ByteArrayContent(pdf);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
                 form.Add(fileContent, _o.UploadFileField, fileName);
 
-                using var upReq = new HttpRequestMessage(HttpMethod.Post, Url(_o.UploadPath)) { Content = form };
+                using var upReq = new HttpRequestMessage(HttpMethod.Post, Url(path)) { Content = form };
                 Authorize(upReq);
                 using var upResp = await http.SendAsync(upReq, ct);
                 var upBody = await upResp.Content.ReadAsStringAsync(ct);
+                tried.Add($"{path}→{(int)upResp.StatusCode}");
                 if (!upResp.IsSuccessStatusCode)
                 {
-                    logger.LogWarning("Circularo upload failed {Status}: {Body}", upResp.StatusCode, Trunc(upBody));
-                    return new(false, null, null, $"Upload failed ({(int)upResp.StatusCode}).");
+                    logger.LogWarning("Circularo upload via '{Path}' failed {Status}: {Body}", path, upResp.StatusCode, Trunc(upBody));
+                    continue;
                 }
                 documentId = ExtractId(upBody);
-                if (string.IsNullOrWhiteSpace(documentId))
-                    return new(false, null, null, "Upload succeeded but no document id was returned.");
+                logger.LogInformation("Circularo upload succeeded via '{Path}', document {DocId}.", path, documentId);
+                break;
             }
+            if (string.IsNullOrWhiteSpace(documentId))
+                return new(false, null, null, $"Upload failed. Tried: {string.Join(", ", tried)}");
 
             // 2) Create the signature workflow addressed to the signer (Circularo emails them). The
             // "sign here" box printed on the last page of the summary is the visual anchor for the field.

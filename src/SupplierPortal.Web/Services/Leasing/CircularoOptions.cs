@@ -26,6 +26,11 @@ public class CircularoOptions
     /// <summary>Multipart upload endpoint (relative to <see cref="BaseUrl"/>).</summary>
     public string UploadPath { get; set; } = "document/upload";
 
+    /// <summary>Candidate upload endpoints tried in order until one succeeds (self-discovery when the exact
+    /// path isn't known). When empty, a built-in candidate list is used. Set this once the working path is
+    /// known to avoid probing.</summary>
+    public string[] UploadPathCandidates { get; set; } = [];
+
     /// <summary>Form field name for the uploaded file in the multipart request.</summary>
     public string UploadFileField { get; set; } = "file";
 
