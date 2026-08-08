@@ -16,7 +16,9 @@ public static partial class EmiratesIdExtractor
     [GeneratedRegex(@"\b(\d{2})[/-](\d{2})[/-](\d{4})\b", RegexOptions.Compiled)]
     private static partial Regex DateRegex();
 
-    [GeneratedRegex(@"(?:Name|Holder)\s*[:.]?\s*([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,4})", RegexOptions.Compiled)]
+    // "Name" / "Holder" label, then skip any Arabic text / punctuation on the same line up to the first
+    // run of Latin words (the English name), capturing up to 5 words.
+    [GeneratedRegex(@"(?:Name|Holder|Card\s*Holder)\s*[:.]?[^A-Za-z\n]{0,25}([A-Z][A-Za-z'.\-]+(?:\s+[A-Za-z'.\-]+){0,4})", RegexOptions.Compiled)]
     private static partial Regex NameRegex();
 
     public static Result Parse(string? text)
@@ -34,7 +36,7 @@ public static partial class EmiratesIdExtractor
 
         // Expiry: prefer a date near an "Expiry"/"Expiring" label, else the latest date on the card.
         string? expiry = null;
-        var expiryLabel = Regex.Match(text, @"(?:Expiry|Expiring|Expire[sd]?|Date of Expiry)\D{0,20}(\d{2}[/-]\d{2}[/-]\d{4})", RegexOptions.IgnoreCase);
+        var expiryLabel = Regex.Match(text, @"(?:Expiry|Expiring|Expire[sd]?|Date of Expiry|Card Expiry|Valid\s*Until)\D{0,20}(\d{2}[/-]\d{2}[/-]\d{4})", RegexOptions.IgnoreCase);
         if (expiryLabel.Success)
         {
             expiry = expiryLabel.Groups[1].Value;

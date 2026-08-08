@@ -724,39 +724,51 @@
         documents = await LoadLandlordDocumentsAsync(landlord.Id);
     }
 
-    /// <summary>Best-effort OCR of an uploaded Emirates ID: extracts the ID number, expiry and name and
-    /// prefills the primary contact. Never blocks the upload; always leaves a note so the user knows whether
-    /// to check/enter the details manually.</summary>
+    /// <summary>Best-effort extraction of an uploaded Emirates ID: reads the PDF text layer locally first
+    /// (instant, no cloud), then falls back to cloud OCR for image-only cards. Prefills the primary contact
+    /// and always leaves a note so the user knows whether to check / enter the details manually.</summary>
     private async Task TryExtractEmiratesIdAsync(byte[] bytes, string fileName)
     {
-        if (!Ocr.IsEnabled)
+        string? text = null;
+
+        // 1) Fast path: a PDF that carries a real text layer can be read locally without any cloud OCR.
+        if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            text = LocalPdfText.TryExtract(bytes);
+        var haveId = !string.IsNullOrWhiteSpace(text) && EmiratesIdExtractor.Parse(text).Number is not null;
+
+        // 2) Fall back to cloud OCR for image-only cards (or PDFs without a usable text layer).
+        if (!haveId && Ocr.IsEnabled)
         {
-            eidExtractNote = "Automatic reading is unavailable — please enter the Emirates ID details below.";
+            string? temp = null;
+            try
+            {
+                temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(fileName)}");
+                await File.WriteAllBytesAsync(temp, bytes);
+                var ocr = await Ocr.ExtractTextAsync(temp);
+                if (!string.IsNullOrWhiteSpace(ocr)) text = ocr;
+            }
+            catch { /* fall through to the manual-entry note */ }
+            finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            eidExtractNote = Ocr.IsEnabled
+                ? "We couldn't read the card automatically — please enter the Emirates ID details below."
+                : "Automatic reading is unavailable — please enter the Emirates ID details below.";
             return;
         }
-        string? temp = null;
-        try
-        {
-            temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(fileName)}");
-            await File.WriteAllBytesAsync(temp, bytes);
 
-            var text = await Ocr.ExtractTextAsync(temp);
-            var r = EmiratesIdExtractor.Parse(text);
-            if (r.Number is not null) primary.EmiratesId = r.Number;
-            if (r.Name is not null && string.IsNullOrWhiteSpace(primary.FullName)) primary.FullName = r.Name;
-            if (r.Expiry is not null && primary.EmiratesIdExpiry is null
-                && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
-                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
-                primary.EmiratesIdExpiry = exp;
-            eidExtractNote = (r.Number is not null || r.Name is not null || r.Expiry is not null)
-                ? $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}. Please check and correct if needed."
-                : "We couldn't read the card automatically — please enter the Emirates ID details below.";
-        }
-        catch
-        {
-            eidExtractNote = "We couldn't read the card automatically — please enter the Emirates ID details below.";
-        }
-        finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
+        var r = EmiratesIdExtractor.Parse(text);
+        if (r.Number is not null) primary.EmiratesId = r.Number;
+        if (r.Name is not null && string.IsNullOrWhiteSpace(primary.FullName)) primary.FullName = r.Name;
+        if (r.Expiry is not null && primary.EmiratesIdExpiry is null
+            && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
+            primary.EmiratesIdExpiry = exp;
+        eidExtractNote = (r.Number is not null || r.Name is not null || r.Expiry is not null)
+            ? $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}. Please check and correct if needed."
+            : "We couldn't read the card automatically — please enter the Emirates ID details below.";
     }
 
     // Landlord-facing document list — excludes the system-generated registration-summary PDF.
