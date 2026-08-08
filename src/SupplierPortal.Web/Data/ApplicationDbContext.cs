@@ -23,6 +23,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
     public DbSet<CustomerDocument> CustomerDocuments => Set<CustomerDocument>();
+    public DbSet<CustomerFieldConfig> CustomerFieldConfigs => Set<CustomerFieldConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

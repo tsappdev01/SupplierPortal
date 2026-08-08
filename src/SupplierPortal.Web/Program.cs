@@ -64,6 +64,7 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<SupplierService>();
 builder.Services.AddScoped<SupplierActivityService>();
 builder.Services.AddScoped<SupplierFieldSettingService>();
+builder.Services.AddScoped<CustomerFieldConfigService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();

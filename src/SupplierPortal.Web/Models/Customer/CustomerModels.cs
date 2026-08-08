@@ -198,3 +198,45 @@ public class CustomerDocument
     [MaxLength(150)] public string? UploadedBy { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>Control mode a field takes for a given role. Mirrors the onboarding sheet's vocabulary.</summary>
+public static class CustomerFieldControls
+{
+    public const string Editable = "Editable";
+    public const string Readonly = "Readonly";
+    public const string Lookup = "Lookup";
+    public static readonly string[] All = [Editable, Readonly, Lookup];
+}
+
+/// <summary>Per-field configuration for the CST portal, seeded from the onboarding sheet. For each customer
+/// field it governs the control for the <b>Business</b> Relation department vs the <b>Customer</b>
+/// (self-service) — Editable / Readonly / Lookup — plus whether the field is visible and required. Editing
+/// this on the Field Settings screen changes how the forms render per role, with no code change.</summary>
+public class CustomerFieldConfig
+{
+    public int Id { get; set; }
+
+    /// <summary>The entity property this row governs (e.g. "LegalName"). Unique within a <see cref="Section"/>.</summary>
+    [Required, MaxLength(100)] public string FieldKey { get; set; } = string.Empty;
+
+    [Required, MaxLength(200)] public string DisplayLabel { get; set; } = string.Empty;
+
+    /// <summary>"Account" (the Customer entity) or "Contact" (the CustomerContact entity).</summary>
+    [MaxLength(20)] public string Section { get; set; } = "Account";
+
+    /// <summary>Display order within the section.</summary>
+    public int Sequence { get; set; }
+
+    /// <summary>How the field renders: text | lookup | date | yesno.</summary>
+    [MaxLength(20)] public string FieldKind { get; set; } = "text";
+
+    /// <summary>Control for the Business Relation department. See <see cref="CustomerFieldControls"/>.</summary>
+    [MaxLength(20)] public string BusinessControl { get; set; } = CustomerFieldControls.Editable;
+
+    /// <summary>Control for the Customer (self-service). See <see cref="CustomerFieldControls"/>.</summary>
+    [MaxLength(20)] public string CustomerControl { get; set; } = CustomerFieldControls.Editable;
+
+    public bool IsVisible { get; set; } = true;
+
+    public bool IsRequired { get; set; }
+}

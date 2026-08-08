@@ -113,8 +113,16 @@
                 @if (customerExpanded)
                 {
                     <div class="nav-item px-3 di-sub-item">
-                        <span class="nav-link di-sub-disabled">Manage Customer <span class="di-soon-tag">Soon</span></span>
+                        <span class="nav-link di-sub-disabled">Customer Registrations <span class="di-soon-tag">Soon</span></span>
                     </div>
+                    @if (isAdministrator)
+                    {
+                        <div class="nav-item px-3 di-sub-item">
+                            <NavLink class="nav-link" href="admin/customer-fields">
+                                Field Settings
+                            </NavLink>
+                        </div>
+                    }
                 }
             }
 

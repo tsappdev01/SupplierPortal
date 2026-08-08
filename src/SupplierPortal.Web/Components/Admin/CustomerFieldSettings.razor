@@ -1,0 +1,127 @@
+@page "/admin/customer-fields"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerFieldConfigService FieldConfigService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Customer Field Settings - CST Portal</PageTitle>
+
+<h1>Customer Field Settings</h1>
+<p class="text-muted">
+    For each field from the customer onboarding sheet, choose the control the <strong>Business Relation</strong>
+    department gets versus the <strong>Customer</strong> (self-service) — Editable, Read-only or Lookup — and
+    whether the field is visible and required. These rules drive how the customer forms render, with no code change.
+</p>
+
+@if (savedMessage is not null)
+{
+    <div class="alert alert-success">@savedMessage</div>
+}
+
+@if (configs.Count == 0)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
+            @(saving ? "Saving…" : "Save changes")
+        </button>
+        <span class="text-muted">@configs.Count fields · @configs.Count(c => c.Section == "Account") account · @configs.Count(c => c.Section == "Contact") contact</span>
+    </div>
+
+    @foreach (var group in configs.GroupBy(c => c.Section).OrderBy(g => g.Key == "Account" ? 0 : 1))
+    {
+        <div class="di-field-settings-section mb-3">
+            <div class="di-field-settings-header">@(group.Key == "Account" ? "Account (Company)" : "Contact (Individual)") — @group.Count() fields</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th style="width: 150px;">Business control</th>
+                            <th style="width: 150px;">Customer control</th>
+                            <th style="width: 90px;">Visible</th>
+                            <th style="width: 90px;">Required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in group)
+                        {
+                            <tr>
+                                <td>
+                                    @f.DisplayLabel
+                                    @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
+                                    else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Date</span> }
+                                    else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Yes/No</span> }
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" @bind="f.BusinessControl">
+                                        @foreach (var c in CustomerFieldControls.All)
+                                        {
+                                            <option value="@c">@c</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" @bind="f.CustomerControl">
+                                        @foreach (var c in CustomerFieldControls.All)
+                                        {
+                                            <option value="@c">@c</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <label class="di-switch">
+                                        <input type="checkbox" @bind="f.IsVisible" />
+                                        <span class="di-switch-slider"></span>
+                                    </label>
+                                </td>
+                                <td>
+                                    <label class="di-switch">
+                                        <input type="checkbox" @bind="f.IsRequired" disabled="@(!f.IsVisible)" />
+                                        <span class="di-switch-slider"></span>
+                                    </label>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
+        @(saving ? "Saving…" : "Save changes")
+    </button>
+}
+
+@code {
+    private List<CustomerFieldConfig> configs = [];
+    private string currentUser = "unknown";
+    private string? savedMessage;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        configs = await FieldConfigService.GetAllAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        savedMessage = null;
+        // Keep the grid consistent: an invisible field can't be required.
+        foreach (var f in configs.Where(f => !f.IsVisible)) f.IsRequired = false;
+        await FieldConfigService.SaveAsync(configs, currentUser);
+        saving = false;
+        savedMessage = "Field settings saved.";
+    }
+}
