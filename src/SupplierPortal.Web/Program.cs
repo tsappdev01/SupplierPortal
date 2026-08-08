@@ -194,6 +194,12 @@ using (var scope = app.Services.CreateScope())
         .GetRequiredService<IDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>>();
     await using var leasingDb = await leasingFactory.CreateDbContextAsync();
     await leasingDb.Database.MigrateAsync();
+
+    // Make the effective SQL Server unambiguous in the logs. If appsettings.Local.json is present it
+    // overrides appsettings.json — this line shows which server/database the app actually talks to.
+    var conn = db.Database.GetDbConnection();
+    app.Logger.LogInformation("Database: connected to SQL Server '{Server}', database '{Database}'.",
+        conn.DataSource, conn.Database);
 }
 
 // Configure the HTTP request pipeline.
