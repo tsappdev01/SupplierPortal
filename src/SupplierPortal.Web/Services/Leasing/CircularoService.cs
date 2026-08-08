@@ -72,14 +72,36 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
             // 2) Create the signature workflow addressed to the signer (Circularo emails them). The
             // "sign here" box printed on the last page of the summary is the visual anchor for the field.
-            var payload = new
+            // When configured, require UAE Pass signing + UAE Pass identity verification (email-match) —
+            // the signer email is the UAE-Pass-verified primary-contact email.
+            var recipient = new Dictionary<string, object?>
             {
-                subject = _o.RequestSubject,
-                message = _o.RequestMessage,
-                signers = new[] { new { name = signerName, email = signerEmail, role = "signer", order = 1 } },
-                recipients = new[] { new { name = signerName, email = signerEmail, action = "sign", order = 1 } },
-                fields = new[] { new { type = "signature", recipientEmail = signerEmail, page = -1, anchor = "Sign here", required = true } }
+                ["name"] = signerName, ["email"] = signerEmail, ["role"] = "signer", ["action"] = "sign", ["order"] = 1
             };
+            if (_o.RequireUaePassSignature) recipient["signatureProvider"] = _o.SignatureProvider;
+            if (_o.RequireUaePassVerification)
+                recipient["authentication"] = new Dictionary<string, object?>
+                {
+                    ["method"] = _o.VerificationMethod,
+                    ["factor"] = _o.VerificationFactor,
+                    ["email"] = signerEmail
+                };
+
+            var field = new Dictionary<string, object?>
+            {
+                ["type"] = "signature", ["recipientEmail"] = signerEmail, ["page"] = -1, ["anchor"] = "Sign here", ["required"] = true
+            };
+            if (_o.RequireUaePassSignature) field["provider"] = _o.SignatureProvider;
+
+            var payload = new Dictionary<string, object?>
+            {
+                ["subject"] = _o.RequestSubject,
+                ["message"] = _o.RequestMessage,
+                ["signers"] = new[] { recipient },
+                ["recipients"] = new[] { recipient },
+                ["fields"] = new[] { field }
+            };
+            if (_o.RequireUaePassSignature) payload["signatureProvider"] = _o.SignatureProvider;
             var json = JsonSerializer.Serialize(payload);
             using var signReq = new HttpRequestMessage(HttpMethod.Post, Url(_o.SignInvitePath.Replace("{id}", documentId)))
             {

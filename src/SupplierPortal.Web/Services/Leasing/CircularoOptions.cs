@@ -39,6 +39,22 @@ public class CircularoOptions
     /// <c>X-Webhook-Secret</c> header or a <c>?secret=</c> query value). Empty disables the check.</summary>
     public string WebhookSecret { get; set; } = "";
 
+    // ---- UAE Pass signing / identity verification (per the Circularo ↔ UAE Pass integration) ----
+    /// <summary>Require the signer to sign with UAE Pass (UAE Pass certificate).</summary>
+    public bool RequireUaePassSignature { get; set; } = true;
+
+    /// <summary>Require the external recipient to verify their identity via UAE Pass to open the document.</summary>
+    public bool RequireUaePassVerification { get; set; } = true;
+
+    /// <summary>Signature provider value sent to Circularo when UAE Pass signing is required.</summary>
+    public string SignatureProvider { get; set; } = "uaepass";
+
+    /// <summary>Identity-verification method value for the recipient (UAE Pass).</summary>
+    public string VerificationMethod { get; set; } = "uaepass";
+
+    /// <summary>Verification factor to match the recipient on (email must match their UAE Pass account).</summary>
+    public string VerificationFactor { get; set; } = "email";
+
     /// <summary>Subject line for the signature request Circularo emails to the signer.</summary>
     public string RequestSubject { get; set; } = "Signature required — Landlord Registration";
 
