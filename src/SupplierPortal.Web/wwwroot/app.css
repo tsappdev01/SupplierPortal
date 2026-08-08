@@ -354,7 +354,11 @@ table thead th {
 .di-stat-review { border-top-color: #c8a24a; } .di-stat-review .di-stat-value { color: #a8842f; }
 .di-stat-complete { border-top-color: #2e7d46; } .di-stat-complete .di-stat-value { color: #2e7d46; }
 [data-theme="dark"] .di-stat-total { border-top-color: #8fa0c4; }
-[data-theme="dark"] .di-stat-review .di-stat-value { color: #d8b25f; }
+/* Brighten the accent values so they stay legible on the dark surface. */
+[data-theme="dark"] .di-stat-new .di-stat-value { color: #aeb7c4; }
+[data-theme="dark"] .di-stat-await .di-stat-value { color: #5aa6e0; }
+[data-theme="dark"] .di-stat-review .di-stat-value { color: #e0b45a; }
+[data-theme="dark"] .di-stat-complete .di-stat-value { color: #5cc489; }
 
 /* Toggle switch (used on Field Settings + user forms) */
 .di-switch { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
