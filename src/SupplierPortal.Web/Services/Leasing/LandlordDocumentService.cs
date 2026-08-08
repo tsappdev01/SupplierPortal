@@ -94,6 +94,34 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         return (true, null);
     }
 
+    /// <summary>Stores a system-generated document (raw bytes) against the registration as Base64, superseding
+    /// any previous current document of the same type. Used for the registration-summary PDF on submission.</summary>
+    public async Task StoreGeneratedAsync(
+        int landlordId, LandlordDocumentType documentType, string fileName, string contentType, byte[] bytes, string uploadedBy)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var version = 1;
+        var existing = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && d.DocumentType == documentType && d.IsCurrent)
+            .ToListAsync();
+        foreach (var old in existing) { old.IsCurrent = false; version = Math.Max(version, old.Version + 1); }
+
+        db.LandlordDocuments.Add(new LandlordDocument
+        {
+            LandlordId = landlordId,
+            DocumentType = documentType,
+            FileName = fileName,
+            StoredFileName = $"{Guid.NewGuid():N}.pdf",
+            ContentType = contentType,
+            FileSizeBytes = bytes.LongLength,
+            ContentBase64 = Convert.ToBase64String(bytes),
+            UploadedBy = uploadedBy,
+            Version = version,
+            IsCurrent = true
+        });
+        await db.SaveChangesAsync();
+    }
+
     public async Task<(bool Success, string? Error)> DeleteAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

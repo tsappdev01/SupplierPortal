@@ -487,7 +487,7 @@
                 correction = await LandlordService.GetOpenCorrectionAsync(landlord.Id);
                 SeedFromExisting();
                 ApplyUaePass();
-                documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+                documents = await LoadLandlordDocumentsAsync(landlord.Id);
             }
         }
         loading = false;
@@ -664,7 +664,7 @@
             return res;
         });
         if (!ok) error = err;
-        documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+        documents = await LoadLandlordDocumentsAsync(landlord.Id);
     }
 
     /// <summary>Best-effort OCR of an uploaded Emirates ID: extracts the ID number, expiry and name and
@@ -696,10 +696,16 @@
         finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
     }
 
+    // Landlord-facing document list — excludes the system-generated registration-summary PDF.
+    private async Task<List<LandlordDocument>> LoadLandlordDocumentsAsync(int landlordId) =>
+        (await DocumentService.GetDocumentsAsync(landlordId))
+            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .ToList();
+
     private async Task DeleteDocAsync(int docId)
     {
         await DocumentService.DeleteAsync(docId);
-        documents = await DocumentService.GetDocumentsAsync(landlord!.Id);
+        documents = await LoadLandlordDocumentsAsync(landlord!.Id);
     }
 
     private async Task SaveDraftAsync()
@@ -755,7 +761,7 @@
         }
 
         saving = true;
-        var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null);
+        var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null, Nav.BaseUri);
         if (!ok) { error = err; saving = false; return; }
         await AccessTokenService.MarkUsedAsync(accessToken.Id);
         reference = reason;

@@ -70,7 +70,10 @@ public enum LandlordDocumentType
     TitleDeed = 5,
     Other = 6,
     /// <summary>Combined MOA/POA slot — a company provides one document that is either its MOA or a POA.</summary>
-    MoaOrPoa = 7
+    MoaOrPoa = 7,
+    /// <summary>System-generated PDF summary of the whole registration, produced on submission and later used
+    /// as the document sent to authorised signatories (e.g. via Circularo) for e-signature.</summary>
+    RegistrationSummary = 8
 }
 
 /// <summary>Role a contact plays for the landlord (FRD contact-type field).</summary>

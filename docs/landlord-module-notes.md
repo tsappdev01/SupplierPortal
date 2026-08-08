@@ -146,6 +146,18 @@ status workflow + registration trace wired into the notification bell / activity
   number is prefilled from `idn` when present (still editable — the card upload/OCR remains the source of record).
 - The `trustedx-*` (e-signature) endpoints are carried in config for a future signatory e-sign feature; not used here.
 
+### Update — Registration summary PDF on submission
+- On submit, `LandlordService.SaveAsync` builds a one-file PDF summary of the whole registration
+  (`LandlordSummaryPdfService`, QuestPDF) — property info, primary + secondary contacts, signatories
+  (with signing rule) and the attached-documents list — and stores it against the registration as a
+  `LandlordDocument` of new type `RegistrationSummary` (base64, single-slot, superseded on resubmit) via
+  `LandlordDocumentService.StoreGeneratedAsync`. It's excluded from the landlord's own document list.
+- Business Centre (the initiating user first, then active admins/leasing managers) is emailed a
+  "Registration Submitted" notification with a review link (`SendSubmittedToStaffAsync`). PDF generation +
+  email are best-effort — a failure never rolls back the (already saved) submission.
+- The summary PDF is the artefact intended for downstream e-signature by the authorised signatories
+  (e.g. via Circularo). It's previewable/downloadable from the BC detail Documents list.
+
 ### Update — Property view extra columns + Landlords row actions
 - The `dbo.Property` view gained `LeaseNo, LandLordCode, CompanyName, ContactName, EmailAddress` (source-
   system lease/owner data, read-only). Added to the `Premises` entity, the `LandRegisterService` projection

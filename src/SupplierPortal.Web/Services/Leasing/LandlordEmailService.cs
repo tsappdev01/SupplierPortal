@@ -73,6 +73,24 @@ public class LandlordEmailService(
             .Select(e => SendAsync(e, $"Landlord Registration Completed – {propertyCode}", body)));
     }
 
+    public Task SendSubmittedToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string? reference, string initiatedBy, string? link)
+    {
+        var rows =
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Reference</td><td style=\"padding:4px 0\">{E(reference ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Initiated By</td><td style=\"padding:4px 0\">{E(initiatedBy)}</td></tr>";
+        var body = Wrap("Landlord Registration Submitted",
+            "<p style=\"margin:0 0 14px\">A landlord has submitted their registration and it is ready for review. " +
+            "A PDF summary of the full submission (contacts, signatories and attached documents) has been saved " +
+            "against the registration.</p>" +
+            $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>",
+            link is null ? null : "Open Registration", link,
+            "Open the registration in the Business Centre portal to review and complete it.");
+        return Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
+            .Select(e => SendAsync(e, $"Landlord Registration Submitted – {propertyCode}", body)));
+    }
+
     /// <summary>Wraps content in a branded, email-client-safe HTML shell (inline styles, table layout).</summary>
     private static string Wrap(string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
     {
