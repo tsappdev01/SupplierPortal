@@ -1,0 +1,146 @@
+@page "/admin/customers"
+@attribute [Authorize(Policy = "Portal.Customer")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerService CustomerService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Customer Registrations - CST Portal</PageTitle>
+
+<div class="d-flex align-items-end justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">Customer Registrations</h1>
+        <p class="text-muted mb-0">Onboard and maintain customer accounts and their primary contact.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="NewCustomerAsync">＋ New Customer</button>
+</div>
+
+<div class="d-flex gap-2 flex-wrap mb-3">
+    <input class="form-control" style="max-width: 320px;" placeholder="Search legal name, Customer Id, TRN…"
+           @bind="search" @bind:event="oninput" @onkeyup="OnSearchKey" />
+    <select class="form-select" style="max-width: 220px;" @bind="statusFilter" @bind:after="ReloadAsync">
+        <option value="">All statuses</option>
+        @foreach (var s in CustomerStatuses.All)
+        {
+            <option value="@s">@s</option>
+        }
+    </select>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Customer Id</th>
+                    <th>Legal Name</th>
+                    <th>Type of Customer</th>
+                    <th>TRN</th>
+                    <th>Emirate / City</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (loading)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">Loading…</td></tr>
+                }
+                else if (items.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">No customers yet. Click “New Customer” to add one.</td></tr>
+                }
+                else
+                {
+                    @foreach (var c in items)
+                    {
+                        <tr>
+                            <td>@(string.IsNullOrWhiteSpace(c.CustomerId) ? "—" : c.CustomerId)</td>
+                            <td><strong>@(string.IsNullOrWhiteSpace(c.LegalName) ? "(unnamed draft)" : c.LegalName)</strong></td>
+                            <td>@(c.TypeOfCustomer ?? "—")</td>
+                            <td>@(string.IsNullOrWhiteSpace(c.TRNNumber) ? "—" : c.TRNNumber)</td>
+                            <td>@(c.EmirateCity ?? "—")</td>
+                            <td><span class="badge @StatusClass(c.Status)">@c.Status</span></td>
+                            <td>@((c.UpdatedAt ?? c.CreatedAt).ToString("dd MMM yyyy"))</td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary" href="/admin/customers/@c.Id">Open</a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex align-items-center justify-content-between p-2">
+        <span class="text-muted small">Showing @items.Count of @total</span>
+        <div class="btn-group">
+            <button class="btn btn-sm btn-outline-secondary" disabled="@(page <= 1)" @onclick="() => GoTo(page - 1)">‹ Prev</button>
+            <span class="btn btn-sm btn-light disabled">Page @(page) of @TotalPages</span>
+            <button class="btn btn-sm btn-outline-secondary" disabled="@(page >= TotalPages)" @onclick="() => GoTo(page + 1)">Next ›</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Customer> items = [];
+    private int total;
+    private int page = 1;
+    private const int PageSize = 25;
+    private string? search;
+    private string statusFilter = "";
+    private bool loading = true;
+    private string currentUser = "unknown";
+    private bool isAdministrator;
+    private List<int> scopeBuIds = [];
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        isAdministrator = state.User.IsAdministrator();
+        scopeBuIds = isAdministrator ? [] : state.User.GetBusinessUnitIds();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        var (list, count) = await CustomerService.GetListAsync(search, statusFilter, null, scopeBuIds, page, PageSize);
+        items = list;
+        total = count;
+        loading = false;
+    }
+
+    private async Task OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { page = 1; await ReloadAsync(); }
+    }
+
+    private async Task GoTo(int p)
+    {
+        page = Math.Clamp(p, 1, TotalPages);
+        await ReloadAsync();
+    }
+
+    private async Task NewCustomerAsync()
+    {
+        var buId = scopeBuIds.Count == 1 ? scopeBuIds[0] : (int?)null;
+        var id = await CustomerService.CreateDraftAsync(currentUser, buId);
+        Nav.NavigateTo($"/admin/customers/{id}");
+    }
+
+    private static string StatusClass(string status) => status switch
+    {
+        CustomerStatuses.Complete => "bg-success-subtle text-success-emphasis",
+        CustomerStatuses.ForReview => "bg-warning-subtle text-warning-emphasis",
+        CustomerStatuses.Returned => "bg-danger-subtle text-danger-emphasis",
+        _ => "bg-secondary-subtle text-secondary-emphasis"
+    };
+}

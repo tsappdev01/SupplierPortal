@@ -1,0 +1,182 @@
+@page "/admin/customers/{Id:int}"
+@attribute [Authorize(Policy = "Portal.Customer")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerService CustomerService
+@inject CustomerFieldConfigService FieldConfigService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Customer - CST Portal</PageTitle>
+
+@if (customer is null)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "New Customer" : customer.LegalName)</h1>
+            <span class="badge @StatusClass(customer.Status)">@customer.Status</span>
+            @if (customer.CustomerId is not null) { <span class="text-muted ms-2">@customer.CustomerId</span> }
+        </div>
+        <a class="btn btn-outline-secondary" href="/admin/customers">← Back to list</a>
+    </div>
+
+    @if (message is not null)
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+    }
+
+    <EditForm Model="customer" OnValidSubmit="SaveAsync">
+        @foreach (var group in config.Where(f => f.IsVisible).GroupBy(f => f.Section).OrderBy(g => g.Key == "Account" ? 0 : 1))
+        {
+            var entity = group.Key == "Account" ? (object)customer : contact;
+            <div class="di-field-settings-section mb-3">
+                <div class="di-field-settings-header">@(group.Key == "Account" ? "Account (Company)" : "Primary Contact")</div>
+                <div class="row g-3 p-3">
+                    @foreach (var f in group)
+                    {
+                        var cfg = f;                     // capture per-iteration
+                        var target = entity;
+                        var editable = !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                @cfg.DisplayLabel
+                                @if (cfg.IsRequired) { <span class="text-danger">*</span> }
+                                @if (cfg.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
+                            </label>
+                            @if (!editable)
+                            {
+                                <div class="form-control-plaintext border rounded px-2 bg-body-secondary">
+                                    @CustomerFieldAccessor.GetDisplay(target, cfg.FieldKey)
+                                </div>
+                            }
+                            else if (cfg.FieldKind == "date")
+                            {
+                                <input type="date" class="form-control"
+                                       value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
+                                       @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                            }
+                            else if (cfg.FieldKind == "yesno")
+                            {
+                                <select class="form-select"
+                                        value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
+                                        @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                    <option value="">—</option>
+                                    <option value="true">Yes</option>
+                                    <option value="false">No</option>
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control"
+                                       value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
+                                       @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="d-flex gap-2 flex-wrap mb-4">
+            <button type="submit" class="btn btn-primary" disabled="@busy">Save</button>
+            @if (customer.Status == CustomerStatuses.Draft || customer.Status == CustomerStatuses.Returned)
+            {
+                <button type="button" class="btn btn-di-gold" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.ForReview)">Submit for review</button>
+            }
+            @if (customer.Status == CustomerStatuses.ForReview)
+            {
+                <button type="button" class="btn btn-success" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Complete)">Mark completed</button>
+                <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Returned)">Return</button>
+            }
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Customer? customer;
+    private CustomerContact contact = new();
+    private List<CustomerFieldConfig> config = [];
+    private string currentUser = "unknown";
+    private string? message;
+    private bool isError;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        config = await FieldConfigService.GetAllAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        customer = await CustomerService.GetAsync(Id);
+        if (customer is null) return;
+        contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+    }
+
+    private void OnChange(object entity, string key, string? value)
+    {
+        CustomerFieldAccessor.SetString(entity, key, value);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (customer is null) return;
+        busy = true; message = null;
+        customer.Contact = contact;
+        await CustomerService.SaveAsync(customer, currentUser);
+        busy = false;
+        isError = false;
+        message = "Saved.";
+    }
+
+    private async Task SaveAndSetStatus(string status)
+    {
+        if (customer is null) return;
+
+        // On submit-for-review, enforce the required (visible) fields from the config.
+        if (status == CustomerStatuses.ForReview)
+        {
+            var missing = config
+                .Where(f => f.IsVisible && f.IsRequired)
+                .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+                    f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
+                .Select(f => f.DisplayLabel)
+                .ToList();
+            if (missing.Count > 0)
+            {
+                isError = true;
+                message = "Please complete the required field(s): " + string.Join(", ", missing);
+                return;
+            }
+        }
+
+        busy = true; message = null;
+        customer.Contact = contact;
+        await CustomerService.SaveAsync(customer, currentUser);
+        await CustomerService.SetStatusAsync(customer.Id, status, currentUser);
+        customer.Status = status;
+        busy = false;
+        isError = false;
+        message = $"Saved and moved to “{status}”.";
+    }
+
+    private static string StatusClass(string status) => status switch
+    {
+        CustomerStatuses.Complete => "bg-success-subtle text-success-emphasis",
+        CustomerStatuses.ForReview => "bg-warning-subtle text-warning-emphasis",
+        CustomerStatuses.Returned => "bg-danger-subtle text-danger-emphasis",
+        _ => "bg-secondary-subtle text-secondary-emphasis"
+    };
+}
