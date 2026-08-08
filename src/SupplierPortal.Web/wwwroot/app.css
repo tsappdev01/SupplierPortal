@@ -305,6 +305,29 @@ table thead th {
     padding: 10px 1.5rem 0;
 }
 
+/* KPI stat tiles (Manage Supplier / Manage Customer dashboards) */
+.di-stat-row { display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.di-stat-tile { background: var(--di-surface); border: 1px solid var(--di-border);
+    border-top: 3px solid var(--di-navy, #1a2233); border-radius: 10px; padding: 1rem 1.4rem; min-width: 160px; }
+.di-stat-value { font-size: 1.9rem; font-weight: 700; color: var(--di-heading); line-height: 1.2; }
+.di-stat-label { font-size: .8rem; color: var(--di-text-soft); margin-top: .15rem; }
+.di-stat-total { border-top-color: #1a2233; }
+.di-stat-new { border-top-color: #6c757d; } .di-stat-new .di-stat-value { color: #6c757d; }
+.di-stat-await { border-top-color: #2f80b5; } .di-stat-await .di-stat-value { color: #2f80b5; }
+.di-stat-review { border-top-color: #c8a24a; } .di-stat-review .di-stat-value { color: #a8842f; }
+.di-stat-complete { border-top-color: #2e7d46; } .di-stat-complete .di-stat-value { color: #2e7d46; }
+[data-theme="dark"] .di-stat-total { border-top-color: #8fa0c4; }
+[data-theme="dark"] .di-stat-review .di-stat-value { color: #d8b25f; }
+
+/* Toggle switch (used on Field Settings + user forms) */
+.di-switch { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
+.di-switch input { opacity: 0; width: 0; height: 0; }
+.di-switch-slider { position: absolute; cursor: pointer; inset: 0; background-color: #c34; border-radius: 24px; transition: background-color .15s ease; }
+.di-switch-slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform .15s ease; }
+.di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+.di-switch input:checked + .di-switch-slider::before { transform: translateX(20px); }
+.di-switch input:disabled + .di-switch-slider { opacity: .45; cursor: not-allowed; }
+
 /* Light / dark theme toggle in the top bar */
 .di-theme-toggle {
     display: inline-flex;

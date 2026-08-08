@@ -138,7 +138,7 @@ else
             else
             {
                 <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => SaveAsync(false)">Save</button>
-                @if (customer.Status == CustomerStatuses.Draft || customer.Status == CustomerStatuses.Returned)
+                @if (customer.Status is CustomerStatuses.NotSubmitted or CustomerStatuses.AwaitingCustomerResponse or CustomerStatuses.Returned)
                 {
                     <button type="button" class="btn btn-di-gold" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.ForReview)">Submit for review</button>
                 }

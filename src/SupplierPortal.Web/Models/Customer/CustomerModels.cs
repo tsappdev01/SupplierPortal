@@ -6,12 +6,13 @@ namespace SupplierPortal.Web.Models.Customer;
 /// Business Relation department can move a record from data-entry through review to completion.</summary>
 public static class CustomerStatuses
 {
-    public const string Draft = "Draft";
+    public const string NotSubmitted = "Not Submitted";
+    public const string AwaitingCustomerResponse = "Awaiting Customer Response";
     public const string ForReview = "For Review";
     public const string Complete = "Completed";
     public const string Returned = "Returned";
 
-    public static readonly string[] All = [Draft, ForReview, Complete, Returned];
+    public static readonly string[] All = [NotSubmitted, AwaitingCustomerResponse, ForReview, Complete, Returned];
 }
 
 /// <summary>A customer account (the company/organisation being onboarded). Field set generated from the CST
@@ -27,7 +28,7 @@ public class Customer
     /// <summary>Customer Unique Number / Customer Id (sheet: hidden internal key).</summary>
     [MaxLength(60)] public string? CustomerId { get; set; }
 
-    [MaxLength(40)] public string Status { get; set; } = CustomerStatuses.Draft;
+    [MaxLength(40)] public string Status { get; set; } = CustomerStatuses.NotSubmitted;
     public int? BusinessUnitId { get; set; }
     public BusinessUnit? BusinessUnit { get; set; }
     [MaxLength(150)] public string? CreatedBy { get; set; }
