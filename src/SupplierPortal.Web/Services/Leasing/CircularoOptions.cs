@@ -23,6 +23,16 @@ public class CircularoOptions
     /// empty → the raw key is sent as the header value.</summary>
     public string AuthScheme { get; set; } = "Bearer";
 
+    /// <summary>How the API key/token is transmitted. Per the Circularo docs the token is passed as a
+    /// <c>?token=&lt;key&gt;</c> query parameter on every request (see developers.circularo.com/latest/authentication
+    /// and .../1-creating-and-using-api-tokens — API keys are used the same way as session tokens). Values:
+    /// <c>"Query"</c> (query param only), <c>"Header"</c> (Authorization header only), or <c>"Both"</c>
+    /// (send both — the safe default, since an extra header is harmless but a missing token yields 401/404).</summary>
+    public string AuthMode { get; set; } = "Both";
+
+    /// <summary>Query-string parameter name carrying the token when <see cref="AuthMode"/> includes the query mode.</summary>
+    public string TokenQueryParam { get; set; } = "token";
+
     /// <summary>Multipart upload endpoint (relative to <see cref="BaseUrl"/>).</summary>
     public string UploadPath { get; set; } = "document/upload";
 

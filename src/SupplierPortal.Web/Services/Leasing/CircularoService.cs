@@ -34,18 +34,39 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
     public bool Enabled => _o.Enabled && !string.IsNullOrWhiteSpace(_o.ApiKey);
 
-    private string Url(string relative) => $"{_o.BaseUrl.TrimEnd('/')}/{relative.TrimStart('/')}";
+    private bool UseQueryToken =>
+        _o.AuthMode.Equals("Query", StringComparison.OrdinalIgnoreCase) ||
+        _o.AuthMode.Equals("Both", StringComparison.OrdinalIgnoreCase);
+
+    private bool UseHeaderToken =>
+        _o.AuthMode.Equals("Header", StringComparison.OrdinalIgnoreCase) ||
+        _o.AuthMode.Equals("Both", StringComparison.OrdinalIgnoreCase);
+
+    private string Url(string relative)
+    {
+        var url = $"{_o.BaseUrl.TrimEnd('/')}/{relative.TrimStart('/')}";
+        if (UseQueryToken && !string.IsNullOrWhiteSpace(_o.ApiKey))
+        {
+            var sep = url.Contains('?') ? '&' : '?';
+            var param = string.IsNullOrWhiteSpace(_o.TokenQueryParam) ? "token" : _o.TokenQueryParam;
+            url = $"{url}{sep}{param}={Uri.EscapeDataString(_o.ApiKey)}";
+        }
+        return url;
+    }
 
     private IEnumerable<string> UploadPaths() =>
         (_o.UploadPathCandidates is { Length: > 0 } c
             ? c
-            : new[] { _o.UploadPath, "document/upload", "documents", "document", "documents/upload", "file/upload", "file", "upload" })
+            : new[] { _o.UploadPath, "document/upload", "document/create", "documents", "document", "documents/upload", "share/upload", "file/upload", "file", "upload" })
         .Where(p => !string.IsNullOrWhiteSpace(p))
         .Distinct(StringComparer.OrdinalIgnoreCase);
 
-    private void Authorize(HttpRequestMessage req) =>
+    private void Authorize(HttpRequestMessage req)
+    {
+        if (!UseHeaderToken || string.IsNullOrWhiteSpace(_o.ApiKey)) return;
         req.Headers.TryAddWithoutValidation("Authorization",
             string.IsNullOrWhiteSpace(_o.AuthScheme) ? _o.ApiKey : $"{_o.AuthScheme} {_o.ApiKey}");
+    }
 
     public async Task<CircularoResult> SendForSignatureAsync(
         byte[] pdf, string fileName, string signerName, string signerEmail, CancellationToken ct = default)
