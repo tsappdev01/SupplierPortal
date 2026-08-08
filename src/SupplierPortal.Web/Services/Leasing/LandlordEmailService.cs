@@ -48,6 +48,18 @@ public class LandlordEmailService(
                 "and send you a fresh link.</p>", null, null,
                 "Please contact Dubai Investments Business Centre if you have any questions."));
 
+    public Task SendSubmittedToLandlordAsync(string toEmail, string propertyCode, string? reference) =>
+        SendAsync(toEmail, "Landlord Registration Submitted",
+            Wrap("Registration Submitted Successfully",
+                $"<p style=\"margin:0 0 14px\">Thank you — your landlord registration for property " +
+                $"<strong>{E(propertyCode)}</strong> has been <strong>submitted successfully</strong>.</p>" +
+                "<p style=\"margin:0 0 14px\">The Dubai Investments Business Centre team will now review your submission " +
+                "and will get back to you if any clarification is required.</p>" +
+                "<p style=\"margin:0\">No further action is needed from you at this stage.</p>" +
+                (string.IsNullOrWhiteSpace(reference) ? "" : Note("Reference", reference)),
+                null, null,
+                "You will receive a further email once your registration has been reviewed."));
+
     public Task SendCompletionToLandlordAsync(string toEmail, string propertyCode) =>
         SendAsync(toEmail, "Landlord Registration Completed",
             Wrap("Registration Completed",
