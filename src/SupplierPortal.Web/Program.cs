@@ -49,6 +49,10 @@ builder.Services.Configure<SupplierPortal.Web.Services.Leasing.UaePassOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.UaePassOptions.SectionName));
 builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.IUaePassService,
     SupplierPortal.Web.Services.Leasing.UaePassService>(c => c.Timeout = TimeSpan.FromSeconds(20));
+builder.Services.Configure<SupplierPortal.Web.Services.Leasing.CircularoOptions>(
+    builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.CircularoOptions.SectionName));
+builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.ICircularoService,
+    SupplierPortal.Web.Services.Leasing.CircularoService>(c => c.Timeout = TimeSpan.FromSeconds(60));
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));

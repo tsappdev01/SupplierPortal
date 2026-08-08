@@ -158,6 +158,21 @@ status workflow + registration trace wired into the notification bell / activity
 - The summary PDF is the artefact intended for downstream e-signature by the authorised signatories
   (e.g. via Circularo). It's previewable/downloadable from the BC detail Documents list.
 
+### Update — Circularo e-signature on approval
+- When Business Centre **approves** (`CompleteAsync`), the registration summary is rebuilt from the final data
+  and routed to the **primary contact** for signature via Circularo (`ICircularoService`/`CircularoService`):
+  upload the PDF → create a signature workflow addressed to the signer's email (Circularo emails them).
+- Config is `Leasing:Circularo` (`CircularoOptions`: `Enabled`, `BaseUrl` = `.../api/v1`, `ApiKey`,
+  `AuthScheme`, `UploadPath`, `SignInvitePath`, subject/message). The API key is a **secret** — keep it in the
+  gitignored `appsettings.Local.json` (or env/user-secrets), never in `appsettings.json` (committed with
+  `Enabled:false`, empty key). Best-effort: a Circularo failure never blocks approval.
+- Outcome stored on the registration: `SignatureStatus` (Sent/Signed/Failed), `CircularoDocumentId`,
+  `CircularoSigningUrl`, `SignatureSentTo/At`; shown in the BC detail and audit trail (`SignatureRequested`).
+- The signer email is the UAE-Pass-verified primary-contact email — matching the address the Circularo↔UAE
+  Pass flow expects for identity verification / signing.
+- NOTE: the exact Circularo endpoint paths + workflow payload are **configurable assumptions** to confirm
+  against the live API (developers.circularo.com) / sandbox — they were not reachable from the build network.
+
 ### Update — Property view extra columns + Landlords row actions
 - The `dbo.Property` view gained `LeaseNo, LandLordCode, CompanyName, ContactName, EmailAddress` (source-
   system lease/owner data, read-only). Added to the `Premises` entity, the `LandRegisterService` projection

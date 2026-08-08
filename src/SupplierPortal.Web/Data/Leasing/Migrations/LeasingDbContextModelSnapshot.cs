@@ -37,6 +37,14 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<int>("BusinessUnitId")
                         .HasColumnType("int");
 
+                    b.Property<string>("CircularoDocumentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CircularoSigningUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("CompanyName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -103,6 +111,20 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<string>("ReviewedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("SignatureSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SignatureSentTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("SignatureSignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SignatureStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<int>("SigningRule")
                         .HasColumnType("int");
