@@ -70,7 +70,10 @@ public enum LandlordDocumentType
     TitleDeed = 5,
     Other = 6,
     /// <summary>Combined MOA/POA slot — a company provides one document that is either its MOA or a POA.</summary>
-    MoaOrPoa = 7
+    MoaOrPoa = 7,
+    /// <summary>System-generated PDF summary of the whole registration, produced on submission and later used
+    /// as the document sent to authorised signatories (e.g. via Circularo) for e-signature.</summary>
+    RegistrationSummary = 8
 }
 
 /// <summary>Role a contact plays for the landlord (FRD contact-type field).</summary>
@@ -140,6 +143,18 @@ public class Landlord
 
     /// <summary>Links this registration to the one it was restarted from (audit chain).</summary>
     public int? RestartedFromId { get; set; }
+
+    // ---- Circularo e-signature (the summary PDF is sent to the primary contact for signature on approval) ----
+    /// <summary>Circularo document id for the summary sent for signature.</summary>
+    [MaxLength(100)] public string? CircularoDocumentId { get; set; }
+    /// <summary>Signature status: <c>Sent</c>, <c>Signed</c>, <c>Declined</c>, <c>Failed</c>, or null (not sent).</summary>
+    [MaxLength(40)] public string? SignatureStatus { get; set; }
+    /// <summary>Email the signature request was sent to (the primary contact).</summary>
+    [MaxLength(200)] public string? SignatureSentTo { get; set; }
+    public DateTime? SignatureSentAt { get; set; }
+    public DateTime? SignatureSignedAt { get; set; }
+    /// <summary>Direct signing URL returned by Circularo, if any (for reference / re-send).</summary>
+    [MaxLength(1000)] public string? CircularoSigningUrl { get; set; }
 
     /// <summary>If migrated from the legacy <c>dbo.LandlordData</c> table, its source Id — for traceability
     /// and to make the one-time data migration idempotent (re-runs skip already-migrated rows).</summary>

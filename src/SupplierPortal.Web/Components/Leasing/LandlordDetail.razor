@@ -351,6 +351,18 @@ else
             else if (landlord.Status == LandlordStatus.RegistrationComplete)
             {
                 <div class="alert alert-success"><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</div>
+                @if (landlord.SignatureStatus is not null)
+                {
+                    <div class="alert @(landlord.SignatureStatus == "Signed" ? "alert-success" : landlord.SignatureStatus == "Failed" ? "alert-warning" : "alert-info")">
+                        <strong>E-signature (Circularo):</strong> @landlord.SignatureStatus
+                        @if (!string.IsNullOrWhiteSpace(landlord.SignatureSentTo)) { <text> — sent to @landlord.SignatureSentTo</text> }
+                        @if (landlord.SignatureSentAt is { } sa) { <text> on @sa.ToLocalTime().ToString("g")</text> }
+                        @if (!string.IsNullOrWhiteSpace(landlord.CircularoSigningUrl))
+                        {
+                            <text> · </text><a href="@landlord.CircularoSigningUrl" target="_blank" rel="noopener">Open in Circularo</a>
+                        }
+                    </div>
+                }
             }
         </div>
 
@@ -642,6 +654,7 @@ else
         LandlordService.EventRejected => "Rejected",
         LandlordService.EventRestarted => "Restarted",
         LandlordService.EventCompleted => "Registration completed",
+        LandlordService.EventSignatureRequested => "Sent for signature",
         LandlordService.EventLinkDeactivated => "Link deactivated",
         _ => t
     };

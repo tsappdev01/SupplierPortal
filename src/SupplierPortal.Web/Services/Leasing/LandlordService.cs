@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using SupplierPortal.Web.Data.Leasing;
+using SupplierPortal.Web.Models;
 using SupplierPortal.Web.Models.Leasing;
 
 namespace SupplierPortal.Web.Services.Leasing;
@@ -12,7 +13,10 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// view), issues the secure invite, and drives the review lifecycle: submit → review → correction / reject
 /// (with mandatory reason) / complete, plus restart-after-rejection. Every transition writes an audit event.
 /// </summary>
-public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, LandlordEmailService email)
+public class LandlordService(
+    IDbContextFactory<LeasingDbContext> dbFactory, LandlordEmailService email,
+    LandlordDocumentService documents, LandlordSummaryPdfService summaryPdf,
+    ICircularoService circularo, SupplierPortal.Web.Services.UserService users, ILogger<LandlordService> logger)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(30);
 
@@ -29,6 +33,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     public const string EventRestarted = "RegistrationRestarted";
     public const string EventCompleted = "RegistrationCompleted";
     public const string EventLinkDeactivated = "LinkDeactivated";
+    public const string EventSignatureRequested = "SignatureRequested";
 
     public const string ActorBusinessCentre = "BusinessCentre";
     public const string ActorLandlord = "Landlord";
@@ -258,7 +263,7 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
     /// <summary>Persists the landlord's contacts / signatories (documents are handled by
     /// <see cref="LandlordDocumentService"/>) either as a draft (InProgress) or as a submission.</summary>
     public async Task<(bool Success, string? Error, string? Reference)> SaveAsync(
-        int landlordId, LandlordSelfUpdate update, bool submit, string actor, int? accessTokenId, string? ip)
+        int landlordId, LandlordSelfUpdate update, bool submit, string actor, int? accessTokenId, string? ip, string? baseUrl = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var l = await db.Landlords.Include(x => x.Contacts).Include(x => x.Signatories).Include(x => x.Comments)
@@ -348,6 +353,14 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
             submit ? (wasResubmit ? EventResubmitted : EventSubmitted) : EventDraftSaved,
             submit ? $"Submitted; reference {l.Reference}" : "Draft saved",
             actor, ActorLandlord, old, l.Status, ip);
+
+        // On submission: build the PDF summary of everything captured, attach it to the registration, and
+        // notify Business Centre. Best-effort — a failure here must never undo the (already saved) submission.
+        if (submit)
+        {
+            try { await GenerateSummaryAndNotifyAsync(landlordId, baseUrl); }
+            catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: summary PDF / submission notification failed.", landlordId); }
+        }
 
         return (true, null, l.Reference);
     }
@@ -492,10 +505,95 @@ public class LandlordService(IDbContextFactory<LeasingDbContext> dbFactory, Land
         await email.SendCompletionToLandlordAsync(l.Email, l.PropertyCode);
         // Notify Business-Centre staff, and in particular the user who initiated the request (l.CreatedBy).
         await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy);
+
+        // Route the summary document to the primary contact for signature via Circularo (best-effort).
+        try { await SendForSignatureAsync(db, l); }
+        catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: Circularo send-for-signature error.", landlordId); }
+
         return (true, null);
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /// <summary>Builds the registration-summary PDF from the current data, stores it against the registration,
+    /// and notifies Business Centre (the initiator + leasing staff) that a submission is ready to review.</summary>
+    private async Task GenerateSummaryAndNotifyAsync(int landlordId, string? baseUrl)
+    {
+        var built = await BuildAndStoreSummaryAsync(landlordId);
+        if (built is null) return;
+
+        var (_, _, createdBy, propertyCode, company, reference) = built.Value;
+        var recipients = await ResolveBcRecipientsAsync(createdBy);
+        var link = baseUrl is null ? null : $"{baseUrl}admin/landlords/{landlordId}";
+        await email.SendSubmittedToStaffAsync(recipients, propertyCode, company, reference, createdBy, link);
+    }
+
+    /// <summary>Rebuilds the registration-summary PDF from the current data and stores it against the
+    /// registration (superseding the previous). Returns the bytes + a little context, or null if not found.</summary>
+    private async Task<(byte[] Bytes, string FileName, string CreatedBy, string PropertyCode, string? Company, string? Reference)?>
+        BuildAndStoreSummaryAsync(int landlordId)
+    {
+        // Re-fetch fresh so the summary reflects the current contacts/signatories (not stale nav collections).
+        var fresh = await GetByIdAsync(landlordId);
+        if (fresh is null) return null;
+
+        var docs = (await documents.GetDocumentsAsync(landlordId))
+            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .ToList();
+        var pdf = summaryPdf.Build(fresh, docs);
+        var fileName = $"Landlord-Registration-{(fresh.Reference ?? fresh.PropertyCode)}.pdf".Replace(' ', '-');
+        await documents.StoreGeneratedAsync(landlordId, LandlordDocumentType.RegistrationSummary,
+            fileName, "application/pdf", pdf, "System");
+        return (pdf, fileName, fresh.CreatedBy, fresh.PropertyCode, fresh.CompanyName, fresh.Reference);
+    }
+
+    /// <summary>On approval, (re)builds the summary from the final data and routes it to the primary contact
+    /// for signature via Circularo, recording the outcome on the registration and in the audit trail.</summary>
+    private async Task SendForSignatureAsync(LeasingDbContext db, Landlord l)
+    {
+        if (!circularo.Enabled) return;
+
+        var primary = await db.LandlordContacts.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.LandlordId == l.Id && c.IsPrimary);
+        if (primary is null || string.IsNullOrWhiteSpace(primary.Email))
+        {
+            logger.LogWarning("Landlord {Id}: no primary contact email; skipping Circularo send.", l.Id);
+            return;
+        }
+
+        var built = await BuildAndStoreSummaryAsync(l.Id);
+        if (built is null) return;
+
+        var res = await circularo.SendForSignatureAsync(built.Value.Bytes, built.Value.FileName, primary.FullName, primary.Email);
+
+        l.SignatureSentTo = primary.Email;
+        l.SignatureSentAt = DateTime.UtcNow;
+        l.SignatureStatus = res.Success ? "Sent" : "Failed";
+        l.CircularoDocumentId = res.DocumentId;
+        l.CircularoSigningUrl = res.SigningUrl;
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, l.Id, EventSignatureRequested,
+            res.Success
+                ? $"Registration summary sent to {primary.Email} for signature via Circularo (document {res.DocumentId})."
+                : $"Circularo send-for-signature failed: {res.Error}",
+            "System", ActorSystem, l.Status, l.Status);
+    }
+
+    /// <summary>Business-Centre notification recipients for a submission: the initiating user first, then all
+    /// active administrators / leasing managers.</summary>
+    private async Task<List<string>> ResolveBcRecipientsAsync(string createdBy)
+    {
+        var list = new List<string>();
+        var initiator = await users.GetByUsernameAsync(createdBy);
+        if (!string.IsNullOrWhiteSpace(initiator?.Email)) list.Add(initiator.Email!);
+        var all = await users.GetAllAsync();
+        list.AddRange(all
+            .Where(u => u.IsActive && (u.UserType == UserType.Administrator || u.UserType == UserType.LeasingManager))
+            .Select(u => u.Email)
+            .Where(e => !string.IsNullOrWhiteSpace(e))!);
+        return list;
+    }
 
     /// <summary>The landlord's latest change per field (unacknowledged), for the review-screen highlight.</summary>
     public async Task<List<LandlordFieldChange>> GetFieldChangesAsync(int landlordId)

@@ -161,7 +161,10 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="hint mb-2">The primary contact is always the first authorised signatory and cannot be removed.</div>
+                        <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed. Add any further signatories below.</div>
+
+                        var lockedSecondaries = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+
                         @* Locked primary signatory (mirrors the primary contact) *@
                         <div class="sig open">
                             <div class="sig-hd">
@@ -173,12 +176,30 @@
                                 <span class="tagx">Primary</span>
                             </div>
                         </div>
+
+                        @* Locked secondary-contact signatories (mirror the secondary contacts) *@
+                        @for (var i = 0; i < lockedSecondaries.Count; i++)
+                        {
+                            var c = lockedSecondaries[i];
+                            <div class="sig open">
+                                <div class="sig-hd">
+                                    <span class="seq">@(i + 2)</span>
+                                    <div class="sig-id">
+                                        <b>@c.FullName</b>
+                                        <span>@c.Email</span>
+                                    </div>
+                                    <span class="tagx">Secondary</span>
+                                </div>
+                            </div>
+                        }
+
+                        @* Additional, user-defined signatories *@
                         @for (var i = 0; i < signatories.Count; i++)
                         {
                             var idx = i;
                             <div class="sig open">
                                 <div class="sig-hd">
-                                    <span class="seq">@(idx + 2)</span>
+                                    <span class="seq">@(idx + 2 + lockedSecondaries.Count)</span>
                                     <div class="sig-id" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
                                         <input class="di-in" placeholder="Name" @bind="signatories[idx].Name" />
                                         <input class="di-in" placeholder="Email" @bind="signatories[idx].Email" />
@@ -264,9 +285,13 @@
                             <dl>
                                 <div class="r"><dt>Signing rule</dt><dd>@(signingRule == SigningRule.All ? "All must sign" : "Any one may sign")</dd></div>
                                 <div class="r"><dt>#1 (Primary)</dt><dd>@primary.FullName — @primary.Email</dd></div>
+                                @foreach (var (c, i) in namedSecondaries.Select((c, i) => (c, i)))
+                                {
+                                    <div class="r"><dt>#@(i + 2) (Secondary)</dt><dd>@c.FullName — @c.Email</dd></div>
+                                }
                                 @foreach (var (s, i) in namedSignatories.Select((s, i) => (s, i)))
                                 {
-                                    <div class="r"><dt>#@(i + 2)</dt><dd>@s.Name — @s.Email@(string.IsNullOrWhiteSpace(s.Mobile) ? "" : $" · {s.Mobile}")</dd></div>
+                                    <div class="r"><dt>#@(i + 2 + namedSecondaries.Count)</dt><dd>@s.Name — @s.Email@(string.IsNullOrWhiteSpace(s.Mobile) ? "" : $" · {s.Mobile}")</dd></div>
                                 }
                             </dl>
                         </div>
@@ -462,7 +487,7 @@
                 correction = await LandlordService.GetOpenCorrectionAsync(landlord.Id);
                 SeedFromExisting();
                 ApplyUaePass();
-                documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+                documents = await LoadLandlordDocumentsAsync(landlord.Id);
             }
         }
         loading = false;
@@ -474,8 +499,15 @@
         if (ep is not null) CopyInto(primary, ep);
         foreach (var c in landlord.Contacts.Where(c => !c.IsPrimary)) { var s = new ContactInput(); CopyInto(s, c); secondaries.Add(s); }
         signingRule = landlord.SigningRule;
-        // The primary contact is rendered as the locked signatory #1, so only load the ADDITIONAL ones here.
-        signatories.AddRange(landlord.Signatories.Where(s => !s.IsPrimaryContact).OrderBy(s => s.Order)
+        // Primary + secondary contacts are rendered as locked signatories (derived live from the contacts),
+        // so load ONLY the user-defined ones here — i.e. those not matching any contact's email.
+        var contactEmails = landlord.Contacts
+            .Select(c => c.Email?.Trim().ToLowerInvariant())
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .ToHashSet();
+        signatories.AddRange(landlord.Signatories
+            .Where(s => !s.IsPrimaryContact && !contactEmails.Contains(s.Email?.Trim().ToLowerInvariant()))
+            .OrderBy(s => s.Order)
             .Select(s => new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile }));
     }
 
@@ -607,11 +639,14 @@
         var contacts = new List<ContactInput> { primary };
         contacts.AddRange(secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)));
 
-        // Primary contact is always the first authorised signatory and is not user-editable/removable.
+        // Primary + secondary contacts are always authorised signatories and are not user-editable/removable;
+        // the primary is flagged IsPrimaryContact. Any further user-defined signatories follow.
         var sigs = new List<SignatoryInput>
         {
             new() { Name = primary.FullName, Email = primary.Email, Mobile = primary.Mobile, IsPrimaryContact = true }
         };
+        sigs.AddRange(secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName))
+            .Select(c => new SignatoryInput { Name = c.FullName, Email = c.Email, Mobile = c.Mobile }));
         sigs.AddRange(signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)));
         return new LandlordSelfUpdate { SigningRule = signingRule, Contacts = contacts, Signatories = sigs };
     }
@@ -629,7 +664,7 @@
             return res;
         });
         if (!ok) error = err;
-        documents = await DocumentService.GetDocumentsAsync(landlord.Id);
+        documents = await LoadLandlordDocumentsAsync(landlord.Id);
     }
 
     /// <summary>Best-effort OCR of an uploaded Emirates ID: extracts the ID number, expiry and name and
@@ -661,10 +696,16 @@
         finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
     }
 
+    // Landlord-facing document list — excludes the system-generated registration-summary PDF.
+    private async Task<List<LandlordDocument>> LoadLandlordDocumentsAsync(int landlordId) =>
+        (await DocumentService.GetDocumentsAsync(landlordId))
+            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .ToList();
+
     private async Task DeleteDocAsync(int docId)
     {
         await DocumentService.DeleteAsync(docId);
-        documents = await DocumentService.GetDocumentsAsync(landlord!.Id);
+        documents = await LoadLandlordDocumentsAsync(landlord!.Id);
     }
 
     private async Task SaveDraftAsync()
@@ -720,7 +761,7 @@
         }
 
         saving = true;
-        var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null);
+        var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null, Nav.BaseUri);
         if (!ok) { error = err; saving = false; return; }
         await AccessTokenService.MarkUsedAsync(accessToken.Id);
         reference = reason;
