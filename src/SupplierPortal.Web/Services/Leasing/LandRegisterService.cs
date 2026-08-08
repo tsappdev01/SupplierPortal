@@ -10,7 +10,10 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// and overlays owner-assignment status from the app-owned <c>leasing.LandlordPremises</c> table.
 /// Land data is never written here.
 /// </summary>
-public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, IOptions<LeasingOptions> options)
+public class LandRegisterService(
+    IDbContextFactory<LeasingDbContext> dbFactory,
+    IOptions<LeasingOptions> options,
+    ILogger<LandRegisterService> logger)
 {
     private readonly LeasingOptions _options = options.Value;
 
@@ -116,7 +119,54 @@ public class LandRegisterService(IDbContextFactory<LeasingDbContext> dbFactory, 
     /// its Property-View Company / Contact / Email and the linked registration's status (latest registration
     /// per property). Filterable by zone, category and registration status.
     /// </summary>
+    /// <summary>Property list. Uses the set-based stored procedure <c>leasing.PropertyList</c> (grouping + the
+    /// latest-registration join + filtering all done in SQL Server — efficient for the large land view), and
+    /// falls back to the equivalent in-app query if the procedure is unavailable.</summary>
     public async Task<List<PropertyListRow>> GetPropertyListAsync(
+        string zone, string? category, LandlordStatus[]? statuses, bool notStartedOnly, string? search, int take = 500)
+    {
+        try
+        {
+            return await GetPropertyListViaSpAsync(zone, category, statuses, notStartedOnly, search, take);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "leasing.PropertyList stored procedure failed; falling back to the in-app query.");
+            return await GetPropertyListViaEfAsync(zone, category, statuses, notStartedOnly, search, take);
+        }
+    }
+
+    /// <summary>Row shape returned by the <c>leasing.PropertyList</c> procedure (Status as int for mapping).</summary>
+    private sealed record PropertyListSpRow(
+        int PremisesId, string PropertyCode, string? BuildingName, string? CategoryName, string? CompanyName,
+        string? ContactName, string? EmailAddress, int? RegistrationId, int? StatusInt, bool LinkActive);
+
+    private async Task<List<PropertyListRow>> GetPropertyListViaSpAsync(
+        string zone, string? category, LandlordStatus[]? statuses, bool notStartedOnly, string? search, int take)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+
+        string? zoneParam = zone == AllZones ? null : ResolveZone(zone);
+        string? categoryParam = string.IsNullOrWhiteSpace(category) ? null : category.Trim();
+        string? searchParam = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        string? statusCsv = (!notStartedOnly && statuses is { Length: > 0 })
+            ? string.Join(",", statuses.Select(s => (int)s)) : null;
+
+        var rows = await db.Database.SqlQueryRaw<PropertyListSpRow>(
+            "EXEC [leasing].[PropertyList] @Zone = {0}, @Category = {1}, @Search = {2}, @NotStartedOnly = {3}, @StatusCsv = {4}, @Take = {5}",
+            (object?)zoneParam ?? DBNull.Value,
+            (object?)categoryParam ?? DBNull.Value,
+            (object?)searchParam ?? DBNull.Value,
+            notStartedOnly ? 1 : 0,
+            (object?)statusCsv ?? DBNull.Value,
+            take).ToListAsync();
+
+        return rows.Select(r => new PropertyListRow(
+            r.PremisesId, r.PropertyCode, r.BuildingName, r.CategoryName, r.CompanyName, r.ContactName, r.EmailAddress,
+            r.RegistrationId, r.StatusInt is int s ? (LandlordStatus)s : null, r.LinkActive)).ToList();
+    }
+
+    private async Task<List<PropertyListRow>> GetPropertyListViaEfAsync(
         string zone, string? category, LandlordStatus[]? statuses, bool notStartedOnly, string? search, int take = 500)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
