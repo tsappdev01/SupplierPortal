@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -41,19 +42,22 @@
                 </NavLink>
             </div>
             @* ---------- Supplier Portal ---------- *@
-            <div class="nav-item px-3">
-                <button type="button" class="nav-link di-group-toggle" @onclick="() => supplierExpanded = !supplierExpanded">
-                    <span>Supplier Portal</span>
-                    @Chevron(supplierExpanded)
-                </button>
-            </div>
-            @if (supplierExpanded)
+            @if (canSupplier)
             {
-                <div class="nav-item px-3 di-sub-item">
-                    <NavLink class="nav-link" href="supplier/dashboard">
-                        Manage Supplier
-                    </NavLink>
+                <div class="nav-item px-3">
+                    <button type="button" class="nav-link di-group-toggle" @onclick="() => supplierExpanded = !supplierExpanded">
+                        <span>Supplier Portal</span>
+                        @Chevron(supplierExpanded)
+                    </button>
                 </div>
+                @if (supplierExpanded)
+                {
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="supplier/dashboard">
+                            Manage Supplier
+                        </NavLink>
+                    </div>
+                }
             }
 
             @* ---------- Landlord Portal ---------- *@
@@ -81,31 +85,37 @@
             }
 
             @* ---------- Broker Portal (coming soon) ---------- *@
-            <div class="nav-item px-3">
-                <button type="button" class="nav-link di-group-toggle" @onclick="() => brokerExpanded = !brokerExpanded">
-                    <span>Broker Portal</span>
-                    @Chevron(brokerExpanded)
-                </button>
-            </div>
-            @if (brokerExpanded)
+            @if (canBroker)
             {
-                <div class="nav-item px-3 di-sub-item">
-                    <span class="nav-link di-sub-disabled">Manage Broker <span class="di-soon-tag">Soon</span></span>
+                <div class="nav-item px-3">
+                    <button type="button" class="nav-link di-group-toggle" @onclick="() => brokerExpanded = !brokerExpanded">
+                        <span>Broker Portal</span>
+                        @Chevron(brokerExpanded)
+                    </button>
                 </div>
+                @if (brokerExpanded)
+                {
+                    <div class="nav-item px-3 di-sub-item">
+                        <span class="nav-link di-sub-disabled">Manage Broker <span class="di-soon-tag">Soon</span></span>
+                    </div>
+                }
             }
 
             @* ---------- Customer Portal (coming soon) ---------- *@
-            <div class="nav-item px-3">
-                <button type="button" class="nav-link di-group-toggle" @onclick="() => customerExpanded = !customerExpanded">
-                    <span>Customer Portal</span>
-                    @Chevron(customerExpanded)
-                </button>
-            </div>
-            @if (customerExpanded)
+            @if (canCustomer)
             {
-                <div class="nav-item px-3 di-sub-item">
-                    <span class="nav-link di-sub-disabled">Manage Customer <span class="di-soon-tag">Soon</span></span>
+                <div class="nav-item px-3">
+                    <button type="button" class="nav-link di-group-toggle" @onclick="() => customerExpanded = !customerExpanded">
+                        <span>Customer Portal</span>
+                        @Chevron(customerExpanded)
+                    </button>
                 </div>
+                @if (customerExpanded)
+                {
+                    <div class="nav-item px-3 di-sub-item">
+                        <span class="nav-link di-sub-disabled">Manage Customer <span class="di-soon-tag">Soon</span></span>
+                    </div>
+                }
             }
 
             @if (isAdministrator)
@@ -168,6 +178,9 @@
     private bool isAuthenticated;
     private bool isAdministrator;
     private bool isLeasingUser;
+    private bool canSupplier;
+    private bool canBroker;
+    private bool canCustomer;
     private int userId;
     private string fullName = "";
     private string? designation;
@@ -187,6 +200,9 @@
         {
             isAdministrator = state.User.IsAdministrator();
             isLeasingUser = state.User.IsLeasingUser();
+            canSupplier = state.User.CanAccessPortal(PortalAccess.Supplier);
+            canBroker = state.User.CanAccessPortal(PortalAccess.Broker);
+            canCustomer = state.User.CanAccessPortal(PortalAccess.Customer);
             userId = state.User.GetUserId();
             fullName = state.User.GetFullName();
             designation = state.User.GetDesignation();

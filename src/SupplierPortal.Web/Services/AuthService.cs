@@ -128,5 +128,13 @@ public class AuthService(
         {
             identity.AddClaim(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
         }
+        // One claim per granted portal (Supplier / Landlord / Broker / Customer).
+        foreach (PortalAccess portal in new[] { PortalAccess.Supplier, PortalAccess.Landlord, PortalAccess.Broker, PortalAccess.Customer })
+        {
+            if (user.PortalAccess.HasFlag(portal))
+            {
+                identity.AddClaim(new Claim(AppClaims.Portal, portal.ToString()));
+            }
+        }
     }
 }

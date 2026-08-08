@@ -51,7 +51,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<(bool Success, string? Error)> AddOrLinkUserAsync(
         string username, string fullName, string? designation, string email, string? password, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string actorUsername,
-        AuthSource authSource = AuthSource.Local, string? adLogin = null)
+        AuthSource authSource = AuthSource.Local, string? adLogin = null, PortalAccess portalAccess = PortalAccess.None)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -87,6 +87,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
             existing.FullName = fullName;
             existing.Designation = designation;
             existing.UserType = userType;
+            existing.PortalAccess = portalAccess;
             existing.BusinessUnits = businessUnits;
             existing.IsActive = isActive;
             existing.IsPendingRegistration = false;
@@ -122,6 +123,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
                 Designation = designation,
                 Email = email,
                 UserType = userType,
+                PortalAccess = portalAccess,
                 BusinessUnits = businessUnits,
                 IsActive = isActive,
                 IsPendingRegistration = false,
@@ -154,7 +156,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<(bool Success, string? Error)> UpdateUserAsync(
         int id, string username, string fullName, string? designation, string email, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string? newPassword,
-        AuthSource authSource, string? adLogin, string actorUsername)
+        AuthSource authSource, string? adLogin, string actorUsername, PortalAccess portalAccess = PortalAccess.None)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -185,6 +187,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         user.Designation = designation;
         user.Email = email;
         user.UserType = userType;
+        user.PortalAccess = portalAccess;
         user.AuthSource = authSource;
         user.AdLogin = authSource == AuthSource.ActiveDirectory ? adLogin?.Trim() : null;
         user.BusinessUnits = businessUnits;

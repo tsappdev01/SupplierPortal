@@ -28,18 +28,21 @@
     </div>
 
     <div class="di-launch">
-        <a class="di-launch-card di-launch-supplier" href="/supplier/dashboard">
-            <span class="di-launch-ico">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7l8 4 8-4Z"/><path d="M4 7v10l8 4 8-4V7"/><path d="m12 11 0 10"/></svg>
-            </span>
-            <span class="di-launch-body">
-                <span class="di-launch-title">Supplier Portal</span>
-                <span class="di-launch-sub">Manage suppliers, notifications and self-service.</span>
-            </span>
-            <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
-        </a>
+        @if (canSupplier)
+        {
+            <a class="di-launch-card di-launch-supplier" href="/supplier/dashboard">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7l8 4 8-4Z"/><path d="M4 7v10l8 4 8-4V7"/><path d="m12 11 0 10"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Supplier Portal</span>
+                    <span class="di-launch-sub">Manage suppliers, notifications and self-service.</span>
+                </span>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
 
-        @if (isLeasingUser)
+        @if (canLandlord)
         {
             <a class="di-launch-card di-launch-landlord" href="/admin/land-register">
                 <span class="di-launch-ico">
@@ -53,28 +56,55 @@
             </a>
         }
 
-        <div class="di-launch-card di-launch-broker di-launch-soon" role="button" aria-disabled="true">
-            <span class="di-launch-ico">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </span>
-            <span class="di-launch-body">
-                <span class="di-launch-title">Broker Portal</span>
-                <span class="di-launch-sub">Broker onboarding, listings and commissions.</span>
-            </span>
-            <span class="di-launch-badge">Coming soon</span>
-        </div>
+        @if (canBroker)
+        {
+            <div class="di-launch-card di-launch-broker di-launch-soon" role="button" aria-disabled="true">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Broker Portal</span>
+                    <span class="di-launch-sub">Broker onboarding, listings and commissions.</span>
+                </span>
+                <span class="di-launch-badge">Coming soon</span>
+            </div>
+        }
 
-        <div class="di-launch-card di-launch-customer di-launch-soon" role="button" aria-disabled="true">
-            <span class="di-launch-ico">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </span>
-            <span class="di-launch-body">
-                <span class="di-launch-title">Customer Portal</span>
-                <span class="di-launch-sub">Customer accounts, requests and statements.</span>
-            </span>
-            <span class="di-launch-badge">Coming soon</span>
-        </div>
+        @if (canCustomer)
+        {
+            <div class="di-launch-card di-launch-customer di-launch-soon" role="button" aria-disabled="true">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Customer Portal</span>
+                    <span class="di-launch-sub">Customer accounts, requests and statements.</span>
+                </span>
+                <span class="di-launch-badge">Coming soon</span>
+            </div>
+        }
+
+        @if (isAdministrator)
+        {
+            <a class="di-launch-card di-launch-admin" href="/admin/users">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Administration</span>
+                    <span class="di-launch-sub">Users, business units, supplier fields and audit log.</span>
+                </span>
+                <span class="di-launch-cta">Open <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
     </div>
+
+    @if (!hasAnyPortal && !isAdministrator)
+    {
+        <div class="alert alert-info">
+            You don't have access to any portal yet. Please contact your administrator to be granted access.
+        </div>
+    }
 }
 
 <style>
@@ -206,7 +236,12 @@
 @code {
     private User? user;
     private bool hasPhoto;
-    private bool isLeasingUser;
+    private bool isAdministrator;
+    private bool canSupplier;
+    private bool canLandlord;
+    private bool canBroker;
+    private bool canCustomer;
+    private bool hasAnyPortal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -214,7 +249,12 @@
         var userId = state.User.GetUserId();
         user = await UserService.GetByIdAsync(userId);
         hasPhoto = state.User.HasPhoto();
-        isLeasingUser = state.User.IsLeasingUser();
+        isAdministrator = state.User.IsAdministrator();
+        canSupplier = state.User.CanAccessPortal(PortalAccess.Supplier);
+        canLandlord = state.User.CanAccessPortal(PortalAccess.Landlord);
+        canBroker = state.User.CanAccessPortal(PortalAccess.Broker);
+        canCustomer = state.User.CanAccessPortal(PortalAccess.Customer);
+        hasAnyPortal = canSupplier || canLandlord || canBroker || canCustomer;
     }
 
     private static string GetInitials(string name)

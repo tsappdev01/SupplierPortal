@@ -7,6 +7,20 @@ public enum UserType
     LeasingManager = 3
 }
 
+/// <summary>Which business portals a user is allowed to open. Stored as a bit-flag column on the user and
+/// emitted as claims at login; the home launcher, the sidebar and the portal pages all gate on it. This is a
+/// separate dimension from <see cref="UserType"/> (the Admin/User role, which governs depth of activity and
+/// access to the Settings area). An Administrator only sees the portals they are explicitly granted here.</summary>
+[Flags]
+public enum PortalAccess
+{
+    None = 0,
+    Supplier = 1,
+    Landlord = 2,
+    Broker = 4,
+    Customer = 8
+}
+
 /// <summary>How a user's credentials are verified at login. Local = password hash in this database
 /// (used by the seeded break-glass admin); ActiveDirectory = validated against on-prem AD via LDAP.</summary>
 public enum AuthSource

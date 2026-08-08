@@ -85,6 +85,21 @@ else
                 <option value="@UserType.NormalUser">Normal User</option>
                 <option value="@UserType.Administrator">Administrator</option>
             </InputSelect>
+            <div class="form-text">Administrators also see the Settings area (users, business units, audit log).</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Portal Access</label>
+            <div class="di-bu-checklist">
+                @foreach (var portal in AllPortals)
+                {
+                    <label class="di-bu-check">
+                        <input type="checkbox" checked="@selectedPortals.Contains(portal)"
+                               @onchange="e => TogglePortal(portal, (bool)e.Value!)" />
+                        @portal
+                    </label>
+                }
+            </div>
+            <div class="form-text">The portals this user can open. Only granted portals appear on their home page and sidebar.</div>
         </div>
         <div class="mb-3">
             <label class="form-label">Business Unit(s)</label>
@@ -185,8 +200,12 @@ else
 
     [Parameter] public int Id { get; set; }
 
+    private static readonly PortalAccess[] AllPortals =
+        [PortalAccess.Supplier, PortalAccess.Landlord, PortalAccess.Broker, PortalAccess.Customer];
+
     private List<BusinessUnit> businessUnits = [];
     private HashSet<int> selectedBusinessUnitIds = [];
+    private HashSet<PortalAccess> selectedPortals = [];
     private string currentUser = "unknown";
     private bool notFound;
     private bool hasExistingPhoto;
@@ -213,6 +232,7 @@ else
 
         hasExistingPhoto = user.ProfilePhoto is not null;
         selectedBusinessUnitIds = user.BusinessUnits.Select(b => b.Id).ToHashSet();
+        selectedPortals = AllPortals.Where(p => user.PortalAccess.HasFlag(p)).ToHashSet();
         Input = new UserModel
         {
             Username = user.Username,
@@ -238,6 +258,15 @@ else
         }
     }
 
+    private void TogglePortal(PortalAccess portal, bool isChecked)
+    {
+        if (isChecked) selectedPortals.Add(portal);
+        else selectedPortals.Remove(portal);
+    }
+
+    private PortalAccess SelectedPortalAccess =>
+        selectedPortals.Aggregate(PortalAccess.None, (acc, p) => acc | p);
+
     private async Task OnPhotoSelectedAsync(InputFileChangeEventArgs e)
     {
         var file = e.File;
@@ -259,7 +288,7 @@ else
         var (success, error) = await Loading.RunAsync(() => UserService.UpdateUserAsync(
             Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
             selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword,
-            Input.AuthSource, Input.AdLogin, currentUser));
+            Input.AuthSource, Input.AdLogin, currentUser, SelectedPortalAccess));
 
         if (!success)
         {

@@ -1,5 +1,5 @@
 @page "/admin/landlords/{Id:int}"
-@attribute [Authorize(Roles = "Administrator,LeasingManager")]
+@attribute [Authorize(Policy = "Portal.Landlord")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
@@ -654,7 +654,7 @@ else
     private async Task<IEnumerable<string>> StaffEmailsAsync()
     {
         var users = await UserService.GetAllAsync();
-        return users.Where(u => u.IsActive && (u.UserType == UserType.Administrator || u.UserType == UserType.LeasingManager))
+        return users.Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Landlord))
             .Select(u => u.Email).Where(e => !string.IsNullOrWhiteSpace(e))!;
     }
 

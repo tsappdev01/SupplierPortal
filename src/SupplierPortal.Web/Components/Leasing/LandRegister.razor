@@ -1,5 +1,5 @@
 @page "/admin/land-register"
-@attribute [Authorize(Roles = "Administrator,LeasingManager")]
+@attribute [Authorize(Policy = "Portal.Landlord")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization

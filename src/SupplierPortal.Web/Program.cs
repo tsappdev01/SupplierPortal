@@ -153,7 +153,14 @@ var appUserPolicy = new AuthorizationPolicyBuilder()
     .RequireAuthenticatedUser()
     .RequireClaim(AppClaims.AppUser, "true")
     .Build();
-builder.Services.AddAuthorizationBuilder().SetDefaultPolicy(appUserPolicy);
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(appUserPolicy)
+    // One policy per portal: an app user who holds the matching portal claim. Applied to the portal pages so
+    // access is enforced server-side, not just hidden in the UI.
+    .AddPolicy("Portal.Supplier", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Supplier)))
+    .AddPolicy("Portal.Landlord", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Landlord)))
+    .AddPolicy("Portal.Broker", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Broker)))
+    .AddPolicy("Portal.Customer", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Customer)));
 
 builder.Services.AddRateLimiter(options =>
     options.AddFixedWindowLimiter("credential", limiter =>
@@ -329,7 +336,7 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentServi
     return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
 }).RequireAuthorization();
 
-// Landlord document preview/download for leasing reviewers (Administrator / LeasingManager only).
+// Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
 // Without ?download=1 the file is served inline (preview); with it, as an attachment.
 app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
 {
@@ -338,7 +345,7 @@ app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, Suppli
     return download == true
         ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
         : Results.File(file.Value.Bytes, file.Value.ContentType);
-}).RequireAuthorization(policy => policy.RequireRole(SupplierPortal.Web.Models.UserType.Administrator.ToString(), SupplierPortal.Web.Models.UserType.LeasingManager.ToString()));
+}).RequireAuthorization("Portal.Landlord");
 
 // Circularo signature callback: Circularo POSTs here when a document's signing status changes. Validated by
 // a shared secret (X-Webhook-Secret header or ?secret=). Best-effort parsing of the document id + status.

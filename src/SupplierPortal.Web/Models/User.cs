@@ -42,6 +42,11 @@ public class User
 
     public UserType UserType { get; set; } = UserType.NormalUser;
 
+    /// <summary>Which business portals this user may open (Supplier / Landlord / Broker / Customer). Independent
+    /// of <see cref="UserType"/> — an Administrator only sees the portals granted here. Drives the home launcher,
+    /// the sidebar, and page-level authorization.</summary>
+    public PortalAccess PortalAccess { get; set; } = PortalAccess.None;
+
     /// <summary>A user may be assigned to more than one Business Unit; scopes which suppliers they can see.</summary>
     public List<BusinessUnit> BusinessUnits { get; set; } = [];
 

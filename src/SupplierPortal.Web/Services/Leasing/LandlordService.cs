@@ -648,7 +648,7 @@ public class LandlordService(
         if (!string.IsNullOrWhiteSpace(initiator?.Email)) list.Add(initiator.Email!);
         var all = await users.GetAllAsync();
         list.AddRange(all
-            .Where(u => u.IsActive && (u.UserType == UserType.Administrator || u.UserType == UserType.LeasingManager))
+            .Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Landlord))
             .Select(u => u.Email)
             .Where(e => !string.IsNullOrWhiteSpace(e))!);
         return list;

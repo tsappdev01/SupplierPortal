@@ -25,11 +25,17 @@ public static class ClaimsPrincipalExtensions
         return principal.IsInRole(Models.UserType.Administrator.ToString());
     }
 
-    /// <summary>Access to the Leasing / Landlord module: administrators and leasing managers.</summary>
+    /// <summary>True when the user has been granted the given portal (from the <c>portal</c> claims).</summary>
+    public static bool CanAccessPortal(this ClaimsPrincipal principal, Models.PortalAccess portal)
+    {
+        return principal.FindAll(AppClaims.Portal).Any(c =>
+            Enum.TryParse<Models.PortalAccess>(c.Value, out var p) && p == portal);
+    }
+
+    /// <summary>Access to the Leasing / Landlord module — now driven by the Landlord portal grant.</summary>
     public static bool IsLeasingUser(this ClaimsPrincipal principal)
     {
-        return principal.IsInRole(Models.UserType.Administrator.ToString())
-            || principal.IsInRole(Models.UserType.LeasingManager.ToString());
+        return principal.CanAccessPortal(Models.PortalAccess.Landlord);
     }
 
     public static string GetFullName(this ClaimsPrincipal principal)

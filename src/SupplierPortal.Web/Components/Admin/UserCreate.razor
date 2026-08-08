@@ -85,6 +85,21 @@
             <option value="@UserType.NormalUser">Normal User</option>
             <option value="@UserType.Administrator">Administrator</option>
         </InputSelect>
+        <div class="form-text">Administrators also see the Settings area (users, business units, audit log).</div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Portal Access</label>
+        <div class="di-bu-checklist">
+            @foreach (var portal in AllPortals)
+            {
+                <label class="di-bu-check">
+                    <input type="checkbox" checked="@selectedPortals.Contains(portal)"
+                           @onchange="e => TogglePortal(portal, (bool)e.Value!)" />
+                    @portal
+                </label>
+            }
+        </div>
+        <div class="form-text">The portals this user can open. Only granted portals appear on their home page and sidebar.</div>
     </div>
     <div class="mb-3">
         <label class="form-label">Business Unit(s)</label>
@@ -186,9 +201,13 @@
 @code {
     private const long MaxPhotoSize = 2 * 1024 * 1024;
 
+    private static readonly PortalAccess[] AllPortals =
+        [PortalAccess.Supplier, PortalAccess.Landlord, PortalAccess.Broker, PortalAccess.Customer];
+
     private List<BusinessUnit> businessUnits = [];
     private List<User> pendingRegistrations = [];
     private HashSet<int> selectedBusinessUnitIds = [];
+    private HashSet<PortalAccess> selectedPortals = [PortalAccess.Supplier];
     private string currentUser = "unknown";
     private string? errorMessage;
     private string? photoPreview;
@@ -219,6 +238,15 @@
         }
     }
 
+    private void TogglePortal(PortalAccess portal, bool isChecked)
+    {
+        if (isChecked) selectedPortals.Add(portal);
+        else selectedPortals.Remove(portal);
+    }
+
+    private PortalAccess SelectedPortalAccess =>
+        selectedPortals.Aggregate(PortalAccess.None, (acc, p) => acc | p);
+
     private async Task OnPhotoSelectedAsync(InputFileChangeEventArgs e)
     {
         var file = e.File;
@@ -235,7 +263,7 @@
         var (success, error) = await Loading.RunAsync(() => UserService.AddOrLinkUserAsync(
             Input.Username, Input.FullName, Input.Designation, Input.Email, Input.Password, Input.UserType,
             selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, currentUser,
-            Input.AuthSource, Input.AdLogin));
+            Input.AuthSource, Input.AdLogin, SelectedPortalAccess));
 
         if (!success)
         {

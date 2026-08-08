@@ -1,5 +1,5 @@
 @page "/supplier/dashboard"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "Portal.Supplier")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
