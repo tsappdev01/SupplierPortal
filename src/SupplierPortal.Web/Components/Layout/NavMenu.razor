@@ -40,23 +40,71 @@
                     Home
                 </NavLink>
             </div>
+            @* ---------- Supplier Portal ---------- *@
             <div class="nav-item px-3">
-                <NavLink class="nav-link" href="supplier/dashboard">
-                    Manage Supplier
-                </NavLink>
+                <button type="button" class="nav-link di-group-toggle" @onclick="() => supplierExpanded = !supplierExpanded">
+                    <span>Supplier Portal</span>
+                    @Chevron(supplierExpanded)
+                </button>
             </div>
+            @if (supplierExpanded)
+            {
+                <div class="nav-item px-3 di-sub-item">
+                    <NavLink class="nav-link" href="supplier/dashboard">
+                        Manage Supplier
+                    </NavLink>
+                </div>
+            }
 
+            @* ---------- Landlord Portal ---------- *@
             @if (isLeasingUser)
             {
                 <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/land-register">
-                        Property List
-                    </NavLink>
+                    <button type="button" class="nav-link di-group-toggle" @onclick="() => landlordExpanded = !landlordExpanded">
+                        <span>Landlord Portal</span>
+                        @Chevron(landlordExpanded)
+                    </button>
                 </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin/landlords">
-                        Registrations
-                    </NavLink>
+                @if (landlordExpanded)
+                {
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/land-register">
+                            Property Listing
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/landlords">
+                            Landlord Registrations
+                        </NavLink>
+                    </div>
+                }
+            }
+
+            @* ---------- Broker Portal (coming soon) ---------- *@
+            <div class="nav-item px-3">
+                <button type="button" class="nav-link di-group-toggle" @onclick="() => brokerExpanded = !brokerExpanded">
+                    <span>Broker Portal</span>
+                    @Chevron(brokerExpanded)
+                </button>
+            </div>
+            @if (brokerExpanded)
+            {
+                <div class="nav-item px-3 di-sub-item">
+                    <span class="nav-link di-sub-disabled">Manage Broker <span class="di-soon-tag">Soon</span></span>
+                </div>
+            }
+
+            @* ---------- Customer Portal (coming soon) ---------- *@
+            <div class="nav-item px-3">
+                <button type="button" class="nav-link di-group-toggle" @onclick="() => customerExpanded = !customerExpanded">
+                    <span>Customer Portal</span>
+                    @Chevron(customerExpanded)
+                </button>
+            </div>
+            @if (customerExpanded)
+            {
+                <div class="nav-item px-3 di-sub-item">
+                    <span class="nav-link di-sub-disabled">Manage Customer <span class="di-soon-tag">Soon</span></span>
                 </div>
             }
 
@@ -65,9 +113,7 @@
                 <div class="nav-item px-3">
                     <button type="button" class="nav-link di-group-toggle" @onclick="ToggleSetup">
                         <span>Settings</span>
-                        <svg class="di-chevron @(setupExpanded ? "di-chevron-open" : "")" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M4.646 6.146a.5.5 0 0 1 .708 0L8 8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708Z" />
-                        </svg>
+                        @Chevron(setupExpanded)
                     </button>
                 </div>
                 @if (setupExpanded)
@@ -126,7 +172,11 @@
     private string fullName = "";
     private string? designation;
     private bool hasPhoto;
-    private bool setupExpanded = true;
+    private bool supplierExpanded = true;
+    private bool landlordExpanded = true;
+    private bool brokerExpanded;
+    private bool customerExpanded;
+    private bool setupExpanded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,13 +193,23 @@
             hasPhoto = state.User.HasPhoto();
         }
 
-        setupExpanded = NavigationManager.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase);
+        // Open the group that matches the current route (keep the primary portals open by default).
+        var uri = NavigationManager.Uri;
+        bool In(string s) => uri.Contains(s, StringComparison.OrdinalIgnoreCase);
+        supplierExpanded = In("/supplier") || !(In("/admin/"));
+        landlordExpanded = In("/admin/land-register") || In("/admin/landlords") || !In("/admin/");
+        setupExpanded = In("/admin/business-units") || In("/admin/users")
+            || In("/admin/supplier-fields") || In("/admin/audit-log");
     }
 
     private void ToggleSetup()
     {
         setupExpanded = !setupExpanded;
     }
+
+    private RenderFragment Chevron(bool open) => @<svg class="di-chevron @(open ? "di-chevron-open" : "")" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M4.646 6.146a.5.5 0 0 1 .708 0L8 8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708Z" />
+    </svg>;
 
     private static string GetInitials(string name)
     {

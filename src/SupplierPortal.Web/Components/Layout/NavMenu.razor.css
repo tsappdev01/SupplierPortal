@@ -152,6 +152,28 @@
     font-size: 0.84rem;
 }
 
+.di-sub-disabled {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding-left: 1.75rem;
+    font-size: 0.84rem;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: default;
+}
+
+.di-soon-tag {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+
 .di-nav-divider {
     margin: 0.75rem 1rem;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
