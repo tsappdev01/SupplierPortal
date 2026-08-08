@@ -87,22 +87,6 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
             form.Add(new StringContent(name), "name");
             return form;
         });
-        // JSON envelope carrying the file as base64 (several likely key names — extras are ignored server-side)
-        yield return new UploadStrategy("json:base64", (pdf, name, _) =>
-        {
-            var b64 = Convert.ToBase64String(pdf);
-            var body = new Dictionary<string, object?>
-            {
-                ["name"] = name,
-                ["fileName"] = name,
-                ["docType"] = "pdf",
-                ["contentType"] = "application/pdf",
-                ["data"] = b64,
-                ["file"] = b64,
-                ["content"] = b64
-            };
-            return new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-        });
     }
 
     private void Authorize(HttpRequestMessage req)
@@ -120,19 +104,64 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
 
         try
         {
-            // 1) Upload the document. The exact path AND body format vary by Circularo version, so probe each
-            // candidate path with several body strategies (multipart field "file", multipart field "files",
-            // and JSON+base64) until one returns 2xx. A 404 means the route doesn't exist (skip other strategies
-            // for that path); a 400/415/422 means the route exists but the body was wrong — keep that response
-            // body, it's Circularo's own validation message and pins down what the endpoint actually wants.
+            // Build the signer / signing workflow. Circularo's POST documents creates the document together
+            // with its workflow (it validates that both "definitionType" and "workflow" are present), so the
+            // file, the document type and the workflow all go in one create call. The exact field shapes vary
+            // by Circularo version and are refined by the server's own validation messages, which are surfaced
+            // to the UI verbatim.
+            var signer = new Dictionary<string, object?>
+            {
+                ["email"] = signerEmail, ["name"] = signerName, ["role"] = "signer", ["action"] = "sign", ["order"] = 1
+            };
+            if (_o.RequireUaePassSignature) signer["signatureProvider"] = _o.SignatureProvider;
+            if (_o.RequireUaePassVerification)
+                signer["authentication"] = new Dictionary<string, object?>
+                {
+                    ["method"] = _o.VerificationMethod, ["factor"] = _o.VerificationFactor, ["email"] = signerEmail
+                };
+            var workflow = new[] { signer };
+
+            var title = Path.GetFileNameWithoutExtension(fileName);
+            var b64 = Convert.ToBase64String(pdf);
+            var createBody = new Dictionary<string, object?>
+            {
+                ["definitionType"] = _o.DefinitionType,
+                ["title"] = title,
+                ["name"] = fileName,
+                ["workflow"] = workflow,
+                ["subject"] = _o.RequestSubject,
+                ["message"] = _o.RequestMessage,
+                // the file carried under a few likely keys (extras are ignored server-side)
+                ["fileName"] = fileName,
+                ["contentType"] = "application/pdf",
+                ["data"] = b64,
+                ["file"] = b64,
+                ["content"] = b64
+            };
+            if (_o.RequireUaePassSignature) createBody["signatureProvider"] = _o.SignatureProvider;
+
+            // The create-document JSON body (carries the workflow) is tried first; multipart uploads are kept
+            // as fallbacks for versions that want a plain upload before a separate workflow call.
+            var strategies = new List<UploadStrategy>
+            {
+                new("create:json", (_, _, _) =>
+                    new StringContent(JsonSerializer.Serialize(createBody), Encoding.UTF8, "application/json"))
+            };
+            strategies.AddRange(UploadStrategies());
+
+            // Probe each candidate path with each strategy until one returns 2xx. A 404 means the route doesn't
+            // exist (skip other strategies for that path); a 400/415/422 means the route exists but the body was
+            // wrong — keep that response body, it's Circularo's own validation message.
             string? documentId = null;
+            string? okBody = null;
+            string? winningStrategy = null;
             var tried = new List<string>();
             string? bestHint = null; // most-informative (non-404) server response, surfaced to the UI
 
             foreach (var path in UploadPaths())
             {
                 var routeMissing = false;
-                foreach (var strategy in UploadStrategies())
+                foreach (var strategy in strategies)
                 {
                     using var upReq = new HttpRequestMessage(HttpMethod.Post, Url(path))
                     {
@@ -146,12 +175,14 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
                     if (upResp.IsSuccessStatusCode)
                     {
                         documentId = ExtractId(upBody);
-                        logger.LogInformation("Circularo upload succeeded via '{Path}' [{Strategy}], document {DocId}.",
+                        okBody = upBody;
+                        winningStrategy = strategy.Name;
+                        logger.LogInformation("Circularo create succeeded via '{Path}' [{Strategy}], document {DocId}.",
                             path, strategy.Name, documentId);
                         break;
                     }
 
-                    logger.LogWarning("Circularo upload via '{Path}' [{Strategy}] failed {Status}: {Body}",
+                    logger.LogWarning("Circularo create via '{Path}' [{Strategy}] failed {Status}: {Body}",
                         path, strategy.Name, upResp.StatusCode, Trunc(upBody));
 
                     if (upResp.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -169,58 +200,48 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
             if (string.IsNullOrWhiteSpace(documentId))
             {
                 var detail = bestHint is not null
-                    ? $"Upload failed — {bestHint}"
-                    : $"Upload failed. Tried: {string.Join(", ", tried)}";
+                    ? $"Create failed — {bestHint}"
+                    : $"Create failed. Tried: {string.Join(", ", tried)}";
                 return new(false, null, null, detail);
             }
 
-            // 2) Create the signature workflow addressed to the signer (Circularo emails them). The
-            // "sign here" box printed on the last page of the summary is the visual anchor for the field.
-            // When configured, require UAE Pass signing + UAE Pass identity verification (email-match) —
-            // the signer email is the UAE-Pass-verified primary-contact email.
-            var recipient = new Dictionary<string, object?>
+            // If the create call carried the workflow (create:json), the document is already routed for
+            // signature — Circularo emails the signer. Otherwise (a plain multipart upload won), create the
+            // signature workflow in a separate call.
+            if (winningStrategy != "create:json" && !string.IsNullOrWhiteSpace(_o.SignInvitePath))
             {
-                ["name"] = signerName, ["email"] = signerEmail, ["role"] = "signer", ["action"] = "sign", ["order"] = 1
-            };
-            if (_o.RequireUaePassSignature) recipient["signatureProvider"] = _o.SignatureProvider;
-            if (_o.RequireUaePassVerification)
-                recipient["authentication"] = new Dictionary<string, object?>
+                var field = new Dictionary<string, object?>
                 {
-                    ["method"] = _o.VerificationMethod,
-                    ["factor"] = _o.VerificationFactor,
-                    ["email"] = signerEmail
+                    ["type"] = "signature", ["recipientEmail"] = signerEmail, ["page"] = -1, ["anchor"] = "Sign here", ["required"] = true
                 };
+                if (_o.RequireUaePassSignature) field["provider"] = _o.SignatureProvider;
 
-            var field = new Dictionary<string, object?>
-            {
-                ["type"] = "signature", ["recipientEmail"] = signerEmail, ["page"] = -1, ["anchor"] = "Sign here", ["required"] = true
-            };
-            if (_o.RequireUaePassSignature) field["provider"] = _o.SignatureProvider;
-
-            var payload = new Dictionary<string, object?>
-            {
-                ["subject"] = _o.RequestSubject,
-                ["message"] = _o.RequestMessage,
-                ["signers"] = new[] { recipient },
-                ["recipients"] = new[] { recipient },
-                ["fields"] = new[] { field }
-            };
-            if (_o.RequireUaePassSignature) payload["signatureProvider"] = _o.SignatureProvider;
-            var json = JsonSerializer.Serialize(payload);
-            using var signReq = new HttpRequestMessage(HttpMethod.Post, Url(_o.SignInvitePath.Replace("{id}", documentId)))
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-            Authorize(signReq);
-            using var signResp = await http.SendAsync(signReq, ct);
-            var signBody = await signResp.Content.ReadAsStringAsync(ct);
-            if (!signResp.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Circularo send-for-signature failed {Status}: {Body}", signResp.StatusCode, Trunc(signBody));
-                return new(false, documentId, null, $"Send for signature failed ({(int)signResp.StatusCode}).");
+                var payload = new Dictionary<string, object?>
+                {
+                    ["subject"] = _o.RequestSubject,
+                    ["message"] = _o.RequestMessage,
+                    ["workflow"] = workflow,
+                    ["signers"] = workflow,
+                    ["recipients"] = workflow,
+                    ["fields"] = new[] { field }
+                };
+                if (_o.RequireUaePassSignature) payload["signatureProvider"] = _o.SignatureProvider;
+                using var signReq = new HttpRequestMessage(HttpMethod.Post, Url(_o.SignInvitePath.Replace("{id}", documentId)))
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                };
+                Authorize(signReq);
+                using var signResp = await http.SendAsync(signReq, ct);
+                var signBody = await signResp.Content.ReadAsStringAsync(ct);
+                if (!signResp.IsSuccessStatusCode)
+                {
+                    logger.LogWarning("Circularo send-for-signature failed {Status}: {Body}", signResp.StatusCode, Trunc(signBody));
+                    return new(false, documentId, null, $"Send for signature failed ({(int)signResp.StatusCode}): {Trunc(signBody)}");
+                }
+                okBody = signBody;
             }
 
-            var signingUrl = ExtractString(signBody, "signingUrl", "signUrl", "url", "link");
+            var signingUrl = ExtractString(okBody ?? "", "signingUrl", "signUrl", "url", "link");
             logger.LogInformation("Circularo: document {DocId} sent to {Email} for signature.", documentId, signerEmail);
             return new(true, documentId, signingUrl, null);
         }

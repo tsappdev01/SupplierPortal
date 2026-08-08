@@ -33,8 +33,12 @@ public class CircularoOptions
     /// <summary>Query-string parameter name carrying the token when <see cref="AuthMode"/> includes the query mode.</summary>
     public string TokenQueryParam { get; set; } = "token";
 
-    /// <summary>Multipart upload endpoint (relative to <see cref="BaseUrl"/>).</summary>
-    public string UploadPath { get; set; } = "document/upload";
+    /// <summary>Document-creation endpoint (relative to <see cref="BaseUrl"/>). Circularo's <c>POST documents</c>
+    /// creates the document together with its signing workflow (it validates <c>definitionType</c> + <c>workflow</c>).</summary>
+    public string UploadPath { get; set; } = "documents";
+
+    /// <summary>Circularo document definition type. The default catalogue type is <c>d_default</c>.</summary>
+    public string DefinitionType { get; set; } = "d_default";
 
     /// <summary>Candidate upload endpoints tried in order until one succeeds (self-discovery when the exact
     /// path isn't known). When empty, a built-in candidate list is used. Set this once the working path is
