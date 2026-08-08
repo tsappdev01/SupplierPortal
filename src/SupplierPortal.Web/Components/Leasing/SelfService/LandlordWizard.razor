@@ -762,7 +762,7 @@
     // Landlord-facing document list — excludes the system-generated registration-summary PDF.
     private async Task<List<LandlordDocument>> LoadLandlordDocumentsAsync(int landlordId) =>
         (await DocumentService.GetDocumentsAsync(landlordId))
-            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .Where(d => d.DocumentType is not (LandlordDocumentType.RegistrationSummary or LandlordDocumentType.SignedDocument))
             .ToList();
 
     private async Task DeleteDocAsync(int docId)

@@ -91,6 +91,21 @@ public class LandlordEmailService(
             .Select(e => SendAsync(e, $"Landlord Registration Submitted – {propertyCode}", body)));
     }
 
+    public Task SendSignedToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string? signedBy, DateTime signedAt)
+    {
+        var rows =
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Signed By</td><td style=\"padding:4px 0\">{E(signedBy ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Signed On</td><td style=\"padding:4px 0\">{signedAt:yyyy-MM-dd HH:mm} UTC</td></tr>";
+        var body = Wrap("Landlord Registration Signed",
+            "<p style=\"margin:0 0 14px\">The primary contact has <strong>signed</strong> the landlord registration document via Circularo. " +
+            "The signed copy is available on the registration.</p>" +
+            $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>", null, null, null);
+        return Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
+            .Select(e => SendAsync(e, $"Landlord Registration Signed – {propertyCode}", body)));
+    }
+
     /// <summary>Wraps content in a branded, email-client-safe HTML shell (inline styles, table layout).</summary>
     private static string Wrap(string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
     {

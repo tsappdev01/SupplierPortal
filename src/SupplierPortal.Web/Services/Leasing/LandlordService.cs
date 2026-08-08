@@ -34,6 +34,7 @@ public class LandlordService(
     public const string EventCompleted = "RegistrationCompleted";
     public const string EventLinkDeactivated = "LinkDeactivated";
     public const string EventSignatureRequested = "SignatureRequested";
+    public const string EventSignatureCompleted = "SignatureCompleted";
 
     public const string ActorBusinessCentre = "BusinessCentre";
     public const string ActorLandlord = "Landlord";
@@ -507,7 +508,7 @@ public class LandlordService(
         await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy);
 
         // Route the summary document to the primary contact for signature via Circularo (best-effort).
-        try { await SendForSignatureAsync(db, l); }
+        try { await SendForSignatureAsync(db, l, actor); }
         catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: Circularo send-for-signature error.", landlordId); }
 
         return (true, null);
@@ -538,7 +539,7 @@ public class LandlordService(
         if (fresh is null) return null;
 
         var docs = (await documents.GetDocumentsAsync(landlordId))
-            .Where(d => d.DocumentType != LandlordDocumentType.RegistrationSummary)
+            .Where(d => d.DocumentType is not (LandlordDocumentType.RegistrationSummary or LandlordDocumentType.SignedDocument))
             .ToList();
         var pdf = summaryPdf.Build(fresh, docs);
         var fileName = $"Landlord-Registration-{(fresh.Reference ?? fresh.PropertyCode)}.pdf".Replace(' ', '-');
@@ -547,9 +548,9 @@ public class LandlordService(
         return (pdf, fileName, fresh.CreatedBy, fresh.PropertyCode, fresh.CompanyName, fresh.Reference);
     }
 
-    /// <summary>On approval, (re)builds the summary from the final data and routes it to the primary contact
-    /// for signature via Circularo, recording the outcome on the registration and in the audit trail.</summary>
-    private async Task SendForSignatureAsync(LeasingDbContext db, Landlord l)
+    /// <summary>(Re)builds the summary from the final data and routes it to the primary contact for signature
+    /// via Circularo, recording the outcome on the registration and in the audit trail.</summary>
+    private async Task SendForSignatureAsync(LeasingDbContext db, Landlord l, string actor)
     {
         if (!circularo.Enabled) return;
 
@@ -558,6 +559,8 @@ public class LandlordService(
         if (primary is null || string.IsNullOrWhiteSpace(primary.Email))
         {
             logger.LogWarning("Landlord {Id}: no primary contact email; skipping Circularo send.", l.Id);
+            l.SignatureStatus = "Failed";
+            await db.SaveChangesAsync();
             return;
         }
 
@@ -571,13 +574,69 @@ public class LandlordService(
         l.SignatureStatus = res.Success ? "Sent" : "Failed";
         l.CircularoDocumentId = res.DocumentId;
         l.CircularoSigningUrl = res.SigningUrl;
+        l.SignatureSignedAt = null;
         await db.SaveChangesAsync();
 
         await AddEventAsync(db, l.Id, EventSignatureRequested,
             res.Success
                 ? $"Registration summary sent to {primary.Email} for signature via Circularo (document {res.DocumentId})."
                 : $"Circularo send-for-signature failed: {res.Error}",
-            "System", ActorSystem, l.Status, l.Status);
+            actor, ActorSystem, l.Status, l.Status);
+    }
+
+    /// <summary>Business-Centre-triggered send / resend of the summary to the primary contact for signature.</summary>
+    public async Task<(bool Success, string? Error)> SendForSignatureManualAsync(int landlordId, string actor)
+    {
+        if (!circularo.Enabled)
+            return (false, "Circularo e-signature is not configured. Set Leasing:Circularo (Enabled + ApiKey).");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+        await SendForSignatureAsync(db, l, actor);
+        return l.SignatureStatus == "Failed"
+            ? (false, "Could not send to Circularo — see the audit trail for details.")
+            : (true, null);
+    }
+
+    /// <summary>Applies a Circularo signature callback: marks the registration signed (or records the status),
+    /// stores the signed copy when provided, audits it, and notifies Business Centre. Matches on the
+    /// Circularo document id. Returns false when no matching registration is found.</summary>
+    public async Task<bool> HandleSignatureCallbackAsync(string documentId, string? status, byte[]? signedPdf, string? signedFileName)
+    {
+        if (string.IsNullOrWhiteSpace(documentId)) return false;
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.CircularoDocumentId == documentId);
+        if (l is null) return false;
+
+        var signed = string.IsNullOrWhiteSpace(status)
+            || status.Contains("sign", StringComparison.OrdinalIgnoreCase)
+            || status.Contains("complet", StringComparison.OrdinalIgnoreCase)
+            || status.Contains("finish", StringComparison.OrdinalIgnoreCase);
+        var declined = status is not null
+            && (status.Contains("declin", StringComparison.OrdinalIgnoreCase)
+                || status.Contains("reject", StringComparison.OrdinalIgnoreCase)
+                || status.Contains("cancel", StringComparison.OrdinalIgnoreCase));
+
+        l.SignatureStatus = declined ? "Declined" : signed ? "Signed" : (status ?? l.SignatureStatus);
+        if (signed && !declined) l.SignatureSignedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        if (signedPdf is { Length: > 0 })
+            await documents.StoreGeneratedAsync(l.Id, LandlordDocumentType.SignedDocument,
+                signedFileName ?? $"Signed-{l.Reference ?? l.PropertyCode}.pdf", "application/pdf", signedPdf, "Circularo");
+
+        await AddEventAsync(db, l.Id, EventSignatureCompleted,
+            declined ? $"Signature declined/cancelled in Circularo (status: {status})."
+                     : signed ? $"Document signed by {l.SignatureSentTo} via Circularo (document {documentId})."
+                              : $"Circularo status update: {status}",
+            "Circularo", ActorSystem, l.Status, l.Status);
+
+        if (signed && !declined)
+        {
+            var recipients = await ResolveBcRecipientsAsync(l.CreatedBy);
+            await email.SendSignedToStaffAsync(recipients, l.PropertyCode, l.CompanyName, l.SignatureSentTo, l.SignatureSignedAt!.Value);
+        }
+        return true;
     }
 
     /// <summary>Business-Centre notification recipients for a submission: the initiating user first, then all

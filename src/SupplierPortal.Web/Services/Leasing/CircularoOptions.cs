@@ -32,6 +32,13 @@ public class CircularoOptions
     /// <summary>Send-for-signature endpoint. <c>{id}</c> is replaced with the uploaded document id.</summary>
     public string SignInvitePath { get; set; } = "document/{id}/workflow";
 
+    /// <summary>Endpoint to download the signed copy. <c>{id}</c> is replaced with the document id.</summary>
+    public string DownloadSignedPath { get; set; } = "document/{id}/download";
+
+    /// <summary>Shared secret to validate incoming signature webhooks (matched against the
+    /// <c>X-Webhook-Secret</c> header or a <c>?secret=</c> query value). Empty disables the check.</summary>
+    public string WebhookSecret { get; set; } = "";
+
     /// <summary>Subject line for the signature request Circularo emails to the signer.</summary>
     public string RequestSubject { get; set; } = "Signature required — Landlord Registration";
 

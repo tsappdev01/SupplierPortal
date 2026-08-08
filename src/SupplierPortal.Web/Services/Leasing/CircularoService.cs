@@ -17,6 +17,9 @@ public interface ICircularoService
     /// Circularo emails the signer the request. Best-effort — errors are returned, never thrown.</summary>
     Task<CircularoResult> SendForSignatureAsync(
         byte[] pdf, string fileName, string signerName, string signerEmail, CancellationToken ct = default);
+
+    /// <summary>Attempts to download the signed copy of a document. Returns null when unavailable.</summary>
+    Task<byte[]?> DownloadSignedAsync(string documentId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -67,13 +70,15 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
                     return new(false, null, null, "Upload succeeded but no document id was returned.");
             }
 
-            // 2) Create the signature workflow addressed to the signer (Circularo emails them).
+            // 2) Create the signature workflow addressed to the signer (Circularo emails them). The
+            // "sign here" box printed on the last page of the summary is the visual anchor for the field.
             var payload = new
             {
                 subject = _o.RequestSubject,
                 message = _o.RequestMessage,
                 signers = new[] { new { name = signerName, email = signerEmail, role = "signer", order = 1 } },
-                recipients = new[] { new { name = signerName, email = signerEmail, action = "sign", order = 1 } }
+                recipients = new[] { new { name = signerName, email = signerEmail, action = "sign", order = 1 } },
+                fields = new[] { new { type = "signature", recipientEmail = signerEmail, page = -1, anchor = "Sign here", required = true } }
             };
             var json = JsonSerializer.Serialize(payload);
             using var signReq = new HttpRequestMessage(HttpMethod.Post, Url(_o.SignInvitePath.Replace("{id}", documentId)))
@@ -97,6 +102,28 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
         {
             logger.LogError(ex, "Circularo send-for-signature error.");
             return new(false, null, null, ex.Message);
+        }
+    }
+
+    public async Task<byte[]?> DownloadSignedAsync(string documentId, CancellationToken ct = default)
+    {
+        if (!Enabled || string.IsNullOrWhiteSpace(documentId)) return null;
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, Url(_o.DownloadSignedPath.Replace("{id}", documentId)));
+            Authorize(req);
+            using var resp = await http.SendAsync(req, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Circularo download signed failed {Status} for {Doc}", resp.StatusCode, documentId);
+                return null;
+            }
+            return await resp.Content.ReadAsByteArrayAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Circularo download signed error for {Doc}", documentId);
+            return null;
         }
     }
 

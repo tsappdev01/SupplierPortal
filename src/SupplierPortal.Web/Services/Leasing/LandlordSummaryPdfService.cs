@@ -144,6 +144,25 @@ public class LandlordSummaryPdfService
                         txt.Span("Declaration:  ").Bold();
                         txt.Span("The landlord confirmed that the information above — contacts, documents and signatories — is accurate and complete at the time of submission.");
                     });
+
+                    // ----- Signature placeholder (primary contact) — anchor for the Circularo signature field -----
+                    col.Item().PaddingTop(18).Row(r =>
+                    {
+                        r.RelativeItem().PaddingRight(16).Column(c =>
+                        {
+                            c.Item().Text("Authorised signatory").FontSize(9).FontColor(Colors.Grey.Darken1);
+                            c.Item().Text(primary?.FullName ?? "—").FontSize(12).Bold().FontColor(Navy);
+                            c.Item().Text("Primary contact").FontSize(9).FontColor(Colors.Grey.Darken1);
+                            if (!string.IsNullOrWhiteSpace(primary?.Email))
+                                c.Item().Text(primary!.Email).FontSize(9).FontColor(Colors.Grey.Darken1);
+                        });
+                        r.ConstantItem(230).Column(c =>
+                        {
+                            c.Item().Height(78).Border(1).BorderColor(Navy).Background(Colors.Grey.Lighten5)
+                                .AlignCenter().AlignMiddle().Text("Sign here").FontSize(10).FontColor(Colors.Grey.Medium);
+                            c.Item().PaddingTop(3).Text("Signature & date").FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                    });
                 });
 
                 page.Footer().AlignCenter().Text(txt =>
@@ -200,6 +219,7 @@ public class LandlordSummaryPdfService
         LandlordDocumentType.AuthorisationLetter => "Authorisation Letter",
         LandlordDocumentType.TitleDeed => "Title Deed",
         LandlordDocumentType.RegistrationSummary => "Registration Summary",
+        LandlordDocumentType.SignedDocument => "Signed Document",
         _ => "Other"
     };
 }
