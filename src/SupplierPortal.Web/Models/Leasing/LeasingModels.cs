@@ -343,3 +343,31 @@ public class LandlordAccessToken
     /// <summary>Emirates ID number (UAE Pass <c>idn</c>) where the profile scope exposes it.</summary>
     [MaxLength(50)] public string? UaePassEmiratesId { get; set; }
 }
+
+/// <summary>
+/// Signatory email routed to the source system on approval, mapped to the existing <c>dbo.MaintainTenantUAEPassEmails</c>
+/// (FK → <c>dbo.MaintainTenant</c>). Written when a landlord registration is approved by the Business Centre:
+/// one row per signatory (primary + secondary contacts + additional signatories). Read-only from migrations'
+/// point of view — the table is created/maintained in the shared BP database, not by this app.
+/// </summary>
+public class MaintainTenantUaePassEmail
+{
+    public long Id { get; set; }
+
+    /// <summary>= the source-system landlord id (<c>dbo.Property.LandlordId</c> / <c>dbo.MaintainTenant.ID</c>).</summary>
+    public long MaintainTenantId { get; set; }
+
+    /// <summary>Signing order of the signatory.</summary>
+    public int OwnershipLevel { get; set; }
+
+    public bool IsDeleted { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public string Email { get; set; } = string.Empty;
+
+    /// <summary>"AND" when every signatory must sign (<see cref="SigningRule.All"/>), otherwise "OR".
+    /// Mapped to the <c>AND_OR char(3)</c> column.</summary>
+    public string? AndOr { get; set; }
+}

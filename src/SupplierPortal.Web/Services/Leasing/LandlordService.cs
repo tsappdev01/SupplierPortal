@@ -507,11 +507,92 @@ public class LandlordService(
         // Notify Business-Centre staff, and in particular the user who initiated the request (l.CreatedBy).
         await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy);
 
+        // Push the approved signatory set to the shared source table (dbo.MaintainTenantUAEPassEmails).
+        try { await WriteMaintainTenantEmailsAsync(db, l); }
+        catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: MaintainTenantUAEPassEmails write error.", landlordId); }
+
         // Route the summary document to the primary contact for signature via Circularo (best-effort).
         try { await SendForSignatureAsync(db, l, actor); }
         catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: Circularo send-for-signature error.", landlordId); }
 
         return (true, null);
+    }
+
+    /// <summary>On approval, records the registration's signatory emails into the shared
+    /// <c>dbo.MaintainTenantUAEPassEmails</c> table, keyed by the source-system landlord id
+    /// (<c>dbo.Property.LandlordId</c> → <c>dbo.MaintainTenant.ID</c>). One row per signatory in signing order
+    /// (primary + secondary contacts + additional signatories); <c>AND_OR</c> = "AND" when every signatory must
+    /// sign (<see cref="SigningRule.All"/>), else "OR". Any previous active rows for the tenant are deactivated
+    /// first so a re-approval replaces the set.</summary>
+    private async Task WriteMaintainTenantEmailsAsync(LeasingDbContext db, Landlord l)
+    {
+        // Resolve the source-system landlord id from the premises the registration owns.
+        var premisesIds = await db.LandlordPremises.Where(lp => lp.LandlordId == l.Id)
+            .Select(lp => lp.PremisesId).ToListAsync();
+        if (premisesIds.Count == 0 && l.PropertyId > 0) premisesIds.Add(l.PropertyId);
+
+        var maintainTenantId = await db.Premises
+            .Where(p => premisesIds.Contains(p.Id) && p.LandlordId != null)
+            .Select(p => p.LandlordId)
+            .FirstOrDefaultAsync();
+
+        if (maintainTenantId is null or 0)
+        {
+            logger.LogWarning("Landlord {Id}: no source LandlordId on the linked premises; skipping MaintainTenantUAEPassEmails.", l.Id);
+            return;
+        }
+        var tenantId = (long)maintainTenantId.Value;
+
+        // Ordered, de-duplicated signatory emails: signatories first (in signing order), then any contact
+        // emails not already covered (primary contact, then the rest).
+        var ordered = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string? email)
+        {
+            var e = email?.Trim();
+            if (!string.IsNullOrWhiteSpace(e) && seen.Add(e!)) ordered.Add(e!);
+        }
+
+        var signatories = await db.LandlordSignatories.Where(s => s.LandlordId == l.Id)
+            .OrderBy(s => s.Order).ToListAsync();
+        foreach (var s in signatories) Add(s.Email);
+
+        var contacts = await db.LandlordContacts.Where(c => c.LandlordId == l.Id)
+            .OrderByDescending(c => c.IsPrimary).ToListAsync();
+        foreach (var c in contacts) Add(c.Email);
+
+        if (ordered.Count == 0)
+        {
+            logger.LogWarning("Landlord {Id}: no signatory/contact emails; skipping MaintainTenantUAEPassEmails.", l.Id);
+            return;
+        }
+
+        var andOr = l.SigningRule == SigningRule.All ? "AND" : "OR";
+        var now = DateTime.UtcNow;
+
+        // Replace: deactivate any existing active rows for this tenant, then insert the fresh set.
+        var prior = await db.MaintainTenantUaePassEmails
+            .Where(m => m.MaintainTenantId == tenantId && m.IsActive && !m.IsDeleted).ToListAsync();
+        foreach (var p in prior) { p.IsActive = false; p.IsDeleted = true; p.UpdatedAt = now; }
+
+        for (var i = 0; i < ordered.Count; i++)
+        {
+            db.MaintainTenantUaePassEmails.Add(new MaintainTenantUaePassEmail
+            {
+                MaintainTenantId = tenantId,
+                OwnershipLevel = i + 1,
+                IsDeleted = false,
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Email = ordered[i],
+                AndOr = andOr
+            });
+        }
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("Landlord {Id}: wrote {Count} MaintainTenantUAEPassEmails for tenant {Tenant} ({AndOr}).",
+            l.Id, ordered.Count, tenantId, andOr);
     }
 
     // ---------------------------------------------------------------- helpers

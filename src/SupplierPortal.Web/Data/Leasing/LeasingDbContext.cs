@@ -23,6 +23,7 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
     public DbSet<LandlordFieldChange> LandlordFieldChanges => Set<LandlordFieldChange>();
     public DbSet<LandlordEvent> LandlordEvents => Set<LandlordEvent>();
     public DbSet<LandlordAccessToken> LandlordAccessTokens => Set<LandlordAccessToken>();
+    public DbSet<MaintainTenantUaePassEmail> MaintainTenantUaePassEmails => Set<MaintainTenantUaePassEmail>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -32,6 +33,16 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
             e.ToView("Property");            // [dbo].[Property]
             e.HasKey(p => p.Id);
             e.Property(p => p.Id).ValueGeneratedNever();
+        });
+
+        // Existing shared-DB table (dbo), created by the business's DDL — mapped for writing, excluded from
+        // our migrations. Populated on approval with the registration's signatory emails.
+        b.Entity<MaintainTenantUaePassEmail>(e =>
+        {
+            e.ToTable("MaintainTenantUAEPassEmails", "dbo", t => t.ExcludeFromMigrations());
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Email).HasColumnType("varchar(255)");
+            e.Property(x => x.AndOr).HasColumnName("AND_OR").HasColumnType("char(3)");
         });
 
         b.Entity<Landlord>(e =>
