@@ -361,6 +361,10 @@ public class LandlordService(
         {
             try { await GenerateSummaryAndNotifyAsync(landlordId, baseUrl); }
             catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: summary PDF / submission notification failed.", landlordId); }
+
+            // Confirm to the landlord that the submission was received and what happens next.
+            try { await email.SendSubmittedToLandlordAsync(l.Email, l.PropertyCode, l.Reference); }
+            catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: submission confirmation email failed.", landlordId); }
         }
 
         return (true, null, l.Reference);
