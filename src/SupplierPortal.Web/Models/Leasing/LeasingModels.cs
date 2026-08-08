@@ -25,6 +25,9 @@ public class Premises
 
     // Source-system lease / owner columns exposed by the view (read-only, maintained by the business).
     public string? LeaseNo { get; set; }
+    /// <summary>Source-system landlord id from the view (added to <c>dbo.Property</c>). Read-only; will be used
+    /// by an upcoming change to link a premises to its landlord by id rather than by <see cref="LandLordCode"/>.</summary>
+    public int? LandlordId { get; set; }
     public string? LandLordCode { get; set; }
     public string? CompanyName { get; set; }
     public string? ContactName { get; set; }
