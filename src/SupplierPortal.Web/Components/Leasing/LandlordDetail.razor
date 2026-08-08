@@ -176,7 +176,7 @@ else
                                 <div class="fw-semibold">@c.FullName <span class="badge bg-secondary ms-1">@(c.IsPrimary ? "Primary" : "Secondary")</span> <span class="badge bg-light text-dark">@c.ContactType</span>
                                     @if (changed) { <span class="badge bg-warning text-dark ms-1">Updated by landlord</span> }
                                 </div>
-                                <div class="small text-muted">@(c.Designation ?? "—") · @c.Email · @(c.Mobile ?? "—") @(string.IsNullOrWhiteSpace(c.EmiratesId) ? "" : $"· EID {c.EmiratesId}") @(c.EmiratesIdExpiry is DateTime ex ? $"· exp {ex:dd MMM yyyy}" : "")</div>
+                                <div class="small text-muted">@(c.Designation ?? "—") · @c.Email · @(c.Mobile ?? "—") @(string.IsNullOrWhiteSpace(c.EmiratesId) ? "" : $"· EID {c.EmiratesId}") @(string.IsNullOrWhiteSpace(c.EmiratesIdName) ? "" : $"· EID name: {c.EmiratesIdName}") @(c.EmiratesIdExpiry is DateTime ex ? $"· exp {ex:dd MMM yyyy}" : "")</div>
                             </div>
                         }
                         @if (landlord.Signatories.Count > 0)
@@ -215,6 +215,7 @@ else
                                         </select>
                                     </div>
                                     <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Emirates ID" @bind="c.EmiratesId" /></div>
+                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Name on Emirates ID" @bind="c.EmiratesIdName" /></div>
                                     <div class="col-md-6"><label class="form-label form-label-sm small mb-0 text-muted">Emirates ID expiry</label><input type="date" class="form-control form-control-sm" @bind="c.EmiratesIdExpiry" /></div>
                                 </div>
                             </div>
@@ -540,7 +541,7 @@ else
         foreach (var c in ordered)
             editContacts.Add(new ContactInput { Id = c.Id, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
                 FullName = c.FullName, Designation = c.Designation, Mobile = c.Mobile, Email = c.Email,
-                EmiratesId = c.EmiratesId, EmiratesIdExpiry = c.EmiratesIdExpiry });
+                EmiratesId = c.EmiratesId, EmiratesIdName = c.EmiratesIdName, EmiratesIdExpiry = c.EmiratesIdExpiry });
 
         editSignatories.Clear();
         foreach (var s in landlord.Signatories.OrderBy(s => s.Order))

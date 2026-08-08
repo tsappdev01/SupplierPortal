@@ -278,6 +278,10 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<DateTime?>("EmiratesIdExpiry")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("EmiratesIdName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -589,6 +593,48 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.ToTable("LandlordSignatories", "leasing");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.MaintainTenantUaePassEmail", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AndOr")
+                        .HasColumnType("char(3)")
+                        .HasColumnName("AND_OR");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("MaintainTenantId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("OwnershipLevel")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MaintainTenantUAEPassEmails", "dbo", t =>
+                        {
+                            t.ExcludeFromMigrations();
+                        });
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Leasing.Premises", b =>
                 {
                     b.Property<int>("Id")
@@ -611,6 +657,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
                     b.Property<string>("LandLordCode")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<long?>("LandlordId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("LeaseNo")
                         .HasColumnType("nvarchar(max)");

@@ -125,7 +125,8 @@ public class LandlordService(
             {
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType, FullName = c.FullName.Trim(),
                 Designation = c.Designation?.Trim(), Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
-                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(),
+                EmiratesIdName = c.EmiratesIdName?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
             });
 
         db.LandlordSignatories.RemoveRange(l.Signatories);
@@ -308,7 +309,8 @@ public class LandlordService(
                 LandlordId = landlordId, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
                 FullName = c.FullName.Trim(), Designation = c.Designation?.Trim(),
                 Mobile = ContactValidation.NormalizeUaeMobile(c.Mobile) ?? c.Mobile?.Trim(),
-                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
+                Email = c.Email.Trim(), EmiratesId = c.EmiratesId?.Trim(),
+                EmiratesIdName = c.EmiratesIdName?.Trim(), EmiratesIdExpiry = c.EmiratesIdExpiry
             });
         }
 
@@ -864,6 +866,7 @@ public class ContactInput
     public string? Mobile { get; set; }
     public string Email { get; set; } = "";
     public string? EmiratesId { get; set; }
+    public string? EmiratesIdName { get; set; }
     public DateTime? EmiratesIdExpiry { get; set; }
 }
 

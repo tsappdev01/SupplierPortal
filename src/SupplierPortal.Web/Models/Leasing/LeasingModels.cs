@@ -188,6 +188,9 @@ public class LandlordContact
     [MaxLength(40)] public string? Mobile { get; set; }
     [MaxLength(200)] public string Email { get; set; } = string.Empty;
     [MaxLength(50)] public string? EmiratesId { get; set; }
+    /// <summary>Name exactly as printed on the Emirates ID card (OCR-extracted, editable). Separate from
+    /// <see cref="FullName"/> — the card name can differ from the contact's entered name.</summary>
+    [MaxLength(200)] public string? EmiratesIdName { get; set; }
     /// <summary>Emirates ID expiry date, captured (or OCR-extracted) alongside the Emirates ID document.</summary>
     public DateTime? EmiratesIdExpiry { get; set; }
 

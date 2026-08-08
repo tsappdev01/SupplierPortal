@@ -578,7 +578,7 @@
     {
         t.Id = c.Id; t.IsPrimary = c.IsPrimary; t.ContactType = c.ContactType; t.FullName = c.FullName;
         t.Designation = c.Designation; t.Mobile = c.Mobile; t.Email = c.Email; t.EmiratesId = c.EmiratesId;
-        t.EmiratesIdExpiry = c.EmiratesIdExpiry;
+        t.EmiratesIdName = c.EmiratesIdName; t.EmiratesIdExpiry = c.EmiratesIdExpiry;
     }
 
     private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
@@ -652,7 +652,7 @@
             }
             <div class="grid2">
                 <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID number @MarkReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="primary.EmiratesId" /></div>
-                <div class="field" style="margin-bottom:0"><label class="lbl">Name (as on card) @MarkReq()</label><input type="text" @bind="primary.FullName" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Name (as on card) @MarkReq()</label><input type="text" @bind="primary.EmiratesIdName" /></div>
                 <div class="field" style="margin-bottom:0"><label class="lbl">Expiry date @MarkReq()</label><input type="date" @bind="primary.EmiratesIdExpiry" /></div>
             </div>
             <div class="hint">Read automatically from the uploaded card — please check and correct if needed.</div>
@@ -811,7 +811,8 @@
 
         var r = EmiratesIdExtractor.Parse(text);
         if (r.Number is not null) primary.EmiratesId = r.Number;
-        if (r.Name is not null && string.IsNullOrWhiteSpace(primary.FullName)) primary.FullName = r.Name;
+        // The card name is its OWN field — it is never copied into the contact's entered Full Name.
+        if (r.Name is not null) primary.EmiratesIdName = r.Name;
         if (r.Expiry is not null && primary.EmiratesIdExpiry is null
             && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
@@ -863,6 +864,8 @@
                 return "Emirates ID document is mandatory for an individual landlord.";
             if (string.IsNullOrWhiteSpace(primary.EmiratesId))
                 return "The Emirates ID number is required — check the Documents step.";
+            if (string.IsNullOrWhiteSpace(primary.EmiratesIdName))
+                return "The name as printed on the Emirates ID is required — check the Documents step.";
             if (primary.EmiratesIdExpiry is null)
                 return "The Emirates ID expiry date is required — check the Documents step.";
         }
