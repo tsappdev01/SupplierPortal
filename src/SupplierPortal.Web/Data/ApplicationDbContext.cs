@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SupplierPortal.Web.Models;
+using SupplierPortal.Web.Models.Customer;
 
 namespace SupplierPortal.Web.Data;
 
@@ -18,9 +19,33 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
     public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
 
+    // ---- CST (Customer) Portal ----
+    public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
+    public DbSet<CustomerDocument> CustomerDocuments => Set<CustomerDocument>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // ---- CST (Customer) Portal relationships ----
+        modelBuilder.Entity<Customer>()
+            .HasOne(c => c.BusinessUnit)
+            .WithMany()
+            .HasForeignKey(c => c.BusinessUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Customer>()
+            .HasOne(c => c.Contact)
+            .WithOne(c => c.Customer!)
+            .HasForeignKey<CustomerContact>(c => c.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Customer>()
+            .HasMany(c => c.Documents)
+            .WithOne(d => d.Customer!)
+            .HasForeignKey(d => d.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
