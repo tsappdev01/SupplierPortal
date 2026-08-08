@@ -3,9 +3,13 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// <summary>
 /// Circularo e-signature configuration, bound to <c>Leasing:Circularo</c>. When <see cref="Enabled"/> is
 /// false (or no API key is set) the integration is skipped — approval still completes normally, it just
-/// doesn't route the summary for signature. The endpoint paths are configurable so they can be aligned with
-/// the Circularo API version without a code change.
-/// See https://developers.circularo.com/getting-started/ and .../authentication/#apikeys.
+/// doesn't route the summary for signature.
+/// <para>
+/// The endpoint paths and payload shapes mirror the proven Broker-Portal integration
+/// (see https://developers.circularo.com). Authentication is a <c>?token=&lt;key&gt;</c> query parameter on
+/// every request. The three-step flow is: <c>POST /files/saveFile</c> (upload → content hash) →
+/// <c>POST /documents</c> (create from hash → document id) → <c>POST /share</c> (send for signature).
+/// </para>
 /// </summary>
 public class CircularoOptions
 {
@@ -13,78 +17,56 @@ public class CircularoOptions
 
     public bool Enabled { get; set; }
 
-    /// <summary>API base, e.g. the sandbox <c>https://app.sandbox.circularo.com/api/v1</c>.</summary>
+    /// <summary>API base including the version, e.g. the sandbox <c>https://app.sandbox.circularo.com/api/v1</c>.</summary>
     public string BaseUrl { get; set; } = "https://app.sandbox.circularo.com/api/v1";
 
-    /// <summary>API key created in Circularo, used as the bearer token for API calls.</summary>
+    /// <summary>API token/key created in Circularo. Sent as the <c>?token=</c> query parameter on every request.</summary>
     public string ApiKey { get; set; } = "";
 
-    /// <summary>Authorization header scheme. "Bearer" → <c>Authorization: Bearer &lt;key&gt;</c>;
-    /// empty → the raw key is sent as the header value.</summary>
-    public string AuthScheme { get; set; } = "Bearer";
+    // ---- create-document shape ----
+    /// <summary>Document catalogue type. The default is <c>d_default</c>.</summary>
+    public string DocumentType { get; set; } = "d_default";
 
-    /// <summary>How the API key/token is transmitted. Per the Circularo docs the token is passed as a
-    /// <c>?token=&lt;key&gt;</c> query parameter on every request (see developers.circularo.com/latest/authentication
-    /// and .../1-creating-and-using-api-tokens — API keys are used the same way as session tokens). Values:
-    /// <c>"Query"</c> (query param only), <c>"Header"</c> (Authorization header only), or <c>"Both"</c>
-    /// (send both — the safe default, since an extra header is harmless but a missing token yields 401/404).</summary>
-    public string AuthMode { get; set; } = "Both";
+    /// <summary>Definition type sent at the top level of the create-document body. Uploaded docs use <c>ext</c>.</summary>
+    public string DefinitionType { get; set; } = "ext";
 
-    /// <summary>Query-string parameter name carrying the token when <see cref="AuthMode"/> includes the query mode.</summary>
-    public string TokenQueryParam { get; set; } = "token";
+    /// <summary>Workflow definition name (a string, not a list). The default archive workflow is <c>wf_archive</c>.</summary>
+    public string Workflow { get; set; } = "wf_archive";
 
-    /// <summary>File-storage endpoint (relative to <see cref="BaseUrl"/>). Circularo stores the raw file first
-    /// and returns a file id that the document then references. Discovered from the web app: <c>files/saveFile</c>.</summary>
-    public string FileUploadPath { get; set; } = "files/saveFile";
+    // ---- share / signature-field placement ----
+    /// <summary>Signature field type: <c>signature</c> (a hand/UAE Pass signature) or <c>stamp</c> (e-seal).</summary>
+    public string SignatureType { get; set; } = "signature";
 
-    /// <summary>Form field name for the file in the <see cref="FileUploadPath"/> multipart request.</summary>
-    public string FileUploadField { get; set; } = "file";
+    /// <summary>1-based page the signature field is placed on. 0 (default) means the document's last page.</summary>
+    public int SignaturePage { get; set; }
 
-    /// <summary>Document-creation endpoint (relative to <see cref="BaseUrl"/>). Circularo's <c>POST documents</c>
-    /// creates the document together with its signing workflow (it validates <c>definitionType</c> + <c>workflow</c>).</summary>
-    public string UploadPath { get; set; } = "documents";
+    /// <summary>Signature box placement on the page, as fractions (0–1) of page width/height.</summary>
+    public double SignPercentX { get; set; } = 0.12;
+    public double SignPercentY { get; set; } = 0.78;
+    public double SignPercentWidth { get; set; } = 0.35;
+    public double SignPercentHeight { get; set; } = 0.08;
 
-    /// <summary>Circularo document definition type. The default catalogue type is <c>d_default</c>.</summary>
-    public string DefinitionType { get; set; } = "d_default";
+    /// <summary>Whether signers must sign in order (true) or in parallel (false).</summary>
+    public bool Sequential { get; set; } = true;
 
-    /// <summary>Candidate upload endpoints tried in order until one succeeds (self-discovery when the exact
-    /// path isn't known). When empty, a built-in candidate list is used. Set this once the working path is
-    /// known to avoid probing.</summary>
-    public string[] UploadPathCandidates { get; set; } = [];
+    /// <summary>Attach the completed/signed document to the completion email Circularo sends.</summary>
+    public bool SendAttachmentsOnComplete { get; set; } = true;
 
-    /// <summary>Form field name for the uploaded file in the multipart request.</summary>
-    public string UploadFileField { get; set; } = "file";
-
-    /// <summary>Send-for-signature endpoint. <c>{id}</c> is replaced with the uploaded document id.</summary>
-    public string SignInvitePath { get; set; } = "document/{id}/workflow";
-
-    /// <summary>Endpoint to download the signed copy. <c>{id}</c> is replaced with the document id.</summary>
-    public string DownloadSignedPath { get; set; } = "document/{id}/download";
-
-    /// <summary>Shared secret to validate incoming signature webhooks (matched against the
-    /// <c>X-Webhook-Secret</c> header or a <c>?secret=</c> query value). Empty disables the check.</summary>
-    public string WebhookSecret { get; set; } = "";
-
-    // ---- UAE Pass signing / identity verification (per the Circularo ↔ UAE Pass integration) ----
-    /// <summary>Require the signer to sign with UAE Pass (UAE Pass certificate).</summary>
-    public bool RequireUaePassSignature { get; set; } = true;
-
-    /// <summary>Require the external recipient to verify their identity via UAE Pass to open the document.</summary>
-    public bool RequireUaePassVerification { get; set; } = true;
-
-    /// <summary>Signature provider value sent to Circularo when UAE Pass signing is required.</summary>
-    public string SignatureProvider { get; set; } = "uaepass";
-
-    /// <summary>Identity-verification method value for the recipient (UAE Pass).</summary>
-    public string VerificationMethod { get; set; } = "uaepass";
-
-    /// <summary>Verification factor to match the recipient on (email must match their UAE Pass account).</summary>
-    public string VerificationFactor { get; set; } = "email";
-
-    /// <summary>Subject line for the signature request Circularo emails to the signer.</summary>
+    /// <summary>Subject line recorded for the signature request (kept for reference/emailing).</summary>
     public string RequestSubject { get; set; } = "Signature required — Landlord Registration";
 
-    /// <summary>Message body for the signature request.</summary>
+    /// <summary>Message body Circularo shows/sends to the signer.</summary>
     public string RequestMessage { get; set; } =
         "Please review and sign your landlord registration document for Dubai Investments.";
+
+    // ---- webhook ----
+    /// <summary>Shared secret used to validate incoming signature webhooks. Circularo signs the raw body with
+    /// HMAC-SHA256 and sends the lowercase hex digest in the <c>X-Circularo-Signature</c> header. Empty disables
+    /// the check (also matched against a legacy <c>X-Webhook-Secret</c> header / <c>?secret=</c> value).</summary>
+    public string WebhookSecret { get; set; } = "";
+
+    // ---- UAE Pass (identity of the signer is bound via the signer email; Circularo handles UAE Pass signing) ----
+    /// <summary>Retained for configuration visibility. In the proven share payload the signer's identity is bound
+    /// through their (UAE-Pass-verified) email — Circularo drives the UAE Pass signing experience itself.</summary>
+    public bool RequireUaePassSignature { get; set; } = true;
 }

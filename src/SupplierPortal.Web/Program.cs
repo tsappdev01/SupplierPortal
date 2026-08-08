@@ -348,15 +348,30 @@ app.MapPost("/api/leasing/circularo/webhook", async (
     SupplierPortal.Web.Services.Leasing.LandlordService landlordService,
     SupplierPortal.Web.Services.Leasing.ICircularoService circularo) =>
 {
+    using var reader = new StreamReader(ctx.Request.Body);
+    var body = await reader.ReadToEndAsync();
+
+    // Validate the webhook. Circularo signs the raw body with HMAC-SHA256 and sends the lowercase hex digest
+    // in the X-Circularo-Signature header. A legacy shared-secret header/query is accepted as a fallback.
     var secret = opts.Value.WebhookSecret;
     if (!string.IsNullOrWhiteSpace(secret))
     {
-        var provided = ctx.Request.Headers["X-Webhook-Secret"].ToString();
-        if (provided != secret && ctx.Request.Query["secret"].ToString() != secret) return Results.Unauthorized();
+        var signature = ctx.Request.Headers["X-Circularo-Signature"].ToString();
+        bool valid;
+        if (!string.IsNullOrWhiteSpace(signature))
+        {
+            using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
+            var computed = Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(body))).ToLowerInvariant();
+            valid = System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(signature), System.Text.Encoding.UTF8.GetBytes(computed));
+        }
+        else
+        {
+            valid = ctx.Request.Headers["X-Webhook-Secret"].ToString() == secret
+                 || ctx.Request.Query["secret"].ToString() == secret;
+        }
+        if (!valid) return Results.Unauthorized();
     }
-
-    using var reader = new StreamReader(ctx.Request.Body);
-    var body = await reader.ReadToEndAsync();
     string? docId = null, status = null, signedB64 = null;
     try
     {
