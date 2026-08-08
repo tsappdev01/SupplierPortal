@@ -84,16 +84,41 @@ h1:focus {
     --di-gold-dark: #a8842f;
     --di-page-bg: #f4f6f9;
     --di-border: #e2e5ea;
+    /* semantic tokens (flip in dark) */
+    --di-surface: #ffffff;
+    --di-surface-2: #f4f6f9;
+    --di-text: #26303f;
+    --di-text-soft: #5a6678;
+    --di-heading: #1a2233;      /* page titles / labels — must stay readable on the page ground */
+    --di-row-hover: #fbf6ea;    /* faint gold tint */
+    --di-link: #26324a;
+}
+
+/* ---- Dark theme: our custom chrome. Bootstrap components flip via data-bs-theme="dark". ---- */
+[data-theme="dark"] {
+    --di-page-bg: #0e1626;
+    --di-border: #26314a;
+    --di-surface: #151f33;
+    --di-surface-2: #1b2740;
+    --di-text: #e6ecf6;
+    --di-text-soft: #9aa7bd;
+    --di-heading: #e9eef7;
+    --di-row-hover: #1d2942;
+    --di-link: #8fb6ff;
+    /* nudge Bootstrap's own surfaces to our palette so its dark mode matches the chrome */
+    --bs-body-bg: #0e1626;
+    --bs-body-color: #e6ecf6;
+    --bs-border-color: #26314a;
 }
 
 body {
     background-color: var(--di-page-bg);
-    color: #26303f;
+    color: var(--di-text);
 }
 
 /* Headings in corporate navy with a gold underline accent on page titles */
 h1, h2, h3, .h1, .h2, .h3 {
-    color: var(--di-navy);
+    color: var(--di-heading);
 }
 
 main > article.content > h1:first-child,
@@ -104,7 +129,7 @@ main > article.content > h1:first-child,
 }
 
 .form-label {
-    color: var(--di-navy);
+    color: var(--di-heading);
     font-weight: 600;
 }
 
@@ -130,7 +155,7 @@ main > article.content > h1:first-child,
     color: #fff;
 }
 
-a, .btn-link { color: var(--di-navy-2); }
+a, .btn-link { color: var(--di-link); }
 
 /* Data grid: navy header, subtle striping, gold row hover */
 .table > thead th,
@@ -143,7 +168,7 @@ table thead th {
 }
 
 .table > tbody tr:hover > * {
-    background-color: #fbf6ea;   /* faint gold tint on hover */
+    background-color: var(--di-row-hover);   /* faint gold tint on hover (light) / navy tint (dark) */
 }
 
 .table {
@@ -194,9 +219,9 @@ table thead th {
     width: 64px;
     padding: 6px 4px;
     border-radius: 8px;
-    background: #fff;
-    border: 1px solid #e2e5ea;
-    color: #46618f;
+    background: var(--di-surface);
+    border: 1px solid var(--di-border);
+    color: var(--di-text-soft);
     font-size: 11px;
     font-weight: 700;
     line-height: 1;
@@ -225,9 +250,9 @@ table thead th {
     gap: 8px;
     padding: 8px 14px;
     border-radius: 8px;
-    background: #fff;
+    background: var(--di-surface);
     border: 1px solid var(--di-border);
-    color: var(--di-navy);
+    color: var(--di-heading);
     font-size: 13px;
     font-weight: 600;
     line-height: 1.1;
@@ -279,3 +304,39 @@ table thead th {
     gap: 8px;
     padding: 10px 1.5rem 0;
 }
+
+/* Light / dark theme toggle in the top bar */
+.di-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    border: 1px solid var(--di-border);
+    background: var(--di-surface);
+    color: var(--di-text-soft);
+    cursor: pointer;
+    transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.di-theme-toggle:hover,
+.di-theme-toggle:focus-visible {
+    color: var(--di-gold);
+    border-color: var(--di-gold);
+}
+.di-theme-toggle svg { display: block; width: 18px; height: 18px; }
+/* show the sun in dark mode, the moon in light mode */
+.di-theme-toggle .di-ico-sun { display: none; }
+.di-theme-toggle .di-ico-moon { display: block; }
+[data-theme="dark"] .di-theme-toggle .di-ico-sun { display: block; }
+[data-theme="dark"] .di-theme-toggle .di-ico-moon { display: none; }
+
+/* A couple of custom surfaces that hardcode white so they follow the theme */
+[data-theme="dark"] .di-stat-tile,
+[data-theme="dark"] .di-form-page,
+[data-theme="dark"] .di-field-settings-section {
+    background-color: var(--di-surface);
+    color: var(--di-text);
+    border-color: var(--di-border);
+}
+[data-theme="dark"] .text-muted { color: var(--di-text-soft) !important; }

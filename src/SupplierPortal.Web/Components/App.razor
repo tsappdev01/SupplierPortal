@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="SupplierPortal.Web.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('di-theme');
+                if (!t) { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+                document.documentElement.setAttribute('data-theme', t);
+                document.documentElement.setAttribute('data-bs-theme', t);
+            } catch (e) { /* ignore */ }
+        })();
+    </script>
     <HeadOutlet />
 </head>
 
@@ -16,6 +27,7 @@
     <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="js/site-doc.js"></script>
+    <script src="js/theme.js"></script>
 </body>
 
 </html>
