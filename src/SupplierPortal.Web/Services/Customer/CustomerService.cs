@@ -46,6 +46,41 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return (items, total);
     }
 
+    /// <summary>A lightweight row for the Manage Customer dashboard (mirrors the supplier list columns).</summary>
+    public record CustomerRow(int Id, string Number, string Name, string? FirstName, string? Email,
+        string Status, DateTime Updated, int? BusinessUnitId);
+
+    /// <summary>All customers the user may see (BU-scoped), projected for the dashboard grid + KPI tiles.</summary>
+    public async Task<List<CustomerRow>> GetDashboardAsync(List<int> scopeBusinessUnitIds)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var q = db.Customers.AsNoTracking().Include(c => c.Contact).AsQueryable();
+        if (scopeBusinessUnitIds.Count > 0)
+            q = q.Where(c => c.BusinessUnitId == null || scopeBusinessUnitIds.Contains(c.BusinessUnitId.Value));
+
+        var rows = await q
+            .OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt)
+            .Select(c => new
+            {
+                c.Id,
+                Number = c.CustomerId ?? c.BaanRef,
+                c.LegalName,
+                c.CommercialName,
+                FirstName = c.Contact != null ? c.Contact.FirstName : null,
+                Email = c.Contact != null ? c.Contact.Email : null,
+                c.Status,
+                Updated = c.UpdatedAt ?? c.CreatedAt,
+                c.BusinessUnitId
+            })
+            .ToListAsync();
+
+        return rows.Select(r => new CustomerRow(
+            r.Id,
+            string.IsNullOrWhiteSpace(r.Number) ? $"#{r.Id}" : r.Number!,
+            string.IsNullOrWhiteSpace(r.LegalName) ? (r.CommercialName ?? "(unnamed draft)") : r.LegalName!,
+            r.FirstName, r.Email, r.Status, r.Updated, r.BusinessUnitId)).ToList();
+    }
+
     public async Task<Customer?> GetAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -63,7 +98,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await using var db = await dbFactory.CreateDbContextAsync();
         var customer = new Customer
         {
-            Status = CustomerStatuses.Draft,
+            Status = CustomerStatuses.NotSubmitted,
             BusinessUnitId = businessUnitId,
             CreatedBy = actor,
             CreatedAt = DateTime.UtcNow,

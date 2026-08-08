@@ -1,0 +1,141 @@
+@page "/admin/customers/upload"
+@attribute [Authorize(Policy = "Portal.Customer")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject CustomerImportService CustomerImportService
+@inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Upload Customer Data - CST Portal</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h1 class="mb-0">Upload Customer Data</h1>
+    <a class="btn btn-outline-secondary" href="/admin/customers">← Back to Manage Customer</a>
+</div>
+<p class="text-muted">
+    Upload the <strong>Customer Data Template</strong> (.xlsx). Row 1 is the header; each following row is one
+    customer — account columns first, then the primary-contact columns. Existing customers are matched by
+    <em>Customer Unique Number</em> and updated; new ones are created as <em>Not Submitted</em>.
+</p>
+
+@if (businessUnits.Count > 1 || isAdministrator)
+{
+    <div class="mb-3" style="max-width: 320px;">
+        <label class="form-label">Business Unit</label>
+        <select class="form-select" @bind="selectedBusinessUnitId">
+            <option value="0">-- Select --</option>
+            @foreach (var bu in businessUnits)
+            {
+                <option value="@bu.Id">@bu.Name</option>
+            }
+        </select>
+    </div>
+}
+
+<InputFile OnChange="OnFileSelectedAsync" accept=".xlsx" class="form-control mb-3" style="max-width: 420px;" />
+
+@if (isImporting)
+{
+    <div class="mb-3" style="max-width: 420px;">
+        <div class="progress" role="progressbar" style="height: 22px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: 100%; background-color: var(--di-navy, #1a2233);">Importing…</div>
+        </div>
+    </div>
+}
+
+@if (result is not null)
+{
+    <div class="alert @(result.Errors.Count == 0 ? "alert-success" : "alert-warning")">
+        Imported @result.SuccessCount customer(s).
+        @if (result.Errors.Count > 0) { <span>@result.Errors.Count row(s) failed.</span> }
+    </div>
+
+    @if (result.Errors.Count > 0)
+    {
+        <h5>Rejected rows</h5>
+        <table class="table table-sm">
+            <thead><tr><th style="width:90px;">Row</th><th>Error</th></tr></thead>
+            <tbody>
+                @foreach (var e in result.Errors)
+                {
+                    <tr><td>@e.RowNumber</td><td>@e.Message</td></tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <a class="btn btn-primary" href="/admin/customers">View customers</a>
+}
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+    private const long MaxFileSize = 40 * 1024 * 1024;
+
+    private bool isAdministrator;
+    private int selectedBusinessUnitId;
+    private string uploadedBy = "unknown";
+    private List<BusinessUnit> businessUnits = [];
+    private bool isImporting;
+    private ImportResult? result;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdministrator = state.User.IsAdministrator();
+        uploadedBy = state.User.Identity?.Name ?? "unknown";
+
+        var all = await BusinessUnitService.GetAllAsync();
+        if (isAdministrator)
+        {
+            businessUnits = all;
+        }
+        else
+        {
+            var ids = state.User.GetBusinessUnitIds();
+            businessUnits = all.Where(b => ids.Contains(b.Id)).ToList();
+            if (businessUnits.Count == 1) selectedBusinessUnitId = businessUnits[0].Id;
+        }
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        result = null;
+
+        if (businessUnits.Count > 1 && selectedBusinessUnitId <= 0)
+        {
+            errorMessage = "Select a business unit before uploading.";
+            return;
+        }
+
+        isImporting = true;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(MaxFileSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
+            int? bu = selectedBusinessUnitId > 0 ? selectedBusinessUnitId : null;
+            result = await Loading.RunAsync(() => CustomerImportService.ImportAsync(ms, bu, uploadedBy));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+}
