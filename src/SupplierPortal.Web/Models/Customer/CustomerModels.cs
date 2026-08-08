@@ -224,6 +224,10 @@ public class CustomerFieldConfig
     /// <summary>"Account" (the Customer entity) or "Contact" (the CustomerContact entity).</summary>
     [MaxLength(20)] public string Section { get; set; } = "Account";
 
+    /// <summary>The wizard group/step this field belongs to (e.g. "Company Identity &amp; Classification").
+    /// Fields are laid out as one chevron step per distinct group.</summary>
+    [MaxLength(80)] public string GroupName { get; set; } = "";
+
     /// <summary>Display order within the section.</summary>
     public int Sequence { get; set; }
 
