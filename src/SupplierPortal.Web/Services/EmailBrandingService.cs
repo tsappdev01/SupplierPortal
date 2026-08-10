@@ -42,6 +42,43 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
     public async Task<string?> GetLogoDataUriAsync(string? actorUsername, int? fallbackBusinessUnitId)
         => await GetCompanyLogoDataUriAsync(actorUsername) ?? await GetBusinessUnitLogoDataUriAsync(fallbackBusinessUnitId);
 
+    /// <summary>Default brand name used when the user has no company and no record Business Unit applies.</summary>
+    public const string DefaultBrandName = "Dubai Investments";
+
+    /// <summary>The acting user's company (Business Unit) name, or null if none.</summary>
+    public async Task<string?> GetCompanyNameAsync(string? actorUsername)
+    {
+        if (string.IsNullOrWhiteSpace(actorUsername))
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Users.AsNoTracking()
+            .Where(u => u.Username == actorUsername && u.CompanyBusinessUnit != null)
+            .Select(u => u.CompanyBusinessUnit!.Name)
+            .FirstOrDefaultAsync();
+    }
+
+    /// <summary>A specific Business Unit's name, or null.</summary>
+    public async Task<string?> GetBusinessUnitNameAsync(int? businessUnitId)
+    {
+        if (businessUnitId is not int id)
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.BusinessUnits.AsNoTracking().Where(b => b.Id == id).Select(b => b.Name).FirstOrDefaultAsync();
+    }
+
+    /// <summary>The brand name to show in a communication: the acting user's company, else the record's
+    /// Business Unit, else the default ("Dubai Investments"). Never null.</summary>
+    public async Task<string> GetBrandNameAsync(string? actorUsername, int? fallbackBusinessUnitId)
+        => await GetCompanyNameAsync(actorUsername)
+           ?? await GetBusinessUnitNameAsync(fallbackBusinessUnitId)
+           ?? DefaultBrandName;
+
     private static async Task<string?> LogoDataUriAsync(ApplicationDbContext db, int businessUnitId)
     {
         var bu = await db.BusinessUnits.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessUnitId);

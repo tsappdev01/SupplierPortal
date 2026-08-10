@@ -23,8 +23,8 @@ public class LandlordEmailService(
     private async Task<string> BrandAsync(string? actorUsername, int? businessUnitId,
         string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
     {
-        var logo = await branding.GetLogoDataUriAsync(actorUsername, businessUnitId);
-        return Wrap(logo, heading, bodyHtml, ctaText, ctaUrl, footnote);
+        var brandName = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        return Wrap(brandName, heading, bodyHtml, ctaText, ctaUrl, footnote);
     }
 
     public async Task SendInviteAsync(string toEmail, string legalOrCompany, string link, string? actorUsername = null, int? businessUnitId = null) =>
@@ -128,9 +128,9 @@ public class LandlordEmailService(
             .Select(e => SendAsync(e, $"Landlord Registration Signed – {propertyCode}", body)));
     }
 
-    /// <summary>Wraps content in a branded, email-client-safe HTML shell (inline styles, table layout). When a
-    /// logo data URI is supplied it is shown in the header; otherwise the text brand is used.</summary>
-    private static string Wrap(string? logoDataUri, string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
+    /// <summary>Wraps content in a branded, email-client-safe HTML shell (inline styles, table layout). The
+    /// header shows the associated Business Unit name as text (renders reliably in every email client).</summary>
+    private static string Wrap(string brandName, string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
     {
         var cta = ctaText is not null && ctaUrl is not null
             ? $"<tr><td style=\"padding:22px 28px 4px\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#092F56;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 26px;border-radius:4px\">{E(ctaText)}</a></td></tr>"
@@ -138,10 +138,9 @@ public class LandlordEmailService(
         var foot = footnote is not null
             ? $"<tr><td style=\"padding:6px 28px 0;color:#8A929A;font-size:12px\">{E(footnote)}</td></tr>"
             : "";
-        var header = string.IsNullOrWhiteSpace(logoDataUri)
-            ? @"<div style=""color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em"">Dubai Investments</div>
-          <div style=""color:#9DB3C8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px"">Business Centre · Leasing</div>"
-            : $@"<img src=""{logoDataUri}"" alt=""Company logo"" style=""display:block;max-height:52px;max-width:220px;background:#ffffff;padding:6px 10px;border-radius:4px"" />";
+        var header =
+            $@"<div style=""color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em"">{E(string.IsNullOrWhiteSpace(brandName) ? "Dubai Investments" : brandName)}</div>
+          <div style=""color:#9DB3C8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px"">Business Centre · Leasing</div>";
         return
 $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Segoe UI,Arial,sans-serif"">
   <table role=""presentation"" width=""100%"" style=""background:#06213D;padding:24px 0"">

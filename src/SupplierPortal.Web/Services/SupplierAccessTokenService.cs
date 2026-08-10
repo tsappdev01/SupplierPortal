@@ -13,7 +13,8 @@ namespace SupplierPortal.Web.Services;
 /// so it reuses the app's existing salted <see cref="IPasswordHasher{TUser}"/> exactly as
 /// <c>AuthService</c> does for login passwords.</summary>
 public class SupplierAccessTokenService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env)
+    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
+    EmailBrandingService branding)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(14);
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
@@ -117,7 +118,11 @@ public class SupplierAccessTokenService(
 
         if (sendEmail)
         {
+            var brand = System.Net.WebUtility.HtmlEncode(
+                await branding.GetBusinessUnitNameAsync(token.Supplier.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
+            var brandLine = $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
             body = body!
+                .Replace("{CompanyLogo}", brandLine)
                 .Replace("{Supplier Name}", token.Supplier.SupplierName)
                 .Replace("{OTP Code}", code)
                 .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());

@@ -17,7 +17,8 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// </summary>
 public class LandlordAccessTokenService(
     IDbContextFactory<LeasingDbContext> dbFactory, IPasswordHasher<User> hasher,
-    Microsoft.Extensions.Options.IOptions<LeasingOptions> options)
+    Microsoft.Extensions.Options.IOptions<LeasingOptions> options,
+    SupplierPortal.Web.Services.EmailBrandingService branding)
 {
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
     private const int MaxOtpAttempts = 5;
@@ -81,12 +82,14 @@ public class LandlordAccessTokenService(
         await db.SaveChangesAsync();
 
         var who = System.Net.WebUtility.HtmlEncode(token.Landlord.CompanyName ?? token.Landlord.PropertyCode);
+        var brand = System.Net.WebUtility.HtmlEncode(await branding.GetBusinessUnitNameAsync(token.Landlord.BusinessUnitId)
+                                                     ?? EmailBrandingService.DefaultBrandName);
         var body =
 $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Segoe UI,Arial,sans-serif"">
   <table role=""presentation"" width=""100%"" style=""background:#06213D;padding:24px 0""><tr><td align=""center"">
     <table role=""presentation"" width=""600"" style=""max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden"">
       <tr><td style=""background:#092F56;padding:20px 28px"">
-        <div style=""color:#fff;font-size:18px;font-weight:700"">Dubai Investments</div>
+        <div style=""color:#fff;font-size:18px;font-weight:700"">{brand}</div>
         <div style=""color:#9DB3C8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px"">Business Centre · Leasing</div>
       </td></tr>
       <tr><td style=""padding:24px 28px 8px"">
