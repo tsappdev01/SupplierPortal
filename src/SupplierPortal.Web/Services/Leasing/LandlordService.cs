@@ -767,6 +767,43 @@ public class LandlordService(
         return true;
     }
 
+    /// <summary>Polls Circularo for the current signing status and applies it — used when the completion
+    /// webhook can't reach the server (e.g. the portal isn't publicly reachable). When Circularo reports the
+    /// document as signed, this flips the status to Signed, stores the signed copy and notifies staff, exactly
+    /// as the webhook would. Returns whether anything changed and a message for the UI.</summary>
+    public async Task<(bool Changed, string Message)> SyncSignatureStatusAsync(int landlordId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.");
+        if (string.IsNullOrWhiteSpace(l.CircularoDocumentId))
+            return (false, "This registration hasn't been sent for signature yet.");
+        if (string.Equals(l.SignatureStatus, "Signed", StringComparison.OrdinalIgnoreCase))
+        {
+            // Already signed — just make sure the signed copy is on file.
+            await EnsureSignedDocumentAsync(landlordId, actor);
+            return (false, "Already marked as signed.");
+        }
+
+        var status = await circularo.GetSignatureStatusAsync(l.CircularoDocumentId);
+        if (!status.Reachable)
+            return (false, "Couldn't reach Circularo to check the status. Please try again shortly.");
+
+        if (status.Signed)
+        {
+            await HandleSignatureCallbackAsync(l.CircularoDocumentId!, "signed", status.SignedPdf, null);
+            return (true, "The document has been signed. The signed copy is now saved on the registration.");
+        }
+        if (status.Declined)
+        {
+            await HandleSignatureCallbackAsync(l.CircularoDocumentId!, "declined", null, null);
+            return (true, "Circularo reports the signature was declined or cancelled.");
+        }
+
+        return (false, "Not signed yet in Circularo." +
+            (string.IsNullOrWhiteSpace(status.RawStatus) ? "" : $" (status: {status.RawStatus})"));
+    }
+
     /// <summary>Business-Centre notification recipients for a submission: the initiating user first, then all
     /// active administrators / leasing managers.</summary>
     private async Task<List<string>> ResolveBcRecipientsAsync(string createdBy)
