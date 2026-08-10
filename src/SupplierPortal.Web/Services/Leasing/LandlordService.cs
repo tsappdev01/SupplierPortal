@@ -726,6 +726,47 @@ public class LandlordService(
         return true;
     }
 
+    /// <summary>Guarantees the signed copy is available for future reference: if a registration is marked
+    /// Signed and has a Circularo document id but no stored SignedDocument yet (e.g. the completion webhook
+    /// arrived without the file, or the download failed at callback time), this pulls the signed PDF from
+    /// Circularo now and stores it. Safe to call repeatedly — it no-ops once a current SignedDocument exists.
+    /// Returns true if a signed document is available (already present or freshly fetched).</summary>
+    public async Task<bool> EnsureSignedDocumentAsync(int landlordId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return false;
+
+        var hasSigned = await db.LandlordDocuments.AnyAsync(
+            d => d.LandlordId == landlordId && d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent);
+        if (hasSigned) return true;
+
+        // Only meaningful once the document has actually been signed and we know its Circularo id.
+        if (string.IsNullOrWhiteSpace(l.CircularoDocumentId) ||
+            !string.Equals(l.SignatureStatus, "Signed", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        byte[]? signed;
+        try
+        {
+            signed = await circularo.DownloadSignedAsync(l.CircularoDocumentId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Fetching signed copy from Circularo failed for landlord {Id} (doc {Doc}).",
+                landlordId, l.CircularoDocumentId);
+            return false;
+        }
+
+        if (signed is not { Length: > 0 }) return false;
+
+        await documents.StoreGeneratedAsync(landlordId, LandlordDocumentType.SignedDocument,
+            $"Signed-{l.Reference ?? l.PropertyCode}.pdf", "application/pdf", signed, actor);
+        await AddEventAsync(db, landlordId, EventSignatureCompleted,
+            $"Signed copy retrieved from Circularo (document {l.CircularoDocumentId}).", "Circularo", actor, l.Status, l.Status);
+        return true;
+    }
+
     /// <summary>Business-Centre notification recipients for a submission: the initiating user first, then all
     /// active administrators / leasing managers.</summary>
     private async Task<List<string>> ResolveBcRecipientsAsync(string createdBy)

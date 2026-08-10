@@ -368,7 +368,15 @@ else
                             var signedDoc = documents.FirstOrDefault(d => d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent);
                             @if (signedDoc is not null)
                             {
-                                <a class="btn btn-sm btn-outline-primary" href="/landlord-documents/@signedDoc.Id?download=1" download>Download signed document</a>
+                                <a class="btn btn-sm btn-outline-primary" href="/landlord-documents/@signedDoc.Id" target="_blank">View signed document</a>
+                                <a class="btn btn-sm btn-outline-primary ms-1" href="/landlord-documents/@signedDoc.Id?download=1" download>Download signed document</a>
+                            }
+                            else
+                            {
+                                <p class="text-muted small mb-2">The signed copy has not been retrieved from Circularo yet.</p>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="FetchSignedCopyAsync" disabled="@signatureBusy">
+                                    @(signatureBusy ? "Fetching…" : "Fetch signed copy")
+                                </button>
                             }
                         }
                         else
@@ -511,7 +519,28 @@ else
         trace = await LandlordService.GetTraceAsync(Id);
         documents = await DocumentService.GetAllVersionsAsync(Id);
         fieldChanges = await LandlordService.GetFieldChangesAsync(Id);
+
+        // If the document is signed but we don't yet hold the signed copy (webhook without the file, or a
+        // transient download failure at callback time), pull it now so it's on record for future reference.
+        if (string.Equals(landlord.SignatureStatus, "Signed", StringComparison.OrdinalIgnoreCase) &&
+            !documents.Any(d => d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent))
+        {
+            if (await LandlordService.EnsureSignedDocumentAsync(Id, currentUser))
+                documents = await DocumentService.GetAllVersionsAsync(Id);
+        }
     });
+
+    private async Task FetchSignedCopyAsync()
+    {
+        signatureBusy = true;
+        try
+        {
+            var ok = await Loading.RunAsync(() => LandlordService.EnsureSignedDocumentAsync(Id, currentUser));
+            if (ok) { await LoadAsync(); Toast.ShowSuccess("Signed document retrieved."); }
+            else Toast.ShowError("The signed copy could not be retrieved from Circularo yet. Please try again shortly.");
+        }
+        finally { signatureBusy = false; }
+    }
 
     private void BeginEditProperty()
     {
