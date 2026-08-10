@@ -40,11 +40,15 @@ public class CircularoOptions
     /// <summary>1-based page the signature field is placed on. 0 (default) means the document's last page.</summary>
     public int SignaturePage { get; set; }
 
-    /// <summary>Signature box placement on the page, as fractions (0–1) of page width/height.</summary>
-    public double SignPercentX { get; set; } = 0.12;
-    public double SignPercentY { get; set; } = 0.78;
-    public double SignPercentWidth { get; set; } = 0.35;
-    public double SignPercentHeight { get; set; } = 0.08;
+    /// <summary>Signature box placement on the page, as fractions (0–1) of page width/height, with the
+    /// origin at the TOP-LEFT (X →right, Y →down). These defaults overlay the fixed "Sign here" box printed
+    /// at the bottom-right of the landlord summary (see LandlordSummaryPdfService for the derivation). If the
+    /// field still lands slightly off in Circularo, nudge these four values in appsettings — no code change
+    /// needed.</summary>
+    public double SignPercentX { get; set; } = 0.583;
+    public double SignPercentY { get; set; } = 0.862;
+    public double SignPercentWidth { get; set; } = 0.370;
+    public double SignPercentHeight { get; set; } = 0.083;
 
     /// <summary>Whether signers must sign in order (true) or in parallel (false).</summary>
     public bool Sequential { get; set; } = true;
