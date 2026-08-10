@@ -270,15 +270,10 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
                 return new(false, false, false, null, null);
             }
 
-            // Circularo doesn't publish a single canonical status field name, so read any of the common ones.
-            var raw = ExtractString(body,
-                "signStatus", "signatureStatus", "documentStatus", "workflowState", "currentState",
-                "state", "status", "phase", "stage");
-
-            var s = raw?.ToLowerInvariant() ?? "";
-            var declined = s.Contains("declin") || s.Contains("reject") || s.Contains("cancel") || s.Contains("void");
-            var signed = !declined && (s.Contains("sign") || s.Contains("complet") || s.Contains("finish")
-                                       || s.Contains("done") || s.Contains("closed") || s.Contains("archiv"));
+            // Circularo records signing progress as events in results[0].workflow.history[].name — e.g.
+            // "share_signed" (a signer signed) and "share_rejected" (declined), mirroring the webhook events
+            // documentSigned / signRejected. There is no single top-level status field, so read the history.
+            var (signed, declined, raw) = ParseSigningState(body);
 
             byte[]? pdf = null;
             if (signed)
@@ -299,6 +294,42 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
             logger.LogError(ex, "Circularo GetStatus error for {Doc}", documentId);
             return new(false, false, false, null, null);
         }
+    }
+
+    /// <summary>Determines signed / declined from a GET /documents/{id} body by scanning the workflow
+    /// history event names. Returns the matched event name as the raw status for display/logging.</summary>
+    private static (bool Signed, bool Declined, string? Raw) ParseSigningState(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
+                return (false, false, null);
+
+            var result = results[0];
+            var names = new List<string>();
+            if (result.TryGetProperty("workflow", out var workflow) &&
+                workflow.TryGetProperty("history", out var history) && history.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in history.EnumerateArray())
+                    if (item.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String)
+                        names.Add(n.GetString()!);
+            }
+
+            bool IsDeclined(string x) { x = x.ToLowerInvariant(); return x.Contains("reject") || x.Contains("declin") || x.Contains("cancel") || x.Contains("void"); }
+            // "share_signed"/"documentSigned"/"...completed"/"...archived" = done; avoids "signature_requested".
+            bool IsSigned(string x) { x = x.ToLowerInvariant(); return x.EndsWith("signed") || x.Contains("complet") || x.Contains("archiv") || x.Contains("finish"); }
+
+            var declinedName = names.FirstOrDefault(IsDeclined);
+            if (declinedName is not null) return (false, true, declinedName);
+
+            var signedName = names.FirstOrDefault(IsSigned);
+            if (signedName is not null) return (true, false, signedName);
+
+            return (false, false, null);
+        }
+        catch { return (false, false, null); }
     }
 
     // ---- response helpers ----

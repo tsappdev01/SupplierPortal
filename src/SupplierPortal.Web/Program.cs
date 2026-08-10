@@ -53,6 +53,9 @@ builder.Services.Configure<SupplierPortal.Web.Services.Leasing.CircularoOptions>
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.CircularoOptions.SectionName));
 builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.ICircularoService,
     SupplierPortal.Web.Services.Leasing.CircularoService>(c => c.Timeout = TimeSpan.FromSeconds(60));
+// Background poller: fetch completed signatures from Circularo so the signed document lands automatically
+// even when the completion webhook can't reach this server.
+builder.Services.AddHostedService<SupplierPortal.Web.Services.Leasing.CircularoSignaturePoller>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));

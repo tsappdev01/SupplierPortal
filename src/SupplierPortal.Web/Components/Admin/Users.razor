@@ -74,7 +74,7 @@
                             {
                                 @if (bu.Logo is not null)
                                 {
-                                    <img src="/business-units/@bu.Id/logo" alt="@bu.Name" title="@bu.Name" class="di-bu-logo" />
+                                    <img src="/business-units/@bu.Id/thumbnail" alt="@bu.Name" title="@bu.Name" class="di-bu-logo" />
                                 }
                                 else
                                 {
@@ -140,13 +140,13 @@
     }
 
     .di-bu-logo {
+        width: 28px;
         height: 28px;
-        max-width: 80px;
         object-fit: contain;
         border: 1px solid #e2e5ea;
         border-radius: 4px;
         background: #fff;
-        padding: 1px 4px;
+        padding: 2px;
     }
 
     .di-bu-chip {
