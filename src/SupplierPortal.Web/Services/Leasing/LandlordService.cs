@@ -256,7 +256,7 @@ public class LandlordService(
         await AddEventAsync(db, landlordId, EventInvited, $"Invite link issued to {landlord.Email}", actor, ActorBusinessCentre, old, landlord.Status);
 
         if (baseUrl is not null)
-            await email.SendInviteAsync(landlord.Email, landlord.CompanyName ?? landlord.PropertyCode, $"{baseUrl}landlord/{raw}");
+            await email.SendInviteAsync(landlord.Email, landlord.CompanyName ?? landlord.PropertyCode, $"{baseUrl}landlord/{raw}", actor, landlord.BusinessUnitId);
         return (true, null, raw);
     }
 
@@ -365,7 +365,7 @@ public class LandlordService(
             catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: summary PDF / submission notification failed.", landlordId); }
 
             // Confirm to the landlord that the submission was received and what happens next.
-            try { await email.SendSubmittedToLandlordAsync(l.Email, l.PropertyCode, l.Reference); }
+            try { await email.SendSubmittedToLandlordAsync(l.Email, l.PropertyCode, l.Reference, businessUnitId: l.BusinessUnitId); }
             catch (Exception ex) { logger.LogError(ex, "Landlord {Id}: submission confirmation email failed.", landlordId); }
         }
 
@@ -424,7 +424,7 @@ public class LandlordService(
 
         var raw = await ReissueTokenIfNeededAsync(db, landlordId, actor);
         if (baseUrl is not null && raw is not null)
-            await email.SendCorrectionAsync(l.Email, l.PropertyCode, comment.Trim(), $"{baseUrl}landlord/{raw}");
+            await email.SendCorrectionAsync(l.Email, l.PropertyCode, comment.Trim(), $"{baseUrl}landlord/{raw}", actor, l.BusinessUnitId);
         return (true, null);
     }
 
@@ -455,7 +455,7 @@ public class LandlordService(
         await AcknowledgeFieldChangesAsync(db, landlordId);
         await AddEventAsync(db, landlordId, EventRejected, reason.Trim(), actor, ActorBusinessCentre, old, l.Status, ip);
         await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
-        await email.SendRejectionAsync(l.Email, l.PropertyCode, reason.Trim());
+        await email.SendRejectionAsync(l.Email, l.PropertyCode, reason.Trim(), actor, l.BusinessUnitId);
         return (true, null);
     }
 
@@ -509,9 +509,9 @@ public class LandlordService(
         await AddEventAsync(db, landlordId, EventCompleted, "Registration completed", actor, ActorBusinessCentre, old, l.Status, ip);
         await AddEventAsync(db, landlordId, EventLinkDeactivated, null, actor, ActorSystem, l.Status, l.Status);
 
-        await email.SendCompletionToLandlordAsync(l.Email, l.PropertyCode);
+        await email.SendCompletionToLandlordAsync(l.Email, l.PropertyCode, actor, l.BusinessUnitId);
         // Notify Business-Centre staff, and in particular the user who initiated the request (l.CreatedBy).
-        await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy);
+        await email.SendCompletionToStaffAsync(staffEmails, l.PropertyCode, l.CompanyName, actor, l.CompletedAt!.Value, l.CreatedBy, l.BusinessUnitId);
 
         // Push the approved signatory set to the shared source table (dbo.MaintainTenantUAEPassEmails).
         try { await WriteMaintainTenantEmailsAsync(db, l); }
@@ -721,7 +721,7 @@ public class LandlordService(
         if (signed && !declined)
         {
             var recipients = await ResolveBcRecipientsAsync(l.CreatedBy);
-            await email.SendSignedToStaffAsync(recipients, l.PropertyCode, l.CompanyName, l.SignatureSentTo, l.SignatureSignedAt!.Value);
+            await email.SendSignedToStaffAsync(recipients, l.PropertyCode, l.CompanyName, l.SignatureSentTo, l.SignatureSignedAt!.Value, l.CreatedBy, l.BusinessUnitId);
         }
         return true;
     }

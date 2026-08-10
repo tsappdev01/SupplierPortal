@@ -59,6 +59,7 @@ builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSect
 builder.Services.AddSingleton<ActiveDirectoryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<EmailBrandingService>();
 builder.Services.AddScoped<BusinessUnitService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<SupplierService>();
