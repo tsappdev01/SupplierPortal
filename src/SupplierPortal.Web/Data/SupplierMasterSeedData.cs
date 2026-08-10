@@ -120,29 +120,30 @@ public static class SupplierMasterSeedData
         "Wave 2",
     ];
 
-    /// <summary>Trade License Issuing Body / Licensing Authority (source LOV export: "Licensing Authority").</summary>
-    public static readonly string[] LicensingAuthorities =
+    /// <summary>Trade License Issuing Body / Licensing Authority (source LOV export: "Licensing Authority").
+    /// Uses short codes because the LookupValues.Code column is 50 chars while these display names are longer.</summary>
+    public static readonly (string Code, string DisplayName)[] LicensingAuthorities =
     [
-        "Dubai Department of Economy and Tourism (DET) (formerly DED)",
-        "Abu Dhabi Department of Economic Development (ADDED)",
-        "Sharjah Economic Development Department (SEDD)",
-        "Ajman Department of Economic Development (Ajman DED)",
-        "Ras Al Khaimah Department of Economic Development (RAK DED)",
-        "Fujairah Municipality – Commercial Licensing Department",
-        "Umm Al Quwain Department of Economic Development",
-        "Jebel Ali Free Zone Authority (JAFZA)",
-        "Dubai Multi Commodities Centre (DMCC)",
-        "Dubai Airport Freezone Authority (DAFZA)",
-        "Dubai Silicon Oasis Authority",
-        "Dubai South",
-        "International Free Zone Authority (IFZA)",
-        "Sharjah Airport International Free Zone (SAIF Zone)",
-        "Sharjah Media City (Shams)",
-        "Ras Al Khaimah Economic Zone (RAKEZ)",
-        "Ajman Free Zone",
-        "Abu Dhabi Global Market (ADGM)",
-        "Khalifa Economic Zones Abu Dhabi (KEZAD)",
-        "Others",
+        ("DET", "Dubai Department of Economy and Tourism (DET) (formerly DED)"),
+        ("ADDED", "Abu Dhabi Department of Economic Development (ADDED)"),
+        ("SEDD", "Sharjah Economic Development Department (SEDD)"),
+        ("AJDED", "Ajman Department of Economic Development (Ajman DED)"),
+        ("RAKDED", "Ras Al Khaimah Department of Economic Development (RAK DED)"),
+        ("FUJMUN", "Fujairah Municipality – Commercial Licensing Department"),
+        ("UAQDED", "Umm Al Quwain Department of Economic Development"),
+        ("JAFZA", "Jebel Ali Free Zone Authority (JAFZA)"),
+        ("DMCC", "Dubai Multi Commodities Centre (DMCC)"),
+        ("DAFZA", "Dubai Airport Freezone Authority (DAFZA)"),
+        ("DSO", "Dubai Silicon Oasis Authority"),
+        ("DSOUTH", "Dubai South"),
+        ("IFZA", "International Free Zone Authority (IFZA)"),
+        ("SAIF", "Sharjah Airport International Free Zone (SAIF Zone)"),
+        ("SHAMS", "Sharjah Media City (Shams)"),
+        ("RAKEZ", "Ras Al Khaimah Economic Zone (RAKEZ)"),
+        ("AJFZ", "Ajman Free Zone"),
+        ("ADGM", "Abu Dhabi Global Market (ADGM)"),
+        ("KEZAD", "Khalifa Economic Zones Abu Dhabi (KEZAD)"),
+        ("OTHERS", "Others"),
     ];
 
     public static readonly (string Code, string DisplayName)[] VatCodes =
