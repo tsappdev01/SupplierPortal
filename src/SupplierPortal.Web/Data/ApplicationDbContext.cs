@@ -219,6 +219,42 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasForeignKey(s => s.StatusId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.VatRegistrationType)
+            .WithMany()
+            .HasForeignKey(s => s.VatRegistrationTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.BusinessPartnerType)
+            .WithMany()
+            .HasForeignKey(s => s.BusinessPartnerTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.BusinessLocationType)
+            .WithMany()
+            .HasForeignKey(s => s.BusinessLocationTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.EInvoicingWave)
+            .WithMany()
+            .HasForeignKey(s => s.EInvoicingWaveId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.TradeLicenseIssuingBody)
+            .WithMany()
+            .HasForeignKey(s => s.TradeLicenseIssuingBodyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.IntermediaryCountry)
+            .WithMany()
+            .HasForeignKey(s => s.IntermediaryCountryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<BankBranch>()
             .HasOne(b => b.Bank)
             .WithMany(b => b.Branches)

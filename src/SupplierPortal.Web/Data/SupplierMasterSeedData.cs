@@ -95,6 +95,56 @@ public static class SupplierMasterSeedData
         "None",
     ];
 
+    /// <summary>VAT structure options (source LOV export: "VAT Structure").</summary>
+    public static readonly string[] VatRegistrationTypes =
+    [
+        "VAT Group",
+        "Individual VAT",
+    ];
+
+    public static readonly (string Code, string DisplayName)[] BusinessPartnerTypes =
+    [
+        ("B2B", "Business to Business"),
+        ("B2G", "Business to Government"),
+    ];
+
+    public static readonly string[] BusinessLocationTypes =
+    [
+        "Mainland",
+        "Free Zone",
+    ];
+
+    public static readonly string[] EInvoicingWaves =
+    [
+        "Wave 1",
+        "Wave 2",
+    ];
+
+    /// <summary>Trade License Issuing Body / Licensing Authority (source LOV export: "Licensing Authority").</summary>
+    public static readonly string[] LicensingAuthorities =
+    [
+        "Dubai Department of Economy and Tourism (DET) (formerly DED)",
+        "Abu Dhabi Department of Economic Development (ADDED)",
+        "Sharjah Economic Development Department (SEDD)",
+        "Ajman Department of Economic Development (Ajman DED)",
+        "Ras Al Khaimah Department of Economic Development (RAK DED)",
+        "Fujairah Municipality – Commercial Licensing Department",
+        "Umm Al Quwain Department of Economic Development",
+        "Jebel Ali Free Zone Authority (JAFZA)",
+        "Dubai Multi Commodities Centre (DMCC)",
+        "Dubai Airport Freezone Authority (DAFZA)",
+        "Dubai Silicon Oasis Authority",
+        "Dubai South",
+        "International Free Zone Authority (IFZA)",
+        "Sharjah Airport International Free Zone (SAIF Zone)",
+        "Sharjah Media City (Shams)",
+        "Ras Al Khaimah Economic Zone (RAKEZ)",
+        "Ajman Free Zone",
+        "Abu Dhabi Global Market (ADGM)",
+        "Khalifa Economic Zones Abu Dhabi (KEZAD)",
+        "Others",
+    ];
+
     public static readonly (string Code, string DisplayName)[] VatCodes =
     [
         ("PBR", "Purchases Blocked Recovery"),

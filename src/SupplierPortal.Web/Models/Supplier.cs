@@ -30,8 +30,54 @@ public class Supplier
     [Required, MaxLength(100)]
     public string TaxRegistrationNumber { get; set; } = string.Empty;
 
+    // -- VAT details --
+
+    /// <summary>Whether the supplier is VAT registered.</summary>
+    public bool? VatRegistered { get; set; }
+
+    /// <summary>VAT structure (LookupCategory.VatRegistrationType): "VAT Group" / "Individual VAT".</summary>
+    public int? VatRegistrationTypeId { get; set; }
+    public LookupValue? VatRegistrationType { get; set; }
+
+    /// <summary>Number of entities when the VAT Registration Type is "VAT Group".</summary>
+    public int? NumberOfVatGroupEntities { get; set; }
+
+    /// <summary>Legal names of all entities under the VAT Group (free text, one per line).</summary>
+    [MaxLength(2000)]
+    public string? VatGroupEntityNames { get; set; }
+
+    /// <summary>Supplier Tax Identification Number (distinct from the Tax Registration Number).</summary>
+    [MaxLength(100)]
+    public string? SupplierTin { get; set; }
+
+    // -- Classification --
+
+    /// <summary>Business Partner Type (LookupCategory.BusinessPartnerType): B2B / B2G.</summary>
+    public int? BusinessPartnerTypeId { get; set; }
+    public LookupValue? BusinessPartnerType { get; set; }
+
+    /// <summary>Business Location Type (LookupCategory.BusinessLocationType): Mainland / Free Zone.</summary>
+    public int? BusinessLocationTypeId { get; set; }
+    public LookupValue? BusinessLocationType { get; set; }
+
+    /// <summary>eInvoicing Wave Applicability (LookupCategory.EInvoicingWave): Wave 1 / Wave 2.</summary>
+    public int? EInvoicingWaveId { get; set; }
+    public LookupValue? EInvoicingWave { get; set; }
+
     [MaxLength(100)]
     public string? TradeLicenseNumber { get; set; }
+
+    public DateTime? TradeLicenseIssueDate { get; set; }
+
+    public DateTime? TradeLicenseExpiryDate { get; set; }
+
+    /// <summary>Trade License Issuing Body / Licensing Authority (LookupCategory.LicensingAuthority).</summary>
+    public int? TradeLicenseIssuingBodyId { get; set; }
+    public LookupValue? TradeLicenseIssuingBody { get; set; }
+
+    /// <summary>Free-text issuing body used when the Trade License Issuing Body is "Others".</summary>
+    [MaxLength(200)]
+    public string? IssuingBodyIfOthers { get; set; }
 
     /// <summary>Legal type / license type as printed on the trade license (e.g. "Limited Liability
     /// Company (LLC)"), captured from the license document.</summary>
@@ -86,6 +132,12 @@ public class Supplier
 
     [MaxLength(100)]
     public string? FirstName { get; set; }
+
+    [MaxLength(100)]
+    public string? MiddleName { get; set; }
+
+    [MaxLength(100)]
+    public string? LastName { get; set; }
 
     [MaxLength(200)]
     public string? AdministrativeContact { get; set; }
@@ -177,6 +229,29 @@ public class Supplier
     public DateTime? AccountStartDate { get; set; }
 
     public bool AllowInternationalPayments { get; set; }
+
+    // -- Intermediary bank account (used for international payments routed through a correspondent bank) --
+
+    public bool IntermediaryAccountApplicable { get; set; }
+
+    /// <summary>Intermediary bank country (LookupCategory.Country).</summary>
+    public int? IntermediaryCountryId { get; set; }
+    public LookupValue? IntermediaryCountry { get; set; }
+
+    [MaxLength(200)]
+    public string? IntermediaryBankName { get; set; }
+
+    [MaxLength(50)]
+    public string? IntermediaryAccountNumber { get; set; }
+
+    [MaxLength(50)]
+    public string? IntermediaryBranchNumber { get; set; }
+
+    [MaxLength(50)]
+    public string? IntermediaryIban { get; set; }
+
+    [MaxLength(50)]
+    public string? IntermediaryBicSwiftCode { get; set; }
 
     // -- Status / ownership --
 

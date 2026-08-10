@@ -23,6 +23,9 @@ public class SupplierFormModel
     [Required(ErrorMessage = "First Name is required.")]
     public string FirstName { get; set; } = "";
 
+    public string? MiddleName { get; set; }
+    public string? LastName { get; set; }
+
     [Required(ErrorMessage = "Business E-Mail is required."), EmailAddress(ErrorMessage = "Enter a valid email address.")]
     public string Email { get; set; } = "";
 
@@ -31,11 +34,28 @@ public class SupplierFormModel
 
     public int? TaxpayerCountryId { get; set; }
 
+    /// <summary>Taxpayer Country Name (Country LOV). Persisted via Supplier.CountryNameId.</summary>
+    public int? CountryNameId { get; set; }
+
     [Required(ErrorMessage = "Tax Registration Number is required.")]
     public string TaxRegistrationNumber { get; set; } = "";
 
+    public bool? VatRegistered { get; set; }
+    public int? VatRegistrationTypeId { get; set; }
+    public int? NumberOfVatGroupEntities { get; set; }
+    public string? VatGroupEntityNames { get; set; }
+    public string? SupplierTin { get; set; }
+    public int? BusinessPartnerTypeId { get; set; }
+    public int? BusinessLocationTypeId { get; set; }
+    public int? EInvoicingWaveId { get; set; }
+
     [Required(ErrorMessage = "Trade License Number is required.")]
     public string TradeLicenseNumber { get; set; } = "";
+
+    public DateTime? TradeLicenseIssueDate { get; set; }
+    public DateTime? TradeLicenseExpiryDate { get; set; }
+    public int? TradeLicenseIssuingBodyId { get; set; }
+    public string? IssuingBodyIfOthers { get; set; }
 
     public int? VatCodeId { get; set; }
     public int? BusinessRelationshipId { get; set; }
@@ -52,7 +72,6 @@ public class SupplierFormModel
 
     public int? CountryId { get; set; } = null;
     public string? PostalCode { get; set; }
-    public int? CountryNameId { get; set; }
     public string? AddressName { get; set; }
     public string? AdministrativeContact { get; set; }
     public int? PhoneCountryCodeId { get; set; }
@@ -81,6 +100,15 @@ public class SupplierFormModel
 
     [EmailAddress(ErrorMessage = "Enter a valid Remit Advice Email.")]
     public string? RemitAdviceEmail { get; set; }
+
+    // Intermediary bank account
+    public bool IntermediaryAccountApplicable { get; set; }
+    public int? IntermediaryCountryId { get; set; }
+    public string? IntermediaryBankName { get; set; }
+    public string? IntermediaryAccountNumber { get; set; }
+    public string? IntermediaryBranchNumber { get; set; }
+    public string? IntermediaryIban { get; set; }
+    public string? IntermediaryBicSwiftCode { get; set; }
 
     // -- Step 4: Site / Business Unit --
     [EmailAddress(ErrorMessage = "Enter a valid Remittance E-mail.")]
@@ -114,11 +142,26 @@ public class SupplierFormModel
         PrefixId = s.PrefixId,
         TaxOrganizationTypeId = s.TaxOrganizationTypeId,
         FirstName = s.FirstName ?? "",
+        MiddleName = s.MiddleName,
+        LastName = s.LastName,
         Email = s.Email ?? "",
         SupplierTypeId = s.SupplierTypeId,
         TaxpayerCountryId = s.TaxpayerCountryId,
+        CountryNameId = s.CountryNameId,
         TaxRegistrationNumber = s.TaxRegistrationNumber,
+        VatRegistered = s.VatRegistered,
+        VatRegistrationTypeId = s.VatRegistrationTypeId,
+        NumberOfVatGroupEntities = s.NumberOfVatGroupEntities,
+        VatGroupEntityNames = s.VatGroupEntityNames,
+        SupplierTin = s.SupplierTin,
+        BusinessPartnerTypeId = s.BusinessPartnerTypeId,
+        BusinessLocationTypeId = s.BusinessLocationTypeId,
+        EInvoicingWaveId = s.EInvoicingWaveId,
         TradeLicenseNumber = s.TradeLicenseNumber ?? "",
+        TradeLicenseIssueDate = s.TradeLicenseIssueDate,
+        TradeLicenseExpiryDate = s.TradeLicenseExpiryDate,
+        TradeLicenseIssuingBodyId = s.TradeLicenseIssuingBodyId,
+        IssuingBodyIfOthers = s.IssuingBodyIfOthers,
         VatCodeId = s.VatCodeId,
         BusinessRelationshipId = s.BusinessRelationshipId,
         IsOneTimeSupplier = s.IsOneTimeSupplier,
@@ -130,7 +173,6 @@ public class SupplierFormModel
         CityId = s.CityId,
         CountryId = s.CountryId,
         PostalCode = s.PostalCode,
-        CountryNameId = s.CountryNameId,
         AddressName = s.AddressName,
         AdministrativeContact = s.AdministrativeContact,
         PhoneCountryCodeId = s.PhoneCountryCodeId,
@@ -150,6 +192,13 @@ public class SupplierFormModel
         Iban = s.Iban,
         PaymentMethodCode = s.PaymentMethodCode,
         RemitAdviceEmail = s.RemitAdviceEmail,
+        IntermediaryAccountApplicable = s.IntermediaryAccountApplicable,
+        IntermediaryCountryId = s.IntermediaryCountryId,
+        IntermediaryBankName = s.IntermediaryBankName,
+        IntermediaryAccountNumber = s.IntermediaryAccountNumber,
+        IntermediaryBranchNumber = s.IntermediaryBranchNumber,
+        IntermediaryIban = s.IntermediaryIban,
+        IntermediaryBicSwiftCode = s.IntermediaryBicSwiftCode,
 
         RemittanceEmail = s.RemittanceEmail,
         IsRfqOrBidding = s.IsRfqOrBidding,
@@ -176,11 +225,26 @@ public class SupplierFormModel
         s.PrefixId = PrefixId;
         s.TaxOrganizationTypeId = TaxOrganizationTypeId;
         s.FirstName = FirstName;
+        s.MiddleName = MiddleName;
+        s.LastName = LastName;
         s.Email = Email;
         s.SupplierTypeId = SupplierTypeId;
         s.TaxpayerCountryId = TaxpayerCountryId;
+        s.CountryNameId = CountryNameId;
         s.TaxRegistrationNumber = TaxRegistrationNumber;
+        s.VatRegistered = VatRegistered;
+        s.VatRegistrationTypeId = VatRegistrationTypeId;
+        s.NumberOfVatGroupEntities = NumberOfVatGroupEntities;
+        s.VatGroupEntityNames = VatGroupEntityNames;
+        s.SupplierTin = SupplierTin;
+        s.BusinessPartnerTypeId = BusinessPartnerTypeId;
+        s.BusinessLocationTypeId = BusinessLocationTypeId;
+        s.EInvoicingWaveId = EInvoicingWaveId;
         s.TradeLicenseNumber = TradeLicenseNumber;
+        s.TradeLicenseIssueDate = TradeLicenseIssueDate;
+        s.TradeLicenseExpiryDate = TradeLicenseExpiryDate;
+        s.TradeLicenseIssuingBodyId = TradeLicenseIssuingBodyId;
+        s.IssuingBodyIfOthers = IssuingBodyIfOthers;
         s.VatCodeId = VatCodeId;
         s.BusinessRelationshipId = BusinessRelationshipId;
         s.IsOneTimeSupplier = IsOneTimeSupplier;
@@ -192,7 +256,6 @@ public class SupplierFormModel
         s.CityId = CityId;
         s.CountryId = CountryId;
         s.PostalCode = PostalCode;
-        s.CountryNameId = CountryNameId;
         s.AddressName = AddressName;
         s.AdministrativeContact = string.IsNullOrWhiteSpace(AdministrativeContact) ? FirstName : AdministrativeContact;
         s.PhoneCountryCodeId = PhoneCountryCodeId;
@@ -212,6 +275,13 @@ public class SupplierFormModel
         s.Iban = Iban;
         s.PaymentMethodCode = PaymentMethodCode;
         s.RemitAdviceEmail = RemitAdviceEmail;
+        s.IntermediaryAccountApplicable = IntermediaryAccountApplicable;
+        s.IntermediaryCountryId = IntermediaryCountryId;
+        s.IntermediaryBankName = IntermediaryBankName;
+        s.IntermediaryAccountNumber = IntermediaryAccountNumber;
+        s.IntermediaryBranchNumber = IntermediaryBranchNumber;
+        s.IntermediaryIban = IntermediaryIban;
+        s.IntermediaryBicSwiftCode = IntermediaryBicSwiftCode;
 
         s.RemittanceEmail = RemittanceEmail;
         s.IsRfqOrBidding = IsRfqOrBidding;
