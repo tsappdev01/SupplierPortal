@@ -12,4 +12,8 @@ public static class AppClaims
     /// <summary>One claim per portal the user may open; value is the <see cref="Models.PortalAccess"/> name
     /// (e.g. "Landlord"). Read via <see cref="ClaimsPrincipalExtensions.CanAccessPortal"/>.</summary>
     public const string Portal = "portal";
+
+    /// <summary>The id of the Business Unit / company the user belongs to. Used to brand the portal (nav bar,
+    /// communications) with that company's logo. Absent when the user has no company set.</summary>
+    public const string CompanyBusinessUnitId = "company_bu_id";
 }

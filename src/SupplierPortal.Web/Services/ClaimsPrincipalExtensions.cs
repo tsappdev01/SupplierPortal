@@ -20,6 +20,12 @@ public static class ClaimsPrincipalExtensions
         return int.TryParse(value, out var id) ? id : 0;
     }
 
+    /// <summary>The Business Unit / company the user belongs to, or null if none is set.</summary>
+    public static int? GetCompanyBusinessUnitId(this ClaimsPrincipal principal)
+    {
+        return int.TryParse(principal.FindFirstValue(AppClaims.CompanyBusinessUnitId), out var id) ? id : null;
+    }
+
     public static bool IsAdministrator(this ClaimsPrincipal principal)
     {
         return principal.IsInRole(Models.UserType.Administrator.ToString());

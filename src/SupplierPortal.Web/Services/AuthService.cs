@@ -124,6 +124,10 @@ public class AuthService(
         identity.AddClaim(new Claim("FullName", string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName));
         identity.AddClaim(new Claim("Designation", user.Designation ?? ""));
         identity.AddClaim(new Claim("HasPhoto", (user.ProfilePhoto is not null).ToString()));
+        if (user.CompanyBusinessUnitId is int companyBuId)
+        {
+            identity.AddClaim(new Claim(AppClaims.CompanyBusinessUnitId, companyBuId.ToString()));
+        }
         foreach (var businessUnit in user.BusinessUnits)
         {
             identity.AddClaim(new Claim("BusinessUnitId", businessUnit.Id.ToString()));
