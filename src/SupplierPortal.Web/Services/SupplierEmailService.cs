@@ -11,11 +11,10 @@ public class SupplierEmailService(
     SupplierAccessTokenService accessTokenService, UserService userService, IConfiguration configuration,
     EmailBrandingService branding)
 {
-    /// <summary>Renders the company-logo header image for an email, or an empty string when there is no
-    /// company logo (the template then keeps its text title).</summary>
-    private static string LogoImg(string? dataUri) =>
-        string.IsNullOrEmpty(dataUri) ? "" :
-        $"<img src=\"{dataUri}\" alt=\"Company logo\" style=\"display:block;max-height:48px;max-width:200px;margin-bottom:12px;background:#ffffff;padding:4px 8px;border-radius:4px\" />";
+    /// <summary>Renders the associated Business Unit name as the email header brand line (text renders
+    /// reliably in every email client, unlike an embedded image).</summary>
+    private static string BrandLine(string? name) =>
+        $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name)}</div>";
 
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/supplier_update_notification.html";
@@ -50,10 +49,10 @@ public class SupplierEmailService(
         var linkBase = string.IsNullOrWhiteSpace(portalUrl) ? baseUrl : portalUrl;
         var link = $"{linkBase.TrimEnd('/')}/supplier/self-service/{rawToken}";
 
-        var logo = await branding.GetCompanyLogoDataUriAsync(actorUsername);
+        var brand = await branding.GetBrandNameAsync(actorUsername, null);
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
-            .Replace("{CompanyLogo}", LogoImg(logo))
+            .Replace("{CompanyLogo}", BrandLine(brand))
             .Replace("{Supplier Name}", supplierName)
             .Replace("{Link}", link);
 
@@ -117,11 +116,10 @@ public class SupplierEmailService(
         }
 
         var link = $"{baseUrl.TrimEnd('/')}/supplier/edit/{supplier.Id}";
-        var logo = await branding.GetCompanyLogoDataUriAsync(requestedByUsername)
-                   ?? await branding.GetBusinessUnitLogoDataUriAsync(supplier.BusinessUnitId);
+        var brand = await branding.GetBrandNameAsync(requestedByUsername, supplier.BusinessUnitId);
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
-            .Replace("{CompanyLogo}", LogoImg(logo))
+            .Replace("{CompanyLogo}", BrandLine(brand))
             .Replace("{Supplier Name}", supplier.SupplierName)
             .Replace("{Link}", link);
 
