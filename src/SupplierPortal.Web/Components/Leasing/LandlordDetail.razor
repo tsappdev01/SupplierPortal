@@ -392,10 +392,17 @@ else
                             <button class="btn btn-primary btn-sm" @onclick="SendForSignatureAsync" disabled="@signatureBusy">
                                 @(signatureBusy ? "Sending…" : landlord.SignatureStatus is null ? "Send for signature" : "Resend for signature")
                             </button>
+                            @if (landlord.SignatureStatus is not null)
+                            {
+                                <button class="btn btn-outline-primary btn-sm ms-1" @onclick="SyncStatusAsync" disabled="@signatureBusy" title="Check Circularo for the latest signing status">
+                                    @(signatureBusy ? "Checking…" : "Check signature status")
+                                </button>
+                            }
                             @if (!string.IsNullOrWhiteSpace(landlord.CircularoSigningUrl))
                             {
                                 <a class="btn btn-outline-secondary btn-sm ms-1" href="@landlord.CircularoSigningUrl" target="_blank" rel="noopener">Open in Circularo</a>
                             }
+                            <div class="form-text mt-1">If the landlord has signed but the status hasn't updated, click “Check signature status”.</div>
                         }
                     </div>
                 </div>
@@ -520,6 +527,24 @@ else
         documents = await DocumentService.GetAllVersionsAsync(Id);
         fieldChanges = await LandlordService.GetFieldChangesAsync(Id);
 
+        // Sent for signature but not yet resolved: poll Circularo for the current status (the completion
+        // webhook may not reach this server), so opening the page reflects a signature the landlord has
+        // already completed. Best-effort and quiet — the explicit "Check signature status" button reports.
+        var status = landlord.SignatureStatus;
+        var pending = !string.IsNullOrWhiteSpace(status)
+            && !string.Equals(status, "Signed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Declined", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase);
+        if (pending && !string.IsNullOrWhiteSpace(landlord.CircularoDocumentId))
+        {
+            var (changed, _) = await LandlordService.SyncSignatureStatusAsync(Id, currentUser);
+            if (changed)
+            {
+                landlord = await LandlordService.GetByIdAsync(Id) ?? landlord;
+                trace = await LandlordService.GetTraceAsync(Id);
+            }
+        }
+
         // If the document is signed but we don't yet hold the signed copy (webhook without the file, or a
         // transient download failure at callback time), pull it now so it's on record for future reference.
         if (string.Equals(landlord.SignatureStatus, "Signed", StringComparison.OrdinalIgnoreCase) &&
@@ -538,6 +563,19 @@ else
             var ok = await Loading.RunAsync(() => LandlordService.EnsureSignedDocumentAsync(Id, currentUser));
             if (ok) { await LoadAsync(); Toast.ShowSuccess("Signed document retrieved."); }
             else Toast.ShowError("The signed copy could not be retrieved from Circularo yet. Please try again shortly.");
+        }
+        finally { signatureBusy = false; }
+    }
+
+    private async Task SyncStatusAsync()
+    {
+        signatureBusy = true;
+        try
+        {
+            var (changed, message) = await Loading.RunAsync(() => LandlordService.SyncSignatureStatusAsync(Id, currentUser));
+            await LoadAsync();
+            if (changed) Toast.ShowSuccess(message);
+            else Toast.ShowInfo(message);
         }
         finally { signatureBusy = false; }
     }

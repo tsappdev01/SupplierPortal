@@ -7,6 +7,11 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// <summary>Result of routing a document to Circularo for signature.</summary>
 public record CircularoResult(bool Success, string? DocumentId, string? SigningUrl, string? Error);
 
+/// <summary>Current signing state of a Circularo document, resolved by polling (used when the completion
+/// webhook can't reach the server). <paramref name="Reachable"/> is false when Circularo couldn't be
+/// contacted, so the caller can tell "not signed yet" apart from "couldn't check".</summary>
+public record CircularoStatus(bool Reachable, bool Signed, bool Declined, string? RawStatus, byte[]? SignedPdf);
+
 public interface ICircularoService
 {
     /// <summary>True when Circularo is configured (enabled + API token present).</summary>
@@ -19,6 +24,10 @@ public interface ICircularoService
 
     /// <summary>Attempts to download the signed copy of a document. Returns null when unavailable.</summary>
     Task<byte[]?> DownloadSignedAsync(string documentId, CancellationToken ct = default);
+
+    /// <summary>Polls Circularo for a document's current signing status (and downloads the signed PDF when
+    /// complete). Lets the portal reflect a completed signature without relying on the inbound webhook.</summary>
+    Task<CircularoStatus> GetSignatureStatusAsync(string documentId, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -242,6 +251,53 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
         {
             logger.LogError(ex, "Circularo download signed error for {Doc}", documentId);
             return null;
+        }
+    }
+
+    // ── Poll signing status ──────────────────────────────────────────────────
+    public async Task<CircularoStatus> GetSignatureStatusAsync(string documentId, CancellationToken ct = default)
+    {
+        if (!Enabled || string.IsNullOrWhiteSpace(documentId))
+            return new(false, false, false, null, null);
+
+        try
+        {
+            using var docResp = await http.GetAsync(Url($"documents/{documentId}"), ct);
+            var body = await docResp.Content.ReadAsStringAsync(ct);
+            if (!docResp.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Circularo GetStatus failed {Status} for {Doc}: {Body}", docResp.StatusCode, documentId, Trunc(body));
+                return new(false, false, false, null, null);
+            }
+
+            // Circularo doesn't publish a single canonical status field name, so read any of the common ones.
+            var raw = ExtractString(body,
+                "signStatus", "signatureStatus", "documentStatus", "workflowState", "currentState",
+                "state", "status", "phase", "stage");
+
+            var s = raw?.ToLowerInvariant() ?? "";
+            var declined = s.Contains("declin") || s.Contains("reject") || s.Contains("cancel") || s.Contains("void");
+            var signed = !declined && (s.Contains("sign") || s.Contains("complet") || s.Contains("finish")
+                                       || s.Contains("done") || s.Contains("closed") || s.Contains("archiv"));
+
+            byte[]? pdf = null;
+            if (signed)
+            {
+                var hash = ExtractContentHash(body);
+                if (!string.IsNullOrWhiteSpace(hash))
+                {
+                    using var fileResp = await http.GetAsync(Url($"files/loadFile/hash/{hash}/"), ct);
+                    if (fileResp.IsSuccessStatusCode)
+                        pdf = await fileResp.Content.ReadAsByteArrayAsync(ct);
+                }
+            }
+
+            return new(true, signed, declined, raw, pdf);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Circularo GetStatus error for {Doc}", documentId);
+            return new(false, false, false, null, null);
         }
     }
 
