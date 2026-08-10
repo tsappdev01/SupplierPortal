@@ -15,6 +15,15 @@ public class LandlordSummaryPdfService
 {
     private static readonly string Navy = Colors.Blue.Darken4;
 
+    // Fixed signature-box geometry (points). Must stay in sync with CircularoOptions.SignPercent* so the
+    // e-signature field overlays the printed box. See the derivation note where the box is drawn.
+    private const float SignatureBoxWidthPt = 220f;
+    private const float SignatureBoxHeightPt = 70f;
+    private const float SignatureRightPt = 28f;
+    private const float SignatureBottomPt = 46f;
+    // Bottom space reserved in the content flow so nothing renders under the pinned box (box + a little air).
+    private const float SignatureReservePt = SignatureBoxHeightPt + SignatureBottomPt + 20f;
+
     /// <summary>Builds the registration-summary PDF. <paramref name="documents"/> is the list of attached
     /// files (metadata only) to enumerate — the generated summary itself should be excluded by the caller.</summary>
     public byte[] Build(Landlord l, IReadOnlyList<LandlordDocument> documents)
@@ -50,7 +59,9 @@ public class LandlordSummaryPdfService
                     h.Item().PaddingTop(6).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
                 });
 
-                page.Content().PaddingVertical(10).Column(col =>
+                // The bottom area is reserved (PaddingBottom) for the signature box that is pinned to the
+                // page in Foreground() below, so flowing content never runs underneath it.
+                page.Content().PaddingTop(10).PaddingBottom(SignatureReservePt).Column(col =>
                 {
                     col.Spacing(14);
 
@@ -145,25 +156,25 @@ public class LandlordSummaryPdfService
                         txt.Span("The landlord confirmed that the information above — contacts, documents and signatories — is accurate and complete at the time of submission.");
                     });
 
-                    // ----- Signature placeholder (primary contact) — anchor for the Circularo signature field -----
-                    col.Item().PaddingTop(18).Row(r =>
-                    {
-                        r.RelativeItem().PaddingRight(16).Column(c =>
-                        {
-                            c.Item().Text("Authorised signatory").FontSize(9).FontColor(Colors.Grey.Darken1);
-                            c.Item().Text(primary?.FullName ?? "—").FontSize(12).Bold().FontColor(Navy);
-                            c.Item().Text("Primary contact").FontSize(9).FontColor(Colors.Grey.Darken1);
-                            if (!string.IsNullOrWhiteSpace(primary?.Email))
-                                c.Item().Text(primary!.Email).FontSize(9).FontColor(Colors.Grey.Darken1);
-                        });
-                        r.ConstantItem(230).Column(c =>
-                        {
-                            c.Item().Height(78).Border(1).BorderColor(Navy).Background(Colors.Grey.Lighten5)
-                                .AlignCenter().AlignMiddle().Text("Sign here").FontSize(10).FontColor(Colors.Grey.Medium);
-                            c.Item().PaddingTop(3).Text("Signature & date").FontSize(8).FontColor(Colors.Grey.Medium);
-                        });
-                    });
+                    // The signatory identity is already shown in "Primary Contact" and "Authorised Signatories"
+                    // above; the signature box itself is pinned in Foreground() below at a fixed position so the
+                    // Circularo signature field can overlay it exactly.
                 });
+
+                // ----- Signature box, pinned to a FIXED position (bottom-right of the page) -----
+                // Keeping this box at a deterministic location (not in the flowing content) is what lets the
+                // Circularo signature field line up with it. The CircularoOptions.SignPercent* values are
+                // derived from exactly this rectangle — if you move/resize the box here, update them too.
+                //   A4 = 595.28 × 841.89 pt.  Box 220×70 pt, 28 pt from the right edge, 46 pt above the bottom.
+                //   X = (595.28-28-220)/595.28 = 0.583   Width  = 220/595.28 = 0.370
+                //   Y = (841.89-46-70)/841.89 = 0.862    Height =  70/841.89 = 0.083   (Y measured from the top)
+                page.Foreground()
+                    .PaddingRight(SignatureRightPt).PaddingBottom(SignatureBottomPt)
+                    .AlignBottom().AlignRight()
+                    .Width(SignatureBoxWidthPt).Height(SignatureBoxHeightPt)
+                    .Border(1).BorderColor(Navy).Background(Colors.Grey.Lighten5)
+                    .AlignCenter().AlignMiddle()
+                    .Text("Sign here").FontSize(10).FontColor(Colors.Grey.Medium);
 
                 page.Footer().AlignCenter().Text(txt =>
                 {
