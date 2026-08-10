@@ -16,7 +16,8 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> AddAsync(
-        string name, string? code, string? domain, byte[]? logo, string? logoContentType, string actorUsername)
+        string name, string? code, string? domain, byte[]? logo, string? logoContentType,
+        byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -29,7 +30,11 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         var baseCode = string.IsNullOrWhiteSpace(code) ? GenerateBaseCode(name) : code.Trim().ToUpperInvariant();
         var finalCode = await ResolveUniqueCodeAsync(db, baseCode);
 
-        var (thumb, thumbType) = MakeThumbnail(logo, logoContentType);
+        // A separately uploaded thumbnail is used as-is; if none was provided, derive one from the logo so a
+        // newly created unit always has a thumbnail.
+        var (thumb, thumbType) = thumbnail is { Length: > 0 }
+            ? (thumbnail, thumbnailContentType)
+            : MakeThumbnail(logo, logoContentType);
         var businessUnit = new BusinessUnit
         {
             Name = name,
@@ -55,7 +60,8 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> UpdateAsync(
-        int id, string name, string code, string? domain, byte[]? logo, string? logoContentType, string actorUsername)
+        int id, string name, string code, string? domain, byte[]? logo, string? logoContentType,
+        byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
         code = code.Trim().ToUpperInvariant();
@@ -80,13 +86,16 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         businessUnit.Name = name;
         businessUnit.Code = code;
         businessUnit.Domain = NormalizeDomain(domain);
+        // Logo and thumbnail are independent uploads: each is replaced only when a new file is supplied.
         if (logo is not null)
         {
-            var (thumb, thumbType) = MakeThumbnail(logo, logoContentType);
             businessUnit.Logo = logo;
             businessUnit.LogoContentType = logoContentType;
-            businessUnit.Thumbnail = thumb;
-            businessUnit.ThumbnailContentType = thumbType;
+        }
+        if (thumbnail is { Length: > 0 })
+        {
+            businessUnit.Thumbnail = thumbnail;
+            businessUnit.ThumbnailContentType = thumbnailContentType;
         }
 
         await db.SaveChangesAsync();

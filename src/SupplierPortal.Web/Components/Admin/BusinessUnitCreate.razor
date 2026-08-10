@@ -31,11 +31,19 @@
         <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. dipark.com" />
     </div>
     <div class="mb-3">
-        <label class="form-label">Logo <span class="text-muted small">(stored as a 640×640 thumbnail)</span></label>
+        <label class="form-label">Logo <span class="text-muted small">(full-size)</span></label>
         <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
         @if (logoPreview is not null)
         {
-            <img src="@logoPreview" alt="Preview" class="mt-2" style="max-width: 120px; max-height: 80px; object-fit: contain;" />
+            <img src="@logoPreview" alt="Logo preview" class="mt-2" style="max-width: 160px; max-height: 100px; object-fit: contain;" />
+        }
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Thumbnail <span class="text-muted small">(square, ~640×640; optional — derived from the logo if omitted)</span></label>
+        <InputFile OnChange="OnThumbnailSelectedAsync" accept="image/*" class="form-control" />
+        @if (thumbPreview is not null)
+        {
+            <img src="@thumbPreview" alt="Thumbnail preview" class="mt-2" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #dee2e6; border-radius: 6px;" />
         }
     </div>
 
@@ -56,6 +64,9 @@
     private string? logoPreview;
     private byte[]? logoBytes;
     private string? logoContentType;
+    private string? thumbPreview;
+    private byte[]? thumbBytes;
+    private string? thumbContentType;
 
     [SupplyParameterFromForm]
     private BusinessUnitModel Input { get; set; } = new();
@@ -77,10 +88,21 @@
         logoPreview = $"data:{logoContentType};base64,{Convert.ToBase64String(logoBytes)}";
     }
 
+    private async Task OnThumbnailSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxLogoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        thumbBytes = memoryStream.ToArray();
+        thumbContentType = file.ContentType;
+        thumbPreview = $"data:{thumbContentType};base64,{Convert.ToBase64String(thumbBytes)}";
+    }
+
     private async Task SaveAsync()
     {
         var (success, error) = await Loading.RunAsync(
-            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, logoBytes, logoContentType, currentUser));
+            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser));
         if (!success)
         {
             errorMessage = error;
