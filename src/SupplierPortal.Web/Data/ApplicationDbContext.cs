@@ -65,6 +65,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                     j.ToTable("UserBusinessUnits");
                 });
 
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.CompanyBusinessUnit)
+            .WithMany()
+            .HasForeignKey(u => u.CompanyBusinessUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<BusinessUnit>()
             .HasIndex(b => b.Code)
             .IsUnique();

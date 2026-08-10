@@ -12,6 +12,10 @@ public class BusinessUnit
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Business unit's web/email domain, e.g. "dipark.com" (no scheme). Optional.</summary>
+    [MaxLength(200)]
+    public string? Domain { get; set; }
+
     public byte[]? Logo { get; set; }
 
     [MaxLength(100)]

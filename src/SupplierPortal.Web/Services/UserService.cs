@@ -51,7 +51,8 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<(bool Success, string? Error)> AddOrLinkUserAsync(
         string username, string fullName, string? designation, string email, string? password, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string actorUsername,
-        AuthSource authSource = AuthSource.Local, string? adLogin = null, PortalAccess portalAccess = PortalAccess.None)
+        AuthSource authSource = AuthSource.Local, string? adLogin = null, PortalAccess portalAccess = PortalAccess.None,
+        int? companyBusinessUnitId = null)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -89,6 +90,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
             existing.UserType = userType;
             existing.PortalAccess = portalAccess;
             existing.BusinessUnits = businessUnits;
+            existing.CompanyBusinessUnitId = companyBusinessUnitId;
             existing.IsActive = isActive;
             existing.IsPendingRegistration = false;
             existing.AuthSource = authSource;
@@ -125,6 +127,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
                 UserType = userType,
                 PortalAccess = portalAccess,
                 BusinessUnits = businessUnits,
+                CompanyBusinessUnitId = companyBusinessUnitId,
                 IsActive = isActive,
                 IsPendingRegistration = false,
                 ProfilePhoto = photo,
@@ -156,7 +159,8 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<(bool Success, string? Error)> UpdateUserAsync(
         int id, string username, string fullName, string? designation, string email, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string? newPassword,
-        AuthSource authSource, string? adLogin, string actorUsername, PortalAccess portalAccess = PortalAccess.None)
+        AuthSource authSource, string? adLogin, string actorUsername, PortalAccess portalAccess = PortalAccess.None,
+        int? companyBusinessUnitId = null)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -191,6 +195,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         user.AuthSource = authSource;
         user.AdLogin = authSource == AuthSource.ActiveDirectory ? adLogin?.Trim() : null;
         user.BusinessUnits = businessUnits;
+        user.CompanyBusinessUnitId = companyBusinessUnitId;
         user.IsActive = isActive;
         if (photo is not null)
         {

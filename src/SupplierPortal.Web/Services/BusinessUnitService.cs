@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
@@ -13,7 +16,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> AddAsync(
-        string name, string? code, byte[]? logo, string? logoContentType, string actorUsername)
+        string name, string? code, string? domain, byte[]? logo, string? logoContentType, string actorUsername)
     {
         name = name.Trim();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -26,7 +29,15 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         var baseCode = string.IsNullOrWhiteSpace(code) ? GenerateBaseCode(name) : code.Trim().ToUpperInvariant();
         var finalCode = await ResolveUniqueCodeAsync(db, baseCode);
 
-        var businessUnit = new BusinessUnit { Name = name, Code = finalCode, Logo = logo, LogoContentType = logoContentType };
+        var (thumb, thumbType) = MakeThumbnail(logo, logoContentType);
+        var businessUnit = new BusinessUnit
+        {
+            Name = name,
+            Code = finalCode,
+            Domain = NormalizeDomain(domain),
+            Logo = thumb,
+            LogoContentType = thumbType
+        };
         db.BusinessUnits.Add(businessUnit);
         await db.SaveChangesAsync();
 
@@ -42,7 +53,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> UpdateAsync(
-        int id, string name, string code, byte[]? logo, string? logoContentType, string actorUsername)
+        int id, string name, string code, string? domain, byte[]? logo, string? logoContentType, string actorUsername)
     {
         name = name.Trim();
         code = code.Trim().ToUpperInvariant();
@@ -66,10 +77,12 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
 
         businessUnit.Name = name;
         businessUnit.Code = code;
+        businessUnit.Domain = NormalizeDomain(domain);
         if (logo is not null)
         {
-            businessUnit.Logo = logo;
-            businessUnit.LogoContentType = logoContentType;
+            var (thumb, thumbType) = MakeThumbnail(logo, logoContentType);
+            businessUnit.Logo = thumb;
+            businessUnit.LogoContentType = thumbType;
         }
 
         await db.SaveChangesAsync();
@@ -88,6 +101,63 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         }
 
         return (businessUnit.Logo, businessUnit.LogoContentType);
+    }
+
+    /// <summary>Signature thumbnail size for business unit logos.</summary>
+    private const int ThumbnailSize = 640;
+
+    /// <summary>Normalises an uploaded logo to a 640×640 thumbnail (aspect ratio preserved, padded onto a
+    /// transparent square) stored as PNG. Best-effort: if the bytes can't be decoded as an image, the
+    /// original bytes/content-type are returned unchanged so the upload is never lost.</summary>
+    private static (byte[]? Bytes, string? ContentType) MakeThumbnail(byte[]? logo, string? contentType)
+    {
+        if (logo is not { Length: > 0 })
+        {
+            return (logo, contentType);
+        }
+
+        try
+        {
+            using var image = Image.Load(logo);
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(ThumbnailSize, ThumbnailSize),
+                Mode = ResizeMode.Pad,                 // fit within the square, no distortion
+                PadColor = Color.Transparent
+            }));
+            using var ms = new MemoryStream();
+            image.Save(ms, new PngEncoder());
+            return (ms.ToArray(), "image/png");
+        }
+        catch
+        {
+            // Not a decodable image (or an unsupported format) — keep what was uploaded.
+            return (logo, contentType);
+        }
+    }
+
+    /// <summary>Strips scheme/path/whitespace and lower-cases a domain entry, so "https://DIPark.com/" becomes
+    /// "dipark.com". Returns null for blank input.</summary>
+    private static string? NormalizeDomain(string? domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            return null;
+        }
+
+        var d = domain.Trim();
+        var schemeIdx = d.IndexOf("://", StringComparison.Ordinal);
+        if (schemeIdx >= 0)
+        {
+            d = d[(schemeIdx + 3)..];
+        }
+        d = d.TrimStart('@');
+        var slash = d.IndexOf('/');
+        if (slash >= 0)
+        {
+            d = d[..slash];
+        }
+        return d.Trim().TrimEnd('.').ToLowerInvariant();
     }
 
     /// <summary>Initials-based code from a business unit name, e.g. "Dubai Investments Park Development" -> "DIPD".</summary>
