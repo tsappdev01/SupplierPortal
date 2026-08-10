@@ -7,7 +7,15 @@
 <div class="top-row ps-3 di-sidebar-brand">
     <div class="container-fluid">
         <a class="navbar-brand" href="">
-            <img src="/images/di-logo.png" alt="Dubai Investments" class="di-brand-logo" />
+            @if (companyBusinessUnitId is int companyId)
+            {
+                <img src="/business-units/@companyId/logo" alt="Company logo" class="di-brand-logo"
+                     onerror="this.onerror=null;this.src='/images/di-logo.png';" />
+            }
+            else
+            {
+                <img src="/images/di-logo.png" alt="Dubai Investments" class="di-brand-logo" />
+            }
         </a>
     </div>
 </div>
@@ -197,6 +205,7 @@
     private bool canBroker;
     private bool canCustomer;
     private int userId;
+    private int? companyBusinessUnitId;
     private string fullName = "";
     private string? designation;
     private bool hasPhoto;
@@ -219,6 +228,7 @@
             canBroker = state.User.CanAccessPortal(PortalAccess.Broker);
             canCustomer = state.User.CanAccessPortal(PortalAccess.Customer);
             userId = state.User.GetUserId();
+            companyBusinessUnitId = state.User.GetCompanyBusinessUnitId();
             fullName = state.User.GetFullName();
             designation = state.User.GetDesignation();
             hasPhoto = state.User.HasPhoto();

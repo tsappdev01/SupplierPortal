@@ -35,8 +35,10 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
             Name = name,
             Code = finalCode,
             Domain = NormalizeDomain(domain),
-            Logo = thumb,
-            LogoContentType = thumbType
+            Logo = logo,
+            LogoContentType = logoContentType,
+            Thumbnail = thumb,
+            ThumbnailContentType = thumbType
         };
         db.BusinessUnits.Add(businessUnit);
         await db.SaveChangesAsync();
@@ -81,8 +83,10 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         if (logo is not null)
         {
             var (thumb, thumbType) = MakeThumbnail(logo, logoContentType);
-            businessUnit.Logo = thumb;
-            businessUnit.LogoContentType = thumbType;
+            businessUnit.Logo = logo;
+            businessUnit.LogoContentType = logoContentType;
+            businessUnit.Thumbnail = thumb;
+            businessUnit.ThumbnailContentType = thumbType;
         }
 
         await db.SaveChangesAsync();
@@ -101,6 +105,27 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         }
 
         return (businessUnit.Logo, businessUnit.LogoContentType);
+    }
+
+    /// <summary>The 640×640 thumbnail; falls back to the original logo for units uploaded before thumbnails
+    /// existed (or if thumbnail generation had failed).</summary>
+    public async Task<(byte[] Bytes, string ContentType)?> GetThumbnailAsync(int businessUnitId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var businessUnit = await db.BusinessUnits.FirstOrDefaultAsync(b => b.Id == businessUnitId);
+        if (businessUnit is null)
+        {
+            return null;
+        }
+
+        if (businessUnit.Thumbnail is not null && businessUnit.ThumbnailContentType is not null)
+        {
+            return (businessUnit.Thumbnail, businessUnit.ThumbnailContentType);
+        }
+
+        return businessUnit.Logo is not null && businessUnit.LogoContentType is not null
+            ? (businessUnit.Logo, businessUnit.LogoContentType)
+            : null;
     }
 
     /// <summary>Signature thumbnail size for business unit logos.</summary>

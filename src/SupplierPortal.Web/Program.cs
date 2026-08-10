@@ -59,6 +59,7 @@ builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSect
 builder.Services.AddSingleton<ActiveDirectoryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddScoped<EmailBrandingService>();
 builder.Services.AddScoped<BusinessUnitService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<SupplierService>();
@@ -337,6 +338,12 @@ app.MapGet("/business-units/{id:int}/logo", async (int id, BusinessUnitService b
 {
     var logo = await businessUnitService.GetLogoAsync(id);
     return logo is null ? Results.NotFound() : Results.File(logo.Value.Bytes, logo.Value.ContentType);
+}).RequireAuthorization();
+
+app.MapGet("/business-units/{id:int}/thumbnail", async (int id, BusinessUnitService businessUnitService) =>
+{
+    var thumb = await businessUnitService.GetThumbnailAsync(id);
+    return thumb is null ? Results.NotFound() : Results.File(thumb.Value.Bytes, thumb.Value.ContentType);
 }).RequireAuthorization();
 
 app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentService documentService) =>
