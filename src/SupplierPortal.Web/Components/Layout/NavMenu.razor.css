@@ -28,9 +28,14 @@
 }
 
 .di-brand-logo {
-    height: 2.25rem;
+    height: 2.5rem;
+    max-width: 190px;
     width: auto;
-    border-radius: 4px;
+    object-fit: contain;
+    /* White chip so a transparent or dark-inked company logo stays visible on the dark sidebar. */
+    background: #ffffff;
+    padding: 5px 10px;
+    border-radius: 6px;
 }
 
 .di-profile-card {
