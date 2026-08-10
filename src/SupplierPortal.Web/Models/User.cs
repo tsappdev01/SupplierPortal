@@ -50,6 +50,11 @@ public class User
     /// <summary>A user may be assigned to more than one Business Unit; scopes which suppliers they can see.</summary>
     public List<BusinessUnit> BusinessUnits { get; set; } = [];
 
+    /// <summary>The single Business Unit / company the user belongs to (their home company). Optional; one of
+    /// the seeded Business Units. Distinct from <see cref="BusinessUnits"/>, which is the multi-BU access scope.</summary>
+    public int? CompanyBusinessUnitId { get; set; }
+    public BusinessUnit? CompanyBusinessUnit { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     /// <summary>The single seeded admin account; deactivated once a real administrator is created.</summary>

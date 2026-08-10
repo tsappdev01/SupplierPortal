@@ -24,6 +24,7 @@
             <th></th>
             <th>Code</th>
             <th>Business Unit Name</th>
+            <th>Domain</th>
             <th>Created</th>
             <th></th>
         </tr>
@@ -40,6 +41,7 @@
                 </td>
                 <td>@businessUnit.Code</td>
                 <td>@businessUnit.Name</td>
+                <td>@(string.IsNullOrWhiteSpace(businessUnit.Domain) ? "—" : businessUnit.Domain)</td>
                 <td>@businessUnit.CreatedAt.ToLocalTime().ToString("g")</td>
                 <td>
                     <a class="btn btn-sm btn-outline-secondary" href="/admin/business-units/edit/@businessUnit.Id" title="Edit">

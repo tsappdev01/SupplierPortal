@@ -115,6 +115,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Domain")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<byte[]>("Logo")
                         .HasColumnType("varbinary(max)");
 
@@ -1490,6 +1494,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int>("AuthSource")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CompanyBusinessUnitId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -1542,6 +1549,8 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CompanyBusinessUnitId");
 
                     b.HasIndex("Email")
                         .IsUnique();
@@ -1877,6 +1886,16 @@ namespace SupplierPortal.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Supplier");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.User", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "CompanyBusinessUnit")
+                        .WithMany()
+                        .HasForeignKey("CompanyBusinessUnitId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CompanyBusinessUnit");
                 });
 
             modelBuilder.Entity("UserBusinessUnit", b =>

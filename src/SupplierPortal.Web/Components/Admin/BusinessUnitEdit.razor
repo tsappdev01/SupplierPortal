@@ -37,7 +37,11 @@ else
             <InputText class="form-control" @bind-Value="Input.Code" />
         </div>
         <div class="mb-3">
-            <label class="form-label">Logo</label>
+            <label class="form-label">Domain Name</label>
+            <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. dipark.com" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Logo <span class="text-muted small">(stored as a 640×640 thumbnail)</span></label>
             <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
             @if (logoPreview is not null)
             {
@@ -90,7 +94,8 @@ else
         Input = new BusinessUnitModel
         {
             Name = businessUnit.Name,
-            Code = businessUnit.Code
+            Code = businessUnit.Code,
+            Domain = businessUnit.Domain
         };
     }
 
@@ -113,7 +118,7 @@ else
         }
 
         var (success, error) = await Loading.RunAsync(
-            () => BusinessUnitService.UpdateAsync(Id, Input.Name, Input.Code, logoBytes, logoContentType, currentUser));
+            () => BusinessUnitService.UpdateAsync(Id, Input.Name, Input.Code, Input.Domain, logoBytes, logoContentType, currentUser));
         if (!success)
         {
             errorMessage = error;
@@ -130,5 +135,7 @@ else
 
         [System.ComponentModel.DataAnnotations.Required]
         public string Code { get; set; } = "";
+
+        public string? Domain { get; set; }
     }
 }

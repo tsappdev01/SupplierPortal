@@ -102,6 +102,17 @@
         <div class="form-text">The portals this user can open. Only granted portals appear on their home page and sidebar.</div>
     </div>
     <div class="mb-3">
+        <label class="form-label">Company</label>
+        <InputSelect class="form-select" style="max-width: 360px;" @bind-Value="Input.CompanyBusinessUnitId">
+            <option value="">— Select —</option>
+            @foreach (var businessUnit in businessUnits)
+            {
+                <option value="@businessUnit.Id">@businessUnit.Name</option>
+            }
+        </InputSelect>
+        <div class="form-text">The business unit / company this user belongs to.</div>
+    </div>
+    <div class="mb-3">
         <label class="form-label">Business Unit(s)</label>
         <div class="di-bu-checklist">
             @foreach (var businessUnit in businessUnits)
@@ -116,6 +127,10 @@
         @if (businessUnits.Count == 0)
         {
             <div class="form-text">No business units exist yet. Add one first.</div>
+        }
+        else
+        {
+            <div class="form-text">Additional business units whose suppliers this user can see.</div>
         }
     </div>
     <div class="mb-3">
@@ -263,7 +278,7 @@
         var (success, error) = await Loading.RunAsync(() => UserService.AddOrLinkUserAsync(
             Input.Username, Input.FullName, Input.Designation, Input.Email, Input.Password, Input.UserType,
             selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, currentUser,
-            Input.AuthSource, Input.AdLogin, SelectedPortalAccess));
+            Input.AuthSource, Input.AdLogin, SelectedPortalAccess, Input.CompanyBusinessUnitId));
 
         if (!success)
         {
@@ -301,6 +316,8 @@
         public string? AdLogin { get; set; }
 
         public UserType UserType { get; set; } = UserType.NormalUser;
+
+        public int? CompanyBusinessUnitId { get; set; }
 
         public bool IsActive { get; set; } = true;
     }
