@@ -44,7 +44,7 @@ public static class DbSeeder
         await SeedPairCategoryAsync(db, LookupCategory.BusinessPartnerType, SupplierMasterSeedData.BusinessPartnerTypes);
         await SeedSimpleCategoryAsync(db, LookupCategory.BusinessLocationType, SupplierMasterSeedData.BusinessLocationTypes);
         await SeedSimpleCategoryAsync(db, LookupCategory.EInvoicingWave, SupplierMasterSeedData.EInvoicingWaves);
-        await SeedSimpleCategoryAsync(db, LookupCategory.LicensingAuthority, SupplierMasterSeedData.LicensingAuthorities);
+        await SeedPairCategoryAsync(db, LookupCategory.LicensingAuthority, SupplierMasterSeedData.LicensingAuthorities);
 
         if (!await db.LookupValues.AnyAsync(l => l.Category == LookupCategory.Country))
         {
