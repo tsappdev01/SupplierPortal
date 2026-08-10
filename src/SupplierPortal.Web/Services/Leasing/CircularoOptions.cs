@@ -53,6 +53,11 @@ public class CircularoOptions
     /// <summary>Whether signers must sign in order (true) or in parallel (false).</summary>
     public bool Sequential { get; set; } = true;
 
+    /// <summary>How often (minutes) the background poller checks Circularo for completed signatures, so signed
+    /// documents land in the portal automatically even when the completion webhook can't reach the server.
+    /// 0 disables polling (rely on the webhook / manual "Check signature status" only). Default 5.</summary>
+    public int PollIntervalMinutes { get; set; } = 5;
+
     /// <summary>Attach the completed/signed document to the completion email Circularo sends.</summary>
     public bool SendAttachmentsOnComplete { get; set; } = true;
 

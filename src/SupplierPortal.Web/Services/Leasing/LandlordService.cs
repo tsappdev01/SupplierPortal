@@ -804,6 +804,39 @@ public class LandlordService(
             (string.IsNullOrWhiteSpace(status.RawStatus) ? "" : $" (status: {status.RawStatus})"));
     }
 
+    /// <summary>Background sweep: sync every registration that has been sent for signature but is not yet
+    /// resolved, so a signed document lands in the portal automatically even when the completion webhook can't
+    /// reach the server. Returns the number of registrations that changed state.</summary>
+    public async Task<int> PollPendingSignaturesAsync(string actor = ActorSystem)
+    {
+        List<int> pendingIds;
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            pendingIds = await db.Landlords
+                .Where(l => l.CircularoDocumentId != null
+                            && l.SignatureStatus != null
+                            && l.SignatureStatus != "Signed"
+                            && l.SignatureStatus != "Declined")
+                .Select(l => l.Id)
+                .ToListAsync();
+        }
+
+        var changed = 0;
+        foreach (var id in pendingIds)
+        {
+            try
+            {
+                var (didChange, _) = await SyncSignatureStatusAsync(id, actor);
+                if (didChange) changed++;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Circularo poll: sync failed for landlord {Id}.", id);
+            }
+        }
+        return changed;
+    }
+
     /// <summary>Business-Centre notification recipients for a submission: the initiating user first, then all
     /// active administrators / leasing managers.</summary>
     private async Task<List<string>> ResolveBcRecipientsAsync(string createdBy)
