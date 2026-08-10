@@ -38,6 +38,14 @@ public static class DbSeeder
         await SeedPairCategoryAsync(db, LookupCategory.VatCode, SupplierMasterSeedData.VatCodes);
         await SeedPairCategoryAsync(db, LookupCategory.Currency, SupplierMasterSeedData.Currencies);
 
+        // LOVs added for the extended Supplier master fields (VAT structure, partner/location type,
+        // eInvoicing wave, licensing authority). Seeded per-category so they appear on existing DBs.
+        await SeedSimpleCategoryAsync(db, LookupCategory.VatRegistrationType, SupplierMasterSeedData.VatRegistrationTypes);
+        await SeedPairCategoryAsync(db, LookupCategory.BusinessPartnerType, SupplierMasterSeedData.BusinessPartnerTypes);
+        await SeedSimpleCategoryAsync(db, LookupCategory.BusinessLocationType, SupplierMasterSeedData.BusinessLocationTypes);
+        await SeedSimpleCategoryAsync(db, LookupCategory.EInvoicingWave, SupplierMasterSeedData.EInvoicingWaves);
+        await SeedSimpleCategoryAsync(db, LookupCategory.LicensingAuthority, SupplierMasterSeedData.LicensingAuthorities);
+
         if (!await db.LookupValues.AnyAsync(l => l.Category == LookupCategory.Country))
         {
             db.LookupValues.AddRange(CountrySeedData.Countries.Select(c => new LookupValue
@@ -141,31 +149,41 @@ public static class DbSeeder
         // Add any seed field that isn't already present, so fields introduced after the first run
         // (e.g. the site-usage checkboxes) appear in Supplier Field Settings without wiping the
         // administrator's existing mandatory/visibility choices for the fields already there.
-        var existingKeys = (await db.SupplierFieldSettings.Select(f => f.FieldKey).ToListAsync()).ToHashSet();
-        var nextSequence = await db.SupplierFieldSettings.AnyAsync()
-            ? await db.SupplierFieldSettings.MaxAsync(f => f.Sequence) + 1
-            : 0;
+        var existing = await db.SupplierFieldSettings.ToListAsync();
+        var existingByKey = existing.ToDictionary(f => f.FieldKey);
+        var nextSequence = existing.Count > 0 ? existing.Max(f => f.Sequence) + 1 : 0;
 
-        var added = false;
+        var changed = false;
         foreach (var f in SupplierFieldSettingSeedData.Fields)
         {
-            if (existingKeys.Contains(f.FieldKey))
+            if (existingByKey.TryGetValue(f.FieldKey, out var row))
             {
-                continue;
+                // Keep the administrator's Mandatory / Show-to-Supplier choices, but bring the
+                // display label and wizard step into line with the current spec (so relabels and
+                // step re-groupings ship without wiping configuration).
+                if (row.DisplayLabel != f.DisplayLabel || row.Step != f.Step)
+                {
+                    row.DisplayLabel = f.DisplayLabel;
+                    row.Step = f.Step;
+                    changed = true;
+                }
             }
-            db.SupplierFieldSettings.Add(new SupplierFieldSetting
+            else
             {
-                FieldKey = f.FieldKey,
-                DisplayLabel = f.DisplayLabel,
-                Step = f.Step,
-                Sequence = nextSequence++,
-                IsMandatory = f.IsMandatory,
-                IsVisibleToSupplier = true
-            });
-            added = true;
+                db.SupplierFieldSettings.Add(new SupplierFieldSetting
+                {
+                    FieldKey = f.FieldKey,
+                    DisplayLabel = f.DisplayLabel,
+                    Step = f.Step,
+                    Sequence = nextSequence++,
+                    IsMandatory = f.IsMandatory,
+                    IsVisibleToSupplier = true
+                });
+                changed = true;
+            }
         }
 
-        if (added)
+        if (changed)
         {
             await db.SaveChangesAsync();
         }

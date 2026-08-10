@@ -896,6 +896,12 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("BillToBuId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("BusinessLocationTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BusinessPartnerTypeId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("BusinessRelationshipId")
                         .HasColumnType("int");
 
@@ -942,6 +948,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("EInvoicingWaveId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -951,6 +960,32 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Iban")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IntermediaryAccountApplicable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IntermediaryAccountNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("IntermediaryBankName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("IntermediaryBicSwiftCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("IntermediaryBranchNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("IntermediaryCountryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IntermediaryIban")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -981,9 +1016,24 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("IsSourcingOnly")
                         .HasColumnType("bit");
 
+                    b.Property<string>("IssuingBodyIfOthers")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("LicenseType")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("MiddleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("NumberOfVatGroupEntities")
+                        .HasColumnType("int");
 
                     b.Property<string>("PaymentMethodCode")
                         .HasMaxLength(50)
@@ -1047,6 +1097,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("SupplierSiteBuId")
                         .HasColumnType("int");
 
+                    b.Property<string>("SupplierTin")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int?>("SupplierTypeId")
                         .HasColumnType("int");
 
@@ -1065,6 +1119,15 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("TaxpayerCountryId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("TradeLicenseExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("TradeLicenseIssueDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("TradeLicenseIssuingBodyId")
+                        .HasColumnType("int");
+
                     b.Property<string>("TradeLicenseNumber")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1078,6 +1141,16 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("VatCodeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("VatGroupEntityNames")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool?>("VatRegistered")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("VatRegistrationTypeId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountCountryCodeId");
@@ -1089,6 +1162,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("BankId");
 
                     b.HasIndex("BillToBuId");
+
+                    b.HasIndex("BusinessLocationTypeId");
+
+                    b.HasIndex("BusinessPartnerTypeId");
 
                     b.HasIndex("BusinessRelationshipId");
 
@@ -1105,6 +1182,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("CountryNameId");
 
                     b.HasIndex("CurrencyId");
+
+                    b.HasIndex("EInvoicingWaveId");
+
+                    b.HasIndex("IntermediaryCountryId");
 
                     b.HasIndex("PaymentMethodId");
 
@@ -1128,7 +1209,11 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasIndex("TaxpayerCountryId");
 
+                    b.HasIndex("TradeLicenseIssuingBodyId");
+
                     b.HasIndex("VatCodeId");
+
+                    b.HasIndex("VatRegistrationTypeId");
 
                     b.ToTable("Suppliers");
                 });
@@ -1549,6 +1634,16 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("BillToBuId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessLocationType")
+                        .WithMany()
+                        .HasForeignKey("BusinessLocationTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessPartnerType")
+                        .WithMany()
+                        .HasForeignKey("BusinessPartnerTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessRelationship")
                         .WithMany()
                         .HasForeignKey("BusinessRelationshipId")
@@ -1588,6 +1683,16 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "Currency")
                         .WithMany()
                         .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "EInvoicingWave")
+                        .WithMany()
+                        .HasForeignKey("EInvoicingWaveId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "IntermediaryCountry")
+                        .WithMany()
+                        .HasForeignKey("IntermediaryCountryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "PaymentMethod")
@@ -1645,9 +1750,19 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("TaxpayerCountryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "TradeLicenseIssuingBody")
+                        .WithMany()
+                        .HasForeignKey("TradeLicenseIssuingBodyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "VatCode")
                         .WithMany()
                         .HasForeignKey("VatCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "VatRegistrationType")
+                        .WithMany()
+                        .HasForeignKey("VatRegistrationTypeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("AccountCountryCode");
@@ -1659,6 +1774,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("BankBranch");
 
                     b.Navigation("BillToBu");
+
+                    b.Navigation("BusinessLocationType");
+
+                    b.Navigation("BusinessPartnerType");
 
                     b.Navigation("BusinessRelationship");
 
@@ -1675,6 +1794,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("CountryName");
 
                     b.Navigation("Currency");
+
+                    b.Navigation("EInvoicingWave");
+
+                    b.Navigation("IntermediaryCountry");
 
                     b.Navigation("PaymentMethod");
 
@@ -1698,7 +1821,11 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Navigation("TaxpayerCountry");
 
+                    b.Navigation("TradeLicenseIssuingBody");
+
                     b.Navigation("VatCode");
+
+                    b.Navigation("VatRegistrationType");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierAccessToken", b =>

@@ -42,7 +42,17 @@ public enum LookupCategory
     Currency = 10,
     BusinessRelationship = 11,
     CommunicationMethod = 12,
-    SupplierStatus = 13
+    SupplierStatus = 13,
+    /// <summary>VAT structure: "VAT Group" / "Individual VAT" (used by the Supplier VAT Registration Type field).</summary>
+    VatRegistrationType = 14,
+    /// <summary>Business Partner Type: B2B / B2G.</summary>
+    BusinessPartnerType = 15,
+    /// <summary>Business Location Type: Mainland / Free Zone.</summary>
+    BusinessLocationType = 16,
+    /// <summary>eInvoicing Wave Applicability: Wave 1 / Wave 2.</summary>
+    EInvoicingWave = 17,
+    /// <summary>Trade License Issuing Body / Licensing Authority (DET, ADDED, JAFZA, ... , Others).</summary>
+    LicensingAuthority = 18
 }
 
 /// <summary>Well-known workflow status names (rows seeded into LookupValues under

@@ -79,6 +79,14 @@
                     <label>First Name@(Req("FirstName"))</label>
                     <InputText @bind-Value="formModel.FirstName" />
                 </div>
+                <div class="di-field @FieldClass("MiddleName")">
+                    <label>Middle Name@(Req("MiddleName"))</label>
+                    <InputText @bind-Value="formModel.MiddleName" />
+                </div>
+                <div class="di-field @FieldClass("LastName")">
+                    <label>Last Name@(Req("LastName"))</label>
+                    <InputText @bind-Value="formModel.LastName" />
+                </div>
                 <div class="di-field @FieldClass("Email")">
                     <label>Business E-Mail@(Req("Email"))</label>
                     <InputText @bind-Value="formModel.Email" />
@@ -103,14 +111,110 @@
                         }
                     </InputSelect>
                 </div>
+                <div class="di-field @FieldClass("CountryNameId")">
+                    <label>Taxpayer Country Name@(Req("CountryNameId"))</label>
+                    <InputSelect @bind-Value="formModel.CountryNameId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in countries)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
                 <div class="di-field @FieldClass("TaxRegistrationNumber")">
                     <label>Tax Registration Number@(Req("TaxRegistrationNumber"))</label>
                     <InputText @bind-Value="formModel.TaxRegistrationNumber" />
+                </div>
+                <div class="di-field @FieldClass("SupplierTin")">
+                    <label>Supplier TIN@(Req("SupplierTin"))</label>
+                    <InputText @bind-Value="formModel.SupplierTin" />
+                </div>
+                <div class="di-checkbox-row">
+                    <div class="di-checkbox-item @FieldClass("VatRegistered")">
+                        <InputCheckbox @bind-Value="vatRegisteredBool" id="vatRegistered" />
+                        <label for="vatRegistered" style="margin:0;">VAT Registered?</label>
+                    </div>
+                </div>
+                <div class="di-field @FieldClass("VatRegistrationTypeId")">
+                    <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in vatRegistrationTypes)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (IsVatGroupSelected)
+                {
+                    <div class="di-field @FieldClass("NumberOfVatGroupEntities")">
+                        <label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label>
+                        <InputNumber @bind-Value="formModel.NumberOfVatGroupEntities" />
+                    </div>
+                    <div class="di-field di-full @FieldClass("VatGroupEntityNames")">
+                        <label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label>
+                        <InputTextArea @bind-Value="formModel.VatGroupEntityNames" rows="3" placeholder="One legal entity name per line" />
+                    </div>
+                }
+                <div class="di-field @FieldClass("BusinessPartnerTypeId")">
+                    <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in businessPartnerTypes)
+                        {
+                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("BusinessLocationTypeId")">
+                    <label>Business Location Type@(Req("BusinessLocationTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.BusinessLocationTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in businessLocationTypes)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("EInvoicingWaveId")">
+                    <label>eINvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label>
+                    <InputSelect @bind-Value="formModel.EInvoicingWaveId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in eInvoicingWaves)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
                 </div>
                 <div class="di-field @FieldClass("TradeLicenseNumber")">
                     <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
                     <InputText @bind-Value="formModel.TradeLicenseNumber" />
                 </div>
+                <div class="di-field @FieldClass("TradeLicenseIssueDate")">
+                    <label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label>
+                    <InputDate @bind-Value="formModel.TradeLicenseIssueDate" />
+                </div>
+                <div class="di-field @FieldClass("TradeLicenseExpiryDate")">
+                    <label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label>
+                    <InputDate @bind-Value="formModel.TradeLicenseExpiryDate" />
+                </div>
+                <div class="di-field @FieldClass("TradeLicenseIssuingBodyId")">
+                    <label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label>
+                    <InputSelect @bind-Value="formModel.TradeLicenseIssuingBodyId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in licensingAuthorities)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (IsIssuingBodyOthers)
+                {
+                    <div class="di-field @FieldClass("IssuingBodyIfOthers")">
+                        <label>Issuing Body if Others@(Req("IssuingBodyIfOthers"))</label>
+                        <InputText @bind-Value="formModel.IssuingBodyIfOthers" />
+                    </div>
+                }
                 <div class="di-field @FieldClass("VatCodeId")">
                     <label>VAT Code@(Req("VatCodeId"))</label>
                     <InputSelect @bind-Value="formModel.VatCodeId">
@@ -237,16 +341,6 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("CountryNameId")">
-                    <label>Country Name@(Req("CountryNameId"))</label>
-                    <InputSelect @bind-Value="formModel.CountryNameId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in countries)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
                 <div class="di-field @FieldClass("PostalCode")">
                     <label>Postal Code@(Req("PostalCode"))</label>
                     <InputText @bind-Value="formModel.PostalCode" />
@@ -349,7 +443,46 @@
                         <InputCheckbox @bind-Value="formModel.AllowInternationalPayments" id="intlPay" />
                         <label for="intlPay" style="margin:0;">Allow International Payments</label>
                     </div>
+                    <div class="di-checkbox-item @FieldClass("IntermediaryAccountApplicable")">
+                        <InputCheckbox @bind-Value="formModel.IntermediaryAccountApplicable" id="intermediaryApplicable" />
+                        <label for="intermediaryApplicable" style="margin:0;">Intermediary Account Applicable?</label>
+                    </div>
                 </div>
+
+                @if (formModel.IntermediaryAccountApplicable)
+                {
+                    <div class="di-subsection-header">Intermediary Bank Account</div>
+                    <div class="di-field @FieldClass("IntermediaryCountryId")">
+                        <label>Country Name@(Req("IntermediaryCountryId"))</label>
+                        <InputSelect @bind-Value="formModel.IntermediaryCountryId">
+                            <option value="">— Select —</option>
+                            @foreach (var lov in countries)
+                            {
+                                <option value="@lov.Id">@lov.DisplayName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="di-field @FieldClass("IntermediaryBankName")">
+                        <label>Bank Name@(Req("IntermediaryBankName"))</label>
+                        <InputText @bind-Value="formModel.IntermediaryBankName" />
+                    </div>
+                    <div class="di-field @FieldClass("IntermediaryAccountNumber")">
+                        <label>Account Number@(Req("IntermediaryAccountNumber"))</label>
+                        <InputText @bind-Value="formModel.IntermediaryAccountNumber" />
+                    </div>
+                    <div class="di-field @FieldClass("IntermediaryBranchNumber")">
+                        <label>Branch Number@(Req("IntermediaryBranchNumber"))</label>
+                        <InputText @bind-Value="formModel.IntermediaryBranchNumber" />
+                    </div>
+                    <div class="di-field @FieldClass("IntermediaryIban")">
+                        <label>IBAN@(Req("IntermediaryIban"))</label>
+                        <InputText @bind-Value="formModel.IntermediaryIban" />
+                    </div>
+                    <div class="di-field @FieldClass("IntermediaryBicSwiftCode")">
+                        <label>BIC/Swift Code@(Req("IntermediaryBicSwiftCode"))</label>
+                        <InputText @bind-Value="formModel.IntermediaryBicSwiftCode" />
+                    </div>
+                }
 
                 <div class="di-documents-row">
                     <div class="di-document-slot">
@@ -516,6 +649,15 @@
 
 <style>
     .di-hidden-field { display: none !important; }
+    .di-subsection-header {
+        grid-column: 1 / -1;
+        font-weight: 600;
+        font-size: 0.9rem;
+        margin: 0.75rem 0 0.25rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 1px solid var(--di-border, #e2e5ea);
+        color: var(--di-text, inherit);
+    }
 </style>
 
 @code {
@@ -567,6 +709,11 @@
     private List<LookupValue> prefixes = [];
     private List<LookupValue> communicationMethods = [];
     private List<LookupValue> currencies = [];
+    private List<LookupValue> vatRegistrationTypes = [];
+    private List<LookupValue> businessPartnerTypes = [];
+    private List<LookupValue> businessLocationTypes = [];
+    private List<LookupValue> eInvoicingWaves = [];
+    private List<LookupValue> licensingAuthorities = [];
     private List<Bank> banks = [];
     private List<BusinessUnit> businessUnits = [];
     private List<SupplierDocument> documents = [];
@@ -585,6 +732,25 @@
 
     private List<BankBranch> SelectedBankBranches =>
         banks.FirstOrDefault(b => b.Id == formModel.BankId)?.Branches ?? [];
+
+    // bool? -> bool proxy so the VAT Registered checkbox binds cleanly (unset is treated as No).
+    private bool vatRegisteredBool
+    {
+        get => formModel.VatRegistered ?? false;
+        set => formModel.VatRegistered = value;
+    }
+
+    /// <summary>The VAT-Group-only sub-fields (entity count and names) show only when the selected
+    /// VAT Registration Type is the "VAT Group" option.</summary>
+    private bool IsVatGroupSelected =>
+        vatRegistrationTypes.FirstOrDefault(v => v.Id == formModel.VatRegistrationTypeId)?
+            .DisplayName.Contains("Group", StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>The free-text "Issuing Body if Others" shows only when the selected licensing
+    /// authority is "Others".</summary>
+    private bool IsIssuingBodyOthers =>
+        licensingAuthorities.FirstOrDefault(l => l.Id == formModel.TradeLicenseIssuingBodyId)?
+            .DisplayName.Equals("Others", StringComparison.OrdinalIgnoreCase) == true;
 
     private List<SupplierDocument> OtherDocuments =>
         documents.Where(d => d.DocumentType == SupplierDocumentType.Other).ToList();
@@ -606,6 +772,11 @@
         prefixes = await SupplierService.GetLookupsAsync(LookupCategory.Prefix);
         communicationMethods = await SupplierService.GetLookupsAsync(LookupCategory.CommunicationMethod);
         currencies = await SupplierService.GetLookupsAsync(LookupCategory.Currency);
+        vatRegistrationTypes = await SupplierService.GetLookupsAsync(LookupCategory.VatRegistrationType);
+        businessPartnerTypes = await SupplierService.GetLookupsAsync(LookupCategory.BusinessPartnerType);
+        businessLocationTypes = await SupplierService.GetLookupsAsync(LookupCategory.BusinessLocationType);
+        eInvoicingWaves = await SupplierService.GetLookupsAsync(LookupCategory.EInvoicingWave);
+        licensingAuthorities = await SupplierService.GetLookupsAsync(LookupCategory.LicensingAuthority);
         banks = await SupplierService.GetBanksAsync();
         businessUnits = await BusinessUnitService.GetAllAsync();
 
