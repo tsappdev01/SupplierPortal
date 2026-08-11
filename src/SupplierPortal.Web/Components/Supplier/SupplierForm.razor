@@ -20,7 +20,7 @@
     }
 
     <div class="di-stepper">
-        @for (var i = 1; i <= 4; i++)
+        @for (var i = 1; i <= 5; i++)
         {
             var step = i;
             <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") @(step <= maxStepReached ? "reached" : "")"
@@ -28,7 +28,7 @@
                 <span class="di-stepper-num">@step</span>
                 <span class="di-stepper-label">@StepLabels[step]</span>
             </button>
-            if (i < 4)
+            if (i < 5)
             {
                 <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
@@ -55,16 +55,6 @@
                     <label>Supplier Name@(Req("SupplierName"))</label>
                     <InputText @bind-Value="formModel.SupplierName" />
                 </div>
-                <div class="di-field @FieldClass("PrefixId")">
-                    <label>Prefix@(Req("PrefixId"))</label>
-                    <InputSelect @bind-Value="formModel.PrefixId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in prefixes)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
                 <div class="di-field @FieldClass("TaxOrganizationTypeId")">
                     <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
                     <InputSelect @bind-Value="formModel.TaxOrganizationTypeId">
@@ -74,18 +64,6 @@
                             <option value="@lov.Id">@lov.DisplayName</option>
                         }
                     </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("FirstName")">
-                    <label>First Name@(Req("FirstName"))</label>
-                    <InputText @bind-Value="formModel.FirstName" />
-                </div>
-                <div class="di-field @FieldClass("MiddleName")">
-                    <label>Middle Name@(Req("MiddleName"))</label>
-                    <InputText @bind-Value="formModel.MiddleName" />
-                </div>
-                <div class="di-field @FieldClass("LastName")">
-                    <label>Last Name@(Req("LastName"))</label>
-                    <InputText @bind-Value="formModel.LastName" />
                 </div>
                 <div class="di-field @FieldClass("Email")">
                     <label>Business E-Mail@(Req("Email"))</label>
@@ -239,10 +217,6 @@
                     <label>D-U-N-S Number@(Req("DunsNumber"))</label>
                     <InputText @bind-Value="formModel.DunsNumber" />
                 </div>
-                <div class="di-field @FieldClass("CorporateWebSite")">
-                    <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
-                    <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
-                </div>
                 <div class="di-checkbox-row">
                     <div class="di-checkbox-item @FieldClass("IsOneTimeSupplier")">
                         <InputCheckbox @bind-Value="formModel.IsOneTimeSupplier" id="oneTime" />
@@ -292,8 +266,9 @@
         </div>
 
         <!-- Step 2: Contact Information -->
+        <!-- Step 2: Address Information -->
         <div class="di-section" style="display:@(currentStep == 2 ? "block" : "none")">
-            <div class="di-section-header">Contact Information</div>
+            <div class="di-section-header">Address Information</div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("AddressName")">
                     <label>Address Name@(Req("AddressName"))</label>
@@ -324,6 +299,20 @@
                         <InputText @bind-Value="formModel.CityText" placeholder="Enter city" />
                     }
                 </div>
+                <div class="di-field @FieldClass("CountryId")">
+                    <label>Country@(Req("CountryId"))</label>
+                    <InputSelect @bind-Value="formModel.CountryId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in countries)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("PostalCode")">
+                    <label>PO Box / Postal Code@(Req("PostalCode"))</label>
+                    <InputText @bind-Value="formModel.PostalCode" />
+                </div>
                 <div class="di-field @FieldClass("State")">
                     <label>State@(Req("State"))</label>
                     <InputText @bind-Value="formModel.State" />
@@ -338,23 +327,46 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("CountryId")">
-                    <label>Country@(Req("CountryId"))</label>
-                    <InputSelect @bind-Value="formModel.CountryId">
+                <div class="di-field @FieldClass("CorporateWebSite")">
+                    <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
+                    <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Contact Information -->
+        <div class="di-section" style="display:@(currentStep == 3 ? "block" : "none")">
+            <div class="di-section-header">Contact Information</div>
+            <div class="di-section-body">
+                <div class="di-field @FieldClass("PrefixId")">
+                    <label>Prefix@(Req("PrefixId"))</label>
+                    <InputSelect @bind-Value="formModel.PrefixId">
                         <option value="">— Select —</option>
-                        @foreach (var lov in countries)
+                        @foreach (var lov in prefixes)
                         {
                             <option value="@lov.Id">@lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("PostalCode")">
-                    <label>Postal Code@(Req("PostalCode"))</label>
-                    <InputText @bind-Value="formModel.PostalCode" />
+                <div class="di-field @FieldClass("FirstName")">
+                    <label>First Name@(Req("FirstName"))</label>
+                    <InputText @bind-Value="formModel.FirstName" />
+                </div>
+                <div class="di-field @FieldClass("MiddleName")">
+                    <label>Middle Name@(Req("MiddleName"))</label>
+                    <InputText @bind-Value="formModel.MiddleName" />
+                </div>
+                <div class="di-field @FieldClass("LastName")">
+                    <label>Last Name@(Req("LastName"))</label>
+                    <InputText @bind-Value="formModel.LastName" />
                 </div>
                 <div class="di-field @FieldClass("AdministrativeContact")">
                     <label>Administrative Contact@(Req("AdministrativeContact"))</label>
                     <InputText @bind-Value="formModel.AdministrativeContact" placeholder="Defaults to First Name if left blank" />
+                </div>
+                <div class="di-field @FieldClass("ContactEmail")">
+                    <label>Contacts E-Mail@(Req("ContactEmail"))</label>
+                    <InputText @bind-Value="formModel.ContactEmail" />
                 </div>
                 <div class="di-field @FieldClass("PhoneCountryCodeId")">
                     <label>Phone Country Code@(Req("PhoneCountryCodeId"))</label>
@@ -370,11 +382,15 @@
                     <label>Phone Area Code@(Req("PhoneAreaCode"))</label>
                     <InputText @bind-Value="formModel.PhoneAreaCode" />
                 </div>
+                <div class="di-field @FieldClass("Phone")">
+                    <label>Phone@(Req("Phone"))</label>
+                    <InputText @bind-Value="formModel.Phone" />
+                </div>
             </div>
         </div>
 
-        <!-- Step 3: Payment / Banking Information -->
-        <div class="di-section" style="display:@(currentStep == 3 ? "block" : "none")">
+        <!-- Step 4: Payment / Banking Information -->
+        <div class="di-section" style="display:@(currentStep == 4 ? "block" : "none")">
             <div class="di-section-header">Payment / Banking Information</div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("BankId")">
@@ -512,8 +528,8 @@
             </div>
         </div>
 
-        <!-- Step 4: Site / Business Unit -->
-        <div class="di-section" style="display:@(currentStep == 4 ? "block" : "none")">
+        <!-- Step 5: Site / Business Unit -->
+        <div class="di-section" style="display:@(currentStep == 5 ? "block" : "none")">
             <div class="di-section-header">Site / Business Unit</div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("SupplierSiteBuId")">
@@ -576,32 +592,6 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("CommunicationMethodId")">
-                    <label>Communication Method@(Req("CommunicationMethodId"))</label>
-                    <InputSelect @bind-Value="formModel.CommunicationMethodId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in communicationMethods)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("CommunicationEmail")">
-                    <label>Communication Email@(Req("CommunicationEmail"))</label>
-                    <InputText @bind-Value="formModel.CommunicationEmail" />
-                </div>
-                <div class="di-field @FieldClass("ContactEmail")">
-                    <label>Contact Email@(Req("ContactEmail"))</label>
-                    <InputText @bind-Value="formModel.ContactEmail" />
-                </div>
-                <div class="di-field @FieldClass("Phone")">
-                    <label>Phone@(Req("Phone"))</label>
-                    <InputText @bind-Value="formModel.Phone" />
-                </div>
-                <div class="di-field di-full @FieldClass("RemittanceEmail")">
-                    <label>Remittance E-mail@(Req("RemittanceEmail"))</label>
-                    <InputText @bind-Value="formModel.RemittanceEmail" />
-                </div>
                 @if (!SupplierFacing || SiteUsageKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
                 {
                     <div class="di-hint">Site usages — select all that apply for this Business Unit assignment:</div>
@@ -625,7 +615,7 @@
                     Back
                 </button>
             }
-            @if (currentStep < 4)
+            @if (currentStep < 5)
             {
                 <button class="di-btn di-btn-primary" type="button" @onclick="NextAsync" disabled="@isSaving">
                     Next
@@ -694,9 +684,10 @@
     private static readonly Dictionary<int, string> StepLabels = new()
     {
         [1] = "Business / Organization",
-        [2] = "Contact Information",
-        [3] = "Payment / Banking",
-        [4] = "Site / Business Unit"
+        [2] = "Address Information",
+        [3] = "Contact Information",
+        [4] = "Payment / Banking",
+        [5] = "Site / Business Unit"
     };
 
     private SupplierFormModel formModel = new();
@@ -827,7 +818,7 @@
         }
         else
         {
-            maxStepReached = 4;
+            maxStepReached = 5;
         }
 
         if (Supplier.Id != 0)
@@ -1018,8 +1009,8 @@
     private static readonly Dictionary<int, (string Key, string Label)[]> EmailFieldsByStep = new()
     {
         [1] = [("Email", "Business E-Mail")],
-        [3] = [("RemitAdviceEmail", "Remit Advice Email")],
-        [4] = [("ContactEmail", "Contact Email"), ("CommunicationEmail", "Communication Email"), ("RemittanceEmail", "Remittance E-mail")]
+        [3] = [("ContactEmail", "Contacts E-Mail")],
+        [4] = [("RemitAdviceEmail", "Remit Advice Email")]
     };
 
     private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
@@ -1106,7 +1097,7 @@
             return;
         }
 
-        if (currentStep == 3 && RequiresBankConfirmationLetter())
+        if (currentStep == 4 && RequiresBankConfirmationLetter())
         {
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
@@ -1150,10 +1141,10 @@
 
     private async Task SubmitForApprovalAsync()
     {
-        var errors = Enumerable.Range(1, 4).SelectMany(step => ValidateStep(formModel, step)).ToList();
+        var errors = Enumerable.Range(1, 5).SelectMany(step => ValidateStep(formModel, step)).ToList();
         if (errors.Count > 0)
         {
-            for (var step = 1; step <= 4; step++)
+            for (var step = 1; step <= 5; step++)
             {
                 if (ValidateStep(formModel, step).Count > 0)
                 {
@@ -1176,8 +1167,8 @@
 
         if (RequiresBankConfirmationLetter())
         {
-            currentStep = 3;
-            maxStepReached = Math.Max(maxStepReached, 3);
+            currentStep = 4;
+            maxStepReached = Math.Max(maxStepReached, 4);
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
