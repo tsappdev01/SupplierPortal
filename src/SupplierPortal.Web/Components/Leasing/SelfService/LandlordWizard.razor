@@ -896,8 +896,7 @@
                 return "The name as printed on the Emirates ID is required — check the Documents step.";
             if (primary.EmiratesIdExpiry is null)
                 return "The Emirates ID expiry date is required — check the Documents step.";
-            if (primary.EmiratesIdExpiry.Value.Date < DateTime.UtcNow.Date)
-                return "The Emirates ID has expired — please provide a valid (unexpired) Emirates ID.";
+            // An expired Emirates ID only raises an alert (below / inline) — it does not block submission.
         }
         else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.MoaOrPoa
                      or LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))

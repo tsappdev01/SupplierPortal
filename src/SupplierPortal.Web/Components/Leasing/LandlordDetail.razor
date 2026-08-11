@@ -351,7 +351,12 @@ else
             }
             else if (landlord.Status == LandlordStatus.RegistrationComplete)
             {
-                <div class="alert alert-success"><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</div>
+                <div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="ReopenForChangesAsync" disabled="@reopenBusy" title="Resend the link so the landlord can change signatories or information">
+                        @(reopenBusy ? "Reopening…" : "Reopen for changes (resend link)")
+                    </button>
+                </div>
 
                 <div class="card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
@@ -676,6 +681,21 @@ else
         Toast.ShowSuccess("Link copied.");
     }
 
+    private bool reopenBusy;
+    private async Task ReopenForChangesAsync()
+    {
+        reopenBusy = true;
+        try
+        {
+            var (ok, err, raw) = await Loading.RunAsync(() => LandlordService.ReopenForChangesAsync(Id, currentUser, Nav.BaseUri));
+            if (!ok || raw is null) { Toast.ShowError(err ?? "Could not reopen the registration."); return; }
+            inviteUrl = $"{Nav.BaseUri}landlord/{raw}";
+            await LoadAsync();
+            Toast.ShowSuccess("Registration reopened — a fresh link was resent to the landlord.");
+        }
+        finally { reopenBusy = false; }
+    }
+
     private async Task CompleteAsync()
     {
         if (!await Confirm("Complete this landlord registration? The secure link will be deactivated.")) return;
@@ -761,6 +781,7 @@ else
         LandlordService.EventResubmitted => "Resubmitted",
         LandlordService.EventRejected => "Rejected",
         LandlordService.EventRestarted => "Restarted",
+        LandlordService.EventReopened => "Reopened for changes",
         LandlordService.EventCompleted => "Registration completed",
         LandlordService.EventSignatureRequested => "Sent for signature",
         LandlordService.EventSignatureCompleted => "Signature completed",
