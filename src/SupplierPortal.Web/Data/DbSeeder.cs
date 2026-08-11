@@ -20,8 +20,10 @@ public static class DbSeeder
 
     private static async Task SeedLookupsAsync(ApplicationDbContext db)
     {
-        await SeedSimpleCategoryAsync(db, LookupCategory.TaxOrganizationType, SupplierMasterSeedData.TaxOrganizationTypes);
-        await SeedSimpleCategoryAsync(db, LookupCategory.SupplierType, SupplierMasterSeedData.SupplierTypes);
+        // Reconciled (not skip-if-exists) so databases seeded earlier with a different Supplier Type /
+        // Tax Organization Type list are brought into line with the canonical lists below.
+        await ReconcileSimpleCategoryAsync(db, LookupCategory.TaxOrganizationType, SupplierMasterSeedData.TaxOrganizationTypes);
+        await ReconcileSimpleCategoryAsync(db, LookupCategory.SupplierType, SupplierMasterSeedData.SupplierTypes);
         await SeedSimpleCategoryAsync(db, LookupCategory.Province, SupplierMasterSeedData.Provinces);
         await SeedSimpleCategoryAsync(db, LookupCategory.PaymentMethod, SupplierMasterSeedData.PaymentMethods);
         await SeedSimpleCategoryAsync(db, LookupCategory.PaymentTerms, SupplierMasterSeedData.PaymentTerms);
@@ -72,6 +74,59 @@ public static class DbSeeder
             row.DisplayName = newName;
         }
         if (rows.Count > 0)
+        {
+            await db.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Brings a simple (DisplayName == Code) lookup category into line with the supplied canonical list,
+    /// unlike <see cref="SeedSimpleCategoryAsync"/> which only seeds when the category is empty. Missing
+    /// values are inserted (or reactivated); values no longer in the canonical list are deactivated rather
+    /// than deleted so existing Supplier foreign-key references (DeleteBehavior.Restrict) stay intact.
+    /// </summary>
+    private static async Task ReconcileSimpleCategoryAsync(ApplicationDbContext db, LookupCategory category, string[] values)
+    {
+        var existing = await db.LookupValues.Where(l => l.Category == category).ToListAsync();
+        var desired = values.Select(v => v.Trim()).ToArray();
+        var desiredSet = new HashSet<string>(desired, StringComparer.OrdinalIgnoreCase);
+
+        var changed = false;
+
+        // Insert missing values; reactivate any that exist but were previously deactivated.
+        foreach (var value in desired)
+        {
+            var match = existing.FirstOrDefault(e => string.Equals(e.DisplayName, value, StringComparison.OrdinalIgnoreCase));
+            if (match is null)
+            {
+                db.LookupValues.Add(new LookupValue
+                {
+                    Category = category,
+                    Code = value,
+                    DisplayName = value,
+                    IsActive = true
+                });
+                changed = true;
+            }
+            else if (!match.IsActive)
+            {
+                match.IsActive = true;
+                changed = true;
+            }
+        }
+
+        // Deactivate anything not in the canonical list so it disappears from dropdowns without
+        // breaking historical references.
+        foreach (var row in existing)
+        {
+            if (!desiredSet.Contains(row.DisplayName) && row.IsActive)
+            {
+                row.IsActive = false;
+                changed = true;
+            }
+        }
+
+        if (changed)
         {
             await db.SaveChangesAsync();
         }

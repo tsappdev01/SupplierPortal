@@ -283,7 +283,7 @@
                     <InputText @bind-Value="formModel.AddressLine2" />
                 </div>
                 <div class="di-field @FieldClass("CityId")">
-                    <label>City / Emirate@(Req("CityId"))</label>
+                    <label>City / Emirate@(IsUaeCountry ? Req("CityId") : null)</label>
                     @if (IsUaeCountry)
                     {
                         <InputSelect @bind-Value="formModel.CityId">
@@ -1053,6 +1053,17 @@
         {
             foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
             {
+                // City / Emirate is only mandatory when the country is the UAE (the Emirate LOV then
+                // applies). For other countries the free-text city is used and is not forced here.
+                if (setting.FieldKey == "CityId")
+                {
+                    if (IsUaeCountry && IsEmpty(model.CityId))
+                    {
+                        errors.Add($"{setting.DisplayLabel} is required.");
+                    }
+                    continue;
+                }
+
                 var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
                 var value = property?.GetValue(model);
                 if (IsEmpty(value))
