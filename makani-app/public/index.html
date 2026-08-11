@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Makani Locator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1>Makani Locator</h1>
+      <p>Enter a plot number to find its Makani number, GPS coordinates and a Google Maps link.</p>
+    </header>
+
+    <form id="lookup-form" class="lookup" autocomplete="off">
+      <label class="lookup__label" for="plot">Plot number</label>
+      <div class="lookup__row">
+        <input
+          id="plot"
+          name="plot"
+          class="lookup__input"
+          type="text"
+          placeholder="e.g. 345-1234"
+          list="plot-suggestions"
+          required
+        />
+        <button id="lookup-btn" class="lookup__btn" type="submit">Locate</button>
+      </div>
+      <datalist id="plot-suggestions"></datalist>
+      <p class="lookup__hint" id="sample-hint"></p>
+    </form>
+
+    <section id="status" class="status" role="status" aria-live="polite"></section>
+
+    <section id="result" class="result" hidden>
+      <div class="result__grid">
+        <div class="result__field">
+          <span class="result__key">Makani number</span>
+          <span class="result__value" id="r-makani"></span>
+        </div>
+        <div class="result__field">
+          <span class="result__key">Plot number</span>
+          <span class="result__value" id="r-plot"></span>
+        </div>
+        <div class="result__field">
+          <span class="result__key">Latitude</span>
+          <span class="result__value" id="r-lat"></span>
+        </div>
+        <div class="result__field">
+          <span class="result__key">Longitude</span>
+          <span class="result__value" id="r-lng"></span>
+        </div>
+        <div class="result__field">
+          <span class="result__key">Community</span>
+          <span class="result__value" id="r-community"></span>
+        </div>
+        <div class="result__field">
+          <span class="result__key">Area</span>
+          <span class="result__value" id="r-area"></span>
+        </div>
+      </div>
+
+      <div class="result__actions">
+        <a id="r-gmap" class="btn btn--primary" href="#" target="_blank" rel="noopener">
+          View on Google Maps
+        </a>
+        <a id="r-makani-link" class="btn btn--ghost" href="#" target="_blank" rel="noopener">
+          Open in Makani
+        </a>
+      </div>
+
+      <div class="result__map">
+        <iframe id="r-map-frame" title="Location map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+    </section>
+
+    <footer class="app__footer">
+      <p>Data source is the local plot register. Wire the official Makani API in <code>src/makaniService.js</code> for live coverage.</p>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

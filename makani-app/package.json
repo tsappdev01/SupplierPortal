@@ -1,0 +1,25 @@
+{
+  "name": "makani-locator",
+  "version": "1.0.0",
+  "description": "Look up a plot number to get its Makani number, GPS coordinates, and a Google Maps link (Dubai addressing system).",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "makani",
+    "dubai",
+    "geocoding",
+    "plot",
+    "address",
+    "coordinates"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

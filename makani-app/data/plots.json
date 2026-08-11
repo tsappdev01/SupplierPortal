@@ -1,0 +1,69 @@
+{
+  "_comment": "Sample plot -> Makani mapping. Coordinates are real Dubai locations so the generated Google Maps links resolve correctly. Replace or extend this file with your authoritative plot register, or wire the official Makani API in src/makaniService.js (see fetchFromMakaniApi).",
+  "plots": [
+    {
+      "plotNo": "345-1234",
+      "makani": "2645875390",
+      "latitude": 25.197197,
+      "longitude": 55.274376,
+      "community": "Burj Khalifa",
+      "area": "Downtown Dubai"
+    },
+    {
+      "plotNo": "345-0001",
+      "makani": "2657186572",
+      "latitude": 25.197212,
+      "longitude": 55.279664,
+      "community": "The Dubai Mall",
+      "area": "Downtown Dubai"
+    },
+    {
+      "plotNo": "120-5567",
+      "makani": "3062292625",
+      "latitude": 25.235294,
+      "longitude": 55.300442,
+      "community": "Dubai Frame",
+      "area": "Zabeel"
+    },
+    {
+      "plotNo": "392-0450",
+      "makani": "1954586695",
+      "latitude": 25.141930,
+      "longitude": 55.185890,
+      "community": "Mall of the Emirates",
+      "area": "Al Barsha 1"
+    },
+    {
+      "plotNo": "610-2231",
+      "makani": "2029587695",
+      "latitude": 25.141304,
+      "longitude": 55.190910,
+      "community": "Dubai Internet City",
+      "area": "Al Sufouh"
+    },
+    {
+      "plotNo": "781-0099",
+      "makani": "1587890940",
+      "latitude": 25.276987,
+      "longitude": 55.296249,
+      "community": "Deira Clocktower",
+      "area": "Deira"
+    },
+    {
+      "plotNo": "222-3410",
+      "makani": "3417478764",
+      "latitude": 25.094466,
+      "longitude": 55.153599,
+      "community": "Palm Jumeirah - Atlantis",
+      "area": "Palm Jumeirah"
+    },
+    {
+      "plotNo": "555-8080",
+      "makani": "2703287696",
+      "latitude": 25.078134,
+      "longitude": 55.138729,
+      "community": "Dubai Marina Walk",
+      "area": "Dubai Marina"
+    }
+  ]
+}
