@@ -31,6 +31,7 @@ public class LandlordService(
     public const string EventResubmitted = "RegistrationResubmitted";
     public const string EventRejected = "RegistrationRejected";
     public const string EventRestarted = "RegistrationRestarted";
+    public const string EventReopened = "RegistrationReopened";
     public const string EventCompleted = "RegistrationCompleted";
     public const string EventLinkDeactivated = "LinkDeactivated";
     public const string EventSignatureRequested = "SignatureRequested";
@@ -484,6 +485,54 @@ public class LandlordService(
         await AddEventAsync(db, old.Id, EventRestarted, $"Restarted as registration #{fresh.Id}", actor, ActorBusinessCentre, LandlordStatus.Rejected, LandlordStatus.Rejected);
         await AddEventAsync(db, fresh.Id, EventCreated, $"Restarted from rejected registration #{old.Id}", actor, ActorBusinessCentre, null, LandlordStatus.Draft);
         return (true, null, fresh.Id);
+    }
+
+    /// <summary>Reopen a COMPLETED registration so the landlord can change the signatories or their information:
+    /// re-activates the secure link, issues a fresh token, moves the registration back to CorrectionRequired
+    /// (so the landlord edits and resubmits, which then goes through review → complete → signature again), and
+    /// emails the link. The prior signature workflow is cleared so a fresh signing cycle runs on re-approval.</summary>
+    public async Task<(bool Success, string? Error, string? RawToken)> ReopenForChangesAsync(int landlordId, string actor, string? baseUrl = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return (false, "Registration not found.", null);
+        if (l.Status != LandlordStatus.RegistrationComplete)
+            return (false, "Only a completed registration can be reopened for changes.", null);
+        if (string.IsNullOrWhiteSpace(l.Email))
+            return (false, "This registration has no invitation email.", null);
+
+        var raw = GenerateRawToken();
+        db.LandlordAccessTokens.Add(new LandlordAccessToken
+        {
+            LandlordId = landlordId, TokenHash = Hash(raw),
+            CreatedAt = DateTime.UtcNow, ExpiresAt = DateTime.UtcNow.Add(LinkValidity), CreatedBy = actor
+        });
+
+        var old = l.Status;
+        l.Status = LandlordStatus.CorrectionRequired;
+        l.LinkActive = true;
+        // Clear the prior signing cycle — the document may change, so it must be re-sent on re-approval.
+        l.SignatureStatus = null;
+        l.SignatureSentTo = null;
+        l.SignatureSentAt = null;
+        l.SignatureSignedAt = null;
+        l.CircularoDocumentId = null;
+        l.CircularoSigningUrl = null;
+        l.UpdatedBy = actor;
+        l.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        await AddEventAsync(db, landlordId, EventReopened,
+            "Reopened for changes to signatories / landlord information; a fresh link was resent to the landlord.",
+            actor, ActorBusinessCentre, old, l.Status);
+
+        if (baseUrl is not null)
+            await email.SendCorrectionAsync(l.Email, l.PropertyCode,
+                "Your registration has been reopened so you can update the signatories or landlord information. " +
+                "Please review, make the changes and resubmit.",
+                $"{baseUrl}landlord/{raw}", actor, l.BusinessUnitId);
+
+        return (true, null, raw);
     }
 
     /// <summary>Complete / approve (FRD §24): status → RegistrationComplete, link deactivated, and completion
