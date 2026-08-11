@@ -560,8 +560,7 @@
             <div class="di-section-body">
                 <div class="di-field @FieldClass("SupplierSite")">
                     <label>Supplier Site@(Req("SupplierSite"))</label>
-                    <InputText @bind-Value="SupplierSiteDisplay" />
-                    <div class="di-hint">Defaults to the Address Name — you can overwrite it.</div>
+                    <InputText @bind-Value="formModel.SupplierSite" />
                 </div>
                 <div class="di-field @FieldClass("ProcurementBuId")">
                     <label>Procurement BU@(Req("ProcurementBuId"))</label>
@@ -764,11 +763,14 @@
     /// it is a free-text city input. A not-yet-chosen country defaults to UAE (the form's default).</summary>
     private bool IsUaeCountry => formModel.CountryId is null || formModel.CountryId == UaeCountryId;
 
-    /// <summary>Supplier Site shows the Address Name by default (when blank) but is freely editable.</summary>
-    private string SupplierSiteDisplay
+    /// <summary>Pre-fills the (freely editable) Supplier Site with a copy of the Address Name when it is
+    /// still blank, so the user lands on a concrete value they can keep or overwrite.</summary>
+    private void PrimeSupplierSite()
     {
-        get => string.IsNullOrWhiteSpace(formModel.SupplierSite) ? (formModel.AddressName ?? "") : formModel.SupplierSite!;
-        set => formModel.SupplierSite = value;
+        if (string.IsNullOrWhiteSpace(formModel.SupplierSite) && !string.IsNullOrWhiteSpace(formModel.AddressName))
+        {
+            formModel.SupplierSite = formModel.AddressName;
+        }
     }
 
     // bool? -> bool proxy so the VAT Registered checkbox binds cleanly (unset is treated as No).
@@ -1024,6 +1026,10 @@
         if (step <= maxStepReached)
         {
             currentStep = step;
+            if (currentStep == 5)
+            {
+                PrimeSupplierSite();
+            }
         }
     }
 
@@ -1152,6 +1158,10 @@
                 documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
             }
             currentStep++;
+            if (currentStep == 5)
+            {
+                PrimeSupplierSite();
+            }
             maxStepReached = Math.Max(maxStepReached, currentStep);
         }
         catch (Exception ex)
