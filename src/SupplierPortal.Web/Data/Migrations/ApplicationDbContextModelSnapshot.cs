@@ -1112,6 +1112,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("SupplierSite")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<int?>("SupplierSiteBuId")
                         .HasColumnType("int");
 

@@ -160,7 +160,12 @@ public class Supplier
 
     // -- Business Unit & Site Assignment --
 
-    /// <summary>Selected from the same Business Unit list as Procurement/Client/Bill-to BU.</summary>
+    /// <summary>Free-text supplier site name; defaults to the Address Name but the user may overwrite it.</summary>
+    [MaxLength(200)]
+    public string? SupplierSite { get; set; }
+
+    /// <summary>Legacy Business-Unit reference for the supplier site (superseded by the free-text
+    /// <see cref="SupplierSite"/>; retained so historical data is preserved).</summary>
     public int? SupplierSiteBuId { get; set; }
     public BusinessUnit? SupplierSiteBu { get; set; }
 

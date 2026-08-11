@@ -532,15 +532,10 @@
         <div class="di-section" style="display:@(currentStep == 5 ? "block" : "none")">
             <div class="di-section-header">Site / Business Unit</div>
             <div class="di-section-body">
-                <div class="di-field @FieldClass("SupplierSiteBuId")">
-                    <label>Supplier Site@(Req("SupplierSiteBuId"))</label>
-                    <InputSelect @bind-Value="formModel.SupplierSiteBuId">
-                        <option value="">— Select —</option>
-                        @foreach (var bu in businessUnits)
-                        {
-                            <option value="@bu.Id">@bu.Name</option>
-                        }
-                    </InputSelect>
+                <div class="di-field @FieldClass("SupplierSite")">
+                    <label>Supplier Site@(Req("SupplierSite"))</label>
+                    <InputText @bind-Value="SupplierSiteDisplay" />
+                    <div class="di-hint">Defaults to the Address Name — you can overwrite it.</div>
                 </div>
                 <div class="di-field @FieldClass("ProcurementBuId")">
                     <label>Procurement BU@(Req("ProcurementBuId"))</label>
@@ -742,6 +737,13 @@
     /// <summary>True when the selected country is the UAE — the City field is then the Emirate LOV; otherwise
     /// it is a free-text city input. A not-yet-chosen country defaults to UAE (the form's default).</summary>
     private bool IsUaeCountry => formModel.CountryId is null || formModel.CountryId == UaeCountryId;
+
+    /// <summary>Supplier Site shows the Address Name by default (when blank) but is freely editable.</summary>
+    private string SupplierSiteDisplay
+    {
+        get => string.IsNullOrWhiteSpace(formModel.SupplierSite) ? (formModel.AddressName ?? "") : formModel.SupplierSite!;
+        set => formModel.SupplierSite = value;
+    }
 
     // bool? -> bool proxy so the VAT Registered checkbox binds cleanly (unset is treated as No).
     private bool vatRegisteredBool

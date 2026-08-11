@@ -120,6 +120,7 @@ public class SupplierFormModel
     public bool IsPay { get; set; }
     public string? Phone { get; set; }
     public int? SupplierSiteBuId { get; set; }
+    public string? SupplierSite { get; set; }
     public bool IsSourcingOnly { get; set; }
     public bool IsPurchasing { get; set; }
     public bool IsPrimaryPay { get; set; }
@@ -210,6 +211,7 @@ public class SupplierFormModel
         IsPay = s.IsPay,
         Phone = s.Phone,
         SupplierSiteBuId = s.SupplierSiteBuId,
+        SupplierSite = s.SupplierSite,
         IsSourcingOnly = s.IsSourcingOnly,
         IsPurchasing = s.IsPurchasing,
         IsPrimaryPay = s.IsPrimaryPay,
@@ -295,6 +297,8 @@ public class SupplierFormModel
         s.IsPay = IsPay;
         s.Phone = Phone;
         s.SupplierSiteBuId = SupplierSiteBuId;
+        // Supplier Site defaults to the Address Name when the user leaves it blank.
+        s.SupplierSite = string.IsNullOrWhiteSpace(SupplierSite) ? AddressName : SupplierSite;
         s.IsSourcingOnly = IsSourcingOnly;
         s.IsPurchasing = IsPurchasing;
         s.IsPrimaryPay = IsPrimaryPay;

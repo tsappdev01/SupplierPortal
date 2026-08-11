@@ -77,7 +77,7 @@ public static class SupplierFieldSettingSeedData
         ("IntermediaryBicSwiftCode", "Intermediary BIC/Swift Code", 4, false),
 
         // Step 5: Site / Business Unit
-        ("SupplierSiteBuId", "Supplier Site", 5, false),
+        ("SupplierSite", "Supplier Site", 5, false),
         ("ProcurementBuId", "Procurement BU", 5, false),
         ("ClientBuId", "Client BU", 5, false),
         ("BillToBuId", "Bill-to BU", 5, false),
