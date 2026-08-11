@@ -190,6 +190,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.MobileCountryCode)
+            .WithMany()
+            .HasForeignKey(s => s.MobileCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
             .HasOne(s => s.CommunicationMethod)
             .WithMany()
             .HasForeignKey(s => s.CommunicationMethodId)

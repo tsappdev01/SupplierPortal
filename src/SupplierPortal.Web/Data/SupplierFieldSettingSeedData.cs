@@ -44,6 +44,9 @@ public static class SupplierFieldSettingSeedData
         ("State", "State", 2, false),
         ("ProvinceId", "Province", 2, true),
         ("CorporateWebSite", "Corporate Web Site", 2, false),
+        ("AddressPurposeOrdering", "Address Purpose — Ordering", 2, false),
+        ("AddressPurposeRemitTo", "Address Purpose — Remit to", 2, false),
+        ("AddressPurposeRfqBidding", "Address Purpose — RFQ or Bidding", 2, false),
 
         // Step 3: Contact Information
         ("PrefixId", "Prefix", 3, false),
@@ -55,6 +58,9 @@ public static class SupplierFieldSettingSeedData
         ("PhoneCountryCodeId", "Phone Country Code", 3, false),
         ("PhoneAreaCode", "Phone Area Code", 3, false),
         ("Phone", "Phone", 3, false),
+        ("MobileCountryCodeId", "Mobile Country Code", 3, false),
+        ("MobileAreaCode", "Mobile Area Code", 3, false),
+        ("Mobile", "Mobile", 3, false),
 
         // Step 4: Payment / Banking Information
         ("BankId", "Bank Name", 4, true),

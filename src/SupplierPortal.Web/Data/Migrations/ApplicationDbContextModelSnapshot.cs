@@ -894,6 +894,15 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<bool>("AddressPurposeOrdering")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AddressPurposeRemitTo")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("AddressPurposeRfqBidding")
+                        .HasColumnType("bit");
+
                     b.Property<string>("AdministrativeContact")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1049,6 +1058,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("MiddleName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("MobileAreaCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("MobileCountryCodeId")
+                        .HasColumnType("int");
 
                     b.Property<int?>("NumberOfVatGroupEntities")
                         .HasColumnType("int");
@@ -1208,6 +1228,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("EInvoicingWaveId");
 
                     b.HasIndex("IntermediaryCountryId");
+
+                    b.HasIndex("MobileCountryCodeId");
 
                     b.HasIndex("PaymentMethodId");
 
@@ -1722,6 +1744,11 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("IntermediaryCountryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "MobileCountryCode")
+                        .WithMany()
+                        .HasForeignKey("MobileCountryCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "PaymentMethod")
                         .WithMany()
                         .HasForeignKey("PaymentMethodId")
@@ -1825,6 +1852,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("EInvoicingWave");
 
                     b.Navigation("IntermediaryCountry");
+
+                    b.Navigation("MobileCountryCode");
 
                     b.Navigation("PaymentMethod");
 

@@ -126,6 +126,11 @@ public class Supplier
     [MaxLength(20)]
     public string? PostalCode { get; set; }
 
+    // Address purpose (what this address is used for).
+    public bool AddressPurposeOrdering { get; set; }
+    public bool AddressPurposeRemitTo { get; set; }
+    public bool AddressPurposeRfqBidding { get; set; }
+
     [MaxLength(256)]
     public string? RemittanceEmail { get; set; }
 
@@ -157,6 +162,16 @@ public class Supplier
 
     [MaxLength(50)]
     public string? Phone { get; set; }
+
+    // Mobile (contact) — country dialing code + area code + number.
+    public int? MobileCountryCodeId { get; set; }
+    public LookupValue? MobileCountryCode { get; set; }
+
+    [MaxLength(10)]
+    public string? MobileAreaCode { get; set; }
+
+    [MaxLength(50)]
+    public string? Mobile { get; set; }
 
     // -- Business Unit & Site Assignment --
 

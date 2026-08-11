@@ -331,6 +331,14 @@
                     <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
                     <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
                 </div>
+                <div class="di-field di-full">
+                    <label>Address Purpose</label>
+                    <div class="di-checkbox-row">
+                        <div class="di-checkbox-item @FieldClass("AddressPurposeOrdering")"><InputCheckbox @bind-Value="formModel.AddressPurposeOrdering" id="apOrdering" /><label for="apOrdering" style="margin:0;">Ordering</label></div>
+                        <div class="di-checkbox-item @FieldClass("AddressPurposeRemitTo")"><InputCheckbox @bind-Value="formModel.AddressPurposeRemitTo" id="apRemit" /><label for="apRemit" style="margin:0;">Remit to</label></div>
+                        <div class="di-checkbox-item @FieldClass("AddressPurposeRfqBidding")"><InputCheckbox @bind-Value="formModel.AddressPurposeRfqBidding" id="apRfq" /><label for="apRfq" style="margin:0;">RFQ or Bidding</label></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -385,6 +393,24 @@
                 <div class="di-field @FieldClass("Phone")">
                     <label>Phone@(Req("Phone"))</label>
                     <InputText @bind-Value="formModel.Phone" />
+                </div>
+                <div class="di-field @FieldClass("MobileCountryCodeId")">
+                    <label>Mobile Country Code@(Req("MobileCountryCodeId"))</label>
+                    <InputSelect @bind-Value="formModel.MobileCountryCodeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in countriesWithPhoneCode)
+                        {
+                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("MobileAreaCode")">
+                    <label>Mobile Area Code@(Req("MobileAreaCode"))</label>
+                    <InputText @bind-Value="formModel.MobileAreaCode" />
+                </div>
+                <div class="di-field @FieldClass("Mobile")">
+                    <label>Mobile@(Req("Mobile"))</label>
+                    <InputText @bind-Value="formModel.Mobile" />
                 </div>
             </div>
         </div>

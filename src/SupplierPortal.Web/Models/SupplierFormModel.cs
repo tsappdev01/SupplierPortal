@@ -70,6 +70,9 @@ public class SupplierFormModel
     [Required(ErrorMessage = "City is required.")]
     public int? CityId { get; set; }
     public string? CityText { get; set; }
+    public bool AddressPurposeOrdering { get; set; }
+    public bool AddressPurposeRemitTo { get; set; }
+    public bool AddressPurposeRfqBidding { get; set; }
 
     public int? CountryId { get; set; } = null;
     public string? PostalCode { get; set; }
@@ -77,6 +80,9 @@ public class SupplierFormModel
     public string? AdministrativeContact { get; set; }
     public int? PhoneCountryCodeId { get; set; }
     public string? PhoneAreaCode { get; set; }
+    public int? MobileCountryCodeId { get; set; }
+    public string? MobileAreaCode { get; set; }
+    public string? Mobile { get; set; }
     public string? State { get; set; }
 
     [Required(ErrorMessage = "Province is required.")]
@@ -175,12 +181,18 @@ public class SupplierFormModel
         AddressLine2 = s.AddressLine2,
         CityId = s.CityId,
         CityText = s.CityText,
+        AddressPurposeOrdering = s.AddressPurposeOrdering,
+        AddressPurposeRemitTo = s.AddressPurposeRemitTo,
+        AddressPurposeRfqBidding = s.AddressPurposeRfqBidding,
         CountryId = s.CountryId,
         PostalCode = s.PostalCode,
         AddressName = s.AddressName,
         AdministrativeContact = s.AdministrativeContact,
         PhoneCountryCodeId = s.PhoneCountryCodeId,
         PhoneAreaCode = s.PhoneAreaCode,
+        MobileCountryCodeId = s.MobileCountryCodeId,
+        MobileAreaCode = s.MobileAreaCode,
+        Mobile = s.Mobile,
         State = s.State,
         ProvinceId = s.ProvinceId,
 
@@ -261,12 +273,18 @@ public class SupplierFormModel
         s.AddressLine2 = AddressLine2;
         s.CityId = CityId;
         s.CityText = CityText;
+        s.AddressPurposeOrdering = AddressPurposeOrdering;
+        s.AddressPurposeRemitTo = AddressPurposeRemitTo;
+        s.AddressPurposeRfqBidding = AddressPurposeRfqBidding;
         s.CountryId = CountryId;
         s.PostalCode = PostalCode;
         s.AddressName = AddressName;
         s.AdministrativeContact = string.IsNullOrWhiteSpace(AdministrativeContact) ? FirstName : AdministrativeContact;
         s.PhoneCountryCodeId = PhoneCountryCodeId;
         s.PhoneAreaCode = PhoneAreaCode;
+        s.MobileCountryCodeId = MobileCountryCodeId;
+        s.MobileAreaCode = MobileAreaCode;
+        s.Mobile = Mobile;
         s.State = State;
         s.ProvinceId = ProvinceId;
 
