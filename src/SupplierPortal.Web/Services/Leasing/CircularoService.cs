@@ -7,6 +7,9 @@ namespace SupplierPortal.Web.Services.Leasing;
 /// <summary>Result of routing a document to Circularo for signature.</summary>
 public record CircularoResult(bool Success, string? DocumentId, string? SigningUrl, string? Error);
 
+/// <summary>A person a document is shared with for signature.</summary>
+public record CircularoSigner(string Name, string Email);
+
 /// <summary>Current signing state of a Circularo document, resolved by polling (used when the completion
 /// webhook can't reach the server). <paramref name="Reachable"/> is false when Circularo couldn't be
 /// contacted, so the caller can tell "not signed yet" apart from "couldn't check".</summary>
@@ -21,6 +24,12 @@ public interface ICircularoService
     /// Circularo emails the signer the request. Best-effort — errors are returned, never thrown.</summary>
     Task<CircularoResult> SendForSignatureAsync(
         byte[] pdf, string fileName, string signerName, string signerEmail, CancellationToken ct = default);
+
+    /// <summary>Uploads <paramref name="pdf"/> and sends it to every signer for signature. Each signer gets
+    /// their own signature field. <paramref name="allMustSign"/> = true routes them sequentially (all sign);
+    /// false shares in parallel (any one). Best-effort — errors are returned, never thrown.</summary>
+    Task<CircularoResult> SendForSignatureAsync(
+        byte[] pdf, string fileName, IReadOnlyList<CircularoSigner> signers, bool allMustSign, CancellationToken ct = default);
 
     /// <summary>Attempts to download the signed copy of a document. Returns null when unavailable.</summary>
     Task<byte[]?> DownloadSignedAsync(string documentId, CancellationToken ct = default);
@@ -71,11 +80,18 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
         return content;
     }
 
-    public async Task<CircularoResult> SendForSignatureAsync(
+    public Task<CircularoResult> SendForSignatureAsync(
         byte[] pdf, string fileName, string signerName, string signerEmail, CancellationToken ct = default)
+        => SendForSignatureAsync(pdf, fileName, new[] { new CircularoSigner(signerName, signerEmail) }, true, ct);
+
+    public async Task<CircularoResult> SendForSignatureAsync(
+        byte[] pdf, string fileName, IReadOnlyList<CircularoSigner> signers, bool allMustSign, CancellationToken ct = default)
     {
         if (!Enabled) return new(false, null, null, "Circularo is not configured.");
-        if (string.IsNullOrWhiteSpace(signerEmail)) return new(false, null, null, "No signer email.");
+        var recipients = signers.Where(s => !string.IsNullOrWhiteSpace(s.Email))
+            .GroupBy(s => s.Email.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First()).ToList();
+        if (recipients.Count == 0) return new(false, null, null, "No signer email.");
 
         try
         {
@@ -89,13 +105,13 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
             if (string.IsNullOrWhiteSpace(documentId))
                 return new(false, null, null, $"Create document failed. {createErr}");
 
-            // 3) Share the document with the signer for signature (Circularo emails them).
+            // 3) Share the document with every signer for signature (Circularo emails each of them).
             var page = _o.SignaturePage > 0 ? _o.SignaturePage : Math.Max(1, LocalPdfText.PageCount(pdf));
-            var shareErr = await ShareAsync(documentId!, signerName, signerEmail, page, ct);
+            var shareErr = await ShareAsync(documentId!, recipients, page, allMustSign, ct);
             if (shareErr is not null)
                 return new(false, documentId, null, $"Send for signature failed. {shareErr}");
 
-            logger.LogInformation("Circularo: document {DocId} sent to {Email} for signature.", documentId, signerEmail);
+            logger.LogInformation("Circularo: document {DocId} sent to {Count} signer(s) for signature.", documentId, recipients.Count);
             return new(true, documentId, null, null);
         }
         catch (Exception ex)
@@ -166,45 +182,46 @@ public class CircularoService(HttpClient http, IOptions<CircularoOptions> option
     }
 
     // ── 3. Share ─────────────────────────────────────────────────────────────
-    private async Task<string?> ShareAsync(string documentId, string signerName, string signerEmail, int page, CancellationToken ct)
+    private async Task<string?> ShareAsync(string documentId, IReadOnlyList<CircularoSigner> signers, int page, bool allMustSign, CancellationToken ct)
     {
+        // Each signer gets their own signature field. Stack the boxes upward from the printed "Sign here"
+        // box so multiple signatories don't fully overlap.
+        var gap = 0.012;
+        var data = signers.Select((s, i) => new
+        {
+            sharePurpose = "sign",
+            shareTo = s.Email,
+            mail = s.Email,
+            message = _o.RequestMessage,
+            order = i,
+            sendAttachmentsOnComplete = _o.SendAttachmentsOnComplete
+        }).ToArray();
+
+        var signatureFields = signers.Select((s, i) => new
+        {
+            user = new[] { s.Email },
+            type = _o.SignatureType,
+            required = true,
+            pages = new[] { page },
+            position = new
+            {
+                percentX = _o.SignPercentX,
+                percentY = Math.Max(0.03, _o.SignPercentY - i * (_o.SignPercentHeight + gap)),
+                percentWidth = _o.SignPercentWidth,
+                percentHeight = _o.SignPercentHeight
+            },
+            order = i
+        }).ToArray();
+
         var payload = new
         {
             objectType = "document",
             type = _o.DocumentType,
             id = documentId,
-            sequential = _o.Sequential,
+            sequential = allMustSign && _o.Sequential,
             message = _o.RequestMessage,
-            data = new[]
-            {
-                new
-                {
-                    sharePurpose = "sign",
-                    shareTo = signerEmail,
-                    mail = signerEmail,
-                    message = _o.RequestMessage,
-                    order = 0,
-                    sendAttachmentsOnComplete = _o.SendAttachmentsOnComplete
-                }
-            },
-            signatureFields = new[]
-            {
-                new
-                {
-                    user = new[] { signerEmail },
-                    type = _o.SignatureType,
-                    required = true,
-                    pages = new[] { page },
-                    position = new
-                    {
-                        percentX = _o.SignPercentX,
-                        percentY = _o.SignPercentY,
-                        percentWidth = _o.SignPercentWidth,
-                        percentHeight = _o.SignPercentHeight
-                    },
-                    order = 0
-                }
-            }
+            data,
+            signatureFields
         };
 
         using var resp = await http.PostAsync(Url("share"), JsonBody(payload), ct);

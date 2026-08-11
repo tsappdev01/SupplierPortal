@@ -114,7 +114,7 @@ public class LandlordSummaryPdfService
                         });
 
                     // ----- Authorised signatories -----
-                    Section(col, $"Authorised Signatories ({signatories.Count})  ·  {(l.SigningRule == SigningRule.All ? "All must sign" : "Any one may sign")}");
+                    Section(col, $"Authorised Signatories ({signatories.Count})  ·  {(l.SigningRule == SigningRule.All ? "All Authorized Signatories" : "Any One Authorized Signatory")}");
                     if (signatories.Count == 0)
                         col.Item().Text("None provided.").Italic().FontColor(Colors.Grey.Darken1);
                     else

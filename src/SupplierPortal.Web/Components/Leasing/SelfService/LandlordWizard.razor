@@ -57,7 +57,7 @@
                     </div>
                     <div class="done-step">
                         <span class="done-step-ico">3</span>
-                        <div class="done-step-txt"><b>Signature</b><span>On approval, the primary contact receives the document to sign.</span></div>
+                        <div class="done-step-txt"><b>Signature</b><span>On approval, all authorised signatories receive the document to sign.</span></div>
                     </div>
                 </div>
 
@@ -88,6 +88,10 @@
                     <p>@StepSubtitle</p>
                 </div>
                 <div class="card-bd">
+                    <div class="panel alert-restricted mb-3">
+                        <strong>Alert!</strong> Access to this service is restricted to authorised users whose contact
+                        details are registered and linked to their UAE&nbsp;Pass account.
+                    </div>
                     @if (correction is not null)
                     {
                         <div class="panel bad mb-3">
@@ -119,12 +123,18 @@
                         </div>
 
                         <div class="field">
-                            <label class="lbl">Property code <span class="req">*</span></label>
-                            <div class="code">
-                                <span class="k">Property code</span>
-                                <span class="v">@FormatCode(landlord.PropertyCode)</span>
+                            <label class="lbl">Property details</label>
+                            <div class="prop-details">
+                                <div class="r"><span class="k">Property code</span><span class="v mono">@FormatCode(landlord.PropertyCode)</span></div>
+                                <div class="r"><span class="k">Company</span><span class="v">@(string.IsNullOrWhiteSpace(landlord.CompanyName) ? "—" : landlord.CompanyName)</span></div>
+                                <div class="r"><span class="k">Building</span><span class="v">@(string.IsNullOrWhiteSpace(landlord.Building) ? "—" : landlord.Building)</span></div>
+                                <div class="r"><span class="k">Agreement type</span><span class="v">@landlord.Type</span></div>
+                                @if (!string.IsNullOrWhiteSpace(landlord.LandLordCode))
+                                {
+                                    <div class="r"><span class="k">Landlord code</span><span class="v mono">@landlord.LandLordCode</span></div>
+                                }
                             </div>
-                            <div class="hint">@(landlord.CompanyName ?? "—") @(string.IsNullOrWhiteSpace(landlord.Building) ? "" : "· " + landlord.Building) · issued by Dubai Municipality (read-only).</div>
+                            <div class="hint">Set by Business Centre · issued by Dubai Municipality (read-only).</div>
                         </div>
 
                         @ContactFields(primary, isPrimary: true)
@@ -178,15 +188,21 @@
                             <div class="choices">
                                 <label class="choice @(signingRule == SigningRule.All ? "sel" : "")">
                                     <input type="radio" name="sr" checked="@(signingRule == SigningRule.All)" @onchange="@(() => signingRule = SigningRule.All)" />
-                                    <span><b>All must sign</b><span>Every signatory signs</span></span>
+                                    <span><b>All Authorized Signatories</b><span>Every authorised signatory must sign</span></span>
                                 </label>
                                 <label class="choice @(signingRule == SigningRule.Any ? "sel" : "")">
                                     <input type="radio" name="sr" checked="@(signingRule == SigningRule.Any)" @onchange="@(() => signingRule = SigningRule.Any)" />
-                                    <span><b>Any one may sign</b><span>A single signatory suffices</span></span>
+                                    <span><b>Any One Authorized Signatory</b><span>A single authorised signatory suffices</span></span>
                                 </label>
                             </div>
                         </div>
                         <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed. Add any further signatories below.</div>
+
+                        <div class="field">
+                            <label class="lbl">Authorisation document (MOA / POA)</label>
+                            @UploadField(LandlordDocumentType.MoaOrPoa, "MOA / POA", required: false)
+                            <div class="hint">Optional — upload the MOA or POA that authorises these signatories to sign on the landlord's behalf.</div>
+                        </div>
 
                         var lockedSecondaries = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
 
@@ -308,7 +324,7 @@
                         <div class="rev">
                             <h3>Authorised signatories<button class="link" @onclick="() => step = 3">Edit</button></h3>
                             <dl>
-                                <div class="r"><dt>Signing rule</dt><dd>@(signingRule == SigningRule.All ? "All must sign" : "Any one may sign")</dd></div>
+                                <div class="r"><dt>Signing rule</dt><dd>@(signingRule == SigningRule.All ? "All Authorized Signatories" : "Any One Authorized Signatory")</dd></div>
                                 <div class="r"><dt>#1 (Primary)</dt><dd>@primary.FullName — @primary.Email</dd></div>
                                 @foreach (var (c, i) in namedSecondaries.Select((c, i) => (c, i)))
                                 {
@@ -429,6 +445,14 @@
 
     .di-llw .panel{border:1px solid var(--line-strong);border-radius:var(--r);padding:16px 18px;background:var(--sand)}
     .di-llw .panel.bad{border-color:var(--danger);background:var(--danger-bg)}
+    .di-llw .panel.alert-restricted{border-color:#C79A2E;background:#FBF6E9;color:#6B5410;font-size:13.5px;line-height:1.5}
+    .di-llw .panel.alert-restricted strong{color:#8A6D14}
+    .di-llw .prop-details{border:1px solid var(--line);border-radius:var(--r);background:var(--sand);padding:6px 14px}
+    .di-llw .prop-details .r{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid var(--line)}
+    .di-llw .prop-details .r:last-child{border-bottom:0}
+    .di-llw .prop-details .k{color:var(--ink-soft);font-size:13px}
+    .di-llw .prop-details .v{color:var(--ink);font-weight:600;font-size:13.5px;text-align:right}
+    .di-llw .prop-details .v.mono{font-family:Consolas,monospace}
     .di-llw .panel h3{margin:0 0 6px;font-size:15px;color:var(--navy);font-weight:600}
     .di-llw .panel p{margin:0;font-size:13.5px;color:var(--ink-soft)}
     .di-llw .check{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.6}
@@ -656,6 +680,10 @@
                 <div class="field" style="margin-bottom:0"><label class="lbl">Expiry date @MarkReq()</label><input type="date" @bind="primary.EmiratesIdExpiry" /></div>
             </div>
             <div class="hint">Read automatically from the uploaded card — please check and correct if needed.</div>
+            @if (primary.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
+            {
+                <p style="color:var(--danger);margin:8px 0 0;font-size:13px">This Emirates ID has expired (@exp.ToString("dd MMM yyyy")). A valid, unexpired Emirates ID is required to submit.</p>
+            }
         </div>
     };
 
@@ -868,6 +896,8 @@
                 return "The name as printed on the Emirates ID is required — check the Documents step.";
             if (primary.EmiratesIdExpiry is null)
                 return "The Emirates ID expiry date is required — check the Documents step.";
+            if (primary.EmiratesIdExpiry.Value.Date < DateTime.UtcNow.Date)
+                return "The Emirates ID has expired — please provide a valid (unexpired) Emirates ID.";
         }
         else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.MoaOrPoa
                      or LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))

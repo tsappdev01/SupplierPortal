@@ -225,8 +225,8 @@ else
                         <div class="mb-2">
                             <label class="form-label mb-1">Signing rule</label>
                             <select class="form-select form-select-sm" style="max-width:280px" @bind="editSigningRule">
-                                <option value="@SigningRule.All">All must sign</option>
-                                <option value="@SigningRule.Any">Any one may sign</option>
+                                <option value="@SigningRule.All">All Authorized Signatories</option>
+                                <option value="@SigningRule.Any">Any One Authorized Signatory</option>
                             </select>
                         </div>
                         <table class="table table-sm align-middle">
@@ -383,7 +383,7 @@ else
                         {
                             @if (landlord.SignatureStatus is null)
                             {
-                                <p class="text-muted mb-2">The registration summary has not been sent for signature yet. Send it to the primary contact (<strong>@(landlord.Contacts.FirstOrDefault(c => c.IsPrimary)?.Email ?? "—")</strong>) to sign via Circularo.</p>
+                                <p class="text-muted mb-2">The registration summary has not been sent for signature yet. Send it to all authorised signatories to sign via Circularo (@(landlord.Signatories.Count) signatory/ies).</p>
                             }
                             else
                             {
