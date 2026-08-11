@@ -641,11 +641,25 @@ public class LandlordService(
     {
         if (!circularo.Enabled) return;
 
-        var primary = await db.LandlordContacts.AsNoTracking()
-            .FirstOrDefaultAsync(c => c.LandlordId == l.Id && c.IsPrimary);
-        if (primary is null || string.IsNullOrWhiteSpace(primary.Email))
+        // On approval every authorised signatory receives the document to sign. Signatories were captured at
+        // submission (primary + secondary contacts + any added), ordered; fall back to the primary contact.
+        var signatories = await db.LandlordSignatories.AsNoTracking()
+            .Where(s => s.LandlordId == l.Id && s.Email != null && s.Email != "")
+            .OrderBy(s => s.Order)
+            .Select(s => new CircularoSigner(s.Name ?? s.Email!, s.Email!))
+            .ToListAsync();
+
+        if (signatories.Count == 0)
         {
-            logger.LogWarning("Landlord {Id}: no primary contact email; skipping Circularo send.", l.Id);
+            var primary = await db.LandlordContacts.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.LandlordId == l.Id && c.IsPrimary);
+            if (primary is not null && !string.IsNullOrWhiteSpace(primary.Email))
+                signatories.Add(new CircularoSigner(primary.FullName, primary.Email));
+        }
+
+        if (signatories.Count == 0)
+        {
+            logger.LogWarning("Landlord {Id}: no signatory email; skipping Circularo send.", l.Id);
             l.SignatureStatus = "Failed";
             await db.SaveChangesAsync();
             return;
@@ -654,9 +668,11 @@ public class LandlordService(
         var built = await BuildAndStoreSummaryAsync(l.Id);
         if (built is null) return;
 
-        var res = await circularo.SendForSignatureAsync(built.Value.Bytes, built.Value.FileName, primary.FullName, primary.Email);
+        var allMustSign = l.SigningRule == SigningRule.All;
+        var res = await circularo.SendForSignatureAsync(built.Value.Bytes, built.Value.FileName, signatories, allMustSign);
 
-        l.SignatureSentTo = primary.Email;
+        var emails = string.Join(", ", signatories.Select(s => s.Email));
+        l.SignatureSentTo = emails.Length > 200 ? $"{signatories.Count} signatories" : emails;
         l.SignatureSentAt = DateTime.UtcNow;
         l.SignatureStatus = res.Success ? "Sent" : "Failed";
         l.CircularoDocumentId = res.DocumentId;
@@ -666,7 +682,8 @@ public class LandlordService(
 
         await AddEventAsync(db, l.Id, EventSignatureRequested,
             res.Success
-                ? $"Registration summary sent to {primary.Email} for signature via Circularo (document {res.DocumentId})."
+                ? $"Registration summary sent to {signatories.Count} signatory/ies ({emails}) for signature via Circularo " +
+                  $"({(allMustSign ? "all must sign" : "any one may sign")}; document {res.DocumentId})."
                 : $"Circularo send-for-signature failed: {res.Error}",
             actor, ActorSystem, l.Status, l.Status);
     }
