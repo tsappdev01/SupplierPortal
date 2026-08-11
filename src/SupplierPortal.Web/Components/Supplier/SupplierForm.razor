@@ -308,14 +308,21 @@
                     <InputText @bind-Value="formModel.AddressLine2" />
                 </div>
                 <div class="di-field @FieldClass("CityId")">
-                    <label>City@(Req("CityId"))</label>
-                    <InputSelect @bind-Value="formModel.CityId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in provinces)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
+                    <label>City / Emirate@(Req("CityId"))</label>
+                    @if (IsUaeCountry)
+                    {
+                        <InputSelect @bind-Value="formModel.CityId">
+                            <option value="">— Select Emirate —</option>
+                            @foreach (var lov in provinces)
+                            {
+                                <option value="@lov.Id">@lov.DisplayName</option>
+                            }
+                        </InputSelect>
+                    }
+                    else
+                    {
+                        <InputText @bind-Value="formModel.CityText" placeholder="Enter city" />
+                    }
                 </div>
                 <div class="di-field @FieldClass("State")">
                     <label>State@(Req("State"))</label>
@@ -396,7 +403,7 @@
                         <option value="">— Select —</option>
                         @foreach (var lov in countries)
                         {
-                            <option value="@lov.Id">@lov.DisplayName</option>
+                            <option value="@lov.Id">@lov.Code – @lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
@@ -430,10 +437,14 @@
                     <label>Account Start Date@(Req("AccountStartDate"))</label>
                     <InputDate @bind-Value="formModel.AccountStartDate" />
                 </div>
-                <div class="di-field @FieldClass("PaymentMethodCode")">
-                    <label>Payment Method Code@(Req("PaymentMethodCode"))</label>
-                    <InputText @bind-Value="formModel.PaymentMethodCode" />
-                </div>
+                @if (!SupplierFacing)
+                {
+                    <div class="di-field @FieldClass("AccountEndDate")">
+                        <label>Account End Date</label>
+                        <InputDate @bind-Value="formModel.AccountEndDate" />
+                        <div class="di-hint">Administrators only — set when the bank account is closed.</div>
+                    </div>
+                }
                 <div class="di-field @FieldClass("RemitAdviceEmail")">
                     <label>Remit Advice Email@(Req("RemitAdviceEmail"))</label>
                     <InputText @bind-Value="formModel.RemitAdviceEmail" />
@@ -733,6 +744,14 @@
     private List<BankBranch> SelectedBankBranches =>
         banks.FirstOrDefault(b => b.Id == formModel.BankId)?.Branches ?? [];
 
+    /// <summary>The UAE country lookup id (for the Emirate-vs-free-text-city switch on the address).</summary>
+    private int? UaeCountryId =>
+        countries.FirstOrDefault(c => c.DisplayName.Contains("United Arab Emirates", StringComparison.OrdinalIgnoreCase))?.Id;
+
+    /// <summary>True when the selected country is the UAE — the City field is then the Emirate LOV; otherwise
+    /// it is a free-text city input. A not-yet-chosen country defaults to UAE (the form's default).</summary>
+    private bool IsUaeCountry => formModel.CountryId is null || formModel.CountryId == UaeCountryId;
+
     // bool? -> bool proxy so the VAT Registered checkbox binds cleanly (unset is treated as No).
     private bool vatRegisteredBool
     {
@@ -803,6 +822,8 @@
             formModel.ClientBuId ??= Supplier.BusinessUnitId;
             formModel.BillToBuId ??= Supplier.BusinessUnitId;
             formModel.SupplierSiteBuId ??= Supplier.BusinessUnitId;
+            // A new bank account defaults its start date to today (editable).
+            formModel.AccountStartDate ??= DateTime.Today;
         }
         else
         {

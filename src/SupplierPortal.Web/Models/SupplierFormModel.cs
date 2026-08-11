@@ -69,6 +69,7 @@ public class SupplierFormModel
 
     [Required(ErrorMessage = "City is required.")]
     public int? CityId { get; set; }
+    public string? CityText { get; set; }
 
     public int? CountryId { get; set; } = null;
     public string? PostalCode { get; set; }
@@ -95,6 +96,7 @@ public class SupplierFormModel
     public string? SwiftCode { get; set; }
     public bool AllowInternationalPayments { get; set; }
     public DateTime? AccountStartDate { get; set; }
+    public DateTime? AccountEndDate { get; set; }
     public string? Iban { get; set; }
     public string? PaymentMethodCode { get; set; }
 
@@ -171,6 +173,7 @@ public class SupplierFormModel
         AddressLine1 = s.AddressLine1,
         AddressLine2 = s.AddressLine2,
         CityId = s.CityId,
+        CityText = s.CityText,
         CountryId = s.CountryId,
         PostalCode = s.PostalCode,
         AddressName = s.AddressName,
@@ -189,6 +192,7 @@ public class SupplierFormModel
         SwiftCode = s.SwiftCode,
         AllowInternationalPayments = s.AllowInternationalPayments,
         AccountStartDate = s.AccountStartDate,
+        AccountEndDate = s.AccountEndDate,
         Iban = s.Iban,
         PaymentMethodCode = s.PaymentMethodCode,
         RemitAdviceEmail = s.RemitAdviceEmail,
@@ -254,6 +258,7 @@ public class SupplierFormModel
         s.AddressLine1 = AddressLine1;
         s.AddressLine2 = AddressLine2;
         s.CityId = CityId;
+        s.CityText = CityText;
         s.CountryId = CountryId;
         s.PostalCode = PostalCode;
         s.AddressName = AddressName;
@@ -272,6 +277,7 @@ public class SupplierFormModel
         s.SwiftCode = SwiftCode;
         s.AllowInternationalPayments = AllowInternationalPayments;
         s.AccountStartDate = AccountStartDate;
+        s.AccountEndDate = AccountEndDate;
         s.Iban = Iban;
         s.PaymentMethodCode = PaymentMethodCode;
         s.RemitAdviceEmail = RemitAdviceEmail;

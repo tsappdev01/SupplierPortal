@@ -868,6 +868,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("AccountCurrencyCodeId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("AccountEndDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("AccountName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -921,6 +924,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<int?>("CityId")
                         .HasColumnType("int");
+
+                    b.Property<string>("CityText")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<int?>("ClientBuId")
                         .HasColumnType("int");

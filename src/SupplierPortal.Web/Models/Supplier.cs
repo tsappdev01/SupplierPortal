@@ -106,9 +106,13 @@ public class Supplier
     [MaxLength(300)]
     public string? AddressLine2 { get; set; }
 
-    /// <summary>Selected from the same Emirates list as <see cref="Province"/>.</summary>
+    /// <summary>The Emirate (LOV) when the country is the UAE — selected from the Emirates list.</summary>
     public int? CityId { get; set; }
     public LookupValue? City { get; set; }
+
+    /// <summary>Free-text city, used when the country is not the UAE (the Emirate LOV then does not apply).</summary>
+    [MaxLength(150)]
+    public string? CityText { get; set; }
 
     [MaxLength(150)]
     public string? State { get; set; }
@@ -227,6 +231,9 @@ public class Supplier
     public string? Iban { get; set; }
 
     public DateTime? AccountStartDate { get; set; }
+
+    /// <summary>Date the bank account is closed/ended. Visible to administrators only.</summary>
+    public DateTime? AccountEndDate { get; set; }
 
     public bool AllowInternationalPayments { get; set; }
 
