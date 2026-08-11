@@ -144,6 +144,9 @@ public class SupplierFormModel
     public int? ClientBuId { get; set; }
     public int? BillToBuId { get; set; }
 
+    /// <summary>Additional contacts beyond the primary contact (the flat FirstName/ContactEmail/… fields).</summary>
+    public List<SupplierContactModel> AdditionalContacts { get; set; } = new();
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         SupplierNumber = s.SupplierNumber,
@@ -157,6 +160,10 @@ public class SupplierFormModel
         SupplierTypeId = s.SupplierTypeId,
         TaxpayerCountryId = s.TaxpayerCountryId,
         CountryNameId = s.CountryNameId,
+        AdditionalContacts = s.Contacts
+            .OrderBy(c => c.SortOrder)
+            .Select(SupplierContactModel.FromEntity)
+            .ToList(),
         TaxRegistrationNumber = s.TaxRegistrationNumber,
         VatRegistered = s.VatRegistered,
         VatRegistrationTypeId = s.VatRegistrationTypeId,
@@ -328,5 +335,99 @@ public class SupplierFormModel
         s.ProcurementBuId = ProcurementBuId;
         s.ClientBuId = ClientBuId;
         s.BillToBuId = BillToBuId;
+
+        ApplyContactsTo(s);
     }
+
+    /// <summary>
+    /// Reconciles the additional-contacts collection onto the supplier: updates rows still present,
+    /// adds new ones, and drops those removed in the form. Blank contact cards are ignored so an empty
+    /// "Add New Contact" row is never persisted.
+    /// </summary>
+    private void ApplyContactsTo(Supplier s)
+    {
+        var kept = AdditionalContacts.Where(c => !c.IsBlank).ToList();
+        var keptIds = kept.Where(c => c.Id != 0).Select(c => c.Id).ToHashSet();
+
+        s.Contacts.RemoveAll(existing => !keptIds.Contains(existing.Id));
+
+        var order = 0;
+        foreach (var model in kept)
+        {
+            var entity = model.Id != 0 ? s.Contacts.FirstOrDefault(c => c.Id == model.Id) : null;
+            if (entity is null)
+            {
+                entity = new SupplierContact();
+                s.Contacts.Add(entity);
+            }
+
+            entity.PrefixId = model.PrefixId;
+            entity.FirstName = model.FirstName;
+            entity.MiddleName = model.MiddleName;
+            entity.LastName = model.LastName;
+            entity.AdministrativeContact = model.AdministrativeContact;
+            entity.ContactEmail = model.ContactEmail;
+            entity.PhoneCountryCodeId = model.PhoneCountryCodeId;
+            entity.PhoneAreaCode = model.PhoneAreaCode;
+            entity.Phone = model.Phone;
+            entity.MobileCountryCodeId = model.MobileCountryCodeId;
+            entity.MobileAreaCode = model.MobileAreaCode;
+            entity.Mobile = model.Mobile;
+            entity.SortOrder = order++;
+        }
+    }
+}
+
+/// <summary>Form view-model for a single additional supplier contact.</summary>
+public class SupplierContactModel
+{
+    public int Id { get; set; }
+    public int? PrefixId { get; set; }
+    public string? FirstName { get; set; }
+    public string? MiddleName { get; set; }
+    public string? LastName { get; set; }
+    public string? AdministrativeContact { get; set; }
+
+    [EmailAddress(ErrorMessage = "Enter a valid contact email address.")]
+    public string? ContactEmail { get; set; }
+
+    public int? PhoneCountryCodeId { get; set; }
+    public string? PhoneAreaCode { get; set; }
+    public string? Phone { get; set; }
+    public int? MobileCountryCodeId { get; set; }
+    public string? MobileAreaCode { get; set; }
+    public string? Mobile { get; set; }
+
+    /// <summary>A contact card with no meaningful data entered — not persisted.</summary>
+    public bool IsBlank =>
+        Id == 0
+        && PrefixId is null
+        && string.IsNullOrWhiteSpace(FirstName)
+        && string.IsNullOrWhiteSpace(MiddleName)
+        && string.IsNullOrWhiteSpace(LastName)
+        && string.IsNullOrWhiteSpace(AdministrativeContact)
+        && string.IsNullOrWhiteSpace(ContactEmail)
+        && PhoneCountryCodeId is null
+        && string.IsNullOrWhiteSpace(PhoneAreaCode)
+        && string.IsNullOrWhiteSpace(Phone)
+        && MobileCountryCodeId is null
+        && string.IsNullOrWhiteSpace(MobileAreaCode)
+        && string.IsNullOrWhiteSpace(Mobile);
+
+    public static SupplierContactModel FromEntity(SupplierContact c) => new()
+    {
+        Id = c.Id,
+        PrefixId = c.PrefixId,
+        FirstName = c.FirstName,
+        MiddleName = c.MiddleName,
+        LastName = c.LastName,
+        AdministrativeContact = c.AdministrativeContact,
+        ContactEmail = c.ContactEmail,
+        PhoneCountryCodeId = c.PhoneCountryCodeId,
+        PhoneAreaCode = c.PhoneAreaCode,
+        Phone = c.Phone,
+        MobileCountryCodeId = c.MobileCountryCodeId,
+        MobileAreaCode = c.MobileAreaCode,
+        Mobile = c.Mobile
+    };
 }

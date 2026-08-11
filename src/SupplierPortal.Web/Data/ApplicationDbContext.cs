@@ -18,6 +18,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierFieldChange> SupplierFieldChanges => Set<SupplierFieldChange>();
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
     public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
+    public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
 
     // ---- CST (Customer) Portal ----
     public DbSet<Customer> Customers => Set<Customer>();
@@ -193,6 +194,32 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(s => s.MobileCountryCode)
             .WithMany()
             .HasForeignKey(s => s.MobileCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Additional supplier contacts: cascade-delete with the supplier, but keep LOV references
+        // restricted (no cascade) so lookup rows can't be removed while referenced.
+        modelBuilder.Entity<SupplierContact>()
+            .HasOne(c => c.Supplier)
+            .WithMany(s => s.Contacts)
+            .HasForeignKey(c => c.SupplierId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SupplierContact>()
+            .HasOne(c => c.Prefix)
+            .WithMany()
+            .HasForeignKey(c => c.PrefixId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupplierContact>()
+            .HasOne(c => c.PhoneCountryCode)
+            .WithMany()
+            .HasForeignKey(c => c.PhoneCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupplierContact>()
+            .HasOne(c => c.MobileCountryCode)
+            .WithMany()
+            .HasForeignKey(c => c.MobileCountryCodeId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Supplier>()

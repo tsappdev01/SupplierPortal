@@ -127,7 +127,9 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     public async Task<Supplier?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        return await IncludeLookups(db.Suppliers).FirstOrDefaultAsync(s => s.Id == id);
+        return await IncludeLookups(db.Suppliers)
+            .Include(s => s.Contacts)
+            .FirstOrDefaultAsync(s => s.Id == id);
     }
 
     public async Task<List<LookupValue>> GetLookupsAsync(LookupCategory category)
@@ -207,7 +209,9 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var supplier = await IncludeLookups(db.Suppliers).FirstAsync(s => s.Id == updated.Id);
+        var supplier = await IncludeLookups(db.Suppliers)
+            .Include(s => s.Contacts)
+            .FirstAsync(s => s.Id == updated.Id);
         var before = DiffableProperties.ToDictionary(p => p.Name, p => FormatDisplayValue(supplier, p));
 
         supplier.SupplierNumber = updated.SupplierNumber;
@@ -273,6 +277,34 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.AllowInternationalPayments = updated.AllowInternationalPayments;
 
         supplier.IsDraft = updated.IsDraft;
+
+        // Reconcile additional contacts: update rows still present, add new ones, drop removed ones.
+        var incomingContacts = updated.Contacts ?? new List<SupplierContact>();
+        var incomingIds = incomingContacts.Where(c => c.Id != 0).Select(c => c.Id).ToHashSet();
+        supplier.Contacts.RemoveAll(existing => existing.Id != 0 && !incomingIds.Contains(existing.Id));
+        foreach (var inc in incomingContacts)
+        {
+            var target = inc.Id != 0 ? supplier.Contacts.FirstOrDefault(c => c.Id == inc.Id) : null;
+            if (target is null)
+            {
+                target = new SupplierContact();
+                supplier.Contacts.Add(target);
+            }
+
+            target.PrefixId = inc.PrefixId;
+            target.FirstName = inc.FirstName;
+            target.MiddleName = inc.MiddleName;
+            target.LastName = inc.LastName;
+            target.AdministrativeContact = inc.AdministrativeContact;
+            target.ContactEmail = inc.ContactEmail;
+            target.PhoneCountryCodeId = inc.PhoneCountryCodeId;
+            target.PhoneAreaCode = inc.PhoneAreaCode;
+            target.Phone = inc.Phone;
+            target.MobileCountryCodeId = inc.MobileCountryCodeId;
+            target.MobileAreaCode = inc.MobileAreaCode;
+            target.Mobile = inc.Mobile;
+            target.SortOrder = inc.SortOrder;
+        }
 
         supplier.UpdatedAt = DateTime.UtcNow;
         supplier.UpdatedBy = updatedBy;

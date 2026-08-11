@@ -173,6 +173,9 @@ public class Supplier
     [MaxLength(50)]
     public string? Mobile { get; set; }
 
+    /// <summary>Additional contact people beyond the primary contact captured in the flat columns above.</summary>
+    public List<SupplierContact> Contacts { get; set; } = new();
+
     // -- Business Unit & Site Assignment --
 
     /// <summary>Free-text supplier site name; defaults to the Address Name but the user may overwrite it.</summary>

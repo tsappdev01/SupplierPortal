@@ -1331,6 +1331,78 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierAccessTokens");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierContact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AdministrativeContact")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MiddleName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("MobileAreaCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("MobileCountryCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PhoneAreaCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("PhoneCountryCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PrefixId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MobileCountryCodeId");
+
+                    b.HasIndex("PhoneCountryCodeId");
+
+                    b.HasIndex("PrefixId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierContacts");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.Property<int>("Id")
@@ -1895,6 +1967,38 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierContact", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "MobileCountryCode")
+                        .WithMany()
+                        .HasForeignKey("MobileCountryCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "PhoneCountryCode")
+                        .WithMany()
+                        .HasForeignKey("PhoneCountryCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "Prefix")
+                        .WithMany()
+                        .HasForeignKey("PrefixId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
+                        .WithMany("Contacts")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MobileCountryCode");
+
+                    b.Navigation("PhoneCountryCode");
+
+                    b.Navigation("Prefix");
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
@@ -1975,6 +2079,11 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Contact");
 
                     b.Navigation("Documents");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Supplier", b =>
+                {
+                    b.Navigation("Contacts");
                 });
 #pragma warning restore 612, 618
         }

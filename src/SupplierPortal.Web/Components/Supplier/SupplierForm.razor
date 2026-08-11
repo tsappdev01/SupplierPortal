@@ -412,6 +412,95 @@
                     <label>Mobile@(Req("Mobile"))</label>
                     <InputText @bind-Value="formModel.Mobile" />
                 </div>
+
+                <!-- Additional contacts (beyond the primary contact above) -->
+                <div class="di-field di-full">
+                    <div class="di-subsection-header">Additional Contacts</div>
+                    @if (formModel.AdditionalContacts.Count == 0)
+                    {
+                        <p class="text-muted" style="margin:0;">No additional contacts. Use “Add New Contact” to add one.</p>
+                    }
+                    @for (var index = 0; index < formModel.AdditionalContacts.Count; index++)
+                    {
+                        var contact = formModel.AdditionalContacts[index];
+                        var contactNo = index + 1;
+                        <div class="di-contact-card">
+                            <div class="di-contact-card-head">
+                                <span class="di-contact-card-title">Contact @contactNo</span>
+                                <button type="button" class="di-document-remove" title="Remove contact" @onclick="() => RemoveContact(contact)">&times;</button>
+                            </div>
+                            <div class="di-contact-grid">
+                                <div class="di-field">
+                                    <label>Prefix</label>
+                                    <InputSelect @bind-Value="contact.PrefixId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in prefixes)
+                                        {
+                                            <option value="@lov.Id">@lov.DisplayName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>First Name</label>
+                                    <InputText @bind-Value="contact.FirstName" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Middle Name</label>
+                                    <InputText @bind-Value="contact.MiddleName" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Last Name</label>
+                                    <InputText @bind-Value="contact.LastName" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Administrative Contact</label>
+                                    <InputText @bind-Value="contact.AdministrativeContact" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Contacts E-Mail</label>
+                                    <InputText @bind-Value="contact.ContactEmail" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Phone Country Code</label>
+                                    <InputSelect @bind-Value="contact.PhoneCountryCodeId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in countriesWithPhoneCode)
+                                        {
+                                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Phone Area Code</label>
+                                    <InputText @bind-Value="contact.PhoneAreaCode" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Phone</label>
+                                    <InputText @bind-Value="contact.Phone" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Mobile Country Code</label>
+                                    <InputSelect @bind-Value="contact.MobileCountryCodeId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in countriesWithPhoneCode)
+                                        {
+                                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Mobile Area Code</label>
+                                    <InputText @bind-Value="contact.MobileAreaCode" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Mobile</label>
+                                    <InputText @bind-Value="contact.Mobile" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <button type="button" class="di-btn-secondary di-add-contact" @onclick="AddContact">+ Add New Contact</button>
+                </div>
             </div>
         </div>
 
@@ -1021,6 +1110,16 @@
         formModel.BankBranchId = null;
     }
 
+    private void AddContact()
+    {
+        formModel.AdditionalContacts.Add(new SupplierContactModel());
+    }
+
+    private void RemoveContact(SupplierContactModel contact)
+    {
+        formModel.AdditionalContacts.Remove(contact);
+    }
+
     private void GoToStep(int step)
     {
         if (step <= maxStepReached)
@@ -1131,6 +1230,34 @@
                 await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId);
             }
         });
+
+        await SyncPersistedContactIdsAsync();
+    }
+
+    /// <summary>
+    /// After a save, copies the database-generated ids of the additional contacts back onto the form
+    /// models (matched by their persisted order) so a subsequent save updates the same rows instead of
+    /// inserting duplicates.
+    /// </summary>
+    private async Task SyncPersistedContactIdsAsync()
+    {
+        if (Supplier.Id == 0)
+        {
+            return;
+        }
+
+        var saved = await SupplierService.GetByIdAsync(Supplier.Id);
+        if (saved is null)
+        {
+            return;
+        }
+
+        var savedContacts = saved.Contacts.OrderBy(c => c.SortOrder).ToList();
+        var formContacts = formModel.AdditionalContacts.Where(c => !c.IsBlank).ToList();
+        for (var i = 0; i < formContacts.Count && i < savedContacts.Count; i++)
+        {
+            formContacts[i].Id = savedContacts[i].Id;
+        }
     }
 
     private async Task NextAsync()
