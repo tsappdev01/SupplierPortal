@@ -98,6 +98,17 @@ public enum LandlordCommentType { Correction = 0, Rejection = 1, Note = 2 }
 /// <summary>How signatures are collected for an ownership.</summary>
 public enum SigningRule { All = 0, Any = 1 }
 
+/// <summary>Lifecycle status of a signatory's authorisation document (MOA / POA). Phase 1 uses Submitted and
+/// Approved; the resubmission/deactivation states are wired in Phase 2.</summary>
+public enum SignatoryDocStatus
+{
+    Submitted = 1,
+    UnderReview = 2,
+    Approved = 3,
+    ResubmissionRequired = 4,
+    Deactivated = 5
+}
+
 /// <summary>A landlord registration / update request (FRD LandlordRegistration). Initiated by Business
 /// Centre from a property: the Property-View fields (Property Code / Company / Building / Email) are
 /// snapshotted read-only, and the invitation is always sent to the snapshotted <see cref="Email"/>. The
@@ -273,6 +284,12 @@ public class LandlordDocument
     public int? ContactId { get; set; }
     /// <summary>Optional signatory this document belongs to (e.g. an authorisation letter).</summary>
     public int? SignatoryId { get; set; }
+
+    /// <summary>Expiry date of the document (used for a signatory's MOA / POA authorisation).</summary>
+    public DateTime? ExpiryDate { get; set; }
+
+    /// <summary>Lifecycle status when this is a signatory authorisation document (MOA / POA); null otherwise.</summary>
+    public SignatoryDocStatus? SignatoryDocStatus { get; set; }
 
     // Re-upload versioning (FRD): a replaced document is retained with IsCurrent = false for the audit history.
     public int Version { get; set; } = 1;

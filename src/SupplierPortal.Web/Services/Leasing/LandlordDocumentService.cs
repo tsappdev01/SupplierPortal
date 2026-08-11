@@ -108,6 +108,83 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         return (true, null);
     }
 
+    // ── Signatory authorisation documents (MOA / POA) — Phase 1 ────────────────
+
+    /// <summary>Current authorisation documents for every signatory of a registration (metadata only),
+    /// keyed by signatory id.</summary>
+    public async Task<Dictionary<int, LandlordDocument>> GetSignatoryDocumentsAsync(int landlordId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var docs = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && d.IsCurrent && d.SignatoryId != null
+                && (d.DocumentType == LandlordDocumentType.Moa || d.DocumentType == LandlordDocumentType.PowerOfAttorney
+                    || d.DocumentType == LandlordDocumentType.MoaOrPoa))
+            .Select(d => Meta(d))
+            .ToListAsync();
+        // One current authorisation document per signatory (latest wins if somehow more than one).
+        return docs.GroupBy(d => d.SignatoryId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(d => d.UploadedAt).First());
+    }
+
+    /// <summary>Uploads (or replaces) a signatory's authorisation document. The document type must be MOA or
+    /// POA. Any previous current authorisation document for that signatory is superseded (kept for history).
+    /// New documents start at <see cref="SignatoryDocStatus.Submitted"/>.</summary>
+    public async Task<(bool Success, string? Error)> UploadSignatoryDocAsync(
+        int landlordId, int signatoryId, LandlordDocumentType docType, DateTime? expiry, IBrowserFile file, string uploadedBy)
+    {
+        if (docType is not (LandlordDocumentType.Moa or LandlordDocumentType.PowerOfAttorney))
+            return (false, "The authorisation document type must be MOA or POA.");
+        if (file.Size == 0) return (false, "The selected file is empty.");
+        if (file.Size > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
+
+        using var ms = new MemoryStream();
+        await using (var source = file.OpenReadStream(MaxFileSizeBytes)) await source.CopyToAsync(ms);
+        var bytes = ms.ToArray();
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!AllowedExtensions.Contains(ext))
+            return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var version = 1;
+        var existing = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && d.SignatoryId == signatoryId && d.IsCurrent
+                && (d.DocumentType == LandlordDocumentType.Moa || d.DocumentType == LandlordDocumentType.PowerOfAttorney
+                    || d.DocumentType == LandlordDocumentType.MoaOrPoa))
+            .ToListAsync();
+        foreach (var old in existing) { old.IsCurrent = false; version = Math.Max(version, old.Version + 1); }
+
+        db.LandlordDocuments.Add(new LandlordDocument
+        {
+            LandlordId = landlordId,
+            DocumentType = docType,
+            FileName = file.Name,
+            StoredFileName = $"{Guid.NewGuid():N}{ext}",
+            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            FileSizeBytes = bytes.LongLength,
+            ContentBase64 = Convert.ToBase64String(bytes),
+            UploadedBy = uploadedBy,
+            SignatoryId = signatoryId,
+            ExpiryDate = expiry,
+            SignatoryDocStatus = SignatoryDocStatus.Submitted,
+            Version = version,
+            IsCurrent = true
+        });
+        await db.SaveChangesAsync();
+        return (true, null);
+    }
+
+    /// <summary>Sets the lifecycle status (and optionally the expiry) of a signatory authorisation document.</summary>
+    public async Task<bool> SetSignatoryDocStatusAsync(int documentId, SignatoryDocStatus status, DateTime? expiry = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var doc = await db.LandlordDocuments.FirstOrDefaultAsync(d => d.Id == documentId);
+        if (doc is null) return false;
+        doc.SignatoryDocStatus = status;
+        if (expiry is not null) doc.ExpiryDate = expiry;
+        await db.SaveChangesAsync();
+        return true;
+    }
+
     /// <summary>Stores a system-generated document (raw bytes) against the registration as Base64, superseding
     /// any previous current document of the same type. Used for the registration-summary PDF on submission.</summary>
     public async Task StoreGeneratedAsync(
@@ -164,6 +241,7 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         Id = d.Id, LandlordId = d.LandlordId, DocumentType = d.DocumentType, FileName = d.FileName,
         StoredFileName = d.StoredFileName, ContentType = d.ContentType, FileSizeBytes = d.FileSizeBytes,
         UploadedAt = d.UploadedAt, UploadedBy = d.UploadedBy, ContactId = d.ContactId,
-        SignatoryId = d.SignatoryId, Version = d.Version, IsCurrent = d.IsCurrent
+        SignatoryId = d.SignatoryId, ExpiryDate = d.ExpiryDate, SignatoryDocStatus = d.SignatoryDocStatus,
+        Version = d.Version, IsCurrent = d.IsCurrent
     };
 }

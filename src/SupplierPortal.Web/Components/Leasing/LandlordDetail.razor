@@ -181,13 +181,52 @@ else
                         }
                         @if (landlord.Signatories.Count > 0)
                         {
-                            <div class="text-muted small mt-2">Signatories (@landlord.SigningRule signing):</div>
-                            <ul class="mb-0">
-                                @foreach (var s in landlord.Signatories.OrderBy(s => s.Order))
-                                {
-                                    <li>@s.Name — @s.Email @(s.IsPrimaryContact ? "(primary)" : "")</li>
-                                }
-                            </ul>
+                            <div class="text-muted small mt-3 mb-1"><strong>Authorised signatories</strong> (@(landlord.SigningRule == SigningRule.All ? "All Authorized Signatories" : "Any One Authorized Signatory")) — authorisation document (MOA / POA):</div>
+                            @foreach (var s in landlord.Signatories.OrderBy(s => s.Order))
+                            {
+                                var sid = s.Id;
+                                var doc = signatoryDocs.GetValueOrDefault(sid);
+                                var up = SigUpload(sid);
+                                <div class="border rounded p-2 mb-2">
+                                    <div class="fw-semibold">@s.Name @(s.IsPrimaryContact ? "" : "") <span class="small text-muted">· @s.Email</span></div>
+                                    <div class="small mt-1">
+                                        <span class="text-muted">Authorisation document:</span>
+                                        @if (doc is not null)
+                                        {
+                                            <span class="badge bg-secondary ms-1">@DocLabel(doc.DocumentType)</span>
+                                            <span class="badge @StatusBadge(doc.SignatoryDocStatus) ms-1">@(doc.SignatoryDocStatus?.ToString() ?? "—")</span>
+                                            @if (doc.ExpiryDate is { } de)
+                                            {
+                                                var expired = de.Date < DateTime.UtcNow.Date;
+                                                <span class="ms-1 @(expired ? "text-danger fw-semibold" : "text-muted")">exp @de.ToString("dd MMM yyyy")@(expired ? " (expired)" : "")</span>
+                                            }
+                                            <a class="ms-2" href="/landlord-documents/@doc.Id" target="_blank">View</a>
+                                            <a class="ms-2" href="/landlord-documents/@doc.Id?download=1" download>Download</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted ms-1">None uploaded</span>
+                                        }
+                                    </div>
+                                    <div class="row g-2 mt-1 align-items-end">
+                                        <div class="col-auto">
+                                            <label class="form-label form-label-sm small text-muted mb-0">Type</label>
+                                            <select class="form-select form-select-sm" @bind="up.DocType" style="width:110px">
+                                                <option value="@LandlordDocumentType.Moa">MOA</option>
+                                                <option value="@LandlordDocumentType.PowerOfAttorney">POA</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label form-label-sm small text-muted mb-0">Expiry</label>
+                                            <input type="date" class="form-control form-control-sm" @bind="up.Expiry" style="width:160px" />
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label form-label-sm small text-muted mb-0">@(doc is null ? "Upload" : "Replace")</label>
+                                            <InputFile class="form-control form-control-sm" OnChange="e => UploadSignatoryDocAsync(sid, e)" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff" />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         }
                     }
                     else
@@ -485,7 +524,35 @@ else
     private string? buName;
     private List<LandlordEvent> trace = [];
     private List<LandlordDocument> documents = [];
+    private Dictionary<int, LandlordDocument> signatoryDocs = new();
+    private readonly Dictionary<int, SigUploadState> sigUploads = new();
     private List<LandlordFieldChange> fieldChanges = [];
+
+    private sealed class SigUploadState { public LandlordDocumentType DocType { get; set; } = LandlordDocumentType.Moa; public DateTime? Expiry { get; set; } }
+    private SigUploadState SigUpload(int signatoryId)
+    {
+        if (!sigUploads.TryGetValue(signatoryId, out var s)) { s = new SigUploadState(); sigUploads[signatoryId] = s; }
+        return s;
+    }
+
+    private static string StatusBadge(SignatoryDocStatus? s) => s switch
+    {
+        SignatoryDocStatus.Approved => "bg-success",
+        SignatoryDocStatus.ResubmissionRequired => "bg-danger",
+        SignatoryDocStatus.Deactivated => "bg-secondary",
+        SignatoryDocStatus.UnderReview => "bg-info text-dark",
+        _ => "bg-warning text-dark"
+    };
+
+    private async Task UploadSignatoryDocAsync(int signatoryId, InputFileChangeEventArgs e)
+    {
+        var up = SigUpload(signatoryId);
+        var (ok, err) = await Loading.RunAsync(() =>
+            DocumentService.UploadSignatoryDocAsync(Id, signatoryId, up.DocType, up.Expiry, e.File, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Upload failed."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess($"{DocLabel(up.DocType)} uploaded for the signatory.");
+    }
     private HashSet<string> ChangedKeys => fieldChanges.Select(f => f.FieldKey).ToHashSet();
     private string currentUser = "unknown";
 
@@ -530,6 +597,7 @@ else
         buName = (await BusinessUnitService.GetByIdAsync(landlord.BusinessUnitId))?.Name;
         trace = await LandlordService.GetTraceAsync(Id);
         documents = await DocumentService.GetAllVersionsAsync(Id);
+        signatoryDocs = await DocumentService.GetSignatoryDocumentsAsync(Id);
         fieldChanges = await LandlordService.GetFieldChangesAsync(Id);
 
         // Sent for signature but not yet resolved: poll Circularo for the current status (the completion

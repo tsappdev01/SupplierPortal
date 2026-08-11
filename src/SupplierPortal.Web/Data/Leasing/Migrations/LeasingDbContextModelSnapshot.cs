@@ -329,6 +329,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<int>("DocumentType")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -344,6 +347,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("LandlordId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SignatoryDocStatus")
                         .HasColumnType("int");
 
                     b.Property<int?>("SignatoryId")
