@@ -196,13 +196,7 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed. Add any further signatories below.</div>
-
-                        <div class="field">
-                            <label class="lbl">Authorisation document (MOA / POA)</label>
-                            @UploadField(LandlordDocumentType.MoaOrPoa, "MOA / POA", required: false)
-                            <div class="hint">Optional — upload the MOA or POA that authorises these signatories to sign on the landlord's behalf.</div>
-                        </div>
+                        <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed. Add any further signatories below. Upload each signatory's authorising <strong>MOA or POA</strong> in their card.</div>
 
                         var lockedSecondaries = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
 
@@ -216,6 +210,7 @@
                                 </div>
                                 <span class="tagx">Primary</span>
                             </div>
+                            @SignatoryDocPanel(primary.Email)
                         </div>
 
                         @* Locked secondary-contact signatories (mirror the secondary contacts) *@
@@ -231,6 +226,7 @@
                                     </div>
                                     <span class="tagx">Secondary</span>
                                 </div>
+                                @SignatoryDocPanel(c.Email)
                             </div>
                         }
 
@@ -248,6 +244,7 @@
                                     </div>
                                     <button class="link danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
                                 </div>
+                                @SignatoryDocPanel(signatories[idx].Email)
                             </div>
                         }
                         <div class="addrow"><button class="btn ghost" @onclick="AddSignatory">+ Add signatory</button></div>
@@ -480,6 +477,11 @@
     .di-llw .sig-hd{display:flex;align-items:center;gap:12px;padding:11px 14px}
     .di-llw .seq{font-family:monospace;font-size:13px;color:#fff;background:var(--navy);width:26px;height:26px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none}
     .di-llw .tagx{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;color:var(--taupe);border:1px solid var(--line-strong);border-radius:99px;padding:3px 9px;white-space:nowrap;flex:none}
+    .di-llw .sig-doc{border-top:1px solid var(--line);padding:10px 14px;background:var(--sand)}
+    .di-llw .sig-doc-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+    .di-llw .sig-doc-line:last-child{margin-bottom:0}
+    .di-llw .sig-doc-lbl{font-size:12.5px;color:var(--ink-soft);font-weight:600}
+    .di-llw .sig-doc-file{font-size:12.5px;color:var(--ink)}
     .di-llw .addrow{margin-top:12px}
     .di-llw .olist{margin:0;padding:0;list-style:none}
     .di-llw .olist li{display:flex;gap:10px;padding:6px 0;font-size:14px;align-items:baseline}
@@ -522,6 +524,18 @@
     private LandlordDocumentType? uploadingType;
     private string? uploadingName;
 
+    // Per-signatory authorisation (MOA / POA) documents, keyed by the signatory's (lower-cased) email.
+    private Dictionary<string, LandlordDocument> sigDocByEmail = new();
+    private readonly Dictionary<string, SigUp> sigUpByEmail = new();
+    private string? sigUploadingEmail;
+    private sealed class SigUp { public LandlordDocumentType Type { get; set; } = LandlordDocumentType.Moa; public DateTime? Expiry { get; set; } }
+    private SigUp SigUpFor(string key)
+    {
+        if (!sigUpByEmail.TryGetValue(key, out var v)) { v = new SigUp(); sigUpByEmail[key] = v; }
+        return v;
+    }
+    private static string DocTypeShort(LandlordDocumentType t) => t == LandlordDocumentType.PowerOfAttorney ? "POA" : "MOA";
+
     private string StepHeading => step switch
     {
         0 => "Primary contact details", 1 => "Secondary contacts", 2 => "Supporting documents",
@@ -562,6 +576,7 @@
                 SeedFromExisting();
                 ApplyUaePass();
                 documents = await LoadLandlordDocumentsAsync(landlord.Id);
+                await LoadSignatoryDocsAsync();
             }
         }
         loading = false;
@@ -686,6 +701,99 @@
             }
         </div>
     };
+
+    /// <summary>Per-signatory MOA/POA authorisation document panel (upload / replace / view), keyed by the
+    /// signatory's email. Uploading persists the current form as a draft first so the signatory has an id to
+    /// attach the document to.</summary>
+    private RenderFragment SignatoryDocPanel(string? email) => __builder =>
+    {
+        var key = (email ?? "").Trim().ToLowerInvariant();
+        <div class="sig-doc">
+            @if (string.IsNullOrWhiteSpace(key))
+            {
+                <span class="muted">Enter this signatory's email to attach their MOA / POA.</span>
+            }
+            else
+            {
+                var doc = sigDocByEmail.GetValueOrDefault(key);
+                var up = SigUpFor(key);
+                var busy = sigUploadingEmail == key;
+                <div class="sig-doc-line">
+                    <span class="sig-doc-lbl">Authorisation (MOA / POA):</span>
+                    @if (doc is not null)
+                    {
+                        <span class="sig-doc-file">@DocTypeShort(doc.DocumentType) · @doc.FileName@(doc.ExpiryDate is { } de ? $" · exp {de:dd MMM yyyy}" : "")</span>
+                        <a class="link" href="/landlord-documents/@doc.Id" target="_blank">View</a>
+                    }
+                    else if (!busy)
+                    {
+                        <span class="muted">Not uploaded</span>
+                    }
+                </div>
+                <div class="sig-doc-line">
+                    <select class="di-in" style="max-width:100px" @bind="up.Type">
+                        <option value="@LandlordDocumentType.Moa">MOA</option>
+                        <option value="@LandlordDocumentType.PowerOfAttorney">POA</option>
+                    </select>
+                    <input type="date" class="di-in" style="max-width:150px" @bind="up.Expiry" placeholder="Expiry" />
+                    @if (busy)
+                    {
+                        <span class="muted"><span class="di-up-spinner"></span> Uploading…</span>
+                    }
+                    else
+                    {
+                        <label class="btn ghost" style="padding:6px 12px;font-size:12.5px;margin:0">
+                            @(doc is null ? "Upload" : "Replace")
+                            <InputFile OnChange="@(e => UploadSignatoryDocAsync(key, e))" style="display:none" accept=".pdf,image/*" />
+                        </label>
+                    }
+                </div>
+            }
+        </div>
+    };
+
+    private async Task LoadSignatoryDocsAsync()
+    {
+        if (landlord is null) return;
+        var byId = await DocumentService.GetSignatoryDocumentsAsync(landlord.Id);
+        var emailById = landlord.Signatories.ToDictionary(s => s.Id, s => (s.Email ?? "").Trim().ToLowerInvariant());
+        sigDocByEmail = byId.Where(kv => emailById.ContainsKey(kv.Key))
+            .ToDictionary(kv => emailById[kv.Key], kv => kv.Value);
+    }
+
+    private async Task UploadSignatoryDocAsync(string emailKey, InputFileChangeEventArgs e)
+    {
+        if (landlord is null || accessToken is null) return;
+        error = null;
+        var up = SigUpFor(emailKey);
+        sigUploadingEmail = emailKey;
+        try
+        {
+            // Persist the current form as a draft so the signatory rows exist (with ids) to attach to.
+            var draft = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: false, ActorLabel, accessToken.Id, null);
+            if (!draft.Success)
+            {
+                error = draft.Error ?? "Please complete the required fields before uploading the signatory document.";
+                return;
+            }
+            landlord = await LandlordService.GetForSelfServiceAsync(accessToken.LandlordId) ?? landlord;
+            var sig = landlord.Signatories.FirstOrDefault(s =>
+                string.Equals((s.Email ?? "").Trim(), emailKey, StringComparison.OrdinalIgnoreCase));
+            if (sig is null)
+            {
+                error = "Could not match this signatory — please check the email address and try again.";
+                return;
+            }
+            var (ok, err) = await DocumentService.UploadSignatoryDocAsync(landlord.Id, sig.Id, up.Type, up.Expiry, e.File, ActorLabel);
+            if (!ok) { error = err; return; }
+            await LoadSignatoryDocsAsync();
+        }
+        catch (Exception)
+        {
+            error = "Could not upload the document. Please try again.";
+        }
+        finally { sigUploadingEmail = null; }
+    }
 
     private static string FormatCode(string code) => code;
 

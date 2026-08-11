@@ -322,6 +322,9 @@ public class LandlordService(
             oldSecondaryCount, contacts.Count(c => !c.IsPrimary),
             oldSignatoryCount, update.Signatories.Count(s => !string.IsNullOrWhiteSpace(s.Name)));
 
+        // Signatory rows are replaced on each save; capture the old id→email map so per-signatory documents
+        // (linked by SignatoryId) can be re-pointed to the new rows by email afterwards.
+        var oldSignatoryEmailById = l.Signatories.ToDictionary(s => s.Id, s => (s.Email ?? "").Trim().ToLowerInvariant());
         db.LandlordSignatories.RemoveRange(l.Signatories);
         var order = 0;
         foreach (var s in update.Signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
@@ -351,6 +354,25 @@ public class LandlordService(
         l.UpdatedBy = actor;
         l.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        // Re-point per-signatory authorisation documents to the freshly-inserted signatory rows (matched by
+        // email), so a signatory's MOA/POA survives the delete/re-insert of the signatory records above.
+        var newSignatoryIdByEmail = l.Signatories
+            .GroupBy(s => (s.Email ?? "").Trim().ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        var signatoryDocs = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && d.SignatoryId != null).ToListAsync();
+        var relinked = false;
+        foreach (var d in signatoryDocs)
+        {
+            if (oldSignatoryEmailById.TryGetValue(d.SignatoryId!.Value, out var em)
+                && newSignatoryIdByEmail.TryGetValue(em, out var newId) && d.SignatoryId != newId)
+            {
+                d.SignatoryId = newId;
+                relinked = true;
+            }
+        }
+        if (relinked) await db.SaveChangesAsync();
 
         var wasResubmit = submit && old == LandlordStatus.CorrectionRequired;
         await AddEventAsync(db, landlordId,
