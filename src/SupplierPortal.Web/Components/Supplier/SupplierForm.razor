@@ -282,6 +282,16 @@
                     <label>Address Line 2@(Req("AddressLine2"))</label>
                     <InputText @bind-Value="formModel.AddressLine2" />
                 </div>
+                <div class="di-field @FieldClass("CountryId")">
+                    <label>Country@(Req("CountryId"))</label>
+                    <InputSelect @bind-Value="formModel.CountryId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in countries)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
                 <div class="di-field @FieldClass("CityId")">
                     <label>City / Emirate@(IsUaeCountry ? Req("CityId") : null)</label>
                     @if (IsUaeCountry)
@@ -298,16 +308,6 @@
                     {
                         <InputText @bind-Value="formModel.CityText" placeholder="Enter city" />
                     }
-                </div>
-                <div class="di-field @FieldClass("CountryId")">
-                    <label>Country@(Req("CountryId"))</label>
-                    <InputSelect @bind-Value="formModel.CountryId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in countries)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
                 </div>
                 <div class="di-field @FieldClass("PostalCode")">
                     <label>PO Box / Postal Code@(Req("PostalCode"))</label>
