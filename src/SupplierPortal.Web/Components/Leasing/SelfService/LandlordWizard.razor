@@ -16,6 +16,7 @@
 @inject IWebHostEnvironment Env
 @inject IUaePassService UaePass
 @inject NavigationManager Nav
+@inject ILogger<LandlordWizard> Logger
 
 <PageTitle>Landlord Registration</PageTitle>
 
@@ -774,7 +775,40 @@
         if (landlord is null || accessToken is null) return;
         error = null;
         var up = SigUpFor(emailKey);
+
+        // Validate the file up front so problems are reported clearly rather than as a generic failure.
+        const long maxBytes = 10 * 1024 * 1024;
+        var ext = Path.GetExtension(e.File.Name).ToLowerInvariant();
+        if (e.File.Size == 0) { error = "The selected file is empty. Please choose a different file."; return; }
+        if (e.File.Size > maxBytes) { error = "The file exceeds the 10 MB size limit."; return; }
+        if (ext is not (".pdf" or ".jpg" or ".jpeg" or ".png" or ".tif" or ".tiff"))
+        {
+            error = $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).";
+            return;
+        }
+
         sigUploadingEmail = emailKey;
+
+        // Read the browser file into memory first (it can only be streamed once, and reading it before the
+        // draft save avoids the stream being invalidated by the intervening server round-trips).
+        byte[] bytes;
+        try
+        {
+            using var ms = new MemoryStream();
+            await using (var source = e.File.OpenReadStream(maxBytes))
+            {
+                await source.CopyToAsync(ms);
+            }
+            bytes = ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Signatory MOA/POA: reading the uploaded file failed (landlord {LandlordId}).", landlord.Id);
+            error = $"Could not read the selected file ({ex.Message}). Please choose the file again.";
+            sigUploadingEmail = null;
+            return;
+        }
+
         try
         {
             // Persist the current form as a draft so the signatory rows exist (with ids) to attach to.
@@ -792,13 +826,14 @@
                 error = "Could not match this signatory — please check the email address and try again.";
                 return;
             }
-            var (ok, err) = await DocumentService.UploadSignatoryDocAsync(landlord.Id, sig.Id, up.Type, up.Expiry, e.File, ActorLabel);
+            var (ok, err) = await DocumentService.UploadSignatoryDocAsync(landlord.Id, sig.Id, up.Type, up.Expiry, e.File.Name, e.File.ContentType, bytes, ActorLabel);
             if (!ok) { error = err; return; }
             await LoadSignatoryDocsAsync();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            error = "Could not upload the document. Please try again.";
+            Logger.LogError(ex, "Signatory MOA/POA upload failed (landlord {LandlordId}, signatory {Email}).", landlord.Id, emailKey);
+            error = $"Could not upload the document: {ex.Message}";
         }
         finally { sigUploadingEmail = null; }
     }

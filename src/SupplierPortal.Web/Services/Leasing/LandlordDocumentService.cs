@@ -132,15 +132,33 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
     public async Task<(bool Success, string? Error)> UploadSignatoryDocAsync(
         int landlordId, int signatoryId, LandlordDocumentType docType, DateTime? expiry, IBrowserFile file, string uploadedBy)
     {
-        if (docType is not (LandlordDocumentType.Moa or LandlordDocumentType.PowerOfAttorney))
-            return (false, "The authorisation document type must be MOA or POA.");
         if (file.Size == 0) return (false, "The selected file is empty.");
         if (file.Size > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
 
-        using var ms = new MemoryStream();
-        await using (var source = file.OpenReadStream(MaxFileSizeBytes)) await source.CopyToAsync(ms);
-        var bytes = ms.ToArray();
-        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        byte[] bytes;
+        using (var ms = new MemoryStream())
+        {
+            await using (var source = file.OpenReadStream(MaxFileSizeBytes)) await source.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+        return await UploadSignatoryDocAsync(landlordId, signatoryId, docType, expiry, file.Name, file.ContentType, bytes, uploadedBy);
+    }
+
+    /// <summary>
+    /// Uploads (or replaces) a signatory's authorisation document from an already-read byte array. Callers
+    /// that receive a browser file should read its bytes promptly (before any server round-trips) and use
+    /// this overload, since an <see cref="IBrowserFile"/> stream can be invalidated by intervening awaits.
+    /// </summary>
+    public async Task<(bool Success, string? Error)> UploadSignatoryDocAsync(
+        int landlordId, int signatoryId, LandlordDocumentType docType, DateTime? expiry,
+        string fileName, string? contentType, byte[] bytes, string uploadedBy)
+    {
+        if (docType is not (LandlordDocumentType.Moa or LandlordDocumentType.PowerOfAttorney))
+            return (false, "The authorisation document type must be MOA or POA.");
+        if (bytes.Length == 0) return (false, "The selected file is empty.");
+        if (bytes.LongLength > MaxFileSizeBytes) return (false, "File exceeds the 10 MB size limit.");
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(ext))
             return (false, $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).");
 
@@ -157,9 +175,9 @@ public class LandlordDocumentService(IDbContextFactory<LeasingDbContext> dbFacto
         {
             LandlordId = landlordId,
             DocumentType = docType,
-            FileName = file.Name,
+            FileName = fileName,
             StoredFileName = $"{Guid.NewGuid():N}{ext}",
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
             FileSizeBytes = bytes.LongLength,
             ContentBase64 = Convert.ToBase64String(bytes),
             UploadedBy = uploadedBy,
