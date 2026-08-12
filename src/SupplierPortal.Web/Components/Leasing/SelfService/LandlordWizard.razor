@@ -196,7 +196,7 @@
                                 </label>
                             </div>
                         </div>
-                        <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed. Add any further signatories below. Upload each signatory's authorising <strong>MOA or POA</strong> in their card.</div>
+                        <div class="hint mb-2">Your primary and secondary contacts are automatically included as authorised signatories and cannot be removed — they do not require an MOA/POA. Every <strong>additional signatory you add must have an authorising MOA or POA uploaded</strong> in their card before you can continue.</div>
 
                         var lockedSecondaries = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
 
@@ -244,7 +244,7 @@
                                     </div>
                                     <button class="link danger" @onclick="() => RemoveSignatory(idx)">Remove</button>
                                 </div>
-                                @SignatoryDocPanel(signatories[idx].Email)
+                                @SignatoryDocPanel(signatories[idx].Email, required: true)
                             </div>
                         }
                         <div class="addrow"><button class="btn ghost" @onclick="AddSignatory">+ Add signatory</button></div>
@@ -482,6 +482,7 @@
     .di-llw .sig-doc-line:last-child{margin-bottom:0}
     .di-llw .sig-doc-lbl{font-size:12.5px;color:var(--ink-soft);font-weight:600}
     .di-llw .sig-doc-file{font-size:12.5px;color:var(--ink)}
+    .di-llw .sig-doc-required{font-size:12.5px;color:#c0392b;font-weight:600}
     .di-llw .addrow{margin-top:12px}
     .di-llw .olist{margin:0;padding:0;list-style:none}
     .di-llw .olist li{display:flex;gap:10px;padding:6px 0;font-size:14px;align-items:baseline}
@@ -705,7 +706,7 @@
     /// <summary>Per-signatory MOA/POA authorisation document panel (upload / replace / view), keyed by the
     /// signatory's email. Uploading persists the current form as a draft first so the signatory has an id to
     /// attach the document to.</summary>
-    private RenderFragment SignatoryDocPanel(string? email) => __builder =>
+    private RenderFragment SignatoryDocPanel(string? email, bool required = false) => __builder =>
     {
         var key = (email ?? "").Trim().ToLowerInvariant();
         <div class="sig-doc">
@@ -719,7 +720,7 @@
                 var up = SigUpFor(key);
                 var busy = sigUploadingEmail == key;
                 <div class="sig-doc-line">
-                    <span class="sig-doc-lbl">Authorisation (MOA / POA):</span>
+                    <span class="sig-doc-lbl">Authorisation (MOA / POA):@(required ? " *" : "")</span>
                     @if (doc is not null)
                     {
                         <span class="sig-doc-file">@DocTypeShort(doc.DocumentType) · @doc.FileName@(doc.ExpiryDate is { } de ? $" · exp {de:dd MMM yyyy}" : "")</span>
@@ -727,7 +728,14 @@
                     }
                     else if (!busy)
                     {
-                        <span class="muted">Not uploaded</span>
+                        @if (required)
+                        {
+                            <span class="sig-doc-required">Required — please upload</span>
+                        }
+                        else
+                        {
+                            <span class="muted">Not uploaded</span>
+                        }
                     }
                 </div>
                 <div class="sig-doc-line">
@@ -829,7 +837,29 @@
                 if (error is not null) return;
             }
         }
+        if (step == 3)
+        {
+            error = ValidateSignatoryDocs();
+            if (error is not null) return;
+        }
         if (step < stepLabels.Length - 1) step++;
+    }
+
+    /// <summary>
+    /// Every additional signatory (i.e. anyone who is not the primary or a secondary contact) must have an
+    /// authorising MOA / POA document uploaded. Primary and secondary contacts are exempt.
+    /// </summary>
+    private string? ValidateSignatoryDocs()
+    {
+        foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
+        {
+            var key = (s.Email ?? "").Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(key) || !sigDocByEmail.ContainsKey(key))
+            {
+                return $"Signatory '{s.Name}' requires an authorising MOA / POA document to be uploaded.";
+            }
+        }
+        return null;
     }
 
     private LandlordSelfUpdate BuildUpdate()
@@ -993,6 +1023,10 @@
         foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
             if (!ContactValidation.IsValidEmail(s.Email))
                 return $"Signatory '{s.Name}' needs a valid email address.";
+
+        // Every additional signatory must have an authorising MOA / POA uploaded (primary/secondary exempt).
+        var sigDocError = ValidateSignatoryDocs();
+        if (sigDocError is not null) return sigDocError;
 
         if (landlord!.Type == LandlordType.Individual)
         {
