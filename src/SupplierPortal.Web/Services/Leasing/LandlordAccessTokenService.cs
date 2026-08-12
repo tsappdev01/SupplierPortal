@@ -98,7 +98,7 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
         <div style=""font-family:Consolas,monospace;font-size:34px;letter-spacing:.4em;font-weight:700;color:#092F56;background:#F6F3EF;border-radius:6px;padding:16px 0;text-align:center"">{code}</div>
         <p style=""margin:14px 0 0;color:#8A929A;font-size:12px"">The code expires in {(int)OtpValidity.TotalMinutes} minutes. If you didn't request it, you can ignore this email.</p>
       </td></tr>
-      <tr><td style=""padding:20px 28px;color:#8A929A;font-size:12px;border-top:1px solid #E2DCD4"">Automated message from Dubai Investments Business Centre — please do not reply.</td></tr>
+      <tr><td style=""padding:20px 28px;color:#8A929A;font-size:12px;border-top:1px solid #E2DCD4"">Automated message from {brand} Business Centre — please do not reply.</td></tr>
     </table>
   </td></tr></table>
 </body></html>";

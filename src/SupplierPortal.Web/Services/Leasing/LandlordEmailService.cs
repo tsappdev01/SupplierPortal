@@ -27,16 +27,19 @@ public class LandlordEmailService(
         return Wrap(brandName, heading, bodyHtml, ctaText, ctaUrl, footnote);
     }
 
-    public async Task SendInviteAsync(string toEmail, string legalOrCompany, string link, string? actorUsername = null, int? businessUnitId = null) =>
+    public async Task SendInviteAsync(string toEmail, string legalOrCompany, string link, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         await SendAsync(toEmail, "Landlord Registration – Action Required",
-            await BrandAsync(actorUsername, businessUnitId, "Landlord Registration",
+            Wrap(brand, "Landlord Registration",
                 $"<p style=\"margin:0 0 14px\">Dear Landlord,</p>" +
-                $"<p style=\"margin:0 0 14px\">Dubai Investments Business Centre invites you to complete/update the landlord " +
+                $"<p style=\"margin:0 0 14px\">{E(brand)} Business Centre invites you to complete/update the landlord " +
                 $"registration for <strong>{E(legalOrCompany)}</strong>. The process takes a few minutes and lets you " +
                 $"provide your contact details, upload the required documents and confirm your authorised signatories.</p>" +
                 $"<p style=\"margin:0 0 6px;color:#5C6670;font-size:13px\">You will be asked for a one-time verification code sent to this email address.</p>",
                 "Complete Registration", link,
                 "This link is confidential and unique to you — please do not share it. It expires in 30 days."));
+    }
 
     public async Task SendCorrectionAsync(string toEmail, string propertyCode, string comment, string link, string? actorUsername = null, int? businessUnitId = null) =>
         await SendAsync(toEmail, "Action Required – Landlord Registration",
@@ -49,34 +52,43 @@ public class LandlordEmailService(
                 "Update Registration", link,
                 "You will be asked to verify with a one-time code when you open the link."));
 
-    public async Task SendRejectionAsync(string toEmail, string propertyCode, string reason, string? actorUsername = null, int? businessUnitId = null) =>
+    public async Task SendRejectionAsync(string toEmail, string propertyCode, string reason, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         await SendAsync(toEmail, "Landlord Registration – Not Accepted",
-            await BrandAsync(actorUsername, businessUnitId, "Registration Not Accepted",
+            Wrap(brand, "Registration Not Accepted",
                 $"<p style=\"margin:0 0 14px\">We were unable to accept the landlord registration for property " +
                 $"<strong>{E(propertyCode)}</strong>.</p>{Note("Reason", reason)}" +
                 "<p style=\"margin:14px 0 0\">If the registration is to proceed, Business Centre will restart the process " +
                 "and send you a fresh link.</p>", null, null,
-                "Please contact Dubai Investments Business Centre if you have any questions."));
+                $"Please contact {E(brand)} Business Centre if you have any questions."));
+    }
 
-    public async Task SendSubmittedToLandlordAsync(string toEmail, string propertyCode, string? reference, string? actorUsername = null, int? businessUnitId = null) =>
+    public async Task SendSubmittedToLandlordAsync(string toEmail, string propertyCode, string? reference, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         await SendAsync(toEmail, "Landlord Registration Submitted",
-            await BrandAsync(actorUsername, businessUnitId, "Registration Submitted Successfully",
+            Wrap(brand, "Registration Submitted Successfully",
                 $"<p style=\"margin:0 0 14px\">Thank you — your landlord registration for property " +
                 $"<strong>{E(propertyCode)}</strong> has been <strong>submitted successfully</strong>.</p>" +
-                "<p style=\"margin:0 0 14px\">The Dubai Investments Business Centre team will now review your submission " +
+                $"<p style=\"margin:0 0 14px\">The {E(brand)} Business Centre team will now review your submission " +
                 "and will get back to you if any clarification is required.</p>" +
                 "<p style=\"margin:0\">No further action is needed from you at this stage.</p>" +
                 (string.IsNullOrWhiteSpace(reference) ? "" : Note("Reference", reference)),
                 null, null,
                 "You will receive a further email once your registration has been reviewed."));
+    }
 
-    public async Task SendCompletionToLandlordAsync(string toEmail, string propertyCode, string? actorUsername = null, int? businessUnitId = null) =>
+    public async Task SendCompletionToLandlordAsync(string toEmail, string propertyCode, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         await SendAsync(toEmail, "Landlord Registration Completed",
-            await BrandAsync(actorUsername, businessUnitId, "Registration Completed",
+            Wrap(brand, "Registration Completed",
                 $"<p style=\"margin:0 0 14px\">Good news — your landlord registration for property " +
                 $"<strong>{E(propertyCode)}</strong> has been reviewed and <strong>completed</strong> by Business Centre.</p>" +
-                "<p style=\"margin:0\">No further action is required. Thank you for registering with Dubai Investments.</p>",
+                $"<p style=\"margin:0\">No further action is required. Thank you for registering with {E(brand)}.</p>",
                 null, null, null));
+    }
 
     public async Task SendCompletionToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string completedBy, DateTime completedAt, string? initiatedBy = null, int? businessUnitId = null)
     {
@@ -132,6 +144,7 @@ public class LandlordEmailService(
     /// header shows the associated Business Unit name as text (renders reliably in every email client).</summary>
     private static string Wrap(string brandName, string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
     {
+        var org = string.IsNullOrWhiteSpace(brandName) ? "Dubai Investments" : brandName;
         var cta = ctaText is not null && ctaUrl is not null
             ? $"<tr><td style=\"padding:22px 28px 4px\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#092F56;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 26px;border-radius:4px\">{E(ctaText)}</a></td></tr>"
             : "";
@@ -139,7 +152,7 @@ public class LandlordEmailService(
             ? $"<tr><td style=\"padding:6px 28px 0;color:#8A929A;font-size:12px\">{E(footnote)}</td></tr>"
             : "";
         var header =
-            $@"<div style=""color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em"">{E(string.IsNullOrWhiteSpace(brandName) ? "Dubai Investments" : brandName)}</div>
+            $@"<div style=""color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.02em"">{E(org)}</div>
           <div style=""color:#9DB3C8;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px"">Business Centre · Leasing</div>";
         return
 $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Segoe UI,Arial,sans-serif"">
@@ -153,7 +166,7 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
         {cta}
         {foot}
         <tr><td style=""padding:24px 28px 22px;color:#8A929A;font-size:12px;border-top:1px solid #E2DCD4;margin-top:16px"">
-          This is an automated message from Dubai Investments Business Centre. Please do not reply to this email.
+          This is an automated message from {E(org)} Business Centre. Please do not reply to this email.
         </td></tr>
       </table>
     </td></tr>
