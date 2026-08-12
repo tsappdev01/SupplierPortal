@@ -388,31 +388,62 @@
 
 /* Additional contacts */
 .di-subsection-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-weight: 600;
+    font-size: 14px;
     color: var(--navy);
     border-top: 1px solid var(--border);
-    padding-top: 14px;
-    margin-bottom: 10px;
+    padding-top: 16px;
+    margin-bottom: 12px;
+}
+
+.di-subsection-icon {
+    color: var(--navy);
+    opacity: 0.85;
+}
+
+.di-contact-empty {
+    margin: 0 0 12px;
+    color: #6b7280;
+    font-size: 13px;
+    font-style: italic;
 }
 
 .di-contact-card {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-left: 3px solid var(--navy);
+    border-radius: 8px;
     padding: 14px 16px;
     margin-bottom: 14px;
     background: #fafbfc;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.di-contact-card:hover {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 .di-contact-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
 }
 
 .di-contact-card-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     font-weight: 600;
     color: var(--navy);
+}
+
+.di-contact-card-title svg {
+    opacity: 0.75;
 }
 
 .di-contact-grid {
@@ -427,6 +458,53 @@
     }
 }
 
+/* Icon action buttons */
+.di-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: #6b7280;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.di-icon-btn:hover {
+    background: #fff;
+}
+
+.di-icon-btn-danger:hover {
+    color: #c0392b;
+    border-color: #f0c4be;
+    background: #fdf3f2;
+}
+
 .di-add-contact {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     margin-top: 4px;
+    padding: 8px 16px;
+    border: 1px dashed var(--navy);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.di-add-contact:hover {
+    background: var(--navy);
+    color: #fff;
+}
+
+.di-add-contact svg {
+    flex-shrink: 0;
 }
