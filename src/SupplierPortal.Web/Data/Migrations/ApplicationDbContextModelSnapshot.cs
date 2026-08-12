@@ -1331,6 +1331,69 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierAccessTokens");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierBankAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AccountCountryCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("AccountCurrencyCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("AccountEndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("AccountName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("AccountStartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("BankBranchId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("BankId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Iban")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SwiftCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountCountryCodeId");
+
+                    b.HasIndex("AccountCurrencyCodeId");
+
+                    b.HasIndex("BankBranchId");
+
+                    b.HasIndex("BankId");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierBankAccounts");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierContact", b =>
                 {
                     b.Property<int>("Id")
@@ -1967,6 +2030,45 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierBankAccount", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "AccountCountryCode")
+                        .WithMany()
+                        .HasForeignKey("AccountCountryCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "AccountCurrencyCode")
+                        .WithMany()
+                        .HasForeignKey("AccountCurrencyCodeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.BankBranch", "BankBranch")
+                        .WithMany()
+                        .HasForeignKey("BankBranchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.Bank", "Bank")
+                        .WithMany()
+                        .HasForeignKey("BankId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
+                        .WithMany("BankAccounts")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AccountCountryCode");
+
+                    b.Navigation("AccountCurrencyCode");
+
+                    b.Navigation("Bank");
+
+                    b.Navigation("BankBranch");
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierContact", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "MobileCountryCode")
@@ -2083,6 +2185,8 @@ namespace SupplierPortal.Web.Data.Migrations
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Supplier", b =>
                 {
+                    b.Navigation("BankAccounts");
+
                     b.Navigation("Contacts");
                 });
 #pragma warning restore 612, 618

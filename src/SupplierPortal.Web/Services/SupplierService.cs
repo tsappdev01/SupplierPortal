@@ -129,6 +129,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await using var db = await dbFactory.CreateDbContextAsync();
         return await IncludeLookups(db.Suppliers)
             .Include(s => s.Contacts)
+            .Include(s => s.BankAccounts)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
@@ -211,6 +212,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await using var db = await dbFactory.CreateDbContextAsync();
         var supplier = await IncludeLookups(db.Suppliers)
             .Include(s => s.Contacts)
+            .Include(s => s.BankAccounts)
             .FirstAsync(s => s.Id == updated.Id);
         var before = DiffableProperties.ToDictionary(p => p.Name, p => FormatDisplayValue(supplier, p));
 
@@ -303,6 +305,32 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             target.MobileCountryCodeId = inc.MobileCountryCodeId;
             target.MobileAreaCode = inc.MobileAreaCode;
             target.Mobile = inc.Mobile;
+            target.SortOrder = inc.SortOrder;
+        }
+
+        // Reconcile additional bank accounts: update rows still present, add new ones, drop removed ones.
+        var incomingAccounts = updated.BankAccounts ?? new List<SupplierBankAccount>();
+        var incomingAccountIds = incomingAccounts.Where(a => a.Id != 0).Select(a => a.Id).ToHashSet();
+        supplier.BankAccounts.RemoveAll(existing => existing.Id != 0 && !incomingAccountIds.Contains(existing.Id));
+        foreach (var inc in incomingAccounts)
+        {
+            var target = inc.Id != 0 ? supplier.BankAccounts.FirstOrDefault(a => a.Id == inc.Id) : null;
+            if (target is null)
+            {
+                target = new SupplierBankAccount();
+                supplier.BankAccounts.Add(target);
+            }
+
+            target.BankId = inc.BankId;
+            target.BankBranchId = inc.BankBranchId;
+            target.AccountCountryCodeId = inc.AccountCountryCodeId;
+            target.AccountName = inc.AccountName;
+            target.AccountNumber = inc.AccountNumber;
+            target.AccountCurrencyCodeId = inc.AccountCurrencyCodeId;
+            target.SwiftCode = inc.SwiftCode;
+            target.Iban = inc.Iban;
+            target.AccountStartDate = inc.AccountStartDate;
+            target.AccountEndDate = inc.AccountEndDate;
             target.SortOrder = inc.SortOrder;
         }
 

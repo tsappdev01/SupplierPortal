@@ -19,6 +19,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
     public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
     public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
+    public DbSet<SupplierBankAccount> SupplierBankAccounts => Set<SupplierBankAccount>();
 
     // ---- CST (Customer) Portal ----
     public DbSet<Customer> Customers => Set<Customer>();
@@ -220,6 +221,37 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(c => c.MobileCountryCode)
             .WithMany()
             .HasForeignKey(c => c.MobileCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Additional supplier bank accounts: cascade-delete with the supplier, references restricted.
+        modelBuilder.Entity<SupplierBankAccount>()
+            .HasOne(a => a.Supplier)
+            .WithMany(s => s.BankAccounts)
+            .HasForeignKey(a => a.SupplierId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SupplierBankAccount>()
+            .HasOne(a => a.Bank)
+            .WithMany()
+            .HasForeignKey(a => a.BankId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupplierBankAccount>()
+            .HasOne(a => a.BankBranch)
+            .WithMany()
+            .HasForeignKey(a => a.BankBranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupplierBankAccount>()
+            .HasOne(a => a.AccountCountryCode)
+            .WithMany()
+            .HasForeignKey(a => a.AccountCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SupplierBankAccount>()
+            .HasOne(a => a.AccountCurrencyCode)
+            .WithMany()
+            .HasForeignKey(a => a.AccountCurrencyCodeId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Supplier>()

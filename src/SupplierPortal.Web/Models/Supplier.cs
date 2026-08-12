@@ -176,6 +176,9 @@ public class Supplier
     /// <summary>Additional contact people beyond the primary contact captured in the flat columns above.</summary>
     public List<SupplierContact> Contacts { get; set; } = new();
 
+    /// <summary>Additional bank accounts beyond the primary account captured in the flat columns below.</summary>
+    public List<SupplierBankAccount> BankAccounts { get; set; } = new();
+
     // -- Business Unit & Site Assignment --
 
     /// <summary>Free-text supplier site name; defaults to the Address Name but the user may overwrite it.</summary>

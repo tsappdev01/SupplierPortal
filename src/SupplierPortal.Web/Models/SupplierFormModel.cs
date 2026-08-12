@@ -147,6 +147,9 @@ public class SupplierFormModel
     /// <summary>Additional contacts beyond the primary contact (the flat FirstName/ContactEmail/… fields).</summary>
     public List<SupplierContactModel> AdditionalContacts { get; set; } = new();
 
+    /// <summary>Additional bank accounts beyond the primary account (the flat BankId/AccountNumber/… fields).</summary>
+    public List<SupplierBankAccountModel> AdditionalBankAccounts { get; set; } = new();
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         SupplierNumber = s.SupplierNumber,
@@ -163,6 +166,10 @@ public class SupplierFormModel
         AdditionalContacts = s.Contacts
             .OrderBy(c => c.SortOrder)
             .Select(SupplierContactModel.FromEntity)
+            .ToList(),
+        AdditionalBankAccounts = s.BankAccounts
+            .OrderBy(a => a.SortOrder)
+            .Select(SupplierBankAccountModel.FromEntity)
             .ToList(),
         TaxRegistrationNumber = s.TaxRegistrationNumber,
         VatRegistered = s.VatRegistered,
@@ -337,6 +344,7 @@ public class SupplierFormModel
         s.BillToBuId = BillToBuId;
 
         ApplyContactsTo(s);
+        ApplyBankAccountsTo(s);
     }
 
     /// <summary>
@@ -376,6 +384,86 @@ public class SupplierFormModel
             entity.SortOrder = order++;
         }
     }
+
+    /// <summary>
+    /// Reconciles the additional-bank-account collection onto the supplier: updates rows still present,
+    /// adds new ones, and drops those removed in the form. Blank cards are ignored.
+    /// </summary>
+    private void ApplyBankAccountsTo(Supplier s)
+    {
+        var kept = AdditionalBankAccounts.Where(a => !a.IsBlank).ToList();
+        var keptIds = kept.Where(a => a.Id != 0).Select(a => a.Id).ToHashSet();
+
+        s.BankAccounts.RemoveAll(existing => !keptIds.Contains(existing.Id));
+
+        var order = 0;
+        foreach (var model in kept)
+        {
+            var entity = model.Id != 0 ? s.BankAccounts.FirstOrDefault(a => a.Id == model.Id) : null;
+            if (entity is null)
+            {
+                entity = new SupplierBankAccount();
+                s.BankAccounts.Add(entity);
+            }
+
+            entity.BankId = model.BankId;
+            entity.BankBranchId = model.BankBranchId;
+            entity.AccountCountryCodeId = model.AccountCountryCodeId;
+            entity.AccountName = model.AccountName;
+            entity.AccountNumber = model.AccountNumber;
+            entity.AccountCurrencyCodeId = model.AccountCurrencyCodeId;
+            entity.SwiftCode = model.SwiftCode;
+            entity.Iban = model.Iban;
+            entity.AccountStartDate = model.AccountStartDate;
+            entity.AccountEndDate = model.AccountEndDate;
+            entity.SortOrder = order++;
+        }
+    }
+}
+
+/// <summary>Form view-model for a single additional supplier bank account.</summary>
+public class SupplierBankAccountModel
+{
+    public int Id { get; set; }
+    public int? BankId { get; set; }
+    public int? BankBranchId { get; set; }
+    public int? AccountCountryCodeId { get; set; }
+    public string? AccountName { get; set; }
+    public string? AccountNumber { get; set; }
+    public int? AccountCurrencyCodeId { get; set; }
+    public string? SwiftCode { get; set; }
+    public string? Iban { get; set; }
+    public DateTime? AccountStartDate { get; set; }
+    public DateTime? AccountEndDate { get; set; }
+
+    /// <summary>A bank-account card with no meaningful data entered — not persisted.</summary>
+    public bool IsBlank =>
+        Id == 0
+        && BankId is null
+        && BankBranchId is null
+        && AccountCountryCodeId is null
+        && string.IsNullOrWhiteSpace(AccountName)
+        && string.IsNullOrWhiteSpace(AccountNumber)
+        && AccountCurrencyCodeId is null
+        && string.IsNullOrWhiteSpace(SwiftCode)
+        && string.IsNullOrWhiteSpace(Iban)
+        && AccountStartDate is null
+        && AccountEndDate is null;
+
+    public static SupplierBankAccountModel FromEntity(SupplierBankAccount a) => new()
+    {
+        Id = a.Id,
+        BankId = a.BankId,
+        BankBranchId = a.BankBranchId,
+        AccountCountryCodeId = a.AccountCountryCodeId,
+        AccountName = a.AccountName,
+        AccountNumber = a.AccountNumber,
+        AccountCurrencyCodeId = a.AccountCurrencyCodeId,
+        SwiftCode = a.SwiftCode,
+        Iban = a.Iban,
+        AccountStartDate = a.AccountStartDate,
+        AccountEndDate = a.AccountEndDate
+    };
 }
 
 /// <summary>Form view-model for a single additional supplier contact.</summary>

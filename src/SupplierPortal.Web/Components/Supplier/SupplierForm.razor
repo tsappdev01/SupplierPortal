@@ -323,7 +323,7 @@
                     </InputSelect>
                 </div>
                 <div class="di-field @FieldClass("CityId")">
-                    <label>City / Emirate@(IsUaeCountry ? Req("CityId") : null)</label>
+                    <label>City / Emirate<span class="di-req">*</span></label>
                     @if (IsUaeCountry)
                     {
                         <InputSelect @bind-Value="formModel.CityId">
@@ -682,6 +682,107 @@
                         <InputText @bind-Value="formModel.IntermediaryBicSwiftCode" />
                     </div>
                 }
+
+                <!-- Additional bank accounts (beyond the primary account above) -->
+                <div class="di-field di-full">
+                    <div class="di-subsection-header">
+                        <svg class="di-subsection-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
+                        Additional Bank Accounts
+                    </div>
+                    @if (formModel.AdditionalBankAccounts.Count == 0)
+                    {
+                        <p class="di-contact-empty">No additional bank accounts yet.</p>
+                    }
+                    @for (var index = 0; index < formModel.AdditionalBankAccounts.Count; index++)
+                    {
+                        var account = formModel.AdditionalBankAccounts[index];
+                        var accountNo = index + 1;
+                        <div class="di-contact-card">
+                            <div class="di-contact-card-head">
+                                <span class="di-contact-card-title">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
+                                    Bank Account @accountNo
+                                </span>
+                                <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove bank account" @onclick="() => RemoveBankAccount(account)">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                </button>
+                            </div>
+                            <div class="di-contact-grid">
+                                <div class="di-field">
+                                    <label>Bank Name</label>
+                                    <InputSelect @bind-Value="account.BankId" @bind-Value:after="() => OnAccountBankChanged(account)">
+                                        <option value="">— Select —</option>
+                                        @foreach (var bank in banks)
+                                        {
+                                            <option value="@bank.Id">@bank.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Branch Name</label>
+                                    <InputSelect @bind-Value="account.BankBranchId" disabled="@(account.BankId is null)">
+                                        <option value="">— Select —</option>
+                                        @foreach (var branch in BranchesForBank(account.BankId))
+                                        {
+                                            <option value="@branch.Id">@branch.Name</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Account Country Code</label>
+                                    <InputSelect @bind-Value="account.AccountCountryCodeId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in countries)
+                                        {
+                                            <option value="@lov.Id">@lov.Code – @lov.DisplayName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Account Name</label>
+                                    <InputText @bind-Value="account.AccountName" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Account Number</label>
+                                    <InputText @bind-Value="account.AccountNumber" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Account Currency Code</label>
+                                    <InputSelect @bind-Value="account.AccountCurrencyCodeId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in currencies)
+                                        {
+                                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
+                                        }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>Swift Code / BIC Code</label>
+                                    <InputText @bind-Value="account.SwiftCode" />
+                                </div>
+                                <div class="di-field">
+                                    <label>IBAN</label>
+                                    <InputText @bind-Value="account.Iban" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Account Start Date</label>
+                                    <InputDate @bind-Value="account.AccountStartDate" />
+                                </div>
+                                @if (!SupplierFacing)
+                                {
+                                    <div class="di-field">
+                                        <label>Account End Date</label>
+                                        <InputDate @bind-Value="account.AccountEndDate" />
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                    <button type="button" class="di-add-contact" title="Add a new bank account" @onclick="AddBankAccount">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
+                        <span>Add New Bank Account</span>
+                    </button>
+                </div>
 
                 <div class="di-documents-row">
                     <div class="di-document-slot">
@@ -1188,6 +1289,26 @@
         formModel.AdditionalContacts.Remove(contact);
     }
 
+    private void AddBankAccount()
+    {
+        formModel.AdditionalBankAccounts.Add(new SupplierBankAccountModel());
+    }
+
+    private void RemoveBankAccount(SupplierBankAccountModel account)
+    {
+        formModel.AdditionalBankAccounts.Remove(account);
+    }
+
+    /// <summary>Clears the selected branch when an additional account's bank changes (branches are bank-specific).</summary>
+    private void OnAccountBankChanged(SupplierBankAccountModel account)
+    {
+        account.BankBranchId = null;
+    }
+
+    /// <summary>Branch options for a given bank id (used by the additional bank-account cards).</summary>
+    private List<BankBranch> BranchesForBank(int? bankId) =>
+        banks.FirstOrDefault(b => b.Id == bankId)?.Branches ?? [];
+
     private void GoToStep(int step)
     {
         if (step <= maxStepReached)
@@ -1220,20 +1341,32 @@
     {
         var errors = new List<string>();
 
+        // City is always required and must block progression, regardless of admin/self-service mode:
+        // the UAE uses the Emirate LOV (CityId); every other country uses the free-text city (CityText).
+        if (step == 2)
+        {
+            if (IsUaeCountry)
+            {
+                if (IsEmpty(model.CityId))
+                {
+                    errors.Add("City / Emirate is required.");
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(model.CityText))
+            {
+                errors.Add("City is required.");
+            }
+        }
+
         // Mandatory-field enforcement applies only to the supplier-facing self-service portal. Internal
         // admin/user editing must never be blocked by a mandatory setting, so skip the required checks.
         if (SupplierFacing)
         {
             foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
             {
-                // City / Emirate is only mandatory when the country is the UAE (the Emirate LOV then
-                // applies). For other countries the free-text city is used and is not forced here.
+                // City is handled above (as an always-on rule) so it is skipped in the generic loop.
                 if (setting.FieldKey == "CityId")
                 {
-                    if (IsUaeCountry && IsEmpty(model.CityId))
-                    {
-                        errors.Add($"{setting.DisplayLabel} is required.");
-                    }
                     continue;
                 }
 
@@ -1299,15 +1432,15 @@
             }
         });
 
-        await SyncPersistedContactIdsAsync();
+        await SyncPersistedChildIdsAsync();
     }
 
     /// <summary>
-    /// After a save, copies the database-generated ids of the additional contacts back onto the form
-    /// models (matched by their persisted order) so a subsequent save updates the same rows instead of
-    /// inserting duplicates.
+    /// After a save, copies the database-generated ids of the additional contacts and bank accounts back
+    /// onto the form models (matched by their persisted order) so a subsequent save updates the same rows
+    /// instead of inserting duplicates.
     /// </summary>
-    private async Task SyncPersistedContactIdsAsync()
+    private async Task SyncPersistedChildIdsAsync()
     {
         if (Supplier.Id == 0)
         {
@@ -1325,6 +1458,13 @@
         for (var i = 0; i < formContacts.Count && i < savedContacts.Count; i++)
         {
             formContacts[i].Id = savedContacts[i].Id;
+        }
+
+        var savedAccounts = saved.BankAccounts.OrderBy(a => a.SortOrder).ToList();
+        var formAccounts = formModel.AdditionalBankAccounts.Where(a => !a.IsBlank).ToList();
+        for (var i = 0; i < formAccounts.Count && i < savedAccounts.Count; i++)
+        {
+            formAccounts[i].Id = savedAccounts[i].Id;
         }
     }
 
