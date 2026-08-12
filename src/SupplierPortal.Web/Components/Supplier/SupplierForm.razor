@@ -10,8 +10,22 @@
 
 <div class="di-form-page">
 
-    <div class="di-form-title">Supplier Registration</div>
-    <div class="di-form-sub">Dubai Investments Entities &mdash; @(IsCreateMode ? "New supplier onboarding" : "Edit supplier")</div>
+    <div class="di-form-topbar">
+        <div class="di-form-headings">
+            <div class="di-form-title">Supplier Registration</div>
+            <div class="di-form-sub">Dubai Investments Entities &mdash; @(IsCreateMode ? "New supplier onboarding" : "Edit supplier")</div>
+        </div>
+        <div class="di-progress" title="@ProgressPct% complete">
+            <svg class="di-progress-ring" viewBox="0 0 36 36">
+                <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(System.Globalization.CultureInfo.InvariantCulture) 100"></circle>
+            </svg>
+            <div class="di-progress-center">
+                <span class="di-progress-pct">@ProgressPct%</span>
+                <span class="di-progress-word">Complete</span>
+            </div>
+        </div>
+    </div>
     @if (SupplierFacing)
     {
         <div class="di-legend">
@@ -45,7 +59,15 @@
 
         <!-- Step 1: Business / Organization Information -->
         <div class="di-section" style="display:@(currentStep == 1 ? "block" : "none")">
-            <div class="di-section-header">Business / Organization Information</div>
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 5.5a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm-1 2a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Zm2.5-.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0ZM8 5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Z" /><path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H2V1Zm2 2v1h1V3H4Zm1 2H4v1h1V5Zm1 0v1h1V5H6Zm1-1V3H6v1h1Zm1 0h1V3H8v1Zm1 1H8v1h1V5Zm1-2v1h1V3h-1Zm1 2h-1v1h1V5ZM4 8v1h1V8H4Zm1 2H4v1h1v-1Zm1 0v1h1v-1H6Zm1-1V8H6v1h1Zm1 0h1V8H8v1Zm1 1H8v1h1v-1Zm1-2v1h1V8h-1Zm1 2h-1v1h1v-1ZM4 14h3v-3H4v3Zm5 0h3v-3H9v3Z" /></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">Business / Organization Information</span>
+                    <span class="di-section-desc">Provide accurate business details as per your trade license and official documents.</span>
+                </span>
+            </div>
             <div class="di-section-body">
                 <div class="di-field">
                     <label>Supplier Number</label>
@@ -268,7 +290,15 @@
         <!-- Step 2: Contact Information -->
         <!-- Step 2: Address Information -->
         <div class="di-section" style="display:@(currentStep == 2 ? "block" : "none")">
-            <div class="di-section-header">Address Information</div>
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">Address Information</span>
+                    <span class="di-section-desc">Where the business is located and how it should be contacted.</span>
+                </span>
+            </div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("AddressName")">
                     <label>Address Name@(Req("AddressName"))</label>
@@ -344,7 +374,15 @@
 
         <!-- Step 3: Contact Information -->
         <div class="di-section" style="display:@(currentStep == 3 ? "block" : "none")">
-            <div class="di-section-header">Contact Information</div>
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" /></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">Contact Information</span>
+                    <span class="di-section-desc">Primary and additional people we should reach out to.</span>
+                </span>
+            </div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("PrefixId")">
                     <label>Prefix@(Req("PrefixId"))</label>
@@ -517,7 +555,15 @@
 
         <!-- Step 5: Payment / Banking Information -->
         <div class="di-section" style="display:@(currentStep == 5 ? "block" : "none")">
-            <div class="di-section-header">Payment / Banking Information</div>
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">Payment / Banking Information</span>
+                    <span class="di-section-desc">Bank account and payment details used to settle invoices.</span>
+                </span>
+            </div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("BankId")">
                     <label>Bank Name@(Req("BankId"))</label>
@@ -656,7 +702,15 @@
 
         <!-- Step 4: Site / Business Unit -->
         <div class="di-section" style="display:@(currentStep == 4 ? "block" : "none")">
-            <div class="di-section-header">Site / Business Unit</div>
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z" /></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">Site / Business Unit</span>
+                    <span class="di-section-desc">Assign the supplier to business units and select site usages.</span>
+                </span>
+            </div>
             <div class="di-section-body">
                 <div class="di-field @FieldClass("SupplierSite")">
                     <label>Supplier Site@(Req("SupplierSite"))</label>
@@ -813,6 +867,9 @@
     private SupplierFormModel formModel = new();
     private int currentStep = 1;
     private int maxStepReached = 1;
+
+    /// <summary>Wizard completion percentage (step-based) shown in the progress ring.</summary>
+    private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
     private bool isSaving;
     private string? errorMessage;
 
