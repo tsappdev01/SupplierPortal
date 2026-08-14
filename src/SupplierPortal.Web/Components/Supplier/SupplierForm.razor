@@ -1073,6 +1073,10 @@
             formModel.AddressPurposeOrdering = true;
             formModel.AddressPurposeRemitTo = true;
             formModel.AddressPurposeRfqBidding = true;
+            // Site usages default to Purchasing / Pay / Primary Pay for a new supplier.
+            formModel.IsPurchasing = true;
+            formModel.IsPay = true;
+            formModel.IsPrimaryPay = true;
         }
         else
         {
