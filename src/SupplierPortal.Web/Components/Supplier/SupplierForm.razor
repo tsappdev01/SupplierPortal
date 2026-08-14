@@ -125,11 +125,13 @@
                     <label>Supplier TIN@(Req("SupplierTin"))</label>
                     <InputText @bind-Value="formModel.SupplierTin" />
                 </div>
-                <div class="di-checkbox-row">
-                    <div class="di-checkbox-item @FieldClass("VatRegistered")">
-                        <InputCheckbox @bind-Value="vatRegisteredBool" id="vatRegistered" />
-                        <label for="vatRegistered" style="margin:0;">VAT Registered?</label>
-                    </div>
+                <div class="di-field @FieldClass("VatRegistered")">
+                    <label>VAT Registered?@(Req("VatRegistered"))</label>
+                    <InputSelect @bind-Value="vatRegisteredYesNo">
+                        <option value="">— Select —</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </InputSelect>
                 </div>
                 <div class="di-field @FieldClass("VatRegistrationTypeId")">
                     <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
@@ -408,7 +410,11 @@
                 </div>
                 <div class="di-field @FieldClass("AdministrativeContact")">
                     <label>Administrative Contact@(Req("AdministrativeContact"))</label>
-                    <InputText @bind-Value="formModel.AdministrativeContact" placeholder="Defaults to First Name if left blank" />
+                    <InputSelect @bind-Value="formModel.AdministrativeContact">
+                        <option value="">— Select —</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </InputSelect>
                 </div>
                 <div class="di-field @FieldClass("ContactEmail")">
                     <label>Contacts E-Mail@(Req("ContactEmail"))</label>
@@ -418,10 +424,8 @@
                     <label>Phone@(Req("Phone"))</label>
                     <PhoneField Countries="countriesWithPhoneCode"
                                 @bind-CountryCodeId="formModel.PhoneCountryCodeId"
-                                @bind-AreaCode="formModel.PhoneAreaCode"
                                 @bind-Number="formModel.Phone"
-                                ShowAreaCode="true"
-                                Placeholder="123 4567" />
+                                Placeholder="50 123 4567" />
                 </div>
                 <div class="di-field @FieldClass("Mobile")">
                     <label>Mobile@(Req("Mobile"))</label>
@@ -480,7 +484,11 @@
                                 </div>
                                 <div class="di-field">
                                     <label>Administrative Contact</label>
-                                    <InputText @bind-Value="contact.AdministrativeContact" />
+                                    <InputSelect @bind-Value="contact.AdministrativeContact">
+                                        <option value="">— Select —</option>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </InputSelect>
                                 </div>
                                 <div class="di-field">
                                     <label>Contacts E-Mail</label>
@@ -490,10 +498,8 @@
                                     <label>Phone</label>
                                     <PhoneField Countries="countriesWithPhoneCode"
                                                 @bind-CountryCodeId="contact.PhoneCountryCodeId"
-                                                @bind-AreaCode="contact.PhoneAreaCode"
                                                 @bind-Number="contact.Phone"
-                                                ShowAreaCode="true"
-                                                Placeholder="123 4567" />
+                                                Placeholder="50 123 4567" />
                                 </div>
                                 <div class="di-field">
                                     <label>Mobile</label>
@@ -991,11 +997,11 @@
         }
     }
 
-    // bool? -> bool proxy so the VAT Registered checkbox binds cleanly (unset is treated as No).
-    private bool vatRegisteredBool
+    // bool? -> Yes/No/"" proxy so the VAT Registered dropdown binds cleanly (unset shows "— Select —").
+    private string vatRegisteredYesNo
     {
-        get => formModel.VatRegistered ?? false;
-        set => formModel.VatRegistered = value;
+        get => formModel.VatRegistered is null ? "" : (formModel.VatRegistered.Value ? "Yes" : "No");
+        set => formModel.VatRegistered = string.IsNullOrEmpty(value) ? null : value == "Yes";
     }
 
     /// <summary>The VAT-Group-only sub-fields (entity count and names) show only when the selected

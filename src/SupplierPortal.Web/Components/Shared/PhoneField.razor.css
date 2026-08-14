@@ -56,11 +56,25 @@
     text-align: center;
 }
 
+.di-phone-numberbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-left: 0.6rem;
+}
+
+.di-phone-icon {
+    flex: none;
+    color: var(--di-muted, #94a3b8);
+}
+
 .di-phone-number {
     flex: 1 1 auto;
     min-width: 0;
     border: none;
-    padding: 0 0.6rem;
+    padding: 0 0.6rem 0 0;
     background: transparent;
     color: inherit;
     font: inherit;

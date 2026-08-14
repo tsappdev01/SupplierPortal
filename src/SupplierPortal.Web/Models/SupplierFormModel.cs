@@ -293,7 +293,7 @@ public class SupplierFormModel
         s.CountryId = CountryId;
         s.PostalCode = PostalCode;
         s.AddressName = AddressName;
-        s.AdministrativeContact = string.IsNullOrWhiteSpace(AdministrativeContact) ? FirstName : AdministrativeContact;
+        s.AdministrativeContact = AdministrativeContact;
         s.PhoneCountryCodeId = PhoneCountryCodeId;
         s.PhoneAreaCode = PhoneAreaCode;
         s.MobileCountryCodeId = MobileCountryCodeId;
@@ -495,10 +495,10 @@ public class SupplierContactModel
         && string.IsNullOrWhiteSpace(LastName)
         && string.IsNullOrWhiteSpace(AdministrativeContact)
         && string.IsNullOrWhiteSpace(ContactEmail)
-        && PhoneCountryCodeId is null
+        // Country codes are auto-defaulted (UAE) by the phone control, so they don't count
+        // towards "has the user entered anything" — only the actual numbers do.
         && string.IsNullOrWhiteSpace(PhoneAreaCode)
         && string.IsNullOrWhiteSpace(Phone)
-        && MobileCountryCodeId is null
         && string.IsNullOrWhiteSpace(MobileAreaCode)
         && string.IsNullOrWhiteSpace(Mobile);
 

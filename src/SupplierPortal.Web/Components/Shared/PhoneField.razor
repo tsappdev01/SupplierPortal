@@ -19,8 +19,13 @@
                placeholder="Area" disabled="@Disabled" />
     }
 
-    <input type="tel" class="di-phone-number" value="@Number" @oninput="OnNumberInput"
-           placeholder="@Placeholder" disabled="@Disabled" />
+    <span class="di-phone-numberbox">
+        <svg class="di-phone-icon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a1.745 1.745 0 0 1-1.657-.459L5.482 8.062a1.745 1.745 0 0 1-.46-1.657l.548-2.19a.678.678 0 0 0-.122-.58L3.654 1.328z" />
+        </svg>
+        <input type="tel" class="di-phone-number" value="@Number" @oninput="OnNumberInput"
+               placeholder="@Placeholder" disabled="@Disabled" />
+    </span>
 
     @if (open)
     {
@@ -66,10 +71,27 @@
     [Parameter] public string? Placeholder { get; set; }
     [Parameter] public bool Disabled { get; set; }
 
+    /// <summary>Dial code to pre-select when no country is chosen yet (defaults to UAE, +971).</summary>
+    [Parameter] public string? DefaultDialCode { get; set; } = "971";
+
     private bool open;
     private string search = "";
 
     private LookupValue? Selected => Countries.FirstOrDefault(c => c.Id == CountryCodeId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Default the selector to a country (UAE by default) so the flag + dial code show up
+        // instead of an empty placeholder, and the chosen code is persisted with the record.
+        if (CountryCodeId is null && Countries.Count > 0 && !string.IsNullOrWhiteSpace(DefaultDialCode))
+        {
+            var def = Countries.FirstOrDefault(c => c.PhoneCode == DefaultDialCode);
+            if (def is not null)
+            {
+                await CountryCodeIdChanged.InvokeAsync(def.Id);
+            }
+        }
+    }
 
     private IEnumerable<LookupValue> Filtered =>
         string.IsNullOrWhiteSpace(search)
