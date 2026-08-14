@@ -835,16 +835,18 @@
                 </div>
                 @if (!SupplierFacing || SiteUsageKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
                 {
-                    <div class="di-hint">Site usages — select all that apply for this Business Unit assignment:</div>
+                    <div class="di-field di-full">
+                        <label>Site Usages</label>
+                        <div class="di-checkbox-row">
+                            <div class="di-checkbox-item @FieldClass("IsRfqOrBidding")"><InputCheckbox @bind-Value="formModel.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
+                            <div class="di-checkbox-item @FieldClass("IsOrdering")"><InputCheckbox @bind-Value="formModel.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
+                            <div class="di-checkbox-item @FieldClass("IsSourcingOnly")"><InputCheckbox @bind-Value="formModel.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
+                            <div class="di-checkbox-item @FieldClass("IsPurchasing")"><InputCheckbox @bind-Value="formModel.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
+                            <div class="di-checkbox-item @FieldClass("IsPay")"><InputCheckbox @bind-Value="formModel.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
+                            <div class="di-checkbox-item @FieldClass("IsPrimaryPay")"><InputCheckbox @bind-Value="formModel.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
+                        </div>
+                    </div>
                 }
-                <div class="di-checkbox-row">
-                    <div class="di-checkbox-item @FieldClass("IsRfqOrBidding")"><InputCheckbox @bind-Value="formModel.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
-                    <div class="di-checkbox-item @FieldClass("IsOrdering")"><InputCheckbox @bind-Value="formModel.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
-                    <div class="di-checkbox-item @FieldClass("IsSourcingOnly")"><InputCheckbox @bind-Value="formModel.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
-                    <div class="di-checkbox-item @FieldClass("IsPurchasing")"><InputCheckbox @bind-Value="formModel.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
-                    <div class="di-checkbox-item @FieldClass("IsPay")"><InputCheckbox @bind-Value="formModel.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
-                    <div class="di-checkbox-item @FieldClass("IsPrimaryPay")"><InputCheckbox @bind-Value="formModel.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
-                </div>
             </div>
         </div>
 
