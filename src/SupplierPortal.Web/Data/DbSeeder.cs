@@ -59,6 +59,41 @@ public static class DbSeeder
             }));
             await db.SaveChangesAsync();
         }
+        else
+        {
+            // Backfill phone dialing codes onto existing Country lookups. Databases seeded before
+            // PhoneCode was populated have null codes, which leaves the phone/mobile country selector
+            // empty. Match by ISO code first, then by name, and only fill rows that are missing one.
+            var countryRows = await db.LookupValues
+                .Where(l => l.Category == LookupCategory.Country && (l.PhoneCode == null || l.PhoneCode == ""))
+                .ToListAsync();
+            if (countryRows.Count > 0)
+            {
+                var byCode = CountrySeedData.Countries
+                    .Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode))
+                    .GroupBy(c => c.Code, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().PhoneCode!, StringComparer.OrdinalIgnoreCase);
+                var byName = CountrySeedData.Countries
+                    .Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode))
+                    .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().PhoneCode!, StringComparer.OrdinalIgnoreCase);
+
+                var changed = false;
+                foreach (var row in countryRows)
+                {
+                    if ((byCode.TryGetValue(row.Code, out var code) && !string.IsNullOrWhiteSpace(code))
+                        || (byName.TryGetValue(row.DisplayName, out code) && !string.IsNullOrWhiteSpace(code)))
+                    {
+                        row.PhoneCode = code;
+                        changed = true;
+                    }
+                }
+                if (changed)
+                {
+                    await db.SaveChangesAsync();
+                }
+            }
+        }
     }
 
     private static async Task RenameLookupAsync(ApplicationDbContext db, LookupCategory category, string oldName, string newName)

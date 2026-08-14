@@ -1069,6 +1069,10 @@
             formModel.SupplierSiteBuId ??= Supplier.BusinessUnitId;
             // A new bank account defaults its start date to today (editable).
             formModel.AccountStartDate ??= DateTime.Today;
+            // Address purposes default to all selected for a new supplier.
+            formModel.AddressPurposeOrdering = true;
+            formModel.AddressPurposeRemitTo = true;
+            formModel.AddressPurposeRfqBidding = true;
         }
         else
         {
