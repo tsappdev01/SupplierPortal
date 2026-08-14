@@ -414,41 +414,21 @@
                     <label>Contacts E-Mail@(Req("ContactEmail"))</label>
                     <InputText @bind-Value="formModel.ContactEmail" />
                 </div>
-                <div class="di-field @FieldClass("PhoneCountryCodeId")">
-                    <label>Phone Country Code@(Req("PhoneCountryCodeId"))</label>
-                    <InputSelect @bind-Value="formModel.PhoneCountryCodeId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in countriesWithPhoneCode)
-                        {
-                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("PhoneAreaCode")">
-                    <label>Phone Area Code@(Req("PhoneAreaCode"))</label>
-                    <InputText @bind-Value="formModel.PhoneAreaCode" />
-                </div>
                 <div class="di-field @FieldClass("Phone")">
                     <label>Phone@(Req("Phone"))</label>
-                    <InputText @bind-Value="formModel.Phone" />
-                </div>
-                <div class="di-field @FieldClass("MobileCountryCodeId")">
-                    <label>Mobile Country Code@(Req("MobileCountryCodeId"))</label>
-                    <InputSelect @bind-Value="formModel.MobileCountryCodeId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in countriesWithPhoneCode)
-                        {
-                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("MobileAreaCode")">
-                    <label>Mobile Area Code@(Req("MobileAreaCode"))</label>
-                    <InputText @bind-Value="formModel.MobileAreaCode" />
+                    <PhoneField Countries="countriesWithPhoneCode"
+                                @bind-CountryCodeId="formModel.PhoneCountryCodeId"
+                                @bind-AreaCode="formModel.PhoneAreaCode"
+                                @bind-Number="formModel.Phone"
+                                ShowAreaCode="true"
+                                Placeholder="123 4567" />
                 </div>
                 <div class="di-field @FieldClass("Mobile")">
                     <label>Mobile@(Req("Mobile"))</label>
-                    <InputText @bind-Value="formModel.Mobile" />
+                    <PhoneField Countries="countriesWithPhoneCode"
+                                @bind-CountryCodeId="formModel.MobileCountryCodeId"
+                                @bind-Number="formModel.Mobile"
+                                Placeholder="50 123 4567" />
                 </div>
 
                 <!-- Additional contacts (beyond the primary contact above) -->
@@ -507,40 +487,20 @@
                                     <InputText @bind-Value="contact.ContactEmail" />
                                 </div>
                                 <div class="di-field">
-                                    <label>Phone Country Code</label>
-                                    <InputSelect @bind-Value="contact.PhoneCountryCodeId">
-                                        <option value="">— Select —</option>
-                                        @foreach (var lov in countriesWithPhoneCode)
-                                        {
-                                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-                                <div class="di-field">
-                                    <label>Phone Area Code</label>
-                                    <InputText @bind-Value="contact.PhoneAreaCode" />
-                                </div>
-                                <div class="di-field">
                                     <label>Phone</label>
-                                    <InputText @bind-Value="contact.Phone" />
-                                </div>
-                                <div class="di-field">
-                                    <label>Mobile Country Code</label>
-                                    <InputSelect @bind-Value="contact.MobileCountryCodeId">
-                                        <option value="">— Select —</option>
-                                        @foreach (var lov in countriesWithPhoneCode)
-                                        {
-                                            <option value="@lov.Id">+@lov.PhoneCode @lov.DisplayName</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-                                <div class="di-field">
-                                    <label>Mobile Area Code</label>
-                                    <InputText @bind-Value="contact.MobileAreaCode" />
+                                    <PhoneField Countries="countriesWithPhoneCode"
+                                                @bind-CountryCodeId="contact.PhoneCountryCodeId"
+                                                @bind-AreaCode="contact.PhoneAreaCode"
+                                                @bind-Number="contact.Phone"
+                                                ShowAreaCode="true"
+                                                Placeholder="123 4567" />
                                 </div>
                                 <div class="di-field">
                                     <label>Mobile</label>
-                                    <InputText @bind-Value="contact.Mobile" />
+                                    <PhoneField Countries="countriesWithPhoneCode"
+                                                @bind-CountryCodeId="contact.MobileCountryCodeId"
+                                                @bind-Number="contact.Mobile"
+                                                Placeholder="50 123 4567" />
                                 </div>
                             </div>
                         </div>
