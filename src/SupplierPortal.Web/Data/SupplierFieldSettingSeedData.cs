@@ -11,7 +11,6 @@ public static class SupplierFieldSettingSeedData
         // Step 1: Business / Organization Information
         ("SupplierName", "Supplier Name", 1, true),
         ("TaxOrganizationTypeId", "Tax Organization Type", 1, true),
-        ("Email", "Business E-Mail", 1, true),
         ("SupplierTypeId", "Supplier Type", 1, true),
         ("TaxpayerCountryId", "Taxpayer Country", 1, false),
         ("CountryNameId", "Taxpayer Country Name", 1, false),
@@ -44,6 +43,7 @@ public static class SupplierFieldSettingSeedData
         ("State", "State", 2, false),
         ("ProvinceId", "Province", 2, true),
         ("CorporateWebSite", "Corporate Web Site", 2, false),
+        ("Email", "Business E-Mail", 2, true),
         ("AddressPurposeOrdering", "Address Purpose — Ordering", 2, false),
         ("AddressPurposeRemitTo", "Address Purpose — Remit to", 2, false),
         ("AddressPurposeRfqBidding", "Address Purpose — RFQ or Bidding", 2, false),

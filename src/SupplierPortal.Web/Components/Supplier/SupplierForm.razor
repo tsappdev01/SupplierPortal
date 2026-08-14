@@ -87,10 +87,6 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("Email")">
-                    <label>Business E-Mail@(Req("Email"))</label>
-                    <InputText @bind-Value="formModel.Email" />
-                </div>
                 <div class="di-field @FieldClass("SupplierTypeId")">
                     <label>Supplier Type@(Req("SupplierTypeId"))</label>
                     <InputSelect @bind-Value="formModel.SupplierTypeId">
@@ -360,6 +356,10 @@
                 <div class="di-field @FieldClass("CorporateWebSite")">
                     <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
                     <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
+                </div>
+                <div class="di-field @FieldClass("Email")">
+                    <label>Business E-Mail@(Req("Email"))</label>
+                    <InputText @bind-Value="formModel.Email" />
                 </div>
                 <div class="di-field di-full">
                     <label>Address Purpose</label>
@@ -1263,9 +1263,9 @@
 
     private RenderFragment Req(string fieldKey) => builder =>
     {
-        // Required markers appear only on the supplier-facing self-service portal; mandatory settings
-        // do not restrict internal admin/user editing, so no asterisks are shown there.
-        if (SupplierFacing && mandatoryKeys.Contains(fieldKey))
+        // Show the required marker whenever the field is mandatory per Supplier Field Settings —
+        // in both the internal admin/user view and the supplier-facing self-service portal.
+        if (mandatoryKeys.Contains(fieldKey))
         {
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "class", "di-req");
