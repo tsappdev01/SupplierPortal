@@ -50,7 +50,16 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.City)
             .Include(s => s.CommunicationMethod)
             .Include(s => s.AccountCountryCode)
-            .Include(s => s.AccountCurrencyCode);
+            .Include(s => s.AccountCurrencyCode)
+            // Newer classification / VAT / license / mobile / intermediary lookups, needed by the
+            // full Excel export so their display names resolve.
+            .Include(s => s.VatRegistrationType)
+            .Include(s => s.BusinessPartnerType)
+            .Include(s => s.BusinessLocationType)
+            .Include(s => s.EInvoicingWave)
+            .Include(s => s.TradeLicenseIssuingBody)
+            .Include(s => s.MobileCountryCode)
+            .Include(s => s.IntermediaryCountry);
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null)
