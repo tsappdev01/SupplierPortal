@@ -15,7 +15,7 @@
 
     @if (ShowAreaCode)
     {
-        <input type="text" class="di-phone-area" value="@AreaCode" @oninput="OnAreaInput"
+        <input type="tel" class="di-phone-area" value="@AreaCode" @oninput="OnAreaInput"
                placeholder="Area" maxlength="5" inputmode="numeric" disabled="@Disabled" />
     }
 
