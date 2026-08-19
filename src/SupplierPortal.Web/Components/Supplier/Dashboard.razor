@@ -64,6 +64,14 @@
         </svg>
         <span>Excel (All Fields)</span>
     </a>
+    <button type="button" class="di-export-btn" @onclick="OpenTemplateDialog" title="Generate a supplier upload template" aria-label="Generate supplier template">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#1565c0" stroke-width="2.5" />
+            <path d="M30 3h9v9z" fill="#90caf9" stroke="#1565c0" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="M12 16h16M12 22h16M12 28h16M12 34h9" stroke="#90caf9" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span>Generate Template</span>
+    </button>
     <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF" aria-label="Export to PDF">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#c62828" stroke-width="2.5" />
@@ -119,6 +127,56 @@
         <span>Upload Supplier Data</span>
     </a>
 </div>
+
+@if (showTemplateDialog)
+{
+    <div class="di-tmpl-backdrop" @onclick="CloseTemplateDialog">
+        <div class="di-tmpl-modal" @onclick:stopPropagation>
+            <h5 class="di-tmpl-title">Generate Supplier Template</h5>
+            <p class="di-tmpl-text">
+                Download an Excel template for the business to fill in and re-upload. On upload,
+                duplicate suppliers (by Supplier Number) are detected and skipped automatically.
+            </p>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="tmplMode" checked="@(!templatePopulate)" @onchange="() => templatePopulate = false" />
+                <span>Blank template (headers only)</span>
+            </label>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="tmplMode" checked="@templatePopulate" @onchange="() => templatePopulate = true" />
+                <span>Populate with existing supplier data</span>
+            </label>
+            @if (templatePopulate)
+            {
+                <div class="di-tmpl-field">
+                    <label>Business Unit</label>
+                    <select @bind="templateBuId">
+                        <option value="0">@(isAdministrator ? "All Business Units" : "All My Business Units")</option>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <option value="@bu.Id">@bu.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div class="di-tmpl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CloseTemplateDialog">Cancel</button>
+                <a class="di-btn di-btn-primary" href="@TemplateUrl" @onclick="CloseTemplateDialog">Download</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
+        .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+        .di-tmpl-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #1a2233; }
+        .di-tmpl-text { margin: 0 0 16px; font-size: 13.5px; color: #6b7280; }
+        .di-tmpl-radio { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14.5px; color: #26303f; cursor: pointer; }
+        .di-tmpl-field { margin: 10px 0 4px; display: flex; flex-direction: column; gap: 5px; }
+        .di-tmpl-field label { font-size: 13px; font-weight: 600; color: #46618f; }
+        .di-tmpl-field select { padding: 9px 11px; border: 1px solid #e2e5ea; border-radius: 8px; font-size: 15px; color: #1a2233; background: #fff; }
+        .di-tmpl-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    </style>
+}
 
 <div class="row g-2 mb-3 no-print">
     @if (businessUnits.Count > 1 || isAdministrator)
@@ -432,6 +490,27 @@ else if (TotalPages > 1)
 
 @code {
     private enum SupplierTab { RecentlyUpdated, UpdatedLastWeek, EverythingElse }
+
+    // "Generate Template" dialog state.
+    private bool showTemplateDialog;
+    private bool templatePopulate;
+    private int templateBuId;
+
+    private void OpenTemplateDialog()
+    {
+        templatePopulate = false;
+        templateBuId = filterBusinessUnitId;
+        showTemplateDialog = true;
+    }
+
+    private void CloseTemplateDialog() => showTemplateDialog = false;
+
+    private string TemplateUrl =>
+        templatePopulate
+            ? (templateBuId != 0
+                ? $"/export/template?populate=true&businessUnitId={templateBuId}"
+                : "/export/template?populate=true")
+            : "/export/template?populate=false";
 
     private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
 

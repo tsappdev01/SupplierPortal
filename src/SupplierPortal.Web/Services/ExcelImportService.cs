@@ -101,6 +101,17 @@ public class ExcelImportService(
         var banks = await db.Banks.Include(b => b.Branches).ToListAsync();
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name.ToLowerInvariant(), b => b.Id);
 
+        // Duplicate guard: a re-uploaded template must not create a second copy of a supplier that is
+        // already in the system, nor of a supplier number repeated within the file. Both are reported
+        // and the offending row is skipped.
+        var existingNumbers = (await db.Suppliers
+                .Select(s => s.SupplierNumber)
+                .ToListAsync())
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Select(n => n.Trim().ToLowerInvariant())
+            .ToHashSet();
+        var seenNumbers = new HashSet<string>();
+
         // ClosedXML reads its input stream synchronously, which browser-uploaded IBrowserFile streams
         // (Blazor Server, streamed over SignalR) don't support. Buffer to a seekable MemoryStream first.
         using var bufferedStream = new MemoryStream();
@@ -156,6 +167,20 @@ public class ExcelImportService(
 
             if (string.IsNullOrWhiteSpace(supplierNumber)) rowErrors.Add("Supplier Number is required.");
             if (string.IsNullOrWhiteSpace(supplierName)) rowErrors.Add("Supplier Name is required.");
+
+            // Skip duplicates (already in the system, or repeated earlier in this file).
+            if (!string.IsNullOrWhiteSpace(supplierNumber))
+            {
+                var dupKey = supplierNumber.Trim().ToLowerInvariant();
+                if (existingNumbers.Contains(dupKey))
+                {
+                    rowErrors.Add($"Supplier Number '{supplierNumber}' already exists — skipped as a duplicate.");
+                }
+                else if (!seenNumbers.Add(dupKey))
+                {
+                    rowErrors.Add($"Supplier Number '{supplierNumber}' appears more than once in the file — skipped as a duplicate.");
+                }
+            }
 
             // Every lookup below is optional on import: an unrecognized value is left blank and noted
             // as a warning (see ResolveLookup), so incomplete legacy data still imports.

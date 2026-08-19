@@ -333,6 +333,25 @@ app.MapGet("/export/{format}", async (string format, int? businessUnitId, HttpCo
     };
 }).RequireAuthorization();
 
+// Generates a supplier upload template (importer-compatible columns). Optionally pre-populated with a
+// business unit's existing suppliers so the business can update and re-upload; otherwise a blank sheet.
+app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
+{
+    var suppliers = new List<Supplier>();
+    if (populate == true)
+    {
+        var isAdministrator = ctx.User.IsAdministrator();
+        var effectiveBusinessUnitIds = isAdministrator
+            ? (businessUnitId.HasValue ? new List<int> { businessUnitId.Value } : null)
+            : ctx.User.GetBusinessUnitIds();
+        suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds);
+    }
+
+    return Results.File(exportService.ExportToExcelTemplate(suppliers),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        populate == true ? "Supplier Template (Populated).xlsx" : "Supplier Template (Blank).xlsx");
+}).RequireAuthorization();
+
 app.MapGet("/users/{id:int}/photo", async (int id, UserService userService) =>
 {
     var photo = await userService.GetPhotoAsync(id);
