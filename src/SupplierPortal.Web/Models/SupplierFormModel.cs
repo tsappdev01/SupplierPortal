@@ -85,9 +85,6 @@ public class SupplierFormModel
     public string? Mobile { get; set; }
     public string? State { get; set; }
 
-    [Required(ErrorMessage = "Province is required.")]
-    public int? ProvinceId { get; set; }
-
     // -- Step 3: Payment / Banking Information --
     [Required(ErrorMessage = "Bank Name is required.")]
     public int? BankId { get; set; }
@@ -117,6 +114,11 @@ public class SupplierFormModel
     public string? IntermediaryBranchNumber { get; set; }
     public string? IntermediaryIban { get; set; }
     public string? IntermediaryBicSwiftCode { get; set; }
+
+    // Business-level contact phone (Address tab).
+    public int? BusinessPhoneCountryCodeId { get; set; }
+    public string? BusinessPhoneAreaCode { get; set; }
+    public string? BusinessPhone { get; set; }
 
     // -- Step 4: Site / Business Unit --
     [EmailAddress(ErrorMessage = "Enter a valid Remittance E-mail.")]
@@ -208,7 +210,6 @@ public class SupplierFormModel
         MobileAreaCode = s.MobileAreaCode,
         Mobile = s.Mobile,
         State = s.State,
-        ProvinceId = s.ProvinceId,
 
         BankId = s.BankId,
         BankBranchId = s.BankBranchId,
@@ -232,6 +233,9 @@ public class SupplierFormModel
         IntermediaryBicSwiftCode = s.IntermediaryBicSwiftCode,
 
         RemittanceEmail = s.RemittanceEmail,
+        BusinessPhoneCountryCodeId = s.BusinessPhoneCountryCodeId,
+        BusinessPhoneAreaCode = s.BusinessPhoneAreaCode,
+        BusinessPhone = s.BusinessPhone,
         IsRfqOrBidding = s.IsRfqOrBidding,
         IsOrdering = s.IsOrdering,
         IsPay = s.IsPay,
@@ -300,7 +304,6 @@ public class SupplierFormModel
         s.MobileAreaCode = MobileAreaCode;
         s.Mobile = Mobile;
         s.State = State;
-        s.ProvinceId = ProvinceId;
 
         s.BankId = BankId;
         s.BankBranchId = BankBranchId;
@@ -324,6 +327,9 @@ public class SupplierFormModel
         s.IntermediaryBicSwiftCode = IntermediaryBicSwiftCode;
 
         s.RemittanceEmail = RemittanceEmail;
+        s.BusinessPhoneCountryCodeId = BusinessPhoneCountryCodeId;
+        s.BusinessPhoneAreaCode = BusinessPhoneAreaCode;
+        s.BusinessPhone = BusinessPhone;
         s.IsRfqOrBidding = IsRfqOrBidding;
         s.IsOrdering = IsOrdering;
         s.IsPay = IsPay;

@@ -39,7 +39,6 @@ public class SupplierDto
     public int? PhoneCountryCodeId { get; set; }
     public string? PhoneAreaCode { get; set; }
     public string? State { get; set; }
-    public int? ProvinceId { get; set; }
 
     // -- Step 3: Payment / Banking --
     public int? BankId { get; set; }

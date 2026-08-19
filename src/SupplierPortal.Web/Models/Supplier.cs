@@ -117,9 +117,6 @@ public class Supplier
     [MaxLength(150)]
     public string? State { get; set; }
 
-    public int? ProvinceId { get; set; }
-    public LookupValue? Province { get; set; }
-
     public int? CountryId { get; set; }
     public LookupValue? Country { get; set; }
 
@@ -133,6 +130,17 @@ public class Supplier
 
     [MaxLength(256)]
     public string? RemittanceEmail { get; set; }
+
+    // Business-level contact phone (captured on the Address tab), separate from the personal
+    // contact phone in the Contact section.
+    public int? BusinessPhoneCountryCodeId { get; set; }
+    public LookupValue? BusinessPhoneCountryCode { get; set; }
+
+    [MaxLength(10)]
+    public string? BusinessPhoneAreaCode { get; set; }
+
+    [MaxLength(50)]
+    public string? BusinessPhone { get; set; }
 
     // -- Contact --
 

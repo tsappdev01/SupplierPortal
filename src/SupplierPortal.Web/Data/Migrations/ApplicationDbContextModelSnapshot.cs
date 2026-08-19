@@ -925,6 +925,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("BusinessPartnerTypeId")
                         .HasColumnType("int");
 
+                    b.Property<string>("BusinessPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("BusinessPhoneAreaCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("BusinessPhoneCountryCodeId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("BusinessRelationshipId")
                         .HasColumnType("int");
 
@@ -1104,9 +1115,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("ProcurementBuId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ProvinceId")
-                        .HasColumnType("int");
-
                     b.Property<string>("RemitAdviceEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -1241,7 +1249,7 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasIndex("ProcurementBuId");
 
-                    b.HasIndex("ProvinceId");
+                    b.HasIndex("BusinessPhoneCountryCodeId");
 
                     b.HasIndex("StatusId");
 
@@ -1909,9 +1917,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("ProcurementBuId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "Province")
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessPhoneCountryCode")
                         .WithMany()
-                        .HasForeignKey("ProvinceId")
+                        .HasForeignKey("BusinessPhoneCountryCodeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "Status")
@@ -2000,7 +2008,7 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Navigation("ProcurementBu");
 
-                    b.Navigation("Province");
+                    b.Navigation("BusinessPhoneCountryCode");
 
                     b.Navigation("Status");
 

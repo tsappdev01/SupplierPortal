@@ -150,12 +150,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Supplier>()
-            .HasOne(s => s.Province)
-            .WithMany()
-            .HasForeignKey(s => s.ProvinceId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Supplier>()
             .HasOne(s => s.VatCode)
             .WithMany()
             .HasForeignKey(s => s.VatCodeId)
@@ -195,6 +189,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(s => s.MobileCountryCode)
             .WithMany()
             .HasForeignKey(s => s.MobileCountryCodeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Supplier>()
+            .HasOne(s => s.BusinessPhoneCountryCode)
+            .WithMany()
+            .HasForeignKey(s => s.BusinessPhoneCountryCodeId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Additional supplier contacts: cascade-delete with the supplier, but keep LOV references

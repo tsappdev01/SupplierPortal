@@ -97,13 +97,23 @@
                         }
                     </InputSelect>
                 </div>
+                <div class="di-field @FieldClass("BusinessRelationshipId")">
+                    <label>Business Relationship@(Req("BusinessRelationshipId"))</label>
+                    <InputSelect @bind-Value="formModel.BusinessRelationshipId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in businessRelationships)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
                 <div class="di-field @FieldClass("TaxpayerCountryId")">
                     <label>Taxpayer Country@(Req("TaxpayerCountryId"))</label>
                     <InputSelect @bind-Value="formModel.TaxpayerCountryId">
                         <option value="">— Select —</option>
                         @foreach (var lov in countries)
                         {
-                            <option value="@lov.Id">@lov.DisplayName</option>
+                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
@@ -113,74 +123,7 @@
                         <option value="">— Select —</option>
                         @foreach (var lov in countries)
                         {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("TaxRegistrationNumber")">
-                    <label>Tax Registration Number@(Req("TaxRegistrationNumber"))</label>
-                    <InputText @bind-Value="formModel.TaxRegistrationNumber" />
-                </div>
-                <div class="di-field @FieldClass("SupplierTin")">
-                    <label>Supplier TIN@(Req("SupplierTin"))</label>
-                    <InputText @bind-Value="formModel.SupplierTin" />
-                </div>
-                <div class="di-field @FieldClass("VatRegistered")">
-                    <label>VAT Registered?@(Req("VatRegistered"))</label>
-                    <InputSelect @bind-Value="vatRegisteredYesNo">
-                        <option value="">— Select —</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("VatRegistrationTypeId")">
-                    <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
-                    <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in vatRegistrationTypes)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                @if (IsVatGroupSelected)
-                {
-                    <div class="di-field @FieldClass("NumberOfVatGroupEntities")">
-                        <label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label>
-                        <InputNumber @bind-Value="formModel.NumberOfVatGroupEntities" />
-                    </div>
-                    <div class="di-field di-full @FieldClass("VatGroupEntityNames")">
-                        <label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label>
-                        <InputTextArea @bind-Value="formModel.VatGroupEntityNames" rows="3" placeholder="One legal entity name per line" />
-                    </div>
-                }
-                <div class="di-field @FieldClass("BusinessPartnerTypeId")">
-                    <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>
-                    <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in businessPartnerTypes)
-                        {
                             <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("BusinessLocationTypeId")">
-                    <label>Business Location Type@(Req("BusinessLocationTypeId"))</label>
-                    <InputSelect @bind-Value="formModel.BusinessLocationTypeId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in businessLocationTypes)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("EInvoicingWaveId")">
-                    <label>eINvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label>
-                    <InputSelect @bind-Value="formModel.EInvoicingWaveId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in eInvoicingWaves)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
@@ -213,6 +156,73 @@
                         <InputText @bind-Value="formModel.IssuingBodyIfOthers" />
                     </div>
                 }
+                <div class="di-field @FieldClass("VatRegistered")">
+                    <label>VAT Registered?@(Req("VatRegistered"))</label>
+                    <InputSelect @bind-Value="vatRegisteredYesNo">
+                        <option value="">— Select —</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("TaxRegistrationNumber")">
+                    <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label>
+                    <InputText @bind-Value="formModel.TaxRegistrationNumber" />
+                </div>
+                <div class="di-field @FieldClass("VatRegistrationTypeId")">
+                    <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in vatRegistrationTypes)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                @if (IsVatGroupSelected)
+                {
+                    <div class="di-field @FieldClass("NumberOfVatGroupEntities")">
+                        <label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label>
+                        <InputNumber @bind-Value="formModel.NumberOfVatGroupEntities" />
+                    </div>
+                    <div class="di-field di-full @FieldClass("VatGroupEntityNames")">
+                        <label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label>
+                        <InputTextArea @bind-Value="formModel.VatGroupEntityNames" rows="3" placeholder="One legal entity name per line" />
+                    </div>
+                }
+                <div class="di-field @FieldClass("SupplierTin")">
+                    <label>Supplier TIN@(Req("SupplierTin"))</label>
+                    <InputText @bind-Value="formModel.SupplierTin" />
+                </div>
+                <div class="di-field @FieldClass("BusinessPartnerTypeId")">
+                    <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in businessPartnerTypes)
+                        {
+                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("BusinessLocationTypeId")">
+                    <label>Business Location Type@(Req("BusinessLocationTypeId"))</label>
+                    <InputSelect @bind-Value="formModel.BusinessLocationTypeId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in businessLocationTypes)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="di-field @FieldClass("EInvoicingWaveId")">
+                    <label>eINvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label>
+                    <InputSelect @bind-Value="formModel.EInvoicingWaveId">
+                        <option value="">— Select —</option>
+                        @foreach (var lov in eInvoicingWaves)
+                        {
+                            <option value="@lov.Id">@lov.DisplayName</option>
+                        }
+                    </InputSelect>
+                </div>
                 <div class="di-field @FieldClass("VatCodeId")">
                     <label>VAT Code@(Req("VatCodeId"))</label>
                     <InputSelect @bind-Value="formModel.VatCodeId">
@@ -220,16 +230,6 @@
                         @foreach (var lov in vatCodes)
                         {
                             <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="di-field @FieldClass("BusinessRelationshipId")">
-                    <label>Business Relationship@(Req("BusinessRelationshipId"))</label>
-                    <InputSelect @bind-Value="formModel.BusinessRelationshipId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in businessRelationships)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
@@ -302,7 +302,7 @@
                     <label>Address Name@(Req("AddressName"))</label>
                     <InputText @bind-Value="formModel.AddressName" />
                 </div>
-                <div class="di-field @FieldClass("AddressLine1")">
+                <div class="di-field di-full @FieldClass("AddressLine1")">
                     <label>Address Line 1@(Req("AddressLine1"))</label>
                     <InputText @bind-Value="formModel.AddressLine1" />
                 </div>
@@ -316,7 +316,7 @@
                         <option value="">— Select —</option>
                         @foreach (var lov in countries)
                         {
-                            <option value="@lov.Id">@lov.DisplayName</option>
+                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
                         }
                     </InputSelect>
                 </div>
@@ -345,16 +345,6 @@
                     <label>State@(Req("State"))</label>
                     <InputText @bind-Value="formModel.State" />
                 </div>
-                <div class="di-field @FieldClass("ProvinceId")">
-                    <label>Province@(Req("ProvinceId"))</label>
-                    <InputSelect @bind-Value="formModel.ProvinceId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in provinces)
-                        {
-                            <option value="@lov.Id">@lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
                 <div class="di-field @FieldClass("CorporateWebSite")">
                     <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
                     <InputText @bind-Value="formModel.CorporateWebSite" placeholder="https://" />
@@ -362,6 +352,15 @@
                 <div class="di-field @FieldClass("Email")">
                     <label>Business E-Mail@(Req("Email"))</label>
                     <InputText @bind-Value="formModel.Email" />
+                </div>
+                <div class="di-field @FieldClass("BusinessPhone")">
+                    <label>Business Contact Number@(Req("BusinessPhone"))</label>
+                    <PhoneField Countries="countriesWithPhoneCode"
+                                @bind-CountryCodeId="formModel.BusinessPhoneCountryCodeId"
+                                @bind-AreaCode="formModel.BusinessPhoneAreaCode"
+                                @bind-Number="formModel.BusinessPhone"
+                                ShowAreaCode="true"
+                                Placeholder="888 6998" />
                 </div>
                 <div class="di-field di-full">
                     <label>Address Purpose</label>
@@ -424,14 +423,18 @@
                     <label>Phone@(Req("Phone"))</label>
                     <PhoneField Countries="countriesWithPhoneCode"
                                 @bind-CountryCodeId="formModel.PhoneCountryCodeId"
+                                @bind-AreaCode="formModel.PhoneAreaCode"
                                 @bind-Number="formModel.Phone"
-                                Placeholder="50 123 4567" />
+                                ShowAreaCode="true"
+                                Placeholder="888 6998" />
                 </div>
                 <div class="di-field @FieldClass("Mobile")">
                     <label>Mobile@(Req("Mobile"))</label>
                     <PhoneField Countries="countriesWithPhoneCode"
                                 @bind-CountryCodeId="formModel.MobileCountryCodeId"
+                                @bind-AreaCode="formModel.MobileAreaCode"
                                 @bind-Number="formModel.Mobile"
+                                ShowAreaCode="true"
                                 Placeholder="50 123 4567" />
                 </div>
 
@@ -498,14 +501,18 @@
                                     <label>Phone</label>
                                     <PhoneField Countries="countriesWithPhoneCode"
                                                 @bind-CountryCodeId="contact.PhoneCountryCodeId"
+                                                @bind-AreaCode="contact.PhoneAreaCode"
                                                 @bind-Number="contact.Phone"
-                                                Placeholder="50 123 4567" />
+                                                ShowAreaCode="true"
+                                                Placeholder="888 6998" />
                                 </div>
                                 <div class="di-field">
                                     <label>Mobile</label>
                                     <PhoneField Countries="countriesWithPhoneCode"
                                                 @bind-CountryCodeId="contact.MobileCountryCodeId"
+                                                @bind-AreaCode="contact.MobileAreaCode"
                                                 @bind-Number="contact.Mobile"
+                                                ShowAreaCode="true"
                                                 Placeholder="50 123 4567" />
                                 </div>
                             </div>
@@ -1018,6 +1025,40 @@
         licensingAuthorities.FirstOrDefault(l => l.Id == formModel.TradeLicenseIssuingBodyId)?
             .DisplayName.Equals("Others", StringComparison.OrdinalIgnoreCase) == true;
 
+    // Fields only meaningful / required when the supplier is VAT registered.
+    private static readonly HashSet<string> VatDependentKeys =
+    [
+        "TaxRegistrationNumber", "VatRegistrationTypeId", "NumberOfVatGroupEntities",
+        "VatGroupEntityNames", "SupplierTin"
+    ];
+
+    // Step-1 fields whose required state is conditional and enforced by dedicated always-on rules
+    // in ValidateStep, so the generic mandatory loop skips them (avoids double/incorrect checks).
+    private static readonly HashSet<string> ConditionalStep1Keys =
+        ["IssuingBodyIfOthers", "NumberOfVatGroupEntities", "VatGroupEntityNames"];
+
+    /// <summary>Effective required state for a field, layering conditional business rules on top of the
+    /// admin-configured mandatory flag:
+    /// • Issuing Body if Others — required only when the issuing body is "Others".
+    /// • VAT Group entity count / names — required when the VAT Registration Type is a VAT Group.
+    /// • VAT-dependent fields (TRN, VAT type, TIN) — never required when VAT Registered is not "Yes".</summary>
+    private bool IsFieldMandatory(string fieldKey)
+    {
+        if (fieldKey == "IssuingBodyIfOthers")
+        {
+            return IsIssuingBodyOthers;
+        }
+        if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
+        {
+            return IsVatGroupSelected;
+        }
+        if (VatDependentKeys.Contains(fieldKey) && formModel.VatRegistered != true)
+        {
+            return false;
+        }
+        return mandatoryKeys.Contains(fieldKey);
+    }
+
     private List<SupplierDocument> OtherDocuments =>
         documents.Where(d => d.DocumentType == SupplierDocumentType.Other).ToList();
 
@@ -1239,9 +1280,9 @@
 
     private RenderFragment Req(string fieldKey) => builder =>
     {
-        // Show the required marker whenever the field is mandatory per Supplier Field Settings —
-        // in both the internal admin/user view and the supplier-facing self-service portal.
-        if (mandatoryKeys.Contains(fieldKey))
+        // Show the required marker whenever the field is effectively mandatory (admin setting plus the
+        // conditional business rules) — in both the internal and supplier-facing views.
+        if (IsFieldMandatory(fieldKey))
         {
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "class", "di-req");
@@ -1334,14 +1375,43 @@
             }
         }
 
+        // Conditional required rules for Business / Organization, enforced in both admin and
+        // supplier-facing modes (like the City rule above):
+        //  • Issuing Body if Others — when the issuing body is "Others".
+        //  • VAT Group entity count / names — when the VAT Registration Type is a VAT Group.
+        if (step == 1)
+        {
+            if (IsIssuingBodyOthers && string.IsNullOrWhiteSpace(model.IssuingBodyIfOthers))
+            {
+                errors.Add("Issuing Body if Others is required.");
+            }
+            if (IsVatGroupSelected)
+            {
+                if (IsEmpty(model.NumberOfVatGroupEntities))
+                {
+                    errors.Add("Number of Entities if VAT Group is required.");
+                }
+                if (string.IsNullOrWhiteSpace(model.VatGroupEntityNames))
+                {
+                    errors.Add("Legal Names of all Entities under the VAT Group is required.");
+                }
+            }
+        }
+
         // Mandatory-field enforcement applies only to the supplier-facing self-service portal. Internal
         // admin/user editing must never be blocked by a mandatory setting, so skip the required checks.
         if (SupplierFacing)
         {
-            foreach (var setting in fieldSettings.Where(f => f.Step == step && f.IsMandatory && !IsHiddenFromSupplier(f.FieldKey)))
+            foreach (var setting in fieldSettings.Where(f => f.Step == step && !IsHiddenFromSupplier(f.FieldKey)))
             {
-                // City is handled above (as an always-on rule) so it is skipped in the generic loop.
-                if (setting.FieldKey == "CityId")
+                // City and the conditional Step-1 rules are handled above as always-on rules.
+                if (setting.FieldKey == "CityId" || ConditionalStep1Keys.Contains(setting.FieldKey))
+                {
+                    continue;
+                }
+                // IsFieldMandatory layers the conditional rules (e.g. VAT Registered = No relaxes the
+                // VAT fields) on top of the admin-configured mandatory flag.
+                if (!IsFieldMandatory(setting.FieldKey))
                 {
                     continue;
                 }

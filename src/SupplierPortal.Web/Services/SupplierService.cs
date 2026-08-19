@@ -33,7 +33,6 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.CountryName)
             .Include(s => s.Country)
             .Include(s => s.BusinessRelationship)
-            .Include(s => s.Province)
             .Include(s => s.VatCode)
             .Include(s => s.PaymentMethod)
             .Include(s => s.PaymentTerms)
@@ -59,6 +58,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.EInvoicingWave)
             .Include(s => s.TradeLicenseIssuingBody)
             .Include(s => s.MobileCountryCode)
+            .Include(s => s.BusinessPhoneCountryCode)
             .Include(s => s.IntermediaryCountry);
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
@@ -244,7 +244,6 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.AddressLine2 = updated.AddressLine2;
         supplier.CityId = updated.CityId;
         supplier.State = updated.State;
-        supplier.ProvinceId = updated.ProvinceId;
         supplier.CountryId = updated.CountryId;
         supplier.PostalCode = updated.PostalCode;
         supplier.RemittanceEmail = updated.RemittanceEmail;

@@ -36,7 +36,6 @@ public class ExcelImportService(
         ["address line 2"] = "AddressLine2",
         ["city"] = "City",
         ["state"] = "State",
-        ["province"] = "Province",
         ["country"] = "Country",
         ["postal code"] = "PostalCode",
         ["remittance e-mail"] = "RemittanceEmail",
@@ -167,7 +166,6 @@ public class ExcelImportService(
             var countryId = ResolveLookup(values, "Country", countries, required: false, rowErrors, rowWarnings);
             var businessRelationshipId = ResolveLookup(values, "BusinessRelationship", businessRelationships, required: false, rowErrors, rowWarnings);
             var cityId = ResolveLookup(values, "City", provinces, required: false, rowErrors, rowWarnings);
-            var provinceId = ResolveLookup(values, "Province", provinces, required: false, rowErrors, rowWarnings);
             var vatCodeId = ResolveLookup(values, "VatCode", vatCodes, required: false, rowErrors, rowWarnings);
             var paymentMethodId = ResolveLookup(values, "PaymentMethod", paymentMethods, required: false, rowErrors, rowWarnings);
             var paymentTermsId = ResolveLookup(values, "PaymentTerms", paymentTerms, required: false, rowErrors, rowWarnings);
@@ -218,7 +216,6 @@ public class ExcelImportService(
                 AddressLine2 = string.IsNullOrWhiteSpace(addressLine2) ? null : addressLine2,
                 CityId = cityId,
                 State = GetOrNull(values, "State"),
-                ProvinceId = provinceId,
                 CountryId = countryId,
                 PostalCode = string.IsNullOrWhiteSpace(postalCode) ? null : postalCode,
                 RemittanceEmail = GetOrNull(values, "RemittanceEmail"),
