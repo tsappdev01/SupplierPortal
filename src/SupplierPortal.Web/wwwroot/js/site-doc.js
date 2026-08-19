@@ -21,5 +21,23 @@ window.ssDoc = {
         var blob = new Blob([view], { type: contentType || 'application/octet-stream' });
         return URL.createObjectURL(blob);
     },
-    revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } }
+    revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } },
+
+    // Save base64-encoded bytes (generated server-side) as a downloaded file. Used so the app can
+    // show a progress indicator while the file is being built, then hand the finished file to the browser.
+    download: function (fileName, contentType, base64) {
+        var binary = atob(base64);
+        var len = binary.length;
+        var view = new Uint8Array(len);
+        for (var i = 0; i < len; i++) { view[i] = binary.charCodeAt(i); }
+        var blob = new Blob([view], { type: contentType || 'application/octet-stream' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 1500);
+    }
 };
