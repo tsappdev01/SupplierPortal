@@ -48,7 +48,8 @@
 }
 
 .di-phone-area {
-    width: 4.25rem;
+    width: 3.25rem;
+    flex: none;
     border: none;
     border-right: 1px solid #e2e5ea;
     padding: 0 0.5rem;
