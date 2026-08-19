@@ -117,16 +117,6 @@
                         }
                     </InputSelect>
                 </div>
-                <div class="di-field @FieldClass("CountryNameId")">
-                    <label>Taxpayer Country Name@(Req("CountryNameId"))</label>
-                    <InputSelect @bind-Value="formModel.CountryNameId">
-                        <option value="">— Select —</option>
-                        @foreach (var lov in countries)
-                        {
-                            <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
-                        }
-                    </InputSelect>
-                </div>
                 <div class="di-field @FieldClass("TradeLicenseNumber")">
                     <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
                     <InputText @bind-Value="formModel.TradeLicenseNumber" />
@@ -1101,7 +1091,6 @@
         {
             var uae = countries.FirstOrDefault(c => c.DisplayName.Contains("United Arab Emirates", StringComparison.OrdinalIgnoreCase));
             formModel.CountryId ??= uae?.Id;
-            formModel.CountryNameId ??= uae?.Id;
             formModel.AccountCountryCodeId ??= uae?.Id;
             var phoneUae = countriesWithPhoneCode.FirstOrDefault(c => c.PhoneCode == "971");
             formModel.PhoneCountryCodeId ??= phoneUae?.Id;

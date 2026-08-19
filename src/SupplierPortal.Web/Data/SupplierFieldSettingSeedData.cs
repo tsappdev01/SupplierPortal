@@ -13,7 +13,6 @@ public static class SupplierFieldSettingSeedData
         ("TaxOrganizationTypeId", "Tax Organization Type", 1, true),
         ("SupplierTypeId", "Supplier Type", 1, true),
         ("TaxpayerCountryId", "Taxpayer Country", 1, false),
-        ("CountryNameId", "Taxpayer Country Name", 1, false),
         ("TaxRegistrationNumber", "TRN/VAT Registration Number", 1, true),
         ("VatRegistered", "VAT Registered?", 1, false),
         ("VatRegistrationTypeId", "VAT Registration Type", 1, false),
