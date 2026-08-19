@@ -347,7 +347,7 @@ app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpC
         suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds);
     }
 
-    return Results.File(exportService.ExportToExcelTemplate(suppliers),
+    return Results.File(exportService.ExportToExcelUploadTemplate(suppliers),
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         populate == true ? "Supplier Template (Populated).xlsx" : "Supplier Template (Blank).xlsx");
 }).RequireAuthorization();

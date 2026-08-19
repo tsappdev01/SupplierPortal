@@ -117,6 +117,144 @@ public class ExportService
     private static string D(DateTime? value) => value?.ToString("yyyy-MM-dd") ?? "";
     private static string DT(DateTime? value) => value?.ToString("yyyy-MM-dd HH:mm") ?? "";
 
+    // Canonical round-trip template: every editable supplier field, with plain header text that the
+    // ExcelImportService recognizes 1:1. Downloading this (blank or populated) and re-uploading it
+    // preserves all fields. Header text here MUST stay in sync with ExcelImportService.HeaderMap.
+    public static readonly (string Header, Func<Supplier, string> Value)[] UploadTemplateColumns =
+    [
+        // Business / Organization
+        ("Supplier Number", s => s.SupplierNumber),
+        ("Supplier Name", s => s.SupplierName),
+        ("Tax Organization Type", s => s.TaxOrganizationType?.DisplayName ?? ""),
+        ("Supplier Type", s => s.SupplierType?.DisplayName ?? ""),
+        ("Business Relationship", s => s.BusinessRelationship?.DisplayName ?? ""),
+        ("Taxpayer Country", s => s.TaxpayerCountry?.DisplayName ?? ""),
+        ("Business Partner Type", s => s.BusinessPartnerType?.DisplayName ?? ""),
+        ("Business Location Type", s => s.BusinessLocationType?.DisplayName ?? ""),
+        ("eInvoicing Wave Applicability", s => s.EInvoicingWave?.DisplayName ?? ""),
+        ("Trade License Number", s => s.TradeLicenseNumber ?? ""),
+        ("Trade License Issue Date", s => D(s.TradeLicenseIssueDate)),
+        ("Trade License Expiry Date", s => D(s.TradeLicenseExpiryDate)),
+        ("Trade License Issuing Body", s => s.TradeLicenseIssuingBody?.DisplayName ?? ""),
+        ("Issuing Body if Others", s => s.IssuingBodyIfOthers ?? ""),
+        ("License Type", s => s.LicenseType ?? ""),
+        ("VAT Registered", s => YesNo(s.VatRegistered)),
+        ("TRN/VAT Registration Number", s => s.TaxRegistrationNumber),
+        ("VAT Registration Type", s => s.VatRegistrationType?.DisplayName ?? ""),
+        ("Number of Entities if VAT Group", s => s.NumberOfVatGroupEntities?.ToString() ?? ""),
+        ("Legal Names of all Entities under the VAT Group", s => s.VatGroupEntityNames ?? ""),
+        ("Supplier TIN", s => s.SupplierTin ?? ""),
+        ("VAT Code", s => s.VatCode?.Code ?? ""),
+        ("D-U-N-S Number", s => s.DunsNumber ?? ""),
+        ("One-time supplier", s => YesNo(s.IsOneTimeSupplier)),
+
+        // Address
+        ("Address Name", s => s.AddressName ?? ""),
+        ("Address Line 1", s => s.AddressLine1 ?? ""),
+        ("Address Line 2", s => s.AddressLine2 ?? ""),
+        ("Country", s => s.Country?.DisplayName ?? ""),
+        ("City / Emirate", s => s.City?.DisplayName ?? s.CityText ?? ""),
+        ("State", s => s.State ?? ""),
+        ("PO Box / Postal Code", s => s.PostalCode ?? ""),
+        ("Corporate Web Site", s => s.CorporateWebSite ?? ""),
+        ("Business E-Mail", s => s.Email ?? ""),
+        ("Business Phone Country Code", s => s.BusinessPhoneCountryCode?.PhoneCode ?? ""),
+        ("Business Phone Area Code", s => s.BusinessPhoneAreaCode ?? ""),
+        ("Business Contact Number", s => s.BusinessPhone ?? ""),
+        ("Address Purpose - Ordering", s => YesNo(s.AddressPurposeOrdering)),
+        ("Address Purpose - Remit to", s => YesNo(s.AddressPurposeRemitTo)),
+        ("Address Purpose - RFQ or Bidding", s => YesNo(s.AddressPurposeRfqBidding)),
+        ("Remittance E-mail", s => s.RemittanceEmail ?? ""),
+
+        // Contact
+        ("Prefix", s => s.Prefix?.DisplayName ?? ""),
+        ("First Name", s => s.FirstName ?? ""),
+        ("Middle Name", s => s.MiddleName ?? ""),
+        ("Last Name", s => s.LastName ?? ""),
+        ("Administrative Contact", s => s.AdministrativeContact ?? ""),
+        ("Contact E-Mail", s => s.ContactEmail ?? ""),
+        ("Phone Country Code", s => s.PhoneCountryCode?.PhoneCode ?? ""),
+        ("Phone Area Code", s => s.PhoneAreaCode ?? ""),
+        ("Phone", s => s.Phone ?? ""),
+        ("Mobile Country Code", s => s.MobileCountryCode?.PhoneCode ?? ""),
+        ("Mobile Area Code", s => s.MobileAreaCode ?? ""),
+        ("Mobile", s => s.Mobile ?? ""),
+
+        // Site / Business Unit
+        ("Supplier Site", s => string.IsNullOrWhiteSpace(s.SupplierSite) ? (s.SupplierSiteBu?.Name ?? "") : s.SupplierSite),
+        ("Procurement BU", s => s.ProcurementBu?.Name ?? ""),
+        ("Client BU", s => s.ClientBu?.Name ?? ""),
+        ("Bill-to BU", s => s.BillToBu?.Name ?? ""),
+        ("Communication Method", s => s.CommunicationMethod?.DisplayName ?? ""),
+        ("Communication E-Mail", s => s.CommunicationEmail ?? ""),
+        ("Site - RFQ or Bidding", s => YesNo(s.IsRfqOrBidding)),
+        ("Site - Ordering", s => YesNo(s.IsOrdering)),
+        ("Site - Sourcing only", s => YesNo(s.IsSourcingOnly)),
+        ("Site - Purchasing", s => YesNo(s.IsPurchasing)),
+        ("Site - Pay", s => YesNo(s.IsPay)),
+        ("Site - Primary Pay", s => YesNo(s.IsPrimaryPay)),
+        ("Payment Method", s => s.PaymentMethod?.DisplayName ?? ""),
+        ("Payment Terms", s => s.PaymentTerms?.DisplayName ?? ""),
+        ("Payment Method Code", s => s.PaymentMethodCode ?? ""),
+
+        // Banking
+        ("Bank Name", s => s.Bank?.Name ?? ""),
+        ("Branch Name", s => s.BankBranch?.Name ?? ""),
+        ("Account Country Code", s => s.AccountCountryCode?.DisplayName ?? ""),
+        ("Account Name", s => s.AccountName ?? ""),
+        ("Account Number", s => s.AccountNumber ?? ""),
+        ("Account Currency Code", s => s.AccountCurrencyCode?.Code ?? ""),
+        ("Swift Code/BIC Code", s => s.SwiftCode ?? ""),
+        ("IBAN", s => s.Iban ?? ""),
+        ("Account Start Date", s => D(s.AccountStartDate)),
+        ("Account End Date", s => D(s.AccountEndDate)),
+        ("Allow International Payments", s => YesNo(s.AllowInternationalPayments)),
+        ("Remit Advice Email", s => s.RemitAdviceEmail ?? ""),
+
+        // Intermediary bank
+        ("Intermediary Account Applicable", s => YesNo(s.IntermediaryAccountApplicable)),
+        ("Intermediary Country", s => s.IntermediaryCountry?.DisplayName ?? ""),
+        ("Intermediary Bank Name", s => s.IntermediaryBankName ?? ""),
+        ("Intermediary Account Number", s => s.IntermediaryAccountNumber ?? ""),
+        ("Intermediary Branch Number", s => s.IntermediaryBranchNumber ?? ""),
+        ("Intermediary IBAN", s => s.IntermediaryIban ?? ""),
+        ("Intermediary BIC/Swift Code", s => s.IntermediaryBicSwiftCode ?? ""),
+    ];
+
+    /// <summary>Exports the canonical all-fields upload template — blank (headers only) or populated
+    /// with the given suppliers. The columns round-trip through ExcelImportService, so a downloaded
+    /// file can be edited by the business and re-uploaded with every field preserved.</summary>
+    public byte[] ExportToExcelUploadTemplate(IEnumerable<Supplier> suppliers)
+    {
+        using var workbook = new XLWorkbook();
+        var sheet = workbook.Worksheets.Add("Supplier Data Template");
+
+        for (var col = 0; col < UploadTemplateColumns.Length; col++)
+        {
+            var headerCell = sheet.Cell(1, col + 1);
+            headerCell.Value = UploadTemplateColumns[col].Header;
+            headerCell.Style.Font.Bold = true;
+        }
+
+        var row = 2;
+        foreach (var supplier in suppliers)
+        {
+            for (var col = 0; col < UploadTemplateColumns.Length; col++)
+            {
+                sheet.Cell(row, col + 1).Value = UploadTemplateColumns[col].Value(supplier);
+            }
+            row++;
+        }
+
+        sheet.SheetView.FreezeRows(1);
+        sheet.Range(1, 1, 1, UploadTemplateColumns.Length).SetAutoFilter();
+        sheet.Columns(1, UploadTemplateColumns.Length).AdjustToContents(1, Math.Min(row - 1, 60));
+
+        using var output = new MemoryStream();
+        workbook.SaveAs(output);
+        return output.ToArray();
+    }
+
     // Complete field set — every supplier attribute, including the fields added after the original
     // Oracle "Supplier Data Template" (VAT structure, classification, license dates/body, mobile,
     // address purposes, intermediary bank, status/audit). This export is for data extraction, not for

@@ -74,7 +74,53 @@ public class ExcelImportService(
         ["swift code/bic code"] = "SwiftCode",
         ["iban"] = "Iban",
         ["account start date"] = "AccountStartDate",
-        ["allow international payments"] = "AllowInternationalPayments"
+        ["allow international payments"] = "AllowInternationalPayments",
+
+        // -- Extended round-trip template fields (match ExportService.UploadTemplateColumns) --
+        ["business e-mail"] = "Email",
+        ["contact e-mail"] = "ContactEmail",
+        ["communication e-mail"] = "CommunicationEmail",
+        ["business partner type"] = "BusinessPartnerType",
+        ["business location type"] = "BusinessLocationType",
+        ["einvoicing wave applicability"] = "EInvoicingWave",
+        ["trade license issue date"] = "TradeLicenseIssueDate",
+        ["trade license expiry date"] = "TradeLicenseExpiryDate",
+        ["trade license issuing body"] = "TradeLicenseIssuingBody",
+        ["issuing body if others"] = "IssuingBodyIfOthers",
+        ["license type"] = "LicenseType",
+        ["vat registered"] = "VatRegistered",
+        ["trn/vat registration number"] = "TaxRegistrationNumber",
+        ["vat registration type"] = "VatRegistrationType",
+        ["number of entities if vat group"] = "NumberOfVatGroupEntities",
+        ["legal names of all entities under the vat group"] = "VatGroupEntityNames",
+        ["supplier tin"] = "SupplierTin",
+        ["city / emirate"] = "City",
+        ["po box / postal code"] = "PostalCode",
+        ["business phone country code"] = "BusinessPhoneCountryCode",
+        ["business phone area code"] = "BusinessPhoneAreaCode",
+        ["business contact number"] = "BusinessPhone",
+        ["address purpose - ordering"] = "AddressPurposeOrdering",
+        ["address purpose - remit to"] = "AddressPurposeRemitTo",
+        ["address purpose - rfq or bidding"] = "AddressPurposeRfqBidding",
+        ["middle name"] = "MiddleName",
+        ["last name"] = "LastName",
+        ["mobile country code"] = "MobileCountryCode",
+        ["mobile area code"] = "MobileAreaCode",
+        ["mobile"] = "Mobile",
+        ["site - rfq or bidding"] = "IsRfqOrBidding",
+        ["site - ordering"] = "IsOrdering",
+        ["site - sourcing only"] = "IsSourcingOnly",
+        ["site - purchasing"] = "IsPurchasing",
+        ["site - pay"] = "IsPay",
+        ["site - primary pay"] = "IsPrimaryPay",
+        ["account end date"] = "AccountEndDate",
+        ["intermediary account applicable"] = "IntermediaryAccountApplicable",
+        ["intermediary country"] = "IntermediaryCountry",
+        ["intermediary bank name"] = "IntermediaryBankName",
+        ["intermediary account number"] = "IntermediaryAccountNumber",
+        ["intermediary branch number"] = "IntermediaryBranchNumber",
+        ["intermediary iban"] = "IntermediaryIban",
+        ["intermediary bic/swift code"] = "IntermediaryBicSwiftCode"
     };
 
     public async Task<ImportResult> ImportAsync(Stream fileStream, int businessUnitId, string uploadedBy)
@@ -98,6 +144,11 @@ public class ExcelImportService(
         var prefixes = await LoadLookupAsync(db, LookupCategory.Prefix);
         var communicationMethods = await LoadLookupAsync(db, LookupCategory.CommunicationMethod);
         var currencies = await LoadLookupAsync(db, LookupCategory.Currency, includeCode: true);
+        var vatRegistrationTypes = await LoadLookupAsync(db, LookupCategory.VatRegistrationType);
+        var businessPartnerTypes = await LoadLookupAsync(db, LookupCategory.BusinessPartnerType, includeCode: true);
+        var businessLocationTypes = await LoadLookupAsync(db, LookupCategory.BusinessLocationType);
+        var eInvoicingWaves = await LoadLookupAsync(db, LookupCategory.EInvoicingWave);
+        var licensingAuthorities = await LoadLookupAsync(db, LookupCategory.LicensingAuthority);
         var banks = await db.Banks.Include(b => b.Branches).ToListAsync();
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name.ToLowerInvariant(), b => b.Id);
 
@@ -206,6 +257,19 @@ public class ExcelImportService(
             var billToBuId = ResolveLookup(values, "BillToBu", businessUnits, required: false, rowErrors, rowWarnings);
             var (bankId, bankBranchId) = ResolveBankBranch(values, banks, rowWarnings);
 
+            // Extended round-trip fields.
+            var businessPartnerTypeId = ResolveLookup(values, "BusinessPartnerType", businessPartnerTypes, required: false, rowErrors, rowWarnings);
+            var businessLocationTypeId = ResolveLookup(values, "BusinessLocationType", businessLocationTypes, required: false, rowErrors, rowWarnings);
+            var eInvoicingWaveId = ResolveLookup(values, "EInvoicingWave", eInvoicingWaves, required: false, rowErrors, rowWarnings);
+            var vatRegistrationTypeId = ResolveLookup(values, "VatRegistrationType", vatRegistrationTypes, required: false, rowErrors, rowWarnings);
+            var tradeLicenseIssuingBodyId = ResolveLookup(values, "TradeLicenseIssuingBody", licensingAuthorities, required: false, rowErrors, rowWarnings);
+            var mobileCountryCodeId = ResolveLookup(values, "MobileCountryCode", countriesByPhoneCode, required: false, rowErrors, rowWarnings);
+            var businessPhoneCountryCodeId = ResolveLookup(values, "BusinessPhoneCountryCode", countriesByPhoneCode, required: false, rowErrors, rowWarnings);
+            var intermediaryCountryId = ResolveLookup(values, "IntermediaryCountry", countries, required: false, rowErrors, rowWarnings);
+
+            // City / Emirate: keep as the LOV id when it matches an Emirate, otherwise as free text.
+            var cityText = cityId is null ? GetOrNull(values, "City") : null;
+
             values.TryGetValue("AddressLine2", out var addressLine2);
             values.TryGetValue("PostalCode", out var postalCode);
             values.TryGetValue("Phone", out var phone);
@@ -283,6 +347,42 @@ public class ExcelImportService(
                 AccountStartDate = ParseDate(values, "AccountStartDate"),
                 AllowInternationalPayments = ParseBool(values, "AllowInternationalPayments"),
 
+                // -- Extended round-trip template fields --
+                Email = GetOrNull(values, "Email"),
+                SupplierTin = GetOrNull(values, "SupplierTin"),
+                VatRegistered = ParseBoolNullable(values, "VatRegistered"),
+                VatRegistrationTypeId = vatRegistrationTypeId,
+                NumberOfVatGroupEntities = ParseInt(values, "NumberOfVatGroupEntities"),
+                VatGroupEntityNames = GetOrNull(values, "VatGroupEntityNames"),
+                BusinessPartnerTypeId = businessPartnerTypeId,
+                BusinessLocationTypeId = businessLocationTypeId,
+                EInvoicingWaveId = eInvoicingWaveId,
+                TradeLicenseIssueDate = ParseDate(values, "TradeLicenseIssueDate"),
+                TradeLicenseExpiryDate = ParseDate(values, "TradeLicenseExpiryDate"),
+                TradeLicenseIssuingBodyId = tradeLicenseIssuingBodyId,
+                IssuingBodyIfOthers = GetOrNull(values, "IssuingBodyIfOthers"),
+                LicenseType = GetOrNull(values, "LicenseType"),
+                CityText = cityText,
+                MiddleName = GetOrNull(values, "MiddleName"),
+                LastName = GetOrNull(values, "LastName"),
+                MobileCountryCodeId = mobileCountryCodeId,
+                MobileAreaCode = GetOrNull(values, "MobileAreaCode"),
+                Mobile = GetOrNull(values, "Mobile"),
+                BusinessPhoneCountryCodeId = businessPhoneCountryCodeId,
+                BusinessPhoneAreaCode = GetOrNull(values, "BusinessPhoneAreaCode"),
+                BusinessPhone = GetOrNull(values, "BusinessPhone"),
+                AddressPurposeOrdering = ParseBool(values, "AddressPurposeOrdering"),
+                AddressPurposeRemitTo = ParseBool(values, "AddressPurposeRemitTo"),
+                AddressPurposeRfqBidding = ParseBool(values, "AddressPurposeRfqBidding"),
+                AccountEndDate = ParseDate(values, "AccountEndDate"),
+                IntermediaryAccountApplicable = ParseBool(values, "IntermediaryAccountApplicable"),
+                IntermediaryCountryId = intermediaryCountryId,
+                IntermediaryBankName = GetOrNull(values, "IntermediaryBankName"),
+                IntermediaryAccountNumber = GetOrNull(values, "IntermediaryAccountNumber"),
+                IntermediaryBranchNumber = GetOrNull(values, "IntermediaryBranchNumber"),
+                IntermediaryIban = GetOrNull(values, "IntermediaryIban"),
+                IntermediaryBicSwiftCode = GetOrNull(values, "IntermediaryBicSwiftCode"),
+
                 BusinessUnitId = businessUnitId,
                 CreatedBy = uploadedBy,
                 IsDraft = false
@@ -314,6 +414,28 @@ public class ExcelImportService(
         }
 
         return DateTime.TryParse(text, out var date) ? date : null;
+    }
+
+    private static int? ParseInt(Dictionary<string, string> values, string field)
+    {
+        if (!values.TryGetValue(field, out var text) || string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return int.TryParse(text.Trim(), out var n) ? n : null;
+    }
+
+    /// <summary>Yes/No that preserves "unset": blank → null, so re-importing a template that leaves
+    /// VAT Registered empty doesn't force it to "No".</summary>
+    private static bool? ParseBoolNullable(Dictionary<string, string> values, string field)
+    {
+        if (!values.TryGetValue(field, out var text) || string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return text.Trim().ToLowerInvariant() is "yes" or "true" or "1" or "y";
     }
 
     /// <summary>
