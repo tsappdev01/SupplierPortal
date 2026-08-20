@@ -62,7 +62,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.IntermediaryCountry);
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
-    public async Task<List<Supplier>> GetSuppliersAsync(IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null)
+    public async Task<List<Supplier>> GetSuppliersAsync(
+        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = IncludeLookups(db.Suppliers).AsNoTracking();
@@ -73,6 +74,10 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
             query = query.Where(s => s.SupplierName.Contains(supplierName));
+        }
+        if (!string.IsNullOrWhiteSpace(statusName))
+        {
+            query = query.Where(s => s.Status != null && s.Status.DisplayName == statusName);
         }
 
         return await query.OrderBy(s => s.SupplierName).ToListAsync();

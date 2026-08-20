@@ -1052,10 +1052,11 @@
         {
             return IsVatGroupSelected;
         }
-        // Bank Name / Branch are required only when paying Electronically; optional for Cheque.
-        if (fieldKey is "BankId" or "BankBranchId")
+        // The whole Payment / Banking section (step 5) is required only when paying Electronically;
+        // for Cheque (or when the payment method is unset) all bank fields are optional.
+        if (fieldSettings.FirstOrDefault(f => f.FieldKey == fieldKey)?.Step == 5)
         {
-            return IsElectronicPayment;
+            return IsElectronicPayment && mandatoryKeys.Contains(fieldKey);
         }
         if (VatDependentKeys.Contains(fieldKey) && formModel.VatRegistered != true)
         {

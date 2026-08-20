@@ -956,9 +956,16 @@ else if (TotalPages > 1)
 
     private string ExportUrl(string format)
     {
-        return filterBusinessUnitId != 0
-            ? $"/export/{format}?businessUnitId={filterBusinessUnitId}"
-            : $"/export/{format}";
+        var query = new List<string>();
+        if (filterBusinessUnitId != 0)
+        {
+            query.Add($"businessUnitId={filterBusinessUnitId}");
+        }
+        if (!string.IsNullOrEmpty(statusFilter))
+        {
+            query.Add($"status={Uri.EscapeDataString(statusFilter)}");
+        }
+        return query.Count > 0 ? $"/export/{format}?{string.Join("&", query)}" : $"/export/{format}";
     }
 
     private static DateTime EffectiveUpdated(SupplierListItem supplier) => supplier.UpdatedAt ?? supplier.CreatedAt;

@@ -420,7 +420,7 @@ public class ExportService
         "Payment Method", "Payment Terms", "Payment Method Code", "Remit Advice Email", "VAT Code", "Currency",
         "Bank Name", "Branch Name", "Account Country Code", "Account Name", "Account Number",
         "Account Currency Code", "Swift Code", "IBAN", "Account Start Date", "Allow International Payments",
-        "Active"
+        "Status", "Active"
     ];
 
     // Curated subset for PDF (landscape A4 page) so columns stay legible.
@@ -428,7 +428,7 @@ public class ExportService
     [
         "Supplier Number", "Supplier Name", "Email", "Tax Organization Type", "Supplier Type",
         "Taxpayer Country", "Country Name", "Tax Registration Number", "Address Line 1",
-        "Address Line 2", "City", "Country", "Active"
+        "Address Line 2", "City", "Country", "Status", "Active"
     ];
 
     private static IEnumerable<string> ToCsvRow(Supplier s) =>
@@ -488,6 +488,7 @@ public class ExportService
         s.Iban ?? "",
         s.AccountStartDate?.ToString("yyyy-MM-dd") ?? "",
         s.AllowInternationalPayments ? "Yes" : "No",
+        s.Status?.DisplayName ?? "",
         s.IsActive ? "Yes" : "No"
     ];
 
@@ -505,6 +506,7 @@ public class ExportService
         s.AddressLine2 ?? "",
         s.City?.DisplayName ?? "",
         s.Country?.DisplayName ?? "",
+        s.Status?.DisplayName ?? "",
         s.IsActive ? "Yes" : "No"
     ];
 

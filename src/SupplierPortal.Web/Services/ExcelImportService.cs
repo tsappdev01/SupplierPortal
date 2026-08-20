@@ -152,16 +152,15 @@ public class ExcelImportService(
         var banks = await db.Banks.Include(b => b.Branches).ToListAsync();
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name.ToLowerInvariant(), b => b.Id);
 
-        // Duplicate guard: a re-uploaded template must not create a second copy of a supplier that is
-        // already in the system, nor of a supplier number repeated within the file. Both are reported
-        // and the offending row is skipped.
-        var existingNumbers = (await db.Suppliers
-                .Select(s => s.SupplierNumber)
-                .ToListAsync())
-            .Where(n => !string.IsNullOrWhiteSpace(n))
-            .Select(n => n.Trim().ToLowerInvariant())
-            .ToHashSet();
+        // Existing suppliers keyed by number so a re-uploaded template UPDATES the matching supplier
+        // (upsert) instead of creating a duplicate. A supplier number repeated within the same file is
+        // still rejected. The loaded entities are tracked, so field changes persist on SaveChanges.
+        var existingByNumber = (await db.Suppliers.ToListAsync())
+            .Where(s => !string.IsNullOrWhiteSpace(s.SupplierNumber))
+            .GroupBy(s => s.SupplierNumber.Trim().ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First());
         var seenNumbers = new HashSet<string>();
+        var updateCount = 0;
 
         // ClosedXML reads its input stream synchronously, which browser-uploaded IBrowserFile streams
         // (Blazor Server, streamed over SignalR) don't support. Buffer to a seekable MemoryStream first.
@@ -219,18 +218,10 @@ public class ExcelImportService(
             if (string.IsNullOrWhiteSpace(supplierNumber)) rowErrors.Add("Supplier Number is required.");
             if (string.IsNullOrWhiteSpace(supplierName)) rowErrors.Add("Supplier Name is required.");
 
-            // Skip duplicates (already in the system, or repeated earlier in this file).
-            if (!string.IsNullOrWhiteSpace(supplierNumber))
+            // Reject only repeats within the same file; a number already in the system is an update.
+            if (!string.IsNullOrWhiteSpace(supplierNumber) && !seenNumbers.Add(supplierNumber.Trim().ToLowerInvariant()))
             {
-                var dupKey = supplierNumber.Trim().ToLowerInvariant();
-                if (existingNumbers.Contains(dupKey))
-                {
-                    rowErrors.Add($"Supplier Number '{supplierNumber}' already exists — skipped as a duplicate.");
-                }
-                else if (!seenNumbers.Add(dupKey))
-                {
-                    rowErrors.Add($"Supplier Number '{supplierNumber}' appears more than once in the file — skipped as a duplicate.");
-                }
+                rowErrors.Add($"Supplier Number '{supplierNumber}' appears more than once in the file — skipped as a duplicate.");
             }
 
             // Every lookup below is optional on import: an unrecognized value is left blank and noted
@@ -285,7 +276,7 @@ public class ExcelImportService(
                 warnings.Add(new ImportRowError(rowNumber, string.Join(" ", rowWarnings)));
             }
 
-            suppliers.Add(new Supplier
+            var parsed = new Supplier
             {
                 SupplierNumber = supplierNumber!,
                 SupplierName = supplierName!,
@@ -386,11 +377,57 @@ public class ExcelImportService(
                 BusinessUnitId = businessUnitId,
                 CreatedBy = uploadedBy,
                 IsDraft = false
-            });
+            };
+
+            if (existingByNumber.TryGetValue(supplierNumber!.Trim().ToLowerInvariant(), out var existing))
+            {
+                // Update the existing supplier in place (keeps its Id, business unit, status, created
+                // metadata and draft flag; only the imported data fields change).
+                CopyImportFields(existing, parsed);
+                existing.UpdatedBy = uploadedBy;
+                existing.UpdatedAt = DateTime.UtcNow;
+                updateCount++;
+            }
+            else
+            {
+                suppliers.Add(parsed);
+            }
         }
 
-        var successCount = suppliers.Count > 0 ? await supplierService.AddRangeAsync(suppliers) : 0;
-        return new ImportResult(successCount, errors, warnings);
+        if (updateCount > 0)
+        {
+            await db.SaveChangesAsync();
+        }
+        var insertedCount = suppliers.Count > 0 ? await supplierService.AddRangeAsync(suppliers) : 0;
+        return new ImportResult(insertedCount + updateCount, errors, warnings);
+    }
+
+    // Identity / ownership / lifecycle columns that an upload must never overwrite on an existing
+    // supplier — everything else is copied from the parsed row.
+    private static readonly HashSet<string> UpsertSkipFields =
+    [
+        "Id", "SupplierNumber", "BusinessUnitId", "StatusId", "IsDraft", "IsActive",
+        "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"
+    ];
+
+    /// <summary>Copies the imported scalar/lookup fields from a freshly parsed supplier onto an
+    /// existing (tracked) supplier for upsert, leaving identity/ownership/lifecycle columns intact.</summary>
+    private static void CopyImportFields(Supplier target, Supplier source)
+    {
+        foreach (var p in typeof(Supplier).GetProperties())
+        {
+            if (!p.CanWrite || UpsertSkipFields.Contains(p.Name))
+            {
+                continue;
+            }
+
+            var underlying = Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType;
+            if (underlying == typeof(string) || underlying == typeof(bool) || underlying == typeof(int)
+                || underlying == typeof(DateTime) || underlying == typeof(decimal))
+            {
+                p.SetValue(target, p.GetValue(source));
+            }
+        }
     }
 
     private static string? GetOrNull(Dictionary<string, string> values, string field) =>

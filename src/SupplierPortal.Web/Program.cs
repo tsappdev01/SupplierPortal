@@ -312,14 +312,14 @@ app.MapPost("/api/breakglass", async (BreakGlassRequest body, BreakGlassService 
     .AllowAnonymous()
     .RequireRateLimiting("credential");
 
-app.MapGet("/export/{format}", async (string format, int? businessUnitId, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
+app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {
     var isAdministrator = ctx.User.IsAdministrator();
     var effectiveBusinessUnitIds = isAdministrator
         ? (businessUnitId.HasValue ? new List<int> { businessUnitId.Value } : null)
         : ctx.User.GetBusinessUnitIds();
 
-    var suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds);
+    var suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds, statusName: status);
 
     return format.ToLowerInvariant() switch
     {
