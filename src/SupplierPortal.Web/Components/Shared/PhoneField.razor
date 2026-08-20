@@ -1,11 +1,13 @@
 @namespace SupplierPortal.Web.Components.Shared
+@using System.Globalization
 @using SupplierPortal.Web.Models
+@inject IJSRuntime JS
 
 @* Reusable telephone/mobile control: a flag + dial-code selector combined with the number
    input in a single bordered group (e.g. [🇦🇪 +971 ▾] [ 50 123 4567 ]). Two-way binds the
    country-code lookup id and the number; optionally shows a small area-code segment. *@
 <div class="di-phone @(Disabled ? "di-phone-disabled" : null)">
-    <button type="button" class="di-phone-code" @onclick="Toggle" disabled="@Disabled">
+    <button type="button" class="di-phone-code" @ref="codeButton" @onclick="Toggle" disabled="@Disabled">
         <span class="di-phone-flag">@Flag(Selected?.Code)</span>
         <span class="di-phone-dial">@(Selected is null ? "Code" : $"+{Selected.PhoneCode}")</span>
         <svg class="di-phone-caret" width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
@@ -30,7 +32,7 @@
     @if (open)
     {
         <div class="di-phone-backdrop" @onclick="Close"></div>
-        <div class="di-phone-menu">
+        <div class="di-phone-menu" style="top:@(menuTop.ToString(CultureInfo.InvariantCulture))px; left:@(menuLeft.ToString(CultureInfo.InvariantCulture))px;">
             <input type="text" class="di-phone-search" placeholder="Search country or code"
                    @bind="search" @bind:event="oninput" />
             <div class="di-phone-list">
@@ -76,6 +78,12 @@
 
     private bool open;
     private string search = "";
+    private ElementReference codeButton;
+    private double menuTop;
+    private double menuLeft;
+
+    private sealed record Rect(double Top, double Left, double Bottom, double Right,
+        double Width, double Height, double ViewportWidth, double ViewportHeight);
 
     private LookupValue? Selected => Countries.FirstOrDefault(c => c.Id == CountryCodeId);
 
@@ -101,14 +109,29 @@
                 || (c.PhoneCode ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)
                 || c.Code.Contains(search, StringComparison.OrdinalIgnoreCase));
 
-    private void Toggle()
+    private async Task Toggle()
     {
         if (Disabled)
         {
             return;
         }
-        open = !open;
+        if (open)
+        {
+            open = false;
+            return;
+        }
+
         search = "";
+        // Position the dropdown with position:fixed at the chip's location so it can't be clipped by
+        // any ancestor's overflow (the form section / page scroll container).
+        var rect = await JS.InvokeAsync<Rect?>("ssPhone.rect", codeButton);
+        if (rect is not null)
+        {
+            const double menuWidth = 336; // ~21rem
+            menuTop = rect.Bottom + 4;
+            menuLeft = Math.Max(8, Math.Min(rect.Left, rect.ViewportWidth - menuWidth - 8));
+        }
+        open = true;
     }
 
     private void Close() => open = false;

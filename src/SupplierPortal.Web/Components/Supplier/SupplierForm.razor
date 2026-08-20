@@ -1424,30 +1424,27 @@
             }
         }
 
-        // Mandatory-field enforcement applies only to the supplier-facing self-service portal. Internal
-        // admin/user editing must never be blocked by a mandatory setting, so skip the required checks.
-        if (SupplierFacing)
+        // Mandatory-field enforcement blocks moving to the next step whenever a required field is empty
+        // — in both the internal admin/user view and the supplier-facing portal.
+        foreach (var setting in fieldSettings.Where(f => f.Step == step && !IsHiddenFromSupplier(f.FieldKey)))
         {
-            foreach (var setting in fieldSettings.Where(f => f.Step == step && !IsHiddenFromSupplier(f.FieldKey)))
+            // City and the conditional Step-1 rules are handled above as always-on rules.
+            if (setting.FieldKey == "CityId" || ConditionalStep1Keys.Contains(setting.FieldKey))
             {
-                // City and the conditional Step-1 rules are handled above as always-on rules.
-                if (setting.FieldKey == "CityId" || ConditionalStep1Keys.Contains(setting.FieldKey))
-                {
-                    continue;
-                }
-                // IsFieldMandatory layers the conditional rules (e.g. VAT Registered = No relaxes the
-                // VAT fields) on top of the admin-configured mandatory flag.
-                if (!IsFieldMandatory(setting.FieldKey))
-                {
-                    continue;
-                }
+                continue;
+            }
+            // IsFieldMandatory layers the conditional rules (e.g. VAT Registered = No relaxes the
+            // VAT fields; Cheque relaxes the bank section) on top of the admin-configured flag.
+            if (!IsFieldMandatory(setting.FieldKey))
+            {
+                continue;
+            }
 
-                var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
-                var value = property?.GetValue(model);
-                if (IsEmpty(value))
-                {
-                    errors.Add($"{setting.DisplayLabel} is required.");
-                }
+            var property = typeof(SupplierFormModel).GetProperty(setting.FieldKey);
+            var value = property?.GetValue(model);
+            if (IsEmpty(value))
+            {
+                errors.Add($"{setting.DisplayLabel} is required.");
             }
         }
 

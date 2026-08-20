@@ -99,15 +99,15 @@
 .di-phone-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 40;
+    z-index: 2990;
     background: transparent;
 }
 
 .di-phone-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 50;
+    /* Fixed so ancestor overflow (form section / page scroll) can't clip it; coordinates are set
+       inline from the measured chip position. */
+    position: fixed;
+    z-index: 3000;
     width: 21rem;
     max-width: 85vw;
     padding: 0.4rem;

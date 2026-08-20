@@ -41,3 +41,17 @@ window.ssDoc = {
         setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 1500);
     }
 };
+
+// Measures an element's viewport rect so the phone-control country dropdown can be positioned with
+// position:fixed and escape any ancestor's overflow clipping.
+window.ssPhone = {
+    rect: function (el) {
+        if (!el) { return null; }
+        var r = el.getBoundingClientRect();
+        return {
+            top: r.top, left: r.left, bottom: r.bottom, right: r.right,
+            width: r.width, height: r.height,
+            viewportWidth: window.innerWidth, viewportHeight: window.innerHeight
+        };
+    }
+};
