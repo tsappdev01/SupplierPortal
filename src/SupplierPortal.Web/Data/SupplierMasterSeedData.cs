@@ -55,7 +55,6 @@ public static class SupplierMasterSeedData
     [
         "Electronic",
         "Cheque",
-        "Wire",
     ];
 
     public static readonly string[] PaymentTerms =

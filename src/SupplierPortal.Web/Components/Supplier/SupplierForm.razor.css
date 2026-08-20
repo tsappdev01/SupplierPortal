@@ -162,7 +162,9 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 20px;
-    overflow: hidden;
+    /* Must stay visible so the phone-control country dropdown isn't clipped by the card when a
+       field sits near the bottom of a section. */
+    overflow: visible;
 }
 
 .di-section-header {
@@ -173,6 +175,8 @@
     display: flex;
     align-items: center;
     gap: 14px;
+    /* Keep the top corners rounded now that the section no longer clips with overflow:hidden. */
+    border-radius: 8px 8px 0 0;
 }
 
 .di-section-icon {

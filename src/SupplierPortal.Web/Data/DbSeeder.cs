@@ -25,7 +25,8 @@ public static class DbSeeder
         await ReconcileSimpleCategoryAsync(db, LookupCategory.TaxOrganizationType, SupplierMasterSeedData.TaxOrganizationTypes);
         await ReconcileSimpleCategoryAsync(db, LookupCategory.SupplierType, SupplierMasterSeedData.SupplierTypes);
         await SeedSimpleCategoryAsync(db, LookupCategory.Province, SupplierMasterSeedData.Provinces);
-        await SeedSimpleCategoryAsync(db, LookupCategory.PaymentMethod, SupplierMasterSeedData.PaymentMethods);
+        // Reconcile (not just seed) so removed options like "Wire" are deactivated on existing DBs.
+        await ReconcileSimpleCategoryAsync(db, LookupCategory.PaymentMethod, SupplierMasterSeedData.PaymentMethods);
         await SeedSimpleCategoryAsync(db, LookupCategory.PaymentTerms, SupplierMasterSeedData.PaymentTerms);
         await SeedSimpleCategoryAsync(db, LookupCategory.Prefix, SupplierMasterSeedData.Prefixes);
         await SeedSimpleCategoryAsync(db, LookupCategory.BusinessRelationship, SupplierMasterSeedData.BusinessRelationships);

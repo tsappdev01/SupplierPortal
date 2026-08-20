@@ -248,12 +248,16 @@
                         }
                     </div>
                     <div class="di-document-slot">
-                        <label>VAT Certificate</label>
+                        <label>VAT Certificate @if (SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber)){<span class="di-req">*</span>}</label>
                         @if (GetDocument(SupplierDocumentType.VatCertification) is { } vatDoc)
                         {
                             <div class="di-document-current">Uploaded: @vatDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vatDoc.Id)" disabled="@viewingDocument">View</button></div>
                         }
                         <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.VatCertification)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        @if (SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate())
+                        {
+                            <div class="text-danger" style="font-size:0.85em;">Required — attach the VAT Certificate when a TRN/VAT number is provided.</div>
+                        }
                     </div>
                     <div class="di-document-slot">
                         <label>Other Documents</label>
@@ -1015,6 +1019,12 @@
         licensingAuthorities.FirstOrDefault(l => l.Id == formModel.TradeLicenseIssuingBodyId)?
             .DisplayName.Equals("Others", StringComparison.OrdinalIgnoreCase) == true;
 
+    /// <summary>Bank account data is required when the Payment Method is "Electronic"; for "Cheque"
+    /// (or when unset) it is optional.</summary>
+    private bool IsElectronicPayment =>
+        paymentMethods.FirstOrDefault(p => p.Id == formModel.PaymentMethodId)?
+            .DisplayName.Equals("Electronic", StringComparison.OrdinalIgnoreCase) == true;
+
     // Fields only meaningful / required when the supplier is VAT registered.
     private static readonly HashSet<string> VatDependentKeys =
     [
@@ -1041,6 +1051,11 @@
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
             return IsVatGroupSelected;
+        }
+        // Bank Name / Branch are required only when paying Electronically; optional for Cheque.
+        if (fieldKey is "BankId" or "BankBranchId")
+        {
+            return IsElectronicPayment;
         }
         if (VatDependentKeys.Contains(fieldKey) && formModel.VatRegistered != true)
         {
@@ -1151,6 +1166,13 @@
     /// <summary>A Trade License document is mandatory before a supplier can be submitted.</summary>
     private bool HasTradeLicenseDocument() =>
         documents.Any(d => d.DocumentType == SupplierDocumentType.TradeLicense);
+
+    /// <summary>A VAT Registration Certificate is required once a TRN/VAT Registration Number is entered.</summary>
+    private bool HasVatCertificate() =>
+        documents.Any(d => d.DocumentType == SupplierDocumentType.VatCertification);
+
+    private bool RequiresVatCertificate() =>
+        !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber) && !HasVatCertificate();
 
     /// <summary>A Bank Confirmation Letter must be attached when an existing (already-submitted)
     /// supplier changes/adds a bank account. Drafts (initial registration) are exempt.</summary>
@@ -1385,6 +1407,20 @@
                     errors.Add("Legal Names of all Entities under the VAT Group is required.");
                 }
             }
+
+            // Document triggers surface on the Business / Organization tab (documents can only be
+            // attached after the first save, so these apply to an existing/saved supplier).
+            if (SupplierFacing && Supplier.Id != 0)
+            {
+                if (!HasTradeLicenseDocument())
+                {
+                    errors.Add("A Trade License document must be attached.");
+                }
+                if (RequiresVatCertificate())
+                {
+                    errors.Add("A VAT Registration Certificate must be attached when a TRN/VAT Registration Number is provided.");
+                }
+            }
         }
 
         // Mandatory-field enforcement applies only to the supplier-facing self-service portal. Internal
@@ -1581,6 +1617,13 @@
         {
             currentStep = 1;
             errorMessage = "A Trade License document must be attached before submitting.";
+            return;
+        }
+
+        if (SupplierFacing && RequiresVatCertificate())
+        {
+            currentStep = 1;
+            errorMessage = "A VAT Registration Certificate must be attached because a TRN/VAT Registration Number is provided.";
             return;
         }
 
