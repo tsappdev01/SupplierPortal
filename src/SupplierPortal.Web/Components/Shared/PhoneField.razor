@@ -1,19 +1,20 @@
 @namespace SupplierPortal.Web.Components.Shared
-@using System.Globalization
 @using SupplierPortal.Web.Models
-@inject IJSRuntime JS
 
-@* Reusable telephone/mobile control: a flag + dial-code selector combined with the number
-   input in a single bordered group (e.g. [🇦🇪 +971 ▾] [ 50 123 4567 ]). Two-way binds the
-   country-code lookup id and the number; optionally shows a small area-code segment. *@
+@* Reusable telephone/mobile control: a native country dial-code selector combined with the number
+   input in one bordered group (e.g. [AE +971] [ 50 123 4567 ]). A native <select> is used for the
+   country so it is always reliable — it can never be clipped by an ancestor's overflow and cannot
+   crash the interactive circuit. Two-way binds the country-code lookup id and the number; optionally
+   shows a small area-code segment. *@
 <div class="di-phone @(Disabled ? "di-phone-disabled" : null)">
-    <button type="button" class="di-phone-code" @ref="codeButton" @onclick="Toggle" disabled="@Disabled">
-        <span class="di-phone-flag">@Flag(Selected?.Code)</span>
-        <span class="di-phone-dial">@(Selected is null ? "Code" : $"+{Selected.PhoneCode}")</span>
-        <svg class="di-phone-caret" width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708Z" />
-        </svg>
-    </button>
+    <select class="di-phone-code-select" value="@(CountryCodeId?.ToString() ?? "")"
+            @onchange="OnCountryChanged" disabled="@Disabled" title="Country dialing code">
+        <option value="">Code</option>
+        @foreach (var c in Countries)
+        {
+            <option value="@c.Id" selected="@(c.Id == CountryCodeId)">@Flag(c.Code) +@c.PhoneCode  @c.DisplayName</option>
+        }
+    </select>
 
     @if (ShowAreaCode)
     {
@@ -28,30 +29,6 @@
         <input type="tel" class="di-phone-number" value="@Number" @oninput="OnNumberInput"
                placeholder="@Placeholder" disabled="@Disabled" />
     </span>
-
-    @if (open)
-    {
-        <div class="di-phone-backdrop" @onclick="Close"></div>
-        <div class="di-phone-menu" style="top:@(menuTop.ToString(CultureInfo.InvariantCulture))px; left:@(menuLeft.ToString(CultureInfo.InvariantCulture))px;">
-            <input type="text" class="di-phone-search" placeholder="Search country or code"
-                   @bind="search" @bind:event="oninput" />
-            <div class="di-phone-list">
-                @foreach (var c in Filtered)
-                {
-                    <button type="button" class="di-phone-option @(c.Id == CountryCodeId ? "is-selected" : null)"
-                            @onclick="() => SelectAsync(c)">
-                        <span class="di-phone-flag">@Flag(c.Code)</span>
-                        <span class="di-phone-name">@c.DisplayName</span>
-                        <span class="di-phone-dial">+@c.PhoneCode</span>
-                    </button>
-                }
-                @if (!Filtered.Any())
-                {
-                    <div class="di-phone-empty">No matching country</div>
-                }
-            </div>
-        </div>
-    }
 </div>
 
 @code {
@@ -76,21 +53,10 @@
     /// <summary>Dial code to pre-select when no country is chosen yet (defaults to UAE, +971).</summary>
     [Parameter] public string? DefaultDialCode { get; set; } = "971";
 
-    private bool open;
-    private string search = "";
-    private ElementReference codeButton;
-    private double menuTop;
-    private double menuLeft;
-
-    private sealed record Rect(double Top, double Left, double Bottom, double Right,
-        double Width, double Height, double ViewportWidth, double ViewportHeight);
-
-    private LookupValue? Selected => Countries.FirstOrDefault(c => c.Id == CountryCodeId);
-
     protected override async Task OnParametersSetAsync()
     {
-        // Default the selector to a country (UAE by default) so the flag + dial code show up
-        // instead of an empty placeholder, and the chosen code is persisted with the record.
+        // Default the selector to a country (UAE by default) so the dial code shows up instead of an
+        // empty placeholder, and the chosen code is persisted with the record.
         if (CountryCodeId is null && Countries.Count > 0 && !string.IsNullOrWhiteSpace(DefaultDialCode))
         {
             var def = Countries.FirstOrDefault(c => c.PhoneCode == DefaultDialCode);
@@ -101,65 +67,29 @@
         }
     }
 
-    private IEnumerable<LookupValue> Filtered =>
-        string.IsNullOrWhiteSpace(search)
-            ? Countries
-            : Countries.Where(c =>
-                c.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
-                || (c.PhoneCode ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)
-                || c.Code.Contains(search, StringComparison.OrdinalIgnoreCase));
-
-    private async Task Toggle()
+    private Task OnCountryChanged(ChangeEventArgs e)
     {
-        if (Disabled)
-        {
-            return;
-        }
-        if (open)
-        {
-            open = false;
-            return;
-        }
-
-        search = "";
-        // Position the dropdown with position:fixed at the chip's location so it can't be clipped by
-        // any ancestor's overflow (the form section / page scroll container).
-        var rect = await JS.InvokeAsync<Rect?>("ssPhone.rect", codeButton);
-        if (rect is not null)
-        {
-            const double menuWidth = 336; // ~21rem
-            menuTop = rect.Bottom + 4;
-            menuLeft = Math.Max(8, Math.Min(rect.Left, rect.ViewportWidth - menuWidth - 8));
-        }
-        open = true;
-    }
-
-    private void Close() => open = false;
-
-    private async Task SelectAsync(LookupValue c)
-    {
-        if (CountryCodeId != c.Id)
-        {
-            await CountryCodeIdChanged.InvokeAsync(c.Id);
-        }
-        open = false;
+        int? id = int.TryParse(e.Value?.ToString(), out var v) ? v : null;
+        return CountryCodeIdChanged.InvokeAsync(id);
     }
 
     private Task OnNumberInput(ChangeEventArgs e) => NumberChanged.InvokeAsync(e.Value?.ToString());
 
     private Task OnAreaInput(ChangeEventArgs e) => AreaCodeChanged.InvokeAsync(e.Value?.ToString());
 
-    /// <summary>Turns a 2-letter ISO country code into its flag emoji (regional indicator symbols).</summary>
+    /// <summary>Turns a 2-letter ISO country code into its flag emoji (regional indicator symbols).
+    /// On platforms that don't render flag emoji (e.g. Windows) this shows the 2-letter code instead,
+    /// which is still a useful label.</summary>
     private static string Flag(string? iso)
     {
         if (string.IsNullOrWhiteSpace(iso) || iso.Length != 2)
         {
-            return "\U0001F310"; // globe fallback
+            return "";
         }
         iso = iso.ToUpperInvariant();
         if (iso[0] < 'A' || iso[0] > 'Z' || iso[1] < 'A' || iso[1] > 'Z')
         {
-            return "\U0001F310";
+            return "";
         }
         return char.ConvertFromUtf32(0x1F1E6 + (iso[0] - 'A')) + char.ConvertFromUtf32(0x1F1E6 + (iso[1] - 'A'));
     }

@@ -52,10 +52,6 @@
     </div>
 
     <EditForm Model="formModel" FormName="supplier-form">
-        @if (errorMessage is not null)
-        {
-            <div class="alert alert-danger">@errorMessage</div>
-        }
 
         <!-- Step 1: Business / Organization Information -->
         <div class="di-section" style="display:@(currentStep == 1 ? "block" : "none")">
@@ -941,7 +937,6 @@
     /// <summary>Wizard completion percentage (step-based) shown in the progress ring.</summary>
     private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
     private bool isSaving;
-    private string? errorMessage;
 
     private List<SupplierFieldSetting> fieldSettings = [];
     private HashSet<string> mandatoryKeys = [];
@@ -1542,17 +1537,16 @@
         var errors = ValidateStep(formModel, currentStep);
         if (errors.Count > 0)
         {
-            errorMessage = string.Join(" ", errors);
+            ToastService.ShowError(string.Join(" ", errors));
             return;
         }
 
         if (currentStep == 5 && RequiresBankConfirmationLetter())
         {
-            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
+            ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
         }
 
-        errorMessage = null;
         isSaving = true;
         try
         {
@@ -1570,7 +1564,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Save failed: {ex.Message}";
+            ToastService.ShowError($"Save failed: {ex.Message}");
         }
         finally
         {
@@ -1583,11 +1577,10 @@
         var errors = ValidateStep(formModel, 5);
         if (errors.Count > 0)
         {
-            errorMessage = string.Join(" ", errors);
+            ToastService.ShowError(string.Join(" ", errors));
             return;
         }
 
-        errorMessage = null;
         Supplier.IsDraft = true;
         await FinishAsync();
     }
@@ -1607,21 +1600,21 @@
                 }
             }
 
-            errorMessage = "Complete all required fields before submitting: " + string.Join(" ", errors);
+            ToastService.ShowError("Complete all required fields before submitting: " + string.Join(" ", errors));
             return;
         }
 
         if (SupplierFacing && !HasTradeLicenseDocument())
         {
             currentStep = 1;
-            errorMessage = "A Trade License document must be attached before submitting.";
+            ToastService.ShowError("A Trade License document must be attached before submitting.");
             return;
         }
 
         if (SupplierFacing && RequiresVatCertificate())
         {
             currentStep = 1;
-            errorMessage = "A VAT Registration Certificate must be attached because a TRN/VAT Registration Number is provided.";
+            ToastService.ShowError("A VAT Registration Certificate must be attached because a TRN/VAT Registration Number is provided.");
             return;
         }
 
@@ -1629,11 +1622,10 @@
         {
             currentStep = 5;
             maxStepReached = Math.Max(maxStepReached, 5);
-            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
+            ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
         }
 
-        errorMessage = null;
         Supplier.IsDraft = false;
         await FinishAsync();
     }
@@ -1648,7 +1640,7 @@
         }
         catch (Exception ex)
         {
-            errorMessage = $"Save failed: {ex.Message}";
+            ToastService.ShowError($"Save failed: {ex.Message}");
         }
         finally
         {

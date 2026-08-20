@@ -1,5 +1,4 @@
 .di-phone {
-    position: relative;
     display: flex;
     align-items: stretch;
     border: 1px solid #e2e5ea;
@@ -14,37 +13,27 @@
     box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15);
 }
 
-.di-phone-code {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0 0.7rem;
+.di-phone-code-select {
+    flex: none;
+    max-width: 8rem;
     border: none;
     border-right: 1px solid #e2e5ea;
     background: #f7f9fc;
     color: #1a2233;
     font: inherit;
-    cursor: pointer;
-    white-space: nowrap;
+    font-size: 15px;
+    padding: 0 0.5rem;
     border-radius: 8px 0 0 8px;
+    cursor: pointer;
 }
 
-.di-phone-code:disabled {
+.di-phone-code-select:disabled {
     cursor: not-allowed;
     opacity: 0.7;
 }
 
-.di-phone-flag {
-    font-size: 1.1rem;
-    line-height: 1;
-}
-
-.di-phone-dial {
-    font-weight: 600;
-}
-
-.di-phone-caret {
-    opacity: 0.55;
+.di-phone-code-select:focus {
+    outline: none;
 }
 
 .di-phone-area {
@@ -71,7 +60,7 @@
 
 .di-phone-icon {
     flex: none;
-    color: var(--di-muted, #94a3b8);
+    color: #94a3b8;
 }
 
 .di-phone-number {
@@ -90,87 +79,11 @@
     height: 40px;
 }
 
-.di-phone-code:focus,
 .di-phone-area:focus,
 .di-phone-number:focus {
     outline: none;
 }
 
-.di-phone-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 2990;
-    background: transparent;
-}
-
-.di-phone-menu {
-    /* Fixed so ancestor overflow (form section / page scroll) can't clip it; coordinates are set
-       inline from the measured chip position. */
-    position: fixed;
-    z-index: 3000;
-    width: 21rem;
-    max-width: 85vw;
-    padding: 0.4rem;
-    background: #fff;
-    border: 1px solid #e2e5ea;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-}
-
-.di-phone-search {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.45rem 0.6rem;
-    margin-bottom: 0.35rem;
-    border: 1px solid var(--di-border, #e2e5ea);
-    border-radius: 6px;
-    font: inherit;
-}
-
-.di-phone-list {
-    max-height: 15rem;
-    overflow-y: auto;
-}
-
-.di-phone-option {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    width: 100%;
-    padding: 0.4rem 0.5rem;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    border-radius: 6px;
-}
-
-.di-phone-option:hover {
-    background: var(--di-hover, #eef3fa);
-}
-
-.di-phone-option.is-selected {
-    background: var(--di-hover, #e4edf9);
-    font-weight: 600;
-}
-
-.di-phone-name {
-    flex: 1 1 auto;
-}
-
-.di-phone-option .di-phone-dial {
-    color: var(--di-muted, #64748b);
-    font-weight: 500;
-}
-
-.di-phone-empty {
-    padding: 0.6rem;
-    color: var(--di-muted, #64748b);
-    text-align: center;
-}
-
 .di-phone-disabled {
-    background: var(--di-disabled-bg, #f1f3f6);
+    background: #f1f3f6;
 }
