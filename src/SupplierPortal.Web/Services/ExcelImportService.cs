@@ -407,7 +407,7 @@ public class ExcelImportService(
     private static readonly HashSet<string> UpsertSkipFields =
     [
         "Id", "SupplierNumber", "BusinessUnitId", "StatusId", "IsDraft", "IsActive",
-        "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy"
+        "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "ReviewRemarks"
     ];
 
     /// <summary>Copies the imported scalar/lookup fields from a freshly parsed supplier onto an

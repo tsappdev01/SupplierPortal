@@ -67,6 +67,7 @@ public static class SupplierStatuses
     public const string AwaitingSupplierResponse = "Awaiting Supplier Response";
     public const string ForReview = "For Review";
     public const string Complete = "Completed";
+    public const string Rejected = "Rejected";
 
-    public static readonly string[] All = [New, AwaitingSupplierResponse, ForReview, Complete];
+    public static readonly string[] All = [New, AwaitingSupplierResponse, ForReview, Complete, Rejected];
 }

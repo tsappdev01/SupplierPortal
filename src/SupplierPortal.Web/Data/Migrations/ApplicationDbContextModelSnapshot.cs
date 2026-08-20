@@ -1123,6 +1123,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("ReviewRemarks")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<string>("State")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");

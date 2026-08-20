@@ -301,6 +301,11 @@ public class Supplier
     public int? StatusId { get; set; }
     public LookupValue? Status { get; set; }
 
+    /// <summary>MDM review comments/remarks captured when a completed supplier is rejected and sent
+    /// back for correction. Shown to the internal owner so they know what to fix before resubmitting.</summary>
+    [MaxLength(2000)]
+    public string? ReviewRemarks { get; set; }
+
     /// <summary>True while the registration wizard is still in progress (not yet Submitted for Approval).</summary>
     public bool IsDraft { get; set; } = true;
 

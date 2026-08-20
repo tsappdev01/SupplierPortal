@@ -114,6 +114,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 TradeLicenseNumber = s.TradeLicenseNumber,
                 ContactEmail = s.ContactEmail,
                 StatusName = s.Status != null ? s.Status.DisplayName : null,
+                ReviewRemarks = s.ReviewRemarks,
                 IsActive = s.IsActive,
                 IsDraft = s.IsDraft,
                 BusinessUnitId = s.BusinessUnitId,
@@ -219,6 +220,29 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await db.SaveChangesAsync();
 
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, $"Marked supplier '{supplier.SupplierName}' Complete");
+    }
+
+    /// <summary>MDM rejects a supplier (typically after re-reviewing a Completed record), capturing
+    /// review remarks. Status moves to "Rejected" and the record returns to the internal owner, who can
+    /// resubmit it to the supplier for correction.</summary>
+    public async Task RejectAsync(int supplierId, string remarks, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null)
+        {
+            return;
+        }
+
+        supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Rejected) ?? supplier.StatusId;
+        supplier.ReviewRemarks = string.IsNullOrWhiteSpace(remarks) ? null : remarks.Trim();
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = actorUsername;
+
+        await db.SaveChangesAsync();
+
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+            $"Rejected supplier '{supplier.SupplierName}': {supplier.ReviewRemarks}");
     }
 
     public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null)
