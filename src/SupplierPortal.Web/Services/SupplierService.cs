@@ -80,7 +80,37 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             query = query.Where(s => s.Status != null && s.Status.DisplayName == statusName);
         }
 
-        return await query.OrderBy(s => s.SupplierName).ToListAsync();
+        var list = await query.OrderBy(s => s.SupplierName).ToListAsync();
+
+        // Collapse accidental duplicate supplier records (same Supplier Number) so exports/templates
+        // show one row per supplier — keeping the most complete (then most recently updated) record.
+        var deduped = list
+            .Where(s => !string.IsNullOrWhiteSpace(s.SupplierNumber))
+            .GroupBy(s => s.SupplierNumber.Trim().ToLowerInvariant())
+            .Select(g => g.OrderByDescending(CompletenessScore)
+                          .ThenByDescending(s => s.UpdatedAt ?? s.CreatedAt)
+                          .First())
+            .ToList();
+        deduped.AddRange(list.Where(s => string.IsNullOrWhiteSpace(s.SupplierNumber)));
+        return deduped.OrderBy(s => s.SupplierName).ToList();
+    }
+
+    /// <summary>Rough "how filled in" score used to choose which record to keep when the same Supplier
+    /// Number appears more than once (duplicate cleanup).</summary>
+    public static int CompletenessScore(Supplier s)
+    {
+        var score = 0;
+        if (!s.IsDraft) score += 2;                                         // submitted beats draft
+        if (s.TaxOrganizationTypeId is not null) score++;
+        if (s.SupplierTypeId is not null) score++;
+        if (s.TaxpayerCountryId is not null) score++;
+        if (!string.IsNullOrWhiteSpace(s.TradeLicenseNumber)) score++;
+        if (!string.IsNullOrWhiteSpace(s.AddressLine1)) score++;
+        if (s.CountryId is not null) score++;
+        if (!string.IsNullOrWhiteSpace(s.ContactEmail)) score++;
+        if (s.BankId is not null) score++;
+        if (!string.IsNullOrWhiteSpace(s.TaxRegistrationNumber)) score++;
+        return score;
     }
 
     /// <summary>Slim projection for the Manage Supplier dashboard: selects only the handful of
