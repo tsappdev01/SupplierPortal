@@ -275,7 +275,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             $"Rejected supplier '{supplier.SupplierName}': {supplier.ReviewRemarks}");
     }
 
-    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null)
+    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null, bool markForReview = false)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var supplier = await IncludeLookups(db.Suppliers)
@@ -283,6 +283,26 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.BankAccounts)
             .FirstAsync(s => s.Id == updated.Id);
         var before = DiffableProperties.ToDictionary(p => p.Name, p => FormatDisplayValue(supplier, p));
+
+        // Fields hidden from suppliers are only hidden client-side, so protect them: on a supplier
+        // self-service save, capture their current values and restore them after the copy so a
+        // supplier can't change a locked field (e.g. via browser dev tools).
+        var protectedOriginals = new Dictionary<string, object?>();
+        if (accessTokenId is not null)
+        {
+            var hiddenKeys = await db.SupplierFieldSettings
+                .Where(f => !f.IsVisibleToSupplier)
+                .Select(f => f.FieldKey)
+                .ToListAsync();
+            foreach (var key in hiddenKeys)
+            {
+                var prop = typeof(Supplier).GetProperty(key);
+                if (prop is not null && prop.CanWrite)
+                {
+                    protectedOriginals[key] = prop.GetValue(supplier);
+                }
+            }
+        }
 
         supplier.SupplierNumber = updated.SupplierNumber;
         supplier.SupplierName = updated.SupplierName;
@@ -383,6 +403,17 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
         supplier.IsDraft = updated.IsDraft;
 
+        // Restore any fields hidden from suppliers so a self-service save can never change a locked
+        // field (the client only hides them; the server is the real guard).
+        foreach (var (key, val) in protectedOriginals)
+        {
+            var prop = typeof(Supplier).GetProperty(key);
+            if (prop is not null && prop.CanWrite)
+            {
+                prop.SetValue(supplier, val);
+            }
+        }
+
         // Reconcile additional contacts: update rows still present, add new ones, drop removed ones.
         var incomingContacts = updated.Contacts ?? new List<SupplierContact>();
         var incomingIds = incomingContacts.Where(c => c.Id != 0).Select(c => c.Id).ToHashSet();
@@ -456,10 +487,11 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 change.AcknowledgedBy = updatedBy;
             }
         }
-        else
+        else if (markForReview)
         {
-            // A supplier self-service submission moves the record to "For Review" so the business
-            // knows there are supplier-made changes waiting to be checked.
+            // A supplier self-service *submission* moves the record to "For Review" so the business
+            // knows there are supplier-made changes waiting to be checked. Intermediate saves as the
+            // supplier steps through the wizard (markForReview == false) must not flip the status.
             supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.ForReview) ?? supplier.StatusId;
         }
 

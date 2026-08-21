@@ -1491,7 +1491,7 @@
         _ => false
     };
 
-    private async Task PersistAsync()
+    private async Task PersistAsync(bool submitting = false)
     {
         formModel.ApplyTo(Supplier);
 
@@ -1512,7 +1512,7 @@
             }
             else
             {
-                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId);
+                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId, markForReview: submitting);
             }
         });
 
@@ -1602,7 +1602,7 @@
         }
 
         Supplier.IsDraft = true;
-        await FinishAsync();
+        await FinishAsync(submitting: false);
     }
 
     private async Task SubmitForApprovalAsync()
@@ -1647,15 +1647,15 @@
         }
 
         Supplier.IsDraft = false;
-        await FinishAsync();
+        await FinishAsync(submitting: true);
     }
 
-    private async Task FinishAsync()
+    private async Task FinishAsync(bool submitting)
     {
         isSaving = true;
         try
         {
-            await PersistAsync();
+            await PersistAsync(submitting);
             await OnComplete.InvokeAsync(Supplier);
         }
         catch (Exception ex)

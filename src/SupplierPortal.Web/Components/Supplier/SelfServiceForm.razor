@@ -14,7 +14,7 @@
 <div class="di-self-service-wrap">
     @if (loading)
     {
-        <p><em>Loading...</em></p>
+        <LoadingIndicator Message="Your supplier information is being retrieved, please wait…" />
     }
     else if (supplier is null)
     {

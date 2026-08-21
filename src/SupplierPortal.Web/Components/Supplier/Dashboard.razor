@@ -312,6 +312,12 @@
     </div>
 }
 
+@if (initialLoad)
+{
+    <LoadingIndicator Message="Supplier information is being retrieved, please wait…" />
+}
+else
+{
 @if (suppliers.Count > 0 && TotalPages > 1)
 {
     <div class="d-flex align-items-center gap-2 no-print mb-2">
@@ -438,6 +444,7 @@ else if (TotalPages > 1)
         <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
     </div>
 }
+}
 
 @if (showDocsModal)
 {
@@ -450,7 +457,7 @@ else if (TotalPages > 1)
         <div class="di-modal-body" tabindex="0" @ref="docsViewerRef" @onkeydown="OnDocsKeyDown">
             @if (modalDocsLoading)
             {
-                <p><em>Loading...</em></p>
+                <LoadingIndicator Message="Documents are being retrieved, please wait…" />
             }
             else if (modalDocuments.Count == 0)
             {
@@ -643,6 +650,7 @@ else if (TotalPages > 1)
     private int pageSize = 50;
 
     private List<SupplierListItem> suppliers = [];
+    private bool initialLoad = true;
     private List<BusinessUnit> businessUnits = [];
     private bool isAdministrator;
     private List<int> userBusinessUnitIds = [];
@@ -733,6 +741,7 @@ else if (TotalPages > 1)
         {
             suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter);
         });
+        initialLoad = false;
         currentPage = 1;
         selectedIds.Clear();
     }
