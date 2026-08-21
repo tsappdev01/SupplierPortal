@@ -1,5 +1,7 @@
+@using Microsoft.AspNetCore.Components.Authorization
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject SupplierService SupplierService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierFieldSettingService SupplierFieldSettingService
@@ -938,6 +940,10 @@
     private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
     private bool isSaving;
 
+    // Administrators edit with everything open — no mandatory/document/bank checks block them. All
+    // validation applies to suppliers (self-service) and non-admin internal users.
+    private bool isAdministrator;
+
     private List<SupplierFieldSetting> fieldSettings = [];
     private HashSet<string> mandatoryKeys = [];
 
@@ -1068,6 +1074,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Suppliers use the token-based self-service flow (never authenticated as an admin). Internal
+        // administrators get an unrestricted form; everyone else is subject to the validation rules.
+        if (!SupplierFacing)
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            isAdministrator = authState.User.IsAdministrator();
+        }
+
         taxOrgTypes = await SupplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType);
         supplierTypes = await SupplierService.GetLookupsAsync(LookupCategory.SupplierType);
         countries = await SupplierService.GetLookupsAsync(LookupCategory.Country);
@@ -1365,6 +1379,12 @@
     {
         var errors = new List<string>();
 
+        // Administrators edit with everything open — skip all required/conditional/document checks.
+        if (isAdministrator)
+        {
+            return errors;
+        }
+
         // City is always required and must block progression, regardless of admin/self-service mode:
         // the UAE uses the Emirate LOV (CityId); every other country uses the free-text city (CityText).
         if (step == 2)
@@ -1541,7 +1561,7 @@
             return;
         }
 
-        if (currentStep == 5 && RequiresBankConfirmationLetter())
+        if (!isAdministrator && currentStep == 5 && RequiresBankConfirmationLetter())
         {
             ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
@@ -1618,7 +1638,7 @@
             return;
         }
 
-        if (RequiresBankConfirmationLetter())
+        if (!isAdministrator && RequiresBankConfirmationLetter())
         {
             currentStep = 5;
             maxStepReached = Math.Max(maxStepReached, 5);
