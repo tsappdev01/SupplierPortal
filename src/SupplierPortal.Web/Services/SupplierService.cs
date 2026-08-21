@@ -345,6 +345,42 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.AccountStartDate = updated.AccountStartDate;
         supplier.AllowInternationalPayments = updated.AllowInternationalPayments;
 
+        // Fields added after this method was first written — copy them too so supplier/admin edits to
+        // them actually persist (previously they were silently dropped on save).
+        supplier.VatRegistered = updated.VatRegistered;
+        supplier.VatRegistrationTypeId = updated.VatRegistrationTypeId;
+        supplier.NumberOfVatGroupEntities = updated.NumberOfVatGroupEntities;
+        supplier.VatGroupEntityNames = updated.VatGroupEntityNames;
+        supplier.SupplierTin = updated.SupplierTin;
+        supplier.BusinessPartnerTypeId = updated.BusinessPartnerTypeId;
+        supplier.BusinessLocationTypeId = updated.BusinessLocationTypeId;
+        supplier.EInvoicingWaveId = updated.EInvoicingWaveId;
+        supplier.TradeLicenseIssueDate = updated.TradeLicenseIssueDate;
+        supplier.TradeLicenseExpiryDate = updated.TradeLicenseExpiryDate;
+        supplier.TradeLicenseIssuingBodyId = updated.TradeLicenseIssuingBodyId;
+        supplier.IssuingBodyIfOthers = updated.IssuingBodyIfOthers;
+        supplier.LicenseType = updated.LicenseType;
+        supplier.CityText = updated.CityText;
+        supplier.AddressPurposeOrdering = updated.AddressPurposeOrdering;
+        supplier.AddressPurposeRemitTo = updated.AddressPurposeRemitTo;
+        supplier.AddressPurposeRfqBidding = updated.AddressPurposeRfqBidding;
+        supplier.MiddleName = updated.MiddleName;
+        supplier.LastName = updated.LastName;
+        supplier.MobileCountryCodeId = updated.MobileCountryCodeId;
+        supplier.MobileAreaCode = updated.MobileAreaCode;
+        supplier.Mobile = updated.Mobile;
+        supplier.BusinessPhoneCountryCodeId = updated.BusinessPhoneCountryCodeId;
+        supplier.BusinessPhoneAreaCode = updated.BusinessPhoneAreaCode;
+        supplier.BusinessPhone = updated.BusinessPhone;
+        supplier.AccountEndDate = updated.AccountEndDate;
+        supplier.IntermediaryAccountApplicable = updated.IntermediaryAccountApplicable;
+        supplier.IntermediaryCountryId = updated.IntermediaryCountryId;
+        supplier.IntermediaryBankName = updated.IntermediaryBankName;
+        supplier.IntermediaryAccountNumber = updated.IntermediaryAccountNumber;
+        supplier.IntermediaryBranchNumber = updated.IntermediaryBranchNumber;
+        supplier.IntermediaryIban = updated.IntermediaryIban;
+        supplier.IntermediaryBicSwiftCode = updated.IntermediaryBicSwiftCode;
+
         supplier.IsDraft = updated.IsDraft;
 
         // Reconcile additional contacts: update rows still present, add new ones, drop removed ones.
