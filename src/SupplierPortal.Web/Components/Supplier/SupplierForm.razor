@@ -1,7 +1,5 @@
-@using Microsoft.AspNetCore.Components.Authorization
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
-@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject SupplierService SupplierService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierFieldSettingService SupplierFieldSettingService
@@ -940,10 +938,6 @@
     private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
     private bool isSaving;
 
-    // Administrators edit with everything open — no mandatory/document/bank checks block them. All
-    // validation applies to suppliers (self-service) and non-admin internal users.
-    private bool isAdministrator;
-
     private List<SupplierFieldSetting> fieldSettings = [];
     private HashSet<string> mandatoryKeys = [];
 
@@ -1074,13 +1068,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Suppliers use the token-based self-service flow (never authenticated as an admin). Internal
-        // administrators get an unrestricted form; everyone else is subject to the validation rules.
-        if (!SupplierFacing)
-        {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            isAdministrator = authState.User.IsAdministrator();
-        }
+        // Mandatory-field validation applies only to the supplier-facing self-service portal. Every
+        // internal view (SupplierFacing == false) — for administrators and other staff alike — edits
+        // with all fields open, so there is no per-role check to make here.
 
         taxOrgTypes = await SupplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType);
         supplierTypes = await SupplierService.GetLookupsAsync(LookupCategory.SupplierType);
@@ -1379,8 +1369,10 @@
     {
         var errors = new List<string>();
 
-        // Administrators edit with everything open — skip all required/conditional/document checks.
-        if (isAdministrator)
+        // Required/conditional/document checks apply ONLY to suppliers updating via the self-service
+        // portal. Internal users (administrators and other staff alike) edit with everything open —
+        // no mandatory-field enforcement — so this returns no errors for any non-self-service view.
+        if (!SupplierFacing)
         {
             return errors;
         }
@@ -1561,7 +1553,7 @@
             return;
         }
 
-        if (!isAdministrator && currentStep == 5 && RequiresBankConfirmationLetter())
+        if (SupplierFacing && currentStep == 5 && RequiresBankConfirmationLetter())
         {
             ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
@@ -1638,7 +1630,7 @@
             return;
         }
 
-        if (!isAdministrator && RequiresBankConfirmationLetter())
+        if (SupplierFacing && RequiresBankConfirmationLetter())
         {
             currentStep = 5;
             maxStepReached = Math.Max(maxStepReached, 5);
