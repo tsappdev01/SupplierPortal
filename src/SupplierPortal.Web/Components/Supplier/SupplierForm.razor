@@ -847,6 +847,36 @@
             </div>
         </div>
 
+        @if (SupplierFacing && currentStep == 5)
+        {
+            <div class="di-disclaimer">
+                <label class="di-disclaimer-label">
+                    <input type="checkbox" @bind="disclaimerAccepted" />
+                    <span>@DisclaimerText</span>
+                </label>
+            </div>
+        }
+        else if (!SupplierFacing && currentStep == 5 && Supplier.DisclaimerAcknowledged)
+        {
+            <div class="di-disclaimer di-disclaimer-ack">
+                <div class="di-disclaimer-label" style="cursor:default;">
+                    <span>✔</span>
+                    <span>
+                        <strong>Supplier declaration accepted.</strong>
+                        &ldquo;@(Supplier.DisclaimerText ?? DisclaimerText)&rdquo;
+                        <br />
+                        <span class="text-muted">
+                            Acknowledged by @Supplier.DisclaimerAcknowledgedBy
+                            @if (Supplier.DisclaimerAcknowledgedAt is not null)
+                            {
+                                <text> on @Supplier.DisclaimerAcknowledgedAt.Value.ToString("yyyy-MM-dd HH:mm") UTC</text>
+                            }
+                        </span>
+                    </span>
+                </div>
+            </div>
+        }
+
         <div class="di-actions">
             @if (currentStep > 1)
             {
@@ -937,6 +967,14 @@
     /// <summary>Wizard completion percentage (step-based) shown in the progress ring.</summary>
     private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
     private bool isSaving;
+
+    /// <summary>The disclaimer a self-service supplier must accept before submitting. Stored verbatim
+    /// with the submission so the exact wording agreed to is preserved.</summary>
+    public const string DisclaimerText =
+        "I hereby confirm that all the information provided in this form is true, complete and correct to the best of my knowledge.";
+
+    /// <summary>Bound to the self-service disclaimer checkbox on the final step.</summary>
+    private bool disclaimerAccepted;
 
     private List<SupplierFieldSetting> fieldSettings = [];
     private HashSet<string> mandatoryKeys = [];
@@ -1095,6 +1133,9 @@
         fieldSettings = await SupplierFieldSettingService.GetAllAsync();
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+
+        // Pre-check the self-service disclaimer if this record was already acknowledged before.
+        disclaimerAccepted = Supplier.DisclaimerAcknowledged;
 
         // Remember the bank account as loaded, to detect a supplier adding/changing a bank account.
         originalBankId = Supplier.BankId;
@@ -1636,6 +1677,24 @@
             maxStepReached = Math.Max(maxStepReached, 5);
             ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
+        }
+
+        // Self-service suppliers must acknowledge the disclaimer before submitting; record the
+        // acknowledgement (who / when / exact wording) with the submission.
+        if (SupplierFacing)
+        {
+            if (!disclaimerAccepted)
+            {
+                currentStep = 5;
+                maxStepReached = Math.Max(maxStepReached, 5);
+                ToastService.ShowError("Please tick the declaration confirming the information is correct before submitting.");
+                return;
+            }
+
+            Supplier.DisclaimerAcknowledged = true;
+            Supplier.DisclaimerAcknowledgedAt = DateTime.UtcNow;
+            Supplier.DisclaimerAcknowledgedBy = CurrentUser;
+            Supplier.DisclaimerText = DisclaimerText;
         }
 
         Supplier.IsDraft = false;

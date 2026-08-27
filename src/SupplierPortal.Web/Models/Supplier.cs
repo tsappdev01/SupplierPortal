@@ -306,6 +306,24 @@ public class Supplier
     [MaxLength(2000)]
     public string? ReviewRemarks { get; set; }
 
+    // -- Self-service disclaimer acknowledgement --
+
+    /// <summary>Whether the supplier acknowledged the "all information is correct" disclaimer when
+    /// submitting via the self-service portal. Recorded with the submission for audit.</summary>
+    public bool DisclaimerAcknowledged { get; set; }
+
+    /// <summary>When the disclaimer was acknowledged (UTC).</summary>
+    public DateTime? DisclaimerAcknowledgedAt { get; set; }
+
+    /// <summary>Who acknowledged the disclaimer (the self-service actor label / contact email).</summary>
+    [MaxLength(256)]
+    public string? DisclaimerAcknowledgedBy { get; set; }
+
+    /// <summary>The exact disclaimer text the supplier agreed to (stored so the wording is preserved
+    /// even if the on-screen text changes later).</summary>
+    [MaxLength(1000)]
+    public string? DisclaimerText { get; set; }
+
     /// <summary>True while the registration wizard is still in progress (not yet Submitted for Approval).</summary>
     public bool IsDraft { get; set; } = true;
 

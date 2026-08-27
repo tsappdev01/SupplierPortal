@@ -982,6 +982,20 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("CurrencyId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("DisclaimerAcknowledged")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("DisclaimerAcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DisclaimerAcknowledgedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("DisclaimerText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("DunsNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");

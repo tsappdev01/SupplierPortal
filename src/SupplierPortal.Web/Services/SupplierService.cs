@@ -401,6 +401,12 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.IntermediaryIban = updated.IntermediaryIban;
         supplier.IntermediaryBicSwiftCode = updated.IntermediaryBicSwiftCode;
 
+        // Self-service disclaimer acknowledgement recorded with the submission.
+        supplier.DisclaimerAcknowledged = updated.DisclaimerAcknowledged;
+        supplier.DisclaimerAcknowledgedAt = updated.DisclaimerAcknowledgedAt;
+        supplier.DisclaimerAcknowledgedBy = updated.DisclaimerAcknowledgedBy;
+        supplier.DisclaimerText = updated.DisclaimerText;
+
         supplier.IsDraft = updated.IsDraft;
 
         // Restore any fields hidden from suppliers so a self-service save can never change a locked

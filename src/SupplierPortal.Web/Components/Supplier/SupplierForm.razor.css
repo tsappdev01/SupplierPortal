@@ -326,6 +326,37 @@
     margin-top: 8px;
 }
 
+.di-disclaimer {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: #fff8e6;
+    border: 1px solid #f5d98a;
+    border-radius: 8px;
+}
+
+.di-disclaimer-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    font-size: 14px;
+    color: #46506b;
+    cursor: pointer;
+}
+
+.di-disclaimer-label input[type="checkbox"] {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    cursor: pointer;
+}
+
+.di-disclaimer-ack {
+    background: #e9f7ef;
+    border-color: #a7dcc0;
+}
+
 .di-btn {
     display: inline-flex;
     align-items: center;
