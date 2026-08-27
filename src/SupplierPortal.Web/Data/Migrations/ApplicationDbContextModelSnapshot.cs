@@ -1619,6 +1619,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("IsMandatory")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsVisibleToSupplier")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")

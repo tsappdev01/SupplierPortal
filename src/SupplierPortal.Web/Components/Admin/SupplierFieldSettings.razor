@@ -8,12 +8,13 @@
 @inject SupplierFieldSettingService SupplierFieldSettingService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Supplier Field Settings - Supplier Portal</PageTitle>
+<PageTitle>Supplier Field Manager - Supplier Portal</PageTitle>
 
-<h1>Supplier Field Settings</h1>
+<h1>Supplier Field Manager</h1>
 <p class="text-muted">
-    Choose which supplier fields are Mandatory. This governs both the Register Supplier wizard's
-    step validation and which fields the Excel bulk upload rejects a row for when missing.
+    Manage the supplier form's fields and tabs. Reorder fields within a tab, move a field to another
+    tab, hide it from suppliers, mark it Mandatory, or remove it from the form entirely. These settings
+    drive both the internal Register/Edit form and the supplier self-service portal.
 </p>
 
 @if (savedMessage is not null)
@@ -30,43 +31,85 @@
     </div>
 </div>
 
-@if (settings.Count == 0)
+@if (rows.Count == 0)
 {
-    <p><em>Loading...</em></p>
+    <LoadingIndicator Message="Loading field settings…" />
 }
 else
 {
-    @foreach (var stepGroup in settings.GroupBy(f => f.Step).OrderBy(g => g.Key))
+    @foreach (var step in TabSteps)
     {
+        var tabRows = ActiveRowsForStep(step);
         <div class="di-field-settings-section">
-            <div class="di-field-settings-header">@StepLabels[stepGroup.Key]</div>
+            <div class="di-field-settings-header">@StepLabels[step] <span class="di-tab-count">@tabRows.Count field(s)</span></div>
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
+                        <th style="width: 90px;">Order</th>
                         <th>Field</th>
-                        <th style="width: 160px;">Show to Supplier</th>
-                        <th style="width: 140px;">Mandatory</th>
+                        <th style="width: 170px;">Move to Tab</th>
+                        <th style="width: 120px;">Show to Supplier</th>
+                        <th style="width: 110px;">Mandatory</th>
+                        <th style="width: 90px;">Remove</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var field in stepGroup)
+                    @if (tabRows.Count == 0)
                     {
+                        <tr><td colspan="6" class="text-muted fst-italic">No fields on this tab.</td></tr>
+                    }
+                    @for (var i = 0; i < tabRows.Count; i++)
+                    {
+                        var row = tabRows[i];
+                        var index = i;
                         <tr>
-                            <td>@field.DisplayLabel</td>
+                            <td>
+                                @if (row.IsFixed)
+                                {
+                                    <span class="di-fixed-badge" title="Composite field — fixed position">fixed</span>
+                                }
+                                else
+                                {
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-secondary" title="Move up"
+                                                disabled="@(index == 0)" @onclick="() => MoveUp(step, index)">↑</button>
+                                        <button class="btn btn-outline-secondary" title="Move down"
+                                                disabled="@(index == tabRows.Count - 1)" @onclick="() => MoveDown(step, index)">↓</button>
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @row.DisplayLabel
+                                <div class="di-field-key">@row.FieldKey</div>
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" value="@row.Step"
+                                        disabled="@row.IsFixed"
+                                        @onchange="e => MoveToTab(row, int.Parse((string)e.Value!))">
+                                    @foreach (var s in TabSteps)
+                                    {
+                                        <option value="@s" selected="@(s == row.Step)">@StepLabels[s]</option>
+                                    }
+                                </select>
+                            </td>
                             <td>
                                 <label class="di-switch">
-                                    <input type="checkbox" checked="@visibleByKey[field.FieldKey]"
-                                           @onchange="e => OnVisibilityChanged(field.FieldKey, (bool)e.Value!)" />
+                                    <input type="checkbox" checked="@row.IsVisibleToSupplier"
+                                           @onchange="e => OnVisibilityChanged(row, (bool)e.Value!)" />
                                     <span class="di-switch-slider"></span>
                                 </label>
                             </td>
                             <td>
                                 <label class="di-switch">
-                                    <input type="checkbox" checked="@mandatoryByKey[field.FieldKey]"
-                                           disabled="@(!visibleByKey[field.FieldKey])"
-                                           @onchange="e => mandatoryByKey[field.FieldKey] = (bool)e.Value!" />
+                                    <input type="checkbox" checked="@row.IsMandatory"
+                                           disabled="@(!row.IsVisibleToSupplier)"
+                                           @onchange="e => row.IsMandatory = (bool)e.Value!" />
                                     <span class="di-switch-slider"></span>
                                 </label>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" title="Remove field from the form"
+                                        @onclick="() => RemoveField(row)">Remove</button>
                             </td>
                         </tr>
                     }
@@ -75,7 +118,33 @@ else
         </div>
     }
 
-    <button class="btn btn-primary mt-2" @onclick="SaveAsync" disabled="@isSaving">Save Settings</button>
+    @if (RemovedRows.Count > 0)
+    {
+        <div class="di-field-settings-section">
+            <div class="di-field-settings-header di-removed-header">Removed Fields</div>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th style="width: 170px;">Originally on Tab</th>
+                        <th style="width: 120px;">Restore</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in RemovedRows)
+                    {
+                        <tr>
+                            <td>@row.DisplayLabel<div class="di-field-key">@row.FieldKey</div></td>
+                            <td>@StepLabels[row.Step]</td>
+                            <td><button class="btn btn-sm btn-outline-success" @onclick="() => RestoreField(row)">Restore</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <button class="btn btn-primary mt-2" @onclick="SaveAsync" disabled="@isSaving">Save Field Layout</button>
 }
 
 <style>
@@ -95,6 +164,25 @@ else
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .di-removed-header { background: #7a1f2b; }
+
+    .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
+
+    .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
+
+    .di-fixed-badge {
+        font-size: 0.68rem;
+        color: #6b7280;
+        background: #eef0f4;
+        border-radius: 4px;
+        padding: 2px 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
     }
 
     .di-switch {
@@ -105,11 +193,7 @@ else
         vertical-align: middle;
     }
 
-    .di-switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
+    .di-switch input { opacity: 0; width: 0; height: 0; }
 
     .di-switch-slider {
         position: absolute;
@@ -132,16 +216,14 @@ else
         transition: transform 0.15s ease;
     }
 
-    .di-switch input:checked + .di-switch-slider {
-        background-color: #28a745;
-    }
+    .di-switch input:checked + .di-switch-slider { background-color: #28a745; }
 
-    .di-switch input:checked + .di-switch-slider::before {
-        transform: translateX(18px);
-    }
+    .di-switch input:checked + .di-switch-slider::before { transform: translateX(18px); }
 </style>
 
 @code {
+    private static readonly int[] TabSteps = [1, 2, 3, 4, 5];
+
     private static readonly Dictionary<int, string> StepLabels = new()
     {
         [1] = "Business / Organization Information",
@@ -151,32 +233,109 @@ else
         [5] = "Payment / Banking Information"
     };
 
-    private List<SupplierFieldSetting> settings = [];
-    private Dictionary<string, bool> mandatoryByKey = [];
-    private Dictionary<string, bool> visibleByKey = [];
+    private sealed class FieldRow
+    {
+        public string FieldKey { get; init; } = "";
+        public string DisplayLabel { get; init; } = "";
+        public bool IsFixed { get; init; }
+        public int Step { get; set; }
+        public int Sequence { get; set; }
+        public bool IsVisibleToSupplier { get; set; }
+        public bool IsMandatory { get; set; }
+        public bool IsRemoved { get; set; }
+    }
+
+    private List<FieldRow> rows = [];
     private string currentUser = "unknown";
     private bool isSaving;
     private string? savedMessage;
     private int pageSize = 50;
+
+    private List<FieldRow> RemovedRows => rows.Where(r => r.IsRemoved).OrderBy(r => r.Step).ThenBy(r => r.DisplayLabel).ToList();
+
+    private List<FieldRow> ActiveRowsForStep(int step) =>
+        rows.Where(r => !r.IsRemoved && r.Step == step).OrderBy(r => r.Sequence).ToList();
 
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
 
-        settings = await SupplierFieldSettingService.GetAllAsync();
-        mandatoryByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsMandatory);
-        visibleByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsVisibleToSupplier);
+        var settings = await SupplierFieldSettingService.GetAllForAdminAsync();
+        rows = settings.Select(f => new FieldRow
+        {
+            FieldKey = f.FieldKey,
+            DisplayLabel = f.DisplayLabel,
+            IsFixed = SupplierFieldSettingService.FixedPositionKeys.Contains(f.FieldKey),
+            Step = f.Step,
+            Sequence = f.Sequence,
+            IsVisibleToSupplier = f.IsVisibleToSupplier,
+            IsMandatory = f.IsMandatory,
+            IsRemoved = f.IsRemoved
+        }).ToList();
+        NormalizeSequences();
+
         pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
     }
 
     // Hiding a field from the supplier makes it optional automatically, so clear Mandatory too.
-    private void OnVisibilityChanged(string fieldKey, bool isVisible)
+    private void OnVisibilityChanged(FieldRow row, bool isVisible)
     {
-        visibleByKey[fieldKey] = isVisible;
+        row.IsVisibleToSupplier = isVisible;
         if (!isVisible)
         {
-            mandatoryByKey[fieldKey] = false;
+            row.IsMandatory = false;
+        }
+    }
+
+    private void MoveUp(int step, int index)
+    {
+        var list = ActiveRowsForStep(step);
+        if (index <= 0) return;
+        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveDown(int step, int index)
+    {
+        var list = ActiveRowsForStep(step);
+        if (index >= list.Count - 1) return;
+        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveToTab(FieldRow row, int newStep)
+    {
+        if (row.IsFixed || row.Step == newStep) return;
+        row.Step = newStep;
+        // Place at the end of the destination tab.
+        var maxSeq = rows.Where(r => !r.IsRemoved && r.Step == newStep && r != row)
+            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
+        row.Sequence = maxSeq + 1;
+    }
+
+    private void RemoveField(FieldRow row)
+    {
+        row.IsRemoved = true;
+        row.IsMandatory = false;
+    }
+
+    private void RestoreField(FieldRow row)
+    {
+        row.IsRemoved = false;
+        var maxSeq = rows.Where(r => !r.IsRemoved && r.Step == row.Step && r != row)
+            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
+        row.Sequence = maxSeq + 1;
+    }
+
+    // Renumber each tab's active fields to contiguous 1..n so up/down swaps are unambiguous.
+    private void NormalizeSequences()
+    {
+        foreach (var step in TabSteps)
+        {
+            var seq = 1;
+            foreach (var row in rows.Where(r => !r.IsRemoved && r.Step == step).OrderBy(r => r.Sequence).ThenBy(r => r.DisplayLabel))
+            {
+                row.Sequence = seq++;
+            }
         }
     }
 
@@ -185,13 +344,12 @@ else
         isSaving = true;
         try
         {
-            await SupplierFieldSettingService.SaveAsync(mandatoryByKey, visibleByKey, currentUser);
+            NormalizeSequences();
+            var layouts = rows.Select(r => new SupplierFieldSettingService.FieldLayout(
+                r.FieldKey, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
+            await SupplierFieldSettingService.SaveLayoutAsync(layouts, currentUser);
             await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
-            savedMessage = "Settings saved.";
-            settings = await SupplierFieldSettingService.GetAllAsync();
-            mandatoryByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsMandatory);
-            visibleByKey = settings.ToDictionary(f => f.FieldKey, f => f.IsVisibleToSupplier);
-            pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
+            savedMessage = "Field layout saved.";
         }
         finally
         {

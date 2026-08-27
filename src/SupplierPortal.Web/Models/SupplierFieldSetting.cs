@@ -29,4 +29,8 @@ public class SupplierFieldSetting
     /// <summary>When false, the field is hidden from the supplier self-service form and is treated as
     /// optional automatically (a hidden field can never be mandatory).</summary>
     public bool IsVisibleToSupplier { get; set; } = true;
+
+    /// <summary>When true, the field is removed from the supplier form entirely (both the supplier and
+    /// internal views) and is never validated. Admins can restore it from the field manager.</summary>
+    public bool IsRemoved { get; set; }
 }
