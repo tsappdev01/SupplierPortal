@@ -14,6 +14,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<BankBranch> BankBranches => Set<BankBranch>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SupplierFieldSetting> SupplierFieldSettings => Set<SupplierFieldSetting>();
+    public DbSet<SupplierTabSetting> SupplierTabSettings => Set<SupplierTabSetting>();
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
     public DbSet<SupplierFieldChange> SupplierFieldChanges => Set<SupplierFieldChange>();
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
@@ -344,6 +345,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         // field stays visible to suppliers (rather than defaulting to hidden).
         modelBuilder.Entity<SupplierFieldSetting>()
             .Property(f => f.IsVisibleToSupplier)
+            .HasDefaultValue(true);
+
+        modelBuilder.Entity<SupplierTabSetting>()
+            .HasIndex(t => t.Step)
+            .IsUnique();
+
+        modelBuilder.Entity<SupplierTabSetting>()
+            .Property(t => t.IsVisible)
             .HasDefaultValue(true);
 
         // Owned child rows of a specific Supplier (not shared master data), so cascade-delete

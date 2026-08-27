@@ -31,6 +31,45 @@
     </div>
 </div>
 
+@if (tabs.Count > 0)
+{
+    <div class="di-field-settings-section">
+        <div class="di-field-settings-header">Wizard Tabs</div>
+        <div class="p-3">
+            <p class="text-muted mb-2" style="font-size: 13px;">
+                Rename or hide the supplier form's tabs. A hidden tab is skipped entirely (its fields
+                are not shown or required). <strong>Address Information</strong> and
+                <strong>Contact Information</strong> are shown together on one page as an accordion.
+            </p>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Tab</th>
+                        <th>Title</th>
+                        <th style="width: 120px;">Visible</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tab in tabs.OrderBy(t => t.Step))
+                    {
+                        <tr>
+                            <td>@tab.Step</td>
+                            <td><input class="form-control form-control-sm" @bind="tab.Title" maxlength="150" /></td>
+                            <td>
+                                <label class="di-switch">
+                                    <input type="checkbox" checked="@tab.IsVisible"
+                                           @onchange="e => tab.IsVisible = (bool)e.Value!" />
+                                    <span class="di-switch-slider"></span>
+                                </label>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
 @if (rows.Count == 0)
 {
     <LoadingIndicator Message="Loading field settings…" />
@@ -41,7 +80,7 @@ else
     {
         var tabRows = ActiveRowsForStep(step);
         <div class="di-field-settings-section">
-            <div class="di-field-settings-header">@StepLabels[step] <span class="di-tab-count">@tabRows.Count field(s)</span></div>
+            <div class="di-field-settings-header">@StepLabel(step) <span class="di-tab-count">@tabRows.Count field(s)</span></div>
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
@@ -88,7 +127,7 @@ else
                                         @onchange="e => MoveToTab(row, int.Parse((string)e.Value!))">
                                     @foreach (var s in TabSteps)
                                     {
-                                        <option value="@s" selected="@(s == row.Step)">@StepLabels[s]</option>
+                                        <option value="@s" selected="@(s == row.Step)">@StepLabel(s)</option>
                                     }
                                 </select>
                             </td>
@@ -135,7 +174,7 @@ else
                     {
                         <tr>
                             <td>@row.DisplayLabel<div class="di-field-key">@row.FieldKey</div></td>
-                            <td>@StepLabels[row.Step]</td>
+                            <td>@StepLabel(row.Step)</td>
                             <td><button class="btn btn-sm btn-outline-success" @onclick="() => RestoreField(row)">Restore</button></td>
                         </tr>
                     }
@@ -224,14 +263,15 @@ else
 @code {
     private static readonly int[] TabSteps = [1, 2, 3, 4, 5];
 
-    private static readonly Dictionary<int, string> StepLabels = new()
+    private List<SupplierTabSetting> tabs = [];
+
+    private string StepLabel(int step)
     {
-        [1] = "Business / Organization Information",
-        [2] = "Address Information",
-        [3] = "Contact Information",
-        [4] = "Site / Business Unit",
-        [5] = "Payment / Banking Information"
-    };
+        var t = tabs.FirstOrDefault(x => x.Step == step);
+        return t is not null && !string.IsNullOrWhiteSpace(t.Title)
+            ? t.Title
+            : SupplierFieldSettingService.DefaultTabTitles.GetValueOrDefault(step, $"Tab {step}");
+    }
 
     private sealed class FieldRow
     {
@@ -260,6 +300,8 @@ else
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
+
+        tabs = await SupplierFieldSettingService.GetTabsAsync();
 
         var settings = await SupplierFieldSettingService.GetAllForAdminAsync();
         rows = settings.Select(f => new FieldRow
@@ -348,6 +390,10 @@ else
             var layouts = rows.Select(r => new SupplierFieldSettingService.FieldLayout(
                 r.FieldKey, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
             await SupplierFieldSettingService.SaveLayoutAsync(layouts, currentUser);
+
+            var tabLayouts = tabs.Select(t => new SupplierFieldSettingService.TabLayout(t.Step, t.Title, t.IsVisible));
+            await SupplierFieldSettingService.SaveTabsAsync(tabLayouts, currentUser);
+
             await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
             savedMessage = "Field layout saved.";
         }

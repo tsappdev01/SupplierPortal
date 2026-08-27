@@ -357,6 +357,31 @@
     border-color: #a7dcc0;
 }
 
+/* Accordion: when Address + Contact share one page, each section's header collapses its body. */
+.di-accordion {
+    margin-bottom: 12px;
+}
+
+.di-accordion-head {
+    cursor: pointer;
+    user-select: none;
+}
+
+.di-accordion-head:hover {
+    filter: brightness(0.98);
+}
+
+.di-accordion-caret {
+    margin-left: auto;
+    color: #94a3b8;
+    transition: transform 0.15s ease;
+    flex: none;
+}
+
+.di-accordion-caret.open {
+    transform: rotate(180deg);
+}
+
 .di-btn {
     display: inline-flex;
     align-items: center;

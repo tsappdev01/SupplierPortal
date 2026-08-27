@@ -171,4 +171,73 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         await db.SaveChangesAsync();
         await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, "Updated supplier field layout (tabs / order / visibility / removed)");
     }
+
+    // ---- Wizard tabs (steps) ----
+
+    /// <summary>Default title for each wizard tab (step), used to seed the tab settings the first time
+    /// and as a fallback if a stored title is blank.</summary>
+    public static readonly Dictionary<int, string> DefaultTabTitles = new()
+    {
+        [1] = "Business / Organization",
+        [2] = "Address Information",
+        [3] = "Contact Information",
+        [4] = "Site / Business Unit",
+        [5] = "Payment / Banking"
+    };
+
+    /// <summary>The five wizard tabs with their (admin-editable) titles and visibility. Seeds the
+    /// defaults on first use so the table is self-initialising without a separate seeding pass.</summary>
+    public async Task<List<SupplierTabSetting>> GetTabsAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
+
+        var missing = DefaultTabTitles.Keys.Where(step => tabs.All(t => t.Step != step)).ToList();
+        if (missing.Count > 0)
+        {
+            foreach (var step in missing)
+            {
+                db.SupplierTabSettings.Add(new SupplierTabSetting
+                {
+                    Step = step,
+                    Title = DefaultTabTitles[step],
+                    IsVisible = true
+                });
+            }
+            await db.SaveChangesAsync();
+            tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
+        }
+
+        return tabs;
+    }
+
+    /// <summary>One tab's editable state from the admin manager.</summary>
+    public record TabLayout(int Step, string Title, bool IsVisible);
+
+    public async Task SaveTabsAsync(IEnumerable<TabLayout> tabs, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var existing = await db.SupplierTabSettings.ToListAsync();
+
+        foreach (var tab in tabs)
+        {
+            if (!DefaultTabTitles.ContainsKey(tab.Step))
+            {
+                continue;
+            }
+
+            var row = existing.FirstOrDefault(t => t.Step == tab.Step);
+            if (row is null)
+            {
+                row = new SupplierTabSetting { Step = tab.Step };
+                db.SupplierTabSettings.Add(row);
+            }
+
+            row.Title = string.IsNullOrWhiteSpace(tab.Title) ? DefaultTabTitles[tab.Step] : tab.Title.Trim();
+            row.IsVisible = tab.IsVisible;
+        }
+
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierTabSetting", null, "Updated supplier wizard tab titles/visibility");
+    }
 }

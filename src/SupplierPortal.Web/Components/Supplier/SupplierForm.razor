@@ -449,15 +449,16 @@
     }
 
     <div class="di-stepper">
-        @for (var i = 1; i <= 5; i++)
+        @{ var visiblePages = VisiblePages; }
+        @for (var i = 1; i <= visiblePages.Count; i++)
         {
             var step = i;
             <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") @(step <= maxStepReached ? "reached" : "")"
                     disabled="@(step > maxStepReached)" @onclick="() => GoToStep(step)">
                 <span class="di-stepper-num">@step</span>
-                <span class="di-stepper-label">@StepLabels[step]</span>
+                <span class="di-stepper-label">@PageTitle(visiblePages[step - 1])</span>
             </button>
-            if (i < 5)
+            if (i < visiblePages.Count)
             {
                 <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
@@ -469,13 +470,13 @@
     <EditForm Model="formModel" FormName="supplier-form">
 
         <!-- Step 1: Business / Organization Information -->
-        <div class="di-section" style="display:@(currentStep == 1 ? "block" : "none")">
+        <div class="di-section" style="display:@(CurrentSections.Contains(1) ? "block" : "none")">
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 5.5a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm-1 2a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Zm2.5-.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0ZM8 5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Z" /><path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H2V1Zm2 2v1h1V3H4Zm1 2H4v1h1V5Zm1 0v1h1V5H6Zm1-1V3H6v1h1Zm1 0h1V3H8v1Zm1 1H8v1h1V5Zm1-2v1h1V3h-1Zm1 2h-1v1h1V5ZM4 8v1h1V8H4Zm1 2H4v1h1v-1Zm1 0v1h1v-1H6Zm1-1V8H6v1h1Zm1 0h1V8H8v1Zm1 1H8v1h1v-1Zm1-2v1h1V8h-1Zm1 2h-1v1h1v-1ZM4 14h3v-3H4v3Zm5 0h3v-3H9v3Z" /></svg>
                 </span>
                 <span class="di-section-heading">
-                    <span class="di-section-title">Business / Organization Information</span>
+                    <span class="di-section-title">@SectionTitle(1)</span>
                     <span class="di-section-desc">Provide accurate business details as per your trade license and official documents.</span>
                 </span>
             </div>
@@ -536,16 +537,23 @@
 
         <!-- Step 2: Contact Information -->
         <!-- Step 2: Address Information -->
-        <div class="di-section" style="display:@(currentStep == 2 ? "block" : "none")">
-            <div class="di-section-header">
+        <div class="di-section @(CurrentSections.Length > 1 ? "di-accordion" : null)" style="display:@(CurrentSections.Contains(2) ? "block" : "none")">
+            <div class="di-section-header @(CurrentSections.Length > 1 ? "di-accordion-head" : null)"
+                 @onclick="@(CurrentSections.Length > 1 ? () => ToggleAccordion(2) : (Action)(() => { }))">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
                 </span>
                 <span class="di-section-heading">
-                    <span class="di-section-title">Address Information</span>
+                    <span class="di-section-title">@SectionTitle(2)</span>
                     <span class="di-section-desc">Where the business is located and how it should be contacted.</span>
                 </span>
+                @if (CurrentSections.Length > 1)
+                {
+                    <svg class="di-accordion-caret @(IsSectionOpen(2) ? "open" : null)" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708Z" /></svg>
+                }
             </div>
+            @if (IsSectionOpen(2))
+            {
             <div class="di-section-body">
                 @foreach (var key in MovableKeysForStep(2))
                 {
@@ -563,19 +571,27 @@
                 </div>
                 }
             </div>
+            }
         </div>
 
-        <!-- Step 3: Contact Information -->
-        <div class="di-section" style="display:@(currentStep == 3 ? "block" : "none")">
-            <div class="di-section-header">
+        <!-- Step 3: Contact Information (shares the Address page as an accordion) -->
+        <div class="di-section @(CurrentSections.Length > 1 ? "di-accordion" : null)" style="display:@(CurrentSections.Contains(3) ? "block" : "none")">
+            <div class="di-section-header @(CurrentSections.Length > 1 ? "di-accordion-head" : null)"
+                 @onclick="@(CurrentSections.Length > 1 ? () => ToggleAccordion(3) : (Action)(() => { }))">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" /></svg>
                 </span>
                 <span class="di-section-heading">
-                    <span class="di-section-title">Contact Information</span>
+                    <span class="di-section-title">@SectionTitle(3)</span>
                     <span class="di-section-desc">Primary and additional people we should reach out to.</span>
                 </span>
+                @if (CurrentSections.Length > 1)
+                {
+                    <svg class="di-accordion-caret @(IsSectionOpen(3) ? "open" : null)" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708Z" /></svg>
+                }
             </div>
+            @if (IsSectionOpen(3))
+            {
             <div class="di-section-body">
                 @foreach (var key in MovableKeysForStep(3))
                 {
@@ -668,16 +684,17 @@
                     </button>
                 </div>
             </div>
+            }
         </div>
 
         <!-- Step 5: Payment / Banking Information -->
-        <div class="di-section" style="display:@(currentStep == 5 ? "block" : "none")">
+        <div class="di-section" style="display:@(CurrentSections.Contains(5) ? "block" : "none")">
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
                 </span>
                 <span class="di-section-heading">
-                    <span class="di-section-title">Payment / Banking Information</span>
+                    <span class="di-section-title">@SectionTitle(5)</span>
                     <span class="di-section-desc">Bank account and payment details used to settle invoices.</span>
                 </span>
             </div>
@@ -859,13 +876,13 @@
         </div>
 
         <!-- Step 4: Site / Business Unit -->
-        <div class="di-section" style="display:@(currentStep == 4 ? "block" : "none")">
+        <div class="di-section" style="display:@(CurrentSections.Contains(4) ? "block" : "none")">
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z" /></svg>
                 </span>
                 <span class="di-section-heading">
-                    <span class="di-section-title">Site / Business Unit</span>
+                    <span class="di-section-title">@SectionTitle(4)</span>
                     <span class="di-section-desc">Assign the supplier to business units and select site usages.</span>
                 </span>
             </div>
@@ -891,7 +908,7 @@
             </div>
         </div>
 
-        @if (SupplierFacing && currentStep == 5)
+        @if (SupplierFacing && IsLastPage)
         {
             <div class="di-disclaimer">
                 <label class="di-disclaimer-label">
@@ -900,7 +917,7 @@
                 </label>
             </div>
         }
-        else if (!SupplierFacing && currentStep == 5 && Supplier.DisclaimerAcknowledged)
+        else if (!SupplierFacing && IsLastPage && Supplier.DisclaimerAcknowledged)
         {
             <div class="di-disclaimer di-disclaimer-ack">
                 <div class="di-disclaimer-label" style="cursor:default;">
@@ -929,7 +946,7 @@
                     Back
                 </button>
             }
-            @if (currentStep < 5)
+            @if (!IsLastPage)
             {
                 <button class="di-btn di-btn-primary" type="button" @onclick="NextAsync" disabled="@isSaving">
                     Next
@@ -995,21 +1012,75 @@
     /// Confirmation Letter attachment.</summary>
     [Parameter] public bool SupplierFacing { get; set; }
 
-    private static readonly Dictionary<int, string> StepLabels = new()
+    // Admin-configured tab titles + visibility (one row per field-section step 1-5).
+    private List<SupplierTabSetting> tabSettings = [];
+
+    // Wizard pages group one or more field-sections. Address (2) and Contact (3) share one page and
+    // are shown as an accordion; the other sections are each their own page. A page appears only if at
+    // least one of its sections is visible; within a page only visible sections render.
+    private static readonly int[][] BasePages = [[1], [2, 3], [4], [5]];
+
+    private bool SectionVisible(int step) =>
+        tabSettings.FirstOrDefault(t => t.Step == step)?.IsVisible ?? true;
+
+    private string SectionTitle(int step)
     {
-        [1] = "Business / Organization",
-        [2] = "Address Information",
-        [3] = "Contact Information",
-        [4] = "Site / Business Unit",
-        [5] = "Payment / Banking"
-    };
+        var t = tabSettings.FirstOrDefault(x => x.Step == step);
+        return t is not null && !string.IsNullOrWhiteSpace(t.Title)
+            ? t.Title
+            : SupplierFieldSettingService.DefaultTabTitles.GetValueOrDefault(step, $"Step {step}");
+    }
+
+    private List<int[]> VisiblePages => BasePages
+        .Select(p => p.Where(SectionVisible).ToArray())
+        .Where(p => p.Length > 0)
+        .ToList();
+
+    private string PageTitle(int[] sections) => string.Join(" & ", sections.Select(SectionTitle));
+
+    private int[] CurrentSections
+    {
+        get
+        {
+            var pages = VisiblePages;
+            if (pages.Count == 0) return [];
+            var idx = Math.Clamp(currentStep, 1, pages.Count) - 1;
+            return pages[idx];
+        }
+    }
+
+    private bool IsLastPage => currentStep >= VisiblePages.Count;
+
+    /// <summary>1-based page index that contains the given field-section (falls back to 1).</summary>
+    private int PageIndexOf(int section)
+    {
+        var pages = VisiblePages;
+        for (var i = 0; i < pages.Count; i++)
+        {
+            if (pages[i].Contains(section)) return i + 1;
+        }
+        return 1;
+    }
+
+    // Accordion: which section's panel is open on a multi-section (merged) page. A single-section page
+    // is always open.
+    private int openAccordionSection = 2;
+    private bool IsSectionOpen(int step) => CurrentSections.Length <= 1 || openAccordionSection == step;
+    private void ToggleAccordion(int step) => openAccordionSection = openAccordionSection == step ? -1 : step;
 
     private SupplierFormModel formModel = new();
     private int currentStep = 1;
     private int maxStepReached = 1;
 
-    /// <summary>Wizard completion percentage (step-based) shown in the progress ring.</summary>
-    private int ProgressPct => (int)Math.Round(currentStep / 5.0 * 100);
+    /// <summary>Wizard completion percentage (page-based) shown in the progress ring.</summary>
+    private int ProgressPct
+    {
+        get
+        {
+            var count = VisiblePages.Count;
+            return count == 0 ? 0 : (int)Math.Round(Math.Clamp(currentStep, 1, count) / (double)count * 100);
+        }
+    }
     private bool isSaving;
 
     /// <summary>The disclaimer a self-service supplier must accept before submitting. Stored verbatim
@@ -1234,6 +1305,7 @@
         fieldSettings = await SupplierFieldSettingService.GetAllAsync();
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+        tabSettings = await SupplierFieldSettingService.GetTabsAsync();
 
         // Pre-check the self-service disclaimer if this record was already acknowledged before.
         disclaimerAccepted = Supplier.DisclaimerAcknowledged;
@@ -1269,7 +1341,7 @@
         }
         else
         {
-            maxStepReached = 5;
+            maxStepReached = VisiblePages.Count;
         }
 
         if (Supplier.Id != 0)
@@ -1484,16 +1556,29 @@
         if (step <= maxStepReached)
         {
             currentStep = step;
-            if (currentStep == 4)
-            {
-                PrimeSupplierSite();
-            }
+            AfterNavigate();
         }
     }
 
     private void Back()
     {
         currentStep = Math.Max(1, currentStep - 1);
+        AfterNavigate();
+    }
+
+    /// <summary>Runs after a page change: prime the Supplier Site when landing on the Site tab, and
+    /// reset the accordion to open the first section of a multi-section (merged) page.</summary>
+    private void AfterNavigate()
+    {
+        var sections = CurrentSections;
+        if (sections.Contains(4))
+        {
+            PrimeSupplierSite();
+        }
+        if (sections.Length > 1)
+        {
+            openAccordionSection = sections[0];
+        }
     }
 
     /// <summary>Email fields shown on each wizard step, with their display label, so their format can
@@ -1684,14 +1769,14 @@
 
     private async Task NextAsync()
     {
-        var errors = ValidateStep(formModel, currentStep);
+        var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
             ToastService.ShowError(string.Join(" ", errors));
             return;
         }
 
-        if (SupplierFacing && currentStep == 5 && RequiresBankConfirmationLetter())
+        if (SupplierFacing && CurrentSections.Contains(5) && RequiresBankConfirmationLetter())
         {
             ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
@@ -1705,12 +1790,9 @@
             {
                 documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
             }
-            currentStep++;
-            if (currentStep == 4)
-            {
-                PrimeSupplierSite();
-            }
+            currentStep = Math.Min(currentStep + 1, VisiblePages.Count);
             maxStepReached = Math.Max(maxStepReached, currentStep);
+            AfterNavigate();
         }
         catch (Exception ex)
         {
@@ -1724,7 +1806,7 @@
 
     private async Task SaveAsDraftAsync()
     {
-        var errors = ValidateStep(formModel, 5);
+        var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
             ToastService.ShowError(string.Join(" ", errors));
@@ -1737,15 +1819,16 @@
 
     private async Task SubmitForApprovalAsync()
     {
-        var errors = Enumerable.Range(1, 5).SelectMany(step => ValidateStep(formModel, step)).ToList();
+        var pages = VisiblePages;
+        var errors = pages.SelectMany(p => p).SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
-            for (var step = 1; step <= 5; step++)
+            for (var i = 0; i < pages.Count; i++)
             {
-                if (ValidateStep(formModel, step).Count > 0)
+                if (pages[i].Any(s => ValidateStep(formModel, s).Count > 0))
                 {
-                    currentStep = step;
-                    maxStepReached = Math.Max(maxStepReached, step);
+                    currentStep = i + 1;
+                    maxStepReached = Math.Max(maxStepReached, currentStep);
                     break;
                 }
             }
@@ -1756,22 +1839,22 @@
 
         if (SupplierFacing && !HasTradeLicenseDocument())
         {
-            currentStep = 1;
+            currentStep = PageIndexOf(1);
             ToastService.ShowError("A Trade License document must be attached before submitting.");
             return;
         }
 
         if (SupplierFacing && RequiresVatCertificate())
         {
-            currentStep = 1;
+            currentStep = PageIndexOf(1);
             ToastService.ShowError("A VAT Registration Certificate must be attached because a TRN/VAT Registration Number is provided.");
             return;
         }
 
         if (SupplierFacing && RequiresBankConfirmationLetter())
         {
-            currentStep = 5;
-            maxStepReached = Math.Max(maxStepReached, 5);
+            currentStep = PageIndexOf(5);
+            maxStepReached = Math.Max(maxStepReached, currentStep);
             ToastService.ShowError("A Bank Confirmation Letter must be attached because the bank account was changed.");
             return;
         }
@@ -1782,8 +1865,8 @@
         {
             if (!disclaimerAccepted)
             {
-                currentStep = 5;
-                maxStepReached = Math.Max(maxStepReached, 5);
+                currentStep = VisiblePages.Count;
+                maxStepReached = Math.Max(maxStepReached, currentStep);
                 ToastService.ShowError("Please tick the declaration confirming the information is correct before submitting.");
                 return;
             }
