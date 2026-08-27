@@ -13,8 +13,9 @@
 <h1>Supplier Field Manager</h1>
 <p class="text-muted">
     Manage the supplier form's fields and tabs. Reorder fields within a tab, move a field to another
-    tab, hide it from suppliers, mark it Mandatory, or remove it from the form entirely. These settings
-    drive both the internal Register/Edit form and the supplier self-service portal.
+    tab, hide it from the form, mark it Mandatory, or remove it entirely. Toggling <strong>Show on
+    Form</strong> off hides the field on every form (internal Register/Edit and the supplier
+    self-service portal); these settings drive both.
 </p>
 
 @if (savedMessage is not null)
@@ -87,7 +88,7 @@ else
                         <th style="width: 90px;">Order</th>
                         <th>Field</th>
                         <th style="width: 170px;">Move to Tab</th>
-                        <th style="width: 120px;">Show to Supplier</th>
+                        <th style="width: 120px;">Show on Form</th>
                         <th style="width: 110px;">Mandatory</th>
                         <th style="width: 90px;">Remove</th>
                     </tr>

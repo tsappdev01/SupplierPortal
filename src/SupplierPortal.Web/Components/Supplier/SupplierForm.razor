@@ -552,7 +552,7 @@
                 {
                     @fieldFragments[key]
                 }
-                @if (!SupplierFacing || AddressPurposeKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
+                @if (AddressPurposeKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
                 {
                 <div class="di-field di-full">
                     <label>Address Purpose</label>
@@ -875,7 +875,7 @@
                 {
                     @fieldFragments[key]
                 }
-                @if (!SupplierFacing || SiteUsageKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
+                @if (SiteUsageKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
                 {
                     <div class="di-field di-full">
                         <label>Site Usages</label>
@@ -1331,7 +1331,8 @@
 
     /// <summary>CSS class for a field wrapper: highlights it green when its current value came from a
     /// supplier self-service edit that an admin hasn't reviewed (saved over) yet, and hides it
-    /// entirely when the form is supplier-facing and the field is marked not visible to suppliers.</summary>
+    /// entirely when the field is toggled off in the field manager (hidden on every form — supplier
+    /// and internal alike).</summary>
     private string FieldClass(string fieldKey)
     {
         var classes = "";
@@ -1339,14 +1340,16 @@
         {
             classes = "di-field-changed";
         }
-        if (SupplierFacing && hiddenFromSupplierKeys.Contains(fieldKey))
+        if (hiddenFromSupplierKeys.Contains(fieldKey))
         {
             classes = string.IsNullOrEmpty(classes) ? "di-hidden-field" : classes + " di-hidden-field";
         }
         return classes;
     }
 
-    private bool IsHiddenFromSupplier(string fieldKey) => SupplierFacing && hiddenFromSupplierKeys.Contains(fieldKey);
+    /// <summary>A field toggled off in the field manager is hidden on every form (supplier and
+    /// internal), and so is never required.</summary>
+    private bool IsHiddenFromSupplier(string fieldKey) => hiddenFromSupplierKeys.Contains(fieldKey);
 
     private bool BankAccountChanged() =>
         formModel.BankId != originalBankId ||
