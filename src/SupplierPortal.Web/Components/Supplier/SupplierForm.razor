@@ -537,9 +537,8 @@
 
         <!-- Step 2: Contact Information -->
         <!-- Step 2: Address Information -->
-        <div class="di-section @(CurrentSections.Length > 1 ? "di-accordion" : null)" style="display:@(CurrentSections.Contains(2) ? "block" : "none")">
-            <div class="di-section-header @(CurrentSections.Length > 1 ? "di-accordion-head" : null)"
-                 @onclick="@(CurrentSections.Length > 1 ? () => ToggleAccordion(2) : (Action)(() => { }))">
+        <div class="di-section" style="display:@(CurrentSections.Contains(2) ? "block" : "none")">
+            <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
                 </span>
@@ -547,13 +546,7 @@
                     <span class="di-section-title">@SectionTitle(2)</span>
                     <span class="di-section-desc">Where the business is located and how it should be contacted.</span>
                 </span>
-                @if (CurrentSections.Length > 1)
-                {
-                    <svg class="di-accordion-caret @(IsSectionOpen(2) ? "open" : null)" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708Z" /></svg>
-                }
             </div>
-            @if (IsSectionOpen(2))
-            {
             <div class="di-section-body">
                 @foreach (var key in MovableKeysForStep(2))
                 {
@@ -571,13 +564,11 @@
                 </div>
                 }
             </div>
-            }
         </div>
 
-        <!-- Step 3: Contact Information (shares the Address page as an accordion) -->
-        <div class="di-section @(CurrentSections.Length > 1 ? "di-accordion" : null)" style="display:@(CurrentSections.Contains(3) ? "block" : "none")">
-            <div class="di-section-header @(CurrentSections.Length > 1 ? "di-accordion-head" : null)"
-                 @onclick="@(CurrentSections.Length > 1 ? () => ToggleAccordion(3) : (Action)(() => { }))">
+        <!-- Step 3: Contact Information (shares the Address page; both always expanded) -->
+        <div class="di-section" style="display:@(CurrentSections.Contains(3) ? "block" : "none")">
+            <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" /></svg>
                 </span>
@@ -585,13 +576,7 @@
                     <span class="di-section-title">@SectionTitle(3)</span>
                     <span class="di-section-desc">Primary and additional people we should reach out to.</span>
                 </span>
-                @if (CurrentSections.Length > 1)
-                {
-                    <svg class="di-accordion-caret @(IsSectionOpen(3) ? "open" : null)" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708Z" /></svg>
-                }
             </div>
-            @if (IsSectionOpen(3))
-            {
             <div class="di-section-body">
                 @foreach (var key in MovableKeysForStep(3))
                 {
@@ -684,7 +669,6 @@
                     </button>
                 </div>
             </div>
-            }
         </div>
 
         <!-- Step 5: Payment / Banking Information -->
@@ -1061,12 +1045,6 @@
         }
         return 1;
     }
-
-    // Accordion: which section's panel is open on a multi-section (merged) page. A single-section page
-    // is always open.
-    private int openAccordionSection = 2;
-    private bool IsSectionOpen(int step) => CurrentSections.Length <= 1 || openAccordionSection == step;
-    private void ToggleAccordion(int step) => openAccordionSection = openAccordionSection == step ? -1 : step;
 
     private SupplierFormModel formModel = new();
     private int currentStep = 1;
@@ -1566,18 +1544,12 @@
         AfterNavigate();
     }
 
-    /// <summary>Runs after a page change: prime the Supplier Site when landing on the Site tab, and
-    /// reset the accordion to open the first section of a multi-section (merged) page.</summary>
+    /// <summary>Runs after a page change: prime the Supplier Site when landing on the Site tab.</summary>
     private void AfterNavigate()
     {
-        var sections = CurrentSections;
-        if (sections.Contains(4))
+        if (CurrentSections.Contains(4))
         {
             PrimeSupplierSite();
-        }
-        if (sections.Length > 1)
-        {
-            openAccordionSection = sections[0];
         }
     }
 
