@@ -21,6 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
     public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
     public DbSet<SupplierBankAccount> SupplierBankAccounts => Set<SupplierBankAccount>();
+    public DbSet<SupplierVatGroupEntity> SupplierVatGroupEntities => Set<SupplierVatGroupEntity>();
 
     // ---- CST (Customer) Portal ----
     public DbSet<Customer> Customers => Set<Customer>();
@@ -254,6 +255,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(a => a.AccountCurrencyCodeId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // VAT group entities: cascade-delete with the supplier. The lookup ids (EInvoicingWaveId,
+        // BusinessLocationTypeId) are stored as plain columns (no navigation), so no FK to restrict.
+        modelBuilder.Entity<SupplierVatGroupEntity>()
+            .HasOne(e => e.Supplier)
+            .WithMany(s => s.VatGroupEntities)
+            .HasForeignKey(e => e.SupplierId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Supplier>()
             .HasOne(s => s.CommunicationMethod)

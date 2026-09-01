@@ -992,9 +992,13 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("DisclaimerSignature")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("DisclaimerText")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<string>("DunsNumber")
                         .HasMaxLength(50)
@@ -1490,6 +1494,49 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("SupplierId");
 
                     b.ToTable("SupplierContacts");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BusinessLegalName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int?>("BusinessLocationTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EInvoicingWaveId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TinNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TrnNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierVatGroupEntities");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
@@ -2159,6 +2206,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
+                        .WithMany("VatGroupEntities")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
@@ -2246,6 +2304,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("BankAccounts");
 
                     b.Navigation("Contacts");
+
+                    b.Navigation("VatGroupEntities");
                 });
 #pragma warning restore 612, 618
         }

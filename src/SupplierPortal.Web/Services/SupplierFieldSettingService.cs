@@ -16,7 +16,9 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     /// <summary>Field keys that were removed from the supplier registration form and so must never
     /// surface in the field-settings grid or drive wizard/import required-field logic, even if a
     /// previously-seeded database still has a row for them.</summary>
-    private static readonly HashSet<string> RemovedFieldKeys = ["ProvinceId"];
+    // NumberOfVatGroupEntities / VatGroupEntityNames are superseded by the structured VAT Group table.
+    private static readonly HashSet<string> RemovedFieldKeys =
+        ["ProvinceId", "NumberOfVatGroupEntities", "VatGroupEntityNames"];
 
     private static bool IsHidden(string fieldKey) =>
         fieldKey == ListPageSizeKey || RemovedFieldKeys.Contains(fieldKey);

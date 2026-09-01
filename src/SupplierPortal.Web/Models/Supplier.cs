@@ -187,6 +187,9 @@ public class Supplier
     /// <summary>Additional bank accounts beyond the primary account captured in the flat columns below.</summary>
     public List<SupplierBankAccount> BankAccounts { get; set; } = new();
 
+    /// <summary>Legal entities within the supplier's VAT group (when VAT Registration Type = VAT Group).</summary>
+    public List<SupplierVatGroupEntity> VatGroupEntities { get; set; } = new();
+
     // -- Business Unit & Site Assignment --
 
     /// <summary>Free-text supplier site name; defaults to the Address Name but the user may overwrite it.</summary>
@@ -321,8 +324,12 @@ public class Supplier
 
     /// <summary>The exact disclaimer text the supplier agreed to (stored so the wording is preserved
     /// even if the on-screen text changes later).</summary>
-    [MaxLength(1000)]
+    [MaxLength(4000)]
     public string? DisclaimerText { get; set; }
+
+    /// <summary>The full name the supplier typed as their digital signature on the declaration.</summary>
+    [MaxLength(200)]
+    public string? DisclaimerSignature { get; set; }
 
     /// <summary>True while the registration wizard is still in progress (not yet Submitted for Approval).</summary>
     public bool IsDraft { get; set; } = true;

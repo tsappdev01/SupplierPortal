@@ -175,6 +175,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return await IncludeLookups(db.Suppliers)
             .Include(s => s.Contacts)
             .Include(s => s.BankAccounts)
+            .Include(s => s.VatGroupEntities)
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
@@ -281,6 +282,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         var supplier = await IncludeLookups(db.Suppliers)
             .Include(s => s.Contacts)
             .Include(s => s.BankAccounts)
+            .Include(s => s.VatGroupEntities)
             .FirstAsync(s => s.Id == updated.Id);
         var before = DiffableProperties.ToDictionary(p => p.Name, p => FormatDisplayValue(supplier, p));
 
@@ -406,6 +408,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.DisclaimerAcknowledgedAt = updated.DisclaimerAcknowledgedAt;
         supplier.DisclaimerAcknowledgedBy = updated.DisclaimerAcknowledgedBy;
         supplier.DisclaimerText = updated.DisclaimerText;
+        supplier.DisclaimerSignature = updated.DisclaimerSignature;
 
         supplier.IsDraft = updated.IsDraft;
 
@@ -471,6 +474,28 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             target.Iban = inc.Iban;
             target.AccountStartDate = inc.AccountStartDate;
             target.AccountEndDate = inc.AccountEndDate;
+            target.SortOrder = inc.SortOrder;
+        }
+
+        // Reconcile VAT group entities: update rows still present, add new ones, drop removed ones.
+        var incomingEntities = updated.VatGroupEntities ?? new List<SupplierVatGroupEntity>();
+        var incomingEntityIds = incomingEntities.Where(e => e.Id != 0).Select(e => e.Id).ToHashSet();
+        supplier.VatGroupEntities.RemoveAll(existing => existing.Id != 0 && !incomingEntityIds.Contains(existing.Id));
+        foreach (var inc in incomingEntities)
+        {
+            var target = inc.Id != 0 ? supplier.VatGroupEntities.FirstOrDefault(e => e.Id == inc.Id) : null;
+            if (target is null)
+            {
+                target = new SupplierVatGroupEntity();
+                supplier.VatGroupEntities.Add(target);
+            }
+
+            target.BusinessLegalName = inc.BusinessLegalName;
+            target.Address = inc.Address;
+            target.EInvoicingWaveId = inc.EInvoicingWaveId;
+            target.TrnNumber = inc.TrnNumber;
+            target.TinNumber = inc.TinNumber;
+            target.BusinessLocationTypeId = inc.BusinessLocationTypeId;
             target.SortOrder = inc.SortOrder;
         }
 

@@ -47,8 +47,11 @@ public class SupplierFieldMappingTests
             CountryNameId = 42,
             VatRegistered = true,
             VatRegistrationTypeId = 7,
-            NumberOfVatGroupEntities = 3,
-            VatGroupEntityNames = "Entity One\nEntity Two\nEntity Three",
+            VatGroupEntities = new()
+            {
+                new VatGroupEntityModel { BusinessLegalName = "Entity One", Address = "Addr 1", EInvoicingWaveId = 1, TrnNumber = "TRN1", TinNumber = "TIN1", BusinessLocationTypeId = 2 },
+                new VatGroupEntityModel { BusinessLegalName = "Entity Two", Address = "Addr 2", EInvoicingWaveId = 2, TrnNumber = "TRN2", TinNumber = "TIN2", BusinessLocationTypeId = 1 }
+            },
             SupplierTin = "TIN-555",
             BusinessPartnerTypeId = 1,
             BusinessLocationTypeId = 2,
@@ -75,8 +78,13 @@ public class SupplierFieldMappingTests
         Assert.Equal(42, round.CountryNameId);
         Assert.Equal(true, round.VatRegistered);
         Assert.Equal(7, round.VatRegistrationTypeId);
-        Assert.Equal(3, round.NumberOfVatGroupEntities);
-        Assert.Equal("Entity One\nEntity Two\nEntity Three", round.VatGroupEntityNames);
+        // The legacy summary fields are now derived from the structured VAT group entities.
+        Assert.Equal(2, round.NumberOfVatGroupEntities);
+        Assert.Equal("Entity One\nEntity Two", round.VatGroupEntityNames);
+        Assert.Equal(2, round.VatGroupEntities.Count);
+        Assert.Equal("Entity One", round.VatGroupEntities[0].BusinessLegalName);
+        Assert.Equal("Addr 2", round.VatGroupEntities[1].Address);
+        Assert.Equal(2, round.VatGroupEntities[0].BusinessLocationTypeId);
         Assert.Equal("TIN-555", round.SupplierTin);
         Assert.Equal(1, round.BusinessPartnerTypeId);
         Assert.Equal(2, round.BusinessLocationTypeId);

@@ -357,6 +357,99 @@
     border-color: #a7dcc0;
 }
 
+/* ---- Declaration pop-up (signed on submit) ---- */
+.di-decl-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 22, 35, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1090;
+    padding: 20px;
+}
+
+.di-decl {
+    background: #fff;
+    border-radius: 10px;
+    width: min(640px, 100%);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35);
+}
+
+.di-decl-head {
+    padding: 18px 22px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+}
+
+.di-decl-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.di-decl-subtitle {
+    font-size: 12.5px;
+    font-style: italic;
+    color: #7b8697;
+    margin-top: 4px;
+}
+
+.di-decl-body {
+    padding: 16px 22px;
+    overflow-y: auto;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.di-decl-body p { margin: 0 0 10px; }
+
+.di-decl-list {
+    margin: 0 0 10px;
+    padding-left: 20px;
+}
+
+.di-decl-list li { margin-bottom: 6px; }
+
+.di-decl-certify { font-style: italic; }
+
+.di-decl-siglabel {
+    display: block;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 14px 0 5px;
+    font-size: 13.5px;
+}
+
+.di-decl-sig {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: inherit;
+}
+
+.di-decl-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+    .di-decl-actions { flex-wrap: wrap; }
+    .di-decl-actions .di-btn { flex: 1 1 auto; justify-content: center; }
+}
+
 .di-btn {
     display: inline-flex;
     align-items: center;
@@ -381,8 +474,10 @@
 
 .di-documents-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(260px, 1fr));
-    gap: 22px;
+    /* auto-fit so the slots align in equal columns and wrap cleanly when the area is narrow. */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: stretch;
+    gap: 18px;
     margin-top: 18px;
     padding-top: 18px;
     border-top: 1px solid var(--border);
@@ -401,11 +496,21 @@
 .di-document-slot input[type="file"] {
     width: 100%;
     max-width: 100%;
+    /* Push the file picker to the bottom of the card so every slot's picker aligns on one line,
+       regardless of how many "Uploaded: …" rows appear above it. */
+    margin-top: auto;
     padding: 9px 10px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: #fff;
     cursor: pointer;
+}
+
+/* Frozen (read-only) field controls — e.g. Supplier Number, Tax Organization Type. */
+.di-frozen, .di-field ::deep .di-frozen {
+    background: #eef1f6 !important;
+    color: #55606f !important;
+    cursor: not-allowed;
 }
 
 .di-document-slot label {
@@ -649,4 +754,112 @@
 
 .di-add-contact svg {
     flex-shrink: 0;
+}
+
+/* ---- VAT Group entities (repeatable table on the Business / Organization tab) ---- */
+.di-vatgroup {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.di-vatgroup-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.di-vatgroup-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--navy);
+}
+
+.di-vatgroup-note {
+    font-size: 13px;
+    color: #7b8697;
+    margin: 0 0 10px;
+}
+
+.di-vatgroup-scroll {
+    overflow-x: auto;
+}
+
+.di-vatgroup-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+}
+
+.di-vatgroup-table th {
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--label);
+    background: #f5f7fc;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.di-vatgroup-table td {
+    padding: 6px 8px;
+    vertical-align: top;
+}
+
+.di-vatgroup-table input,
+.di-vatgroup-table select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.di-vatgroup-empty {
+    font-size: 13px;
+    color: #97a1b3;
+    padding: 10px 0;
+}
+
+/* ---- Mobile: collapse the multi-column grids to a single column ---- */
+@media (max-width: 640px) {
+    .di-form-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .di-form-title { font-size: 20px; }
+
+    .di-section-body {
+        grid-template-columns: 1fr;
+        padding: 16px 14px 6px;
+    }
+
+    .di-contact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .di-documents-row {
+        grid-template-columns: 1fr;
+    }
+
+    .di-section-header { padding: 12px 14px; }
+
+    .di-actions {
+        flex-wrap: wrap;
+    }
+
+    .di-actions .di-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .di-stepper-desc,
+    .di-section-desc {
+        display: none;
+    }
 }

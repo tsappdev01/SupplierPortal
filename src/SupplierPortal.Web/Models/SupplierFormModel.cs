@@ -152,6 +152,9 @@ public class SupplierFormModel
     /// <summary>Additional bank accounts beyond the primary account (the flat BankId/AccountNumber/… fields).</summary>
     public List<SupplierBankAccountModel> AdditionalBankAccounts { get; set; } = new();
 
+    /// <summary>VAT group entities (required when VAT Registration Type is "VAT Group").</summary>
+    public List<VatGroupEntityModel> VatGroupEntities { get; set; } = new();
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         SupplierNumber = s.SupplierNumber,
@@ -172,6 +175,10 @@ public class SupplierFormModel
         AdditionalBankAccounts = s.BankAccounts
             .OrderBy(a => a.SortOrder)
             .Select(SupplierBankAccountModel.FromEntity)
+            .ToList(),
+        VatGroupEntities = s.VatGroupEntities
+            .OrderBy(e => e.SortOrder)
+            .Select(VatGroupEntityModel.FromEntity)
             .ToList(),
         TaxRegistrationNumber = s.TaxRegistrationNumber,
         VatRegistered = s.VatRegistered,
@@ -351,6 +358,45 @@ public class SupplierFormModel
 
         ApplyContactsTo(s);
         ApplyBankAccountsTo(s);
+        ApplyVatGroupEntitiesTo(s);
+    }
+
+    /// <summary>
+    /// Reconciles the VAT group entities onto the supplier: updates rows still present, adds new ones,
+    /// and drops those removed in the form. Blank rows are ignored. When the supplier is not a VAT
+    /// Group all entities are cleared.
+    /// </summary>
+    private void ApplyVatGroupEntitiesTo(Supplier s)
+    {
+        var kept = VatGroupEntities.Where(e => !e.IsBlank).ToList();
+        var keptIds = kept.Where(e => e.Id != 0).Select(e => e.Id).ToHashSet();
+
+        s.VatGroupEntities.RemoveAll(existing => !keptIds.Contains(existing.Id));
+
+        var order = 0;
+        foreach (var model in kept)
+        {
+            var entity = model.Id != 0 ? s.VatGroupEntities.FirstOrDefault(e => e.Id == model.Id) : null;
+            if (entity is null)
+            {
+                entity = new SupplierVatGroupEntity();
+                s.VatGroupEntities.Add(entity);
+            }
+
+            entity.BusinessLegalName = model.BusinessLegalName;
+            entity.Address = model.Address;
+            entity.EInvoicingWaveId = model.EInvoicingWaveId;
+            entity.TrnNumber = model.TrnNumber;
+            entity.TinNumber = model.TinNumber;
+            entity.BusinessLocationTypeId = model.BusinessLocationTypeId;
+            entity.SortOrder = order++;
+        }
+
+        // Keep the legacy summary columns in sync with the structured rows (used by exports / round-trip).
+        s.NumberOfVatGroupEntities = kept.Count > 0 ? kept.Count : null;
+        s.VatGroupEntityNames = kept.Count > 0
+            ? string.Join("\n", kept.Select(e => e.BusinessLegalName).Where(n => !string.IsNullOrWhiteSpace(n)))
+            : null;
     }
 
     /// <summary>
@@ -469,6 +515,48 @@ public class SupplierBankAccountModel
         Iban = a.Iban,
         AccountStartDate = a.AccountStartDate,
         AccountEndDate = a.AccountEndDate
+    };
+}
+
+/// <summary>Form view-model for a single VAT group entity row.</summary>
+public class VatGroupEntityModel
+{
+    public int Id { get; set; }
+    public string? BusinessLegalName { get; set; }
+    public string? Address { get; set; }
+    public int? EInvoicingWaveId { get; set; }
+    public string? TrnNumber { get; set; }
+    public string? TinNumber { get; set; }
+    public int? BusinessLocationTypeId { get; set; }
+
+    /// <summary>A row with nothing entered — not persisted.</summary>
+    public bool IsBlank =>
+        Id == 0
+        && string.IsNullOrWhiteSpace(BusinessLegalName)
+        && string.IsNullOrWhiteSpace(Address)
+        && EInvoicingWaveId is null
+        && string.IsNullOrWhiteSpace(TrnNumber)
+        && string.IsNullOrWhiteSpace(TinNumber)
+        && BusinessLocationTypeId is null;
+
+    /// <summary>True when every required column on the row is filled.</summary>
+    public bool IsComplete =>
+        !string.IsNullOrWhiteSpace(BusinessLegalName)
+        && !string.IsNullOrWhiteSpace(Address)
+        && EInvoicingWaveId is not null
+        && !string.IsNullOrWhiteSpace(TrnNumber)
+        && !string.IsNullOrWhiteSpace(TinNumber)
+        && BusinessLocationTypeId is not null;
+
+    public static VatGroupEntityModel FromEntity(SupplierVatGroupEntity e) => new()
+    {
+        Id = e.Id,
+        BusinessLegalName = e.BusinessLegalName,
+        Address = e.Address,
+        EInvoicingWaveId = e.EInvoicingWaveId,
+        TrnNumber = e.TrnNumber,
+        TinNumber = e.TinNumber,
+        BusinessLocationTypeId = e.BusinessLocationTypeId
     };
 }
 

@@ -22,7 +22,9 @@
     </div>;
     fieldFragments["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")">
         <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
-        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId">
+        @* Frozen (read-only) like the Supplier Number — the value is set from master data / import
+           and must not be changed on the form. *@
+        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="true" class="di-frozen">
             <option value="">— Select —</option>
             @foreach (var lov in taxOrgTypes)
             {
@@ -113,24 +115,6 @@
             }
         </InputSelect>
     </div>;
-    fieldFragments["NumberOfVatGroupEntities"] = @<text>
-        @if (IsVatGroupSelected)
-        {
-            <div class="di-field @FieldClass("NumberOfVatGroupEntities")">
-                <label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label>
-                <InputNumber @bind-Value="formModel.NumberOfVatGroupEntities" />
-            </div>
-        }
-    </text>;
-    fieldFragments["VatGroupEntityNames"] = @<text>
-        @if (IsVatGroupSelected)
-        {
-            <div class="di-field di-full @FieldClass("VatGroupEntityNames")">
-                <label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label>
-                <InputTextArea @bind-Value="formModel.VatGroupEntityNames" rows="3" placeholder="One legal entity name per line" />
-            </div>
-        }
-    </text>;
     fieldFragments["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")">
         <label>Supplier TIN@(Req("SupplierTin"))</label>
         <InputText @bind-Value="formModel.SupplierTin" />
@@ -488,6 +472,73 @@
                 @foreach (var key in MovableKeysForStep(1))
                 {
                     @fieldFragments[key]
+                }
+
+                @if (IsVatGroupSelected)
+                {
+                    <div class="di-field di-full di-vatgroup">
+                        <div class="di-vatgroup-head">
+                            <span class="di-vatgroup-title">VAT Group</span>
+                            <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
+                                <span>Add Row</span>
+                            </button>
+                        </div>
+                        <p class="di-vatgroup-note">Please list all entities within your VAT group.</p>
+                        <div class="di-vatgroup-scroll">
+                            <table class="di-vatgroup-table">
+                                <thead>
+                                    <tr>
+                                        <th>Business Legal Name@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th>Address@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th>E-Invoicing Wave<br />(Wave 1/Wave 2)@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th>TRN Number@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th>TIN Number@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th>Bus. Location Type<br />(Mainland/Free Zone)@(IsVatGroupSelected && SupplierFacing ? "*" : "")</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (formModel.VatGroupEntities.Count == 0)
+                                    {
+                                        <tr><td colspan="7" class="di-vatgroup-empty">No entities added yet. Click "Add Row" to list a VAT group entity.</td></tr>
+                                    }
+                                    @foreach (var entity in formModel.VatGroupEntities)
+                                    {
+                                        <tr>
+                                            <td><input type="text" @bind="entity.BusinessLegalName" /></td>
+                                            <td><input type="text" @bind="entity.Address" /></td>
+                                            <td>
+                                                <select @bind="entity.EInvoicingWaveId">
+                                                    <option value="">Select</option>
+                                                    @foreach (var lov in eInvoicingWaves)
+                                                    {
+                                                        <option value="@lov.Id">@lov.DisplayName</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td><input type="text" @bind="entity.TrnNumber" /></td>
+                                            <td><input type="text" @bind="entity.TinNumber" /></td>
+                                            <td>
+                                                <select @bind="entity.BusinessLocationTypeId">
+                                                    <option value="">Select</option>
+                                                    @foreach (var lov in businessLocationTypes)
+                                                    {
+                                                        <option value="@lov.Id">@lov.DisplayName</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove entity" @onclick="() => RemoveVatGroupEntity(entity)">
+                                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 }
 
                 <div class="di-documents-row">
@@ -892,23 +943,19 @@
             </div>
         </div>
 
-        @if (SupplierFacing && IsLastPage)
-        {
-            <div class="di-disclaimer">
-                <label class="di-disclaimer-label">
-                    <input type="checkbox" @bind="disclaimerAccepted" />
-                    <span>@DisclaimerText</span>
-                </label>
-            </div>
-        }
-        else if (!SupplierFacing && IsLastPage && Supplier.DisclaimerAcknowledged)
+        @* On the last page the supplier signs a declaration in a pop-up when they click Submit (see the
+           declaration modal below). For internal reviewers, show the recorded declaration + signature. *@
+        @if (!SupplierFacing && IsLastPage && Supplier.DisclaimerAcknowledged)
         {
             <div class="di-disclaimer di-disclaimer-ack">
                 <div class="di-disclaimer-label" style="cursor:default;">
                     <span>✔</span>
                     <span>
-                        <strong>Supplier declaration accepted.</strong>
-                        &ldquo;@(Supplier.DisclaimerText ?? DisclaimerText)&rdquo;
+                        <strong>@(Supplier.DisclaimerText is not null ? "Declaration signed by supplier." : "Supplier declaration accepted.")</strong>
+                        @if (!string.IsNullOrWhiteSpace(Supplier.DisclaimerSignature))
+                        {
+                            <text> Digital signature: <em>@Supplier.DisclaimerSignature</em>.</text>
+                        }
                         <br />
                         <span class="text-muted">
                             Acknowledged by @Supplier.DisclaimerAcknowledgedBy
@@ -958,6 +1005,45 @@
                     <button type="button" class="di-viewer-close" title="Close" @onclick="CloseViewer">&times;</button>
                 </div>
                 <iframe class="di-viewer-frame" src="@viewerUrl" title="Document preview"></iframe>
+            </div>
+        </div>
+    }
+
+    @if (showDeclaration)
+    {
+        <div class="di-decl-backdrop">
+            <div class="di-decl" role="dialog" aria-modal="true">
+                <div class="di-decl-head">
+                    <h2 class="di-decl-title">@DeclarationTitle</h2>
+                    <div class="di-decl-subtitle">@DeclarationSubtitle</div>
+                </div>
+                <div class="di-decl-body">
+                    @foreach (var para in DeclarationParagraphs)
+                    {
+                        <p>@para</p>
+                    }
+                    @if (DeclarationBullets.Length > 0)
+                    {
+                        <ol class="di-decl-list">
+                            @foreach (var b in DeclarationBullets)
+                            {
+                                <li>@b</li>
+                            }
+                        </ol>
+                    }
+                    <p class="di-decl-certify">@DeclarationCertify</p>
+
+                    <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
+                    <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
+                           placeholder="Type your full name here (this will be considered as your digital signature)" />
+                </div>
+                <div class="di-decl-actions">
+                    <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@isSaving">Cancel</button>
+                    <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmDeclarationAsync"
+                            disabled="@(isSaving || string.IsNullOrWhiteSpace(declarationSignature))">
+                        Agree &amp; Submit
+                    </button>
+                </div>
             </div>
         </div>
     }
@@ -1061,13 +1147,58 @@
     }
     private bool isSaving;
 
-    /// <summary>The disclaimer a self-service supplier must accept before submitting. Stored verbatim
-    /// with the submission so the exact wording agreed to is preserved.</summary>
-    public const string DisclaimerText =
-        "I hereby confirm that all the information provided in this form is true, complete and correct to the best of my knowledge.";
+    // ---- Declaration pop-up (shown to self-service suppliers on Submit) ----
 
-    /// <summary>Bound to the self-service disclaimer checkbox on the final step.</summary>
-    private bool disclaimerAccepted;
+    /// <summary>True while the declaration pop-up is open, awaiting the supplier's digital signature.</summary>
+    private bool showDeclaration;
+
+    /// <summary>The full name the supplier types as their digital signature in the declaration pop-up.</summary>
+    private string declarationSignature = "";
+
+    /// <summary>True when the supplier is VAT registered (drives which declaration is shown).</summary>
+    private bool IsVatRegistered => formModel.VatRegistered == true;
+
+    private string DeclarationTitle => IsVatRegistered ? "VAT Registered Supplier Declaration" : "Non-VAT Registration Declaration";
+
+    private string DeclarationSubtitle => IsVatRegistered
+        ? "Supplier Data Gathering Portal — VAT Registered Supplier"
+        : "Supplier Data Gathering Portal — Non-VAT Registered Supplier";
+
+    private string[] DeclarationParagraphs => IsVatRegistered
+        ?
+        [
+            "I/We, the undersigned, hereby declare that our organization is registered for Value Added Tax (VAT) in the United Arab Emirates (UAE) and that the VAT Registration Number (TRN) provided during supplier registration is valid and active.",
+            "I/We further declare that all information, documents, and details submitted through the Supplier Data Gathering Portal, including but not limited to company, contact, address, banking, tax, and business information, are true, accurate, current, and complete to the best of our knowledge.",
+            "We undertake to promptly notify the Company of any changes to this information and acknowledge that any false, misleading, or incomplete information may result in the rejection, suspension, or review of our supplier registration."
+        ]
+        :
+        [
+            "I/We, the undersigned, hereby declare that our organization is currently not registered for Value Added Tax (VAT) in the United Arab Emirates (UAE).",
+            "We confirm that our annual taxable turnover and taxable supplies do not exceed the mandatory VAT registration threshold of AED 375,000, as prescribed under the applicable UAE VAT regulations.",
+            "We further acknowledge and confirm that:"
+        ];
+
+    private string[] DeclarationBullets => IsVatRegistered
+        ? []
+        :
+        [
+            "The information provided in this declaration is true, accurate, and complete to the best of our knowledge.",
+            "Should our taxable turnover exceed the mandatory VAT registration threshold in the future, we undertake to register for VAT and promptly provide our VAT Registration Number (TRN) to the Company. We understand that any false or misleading information may result in rejection or suspension of our supplier registration."
+        ];
+
+    private string DeclarationCertify => IsVatRegistered
+        ? "By signing below, we confirm our acceptance of and compliance with the above declaration."
+        : "By signing below, we certify that the above statement is true and correct.";
+
+    /// <summary>The full declaration text stored with the submission (wording preserved for audit).</summary>
+    private string DeclarationFullText()
+    {
+        var parts = new List<string> { DeclarationTitle, DeclarationSubtitle };
+        parts.AddRange(DeclarationParagraphs);
+        parts.AddRange(DeclarationBullets.Select((b, i) => $"{i + 1}. {b}"));
+        parts.Add(DeclarationCertify);
+        return string.Join("\n\n", parts);
+    }
 
     private List<SupplierFieldSetting> fieldSettings = [];
     private HashSet<string> mandatoryKeys = [];
@@ -1285,8 +1416,8 @@
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
         tabSettings = await SupplierFieldSettingService.GetTabsAsync();
 
-        // Pre-check the self-service disclaimer if this record was already acknowledged before.
-        disclaimerAccepted = Supplier.DisclaimerAcknowledged;
+        // Pre-fill the signature if this record was already signed before.
+        declarationSignature = Supplier.DisclaimerSignature ?? "";
 
         // Remember the bank account as loaded, to detect a supplier adding/changing a bank account.
         originalBankId = Supplier.BankId;
@@ -1512,6 +1643,16 @@
         formModel.AdditionalContacts.Remove(contact);
     }
 
+    private void AddVatGroupEntity()
+    {
+        formModel.VatGroupEntities.Add(new VatGroupEntityModel());
+    }
+
+    private void RemoveVatGroupEntity(VatGroupEntityModel entity)
+    {
+        formModel.VatGroupEntities.Remove(entity);
+    }
+
     private void AddBankAccount()
     {
         formModel.AdditionalBankAccounts.Add(new SupplierBankAccountModel());
@@ -1605,15 +1746,19 @@
         {
             errors.Add("Issuing Body if Others is required.");
         }
-        if (IsVatGroupSelected)
+        // VAT Group entities table (anchored on the Business / Organization tab, step 1): when the VAT
+        // Registration Type is a VAT Group the supplier must list at least one entity with every column
+        // filled.
+        if (IsVatGroupSelected && step == 1)
         {
-            if (step == StepOf("NumberOfVatGroupEntities", 1) && IsEmpty(model.NumberOfVatGroupEntities))
+            var rows = model.VatGroupEntities.Where(e => !e.IsBlank).ToList();
+            if (rows.Count == 0)
             {
-                errors.Add("Number of Entities if VAT Group is required.");
+                errors.Add("Please list at least one entity within your VAT group.");
             }
-            if (step == StepOf("VatGroupEntityNames", 1) && string.IsNullOrWhiteSpace(model.VatGroupEntityNames))
+            else if (rows.Any(e => !e.IsComplete))
             {
-                errors.Add("Legal Names of all Entities under the VAT Group is required.");
+                errors.Add("Complete every column (Business Legal Name, Address, E-Invoicing Wave, TRN Number, TIN Number, Bus. Location Type) for each VAT group entity.");
             }
         }
 
@@ -1834,24 +1979,38 @@
             return;
         }
 
-        // Self-service suppliers must acknowledge the disclaimer before submitting; record the
-        // acknowledgement (who / when / exact wording) with the submission.
+        // Self-service suppliers must sign a declaration before submitting: open the pop-up (the
+        // wording depends on whether they are VAT registered) and finish the submit only once signed.
         if (SupplierFacing)
         {
-            if (!disclaimerAccepted)
-            {
-                currentStep = VisiblePages.Count;
-                maxStepReached = Math.Max(maxStepReached, currentStep);
-                ToastService.ShowError("Please tick the declaration confirming the information is correct before submitting.");
-                return;
-            }
-
-            Supplier.DisclaimerAcknowledged = true;
-            Supplier.DisclaimerAcknowledgedAt = DateTime.UtcNow;
-            Supplier.DisclaimerAcknowledgedBy = CurrentUser;
-            Supplier.DisclaimerText = DisclaimerText;
+            showDeclaration = true;
+            return;
         }
 
+        Supplier.IsDraft = false;
+        await FinishAsync(submitting: true);
+    }
+
+    private void CancelDeclaration()
+    {
+        showDeclaration = false;
+    }
+
+    /// <summary>Records the signed declaration and completes the submission.</summary>
+    private async Task ConfirmDeclarationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(declarationSignature))
+        {
+            return;
+        }
+
+        Supplier.DisclaimerAcknowledged = true;
+        Supplier.DisclaimerAcknowledgedAt = DateTime.UtcNow;
+        Supplier.DisclaimerAcknowledgedBy = CurrentUser;
+        Supplier.DisclaimerText = DeclarationFullText();
+        Supplier.DisclaimerSignature = declarationSignature.Trim();
+
+        showDeclaration = false;
         Supplier.IsDraft = false;
         await FinishAsync(submitting: true);
     }
