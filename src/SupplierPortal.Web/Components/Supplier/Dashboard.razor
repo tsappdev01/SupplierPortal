@@ -347,6 +347,7 @@ else
                 <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(supplier.Id)" @onchange="() => ToggleSelected(supplier.Id)" /></td>
                 <td>@supplier.SupplierNumber</td>
                 <td>
+                    <img src="/business-units/@supplier.BusinessUnitId/logo" alt="" class="di-row-bu-logo" onerror="this.style.display='none'" />
                     @supplier.SupplierName
                     @if (supplier.PendingSupplierChangeCount > 0)
                     {
@@ -557,6 +558,7 @@ else if (TotalPages > 1)
     }
     .di-bu-item:hover, .di-bu-item.active { background: #eef1ff; }
     .di-bu-opt-logo { width: 26px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+    .di-row-bu-logo { width: 22px; height: 18px; object-fit: contain; margin-right: 8px; vertical-align: middle; }
     .di-bu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* Attached-documents viewer modal */
