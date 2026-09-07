@@ -54,7 +54,7 @@ else
         <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
     }
 
-    var step = steps[current];
+    @{ var step = steps[current]; }
 
     @if (!step.IsReview)
     {
