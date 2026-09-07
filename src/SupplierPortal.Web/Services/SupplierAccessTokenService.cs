@@ -121,8 +121,13 @@ public class SupplierAccessTokenService(
             var brand = System.Net.WebUtility.HtmlEncode(
                 await branding.GetBusinessUnitNameAsync(token.Supplier.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
             var brandLine = $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
+            // Brand the header with the respective Business Unit's logo (embedded data URI) when available.
+            var logo = await branding.GetBusinessUnitLogoDataUriAsync(token.Supplier.BusinessUnitId);
+            var brandBlock = string.IsNullOrWhiteSpace(logo)
+                ? brandLine
+                : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block;margin-bottom:8px\" />" + brandLine;
             body = body!
-                .Replace("{CompanyLogo}", brandLine)
+                .Replace("{CompanyLogo}", brandBlock)
                 .Replace("{Supplier Name}", token.Supplier.SupplierName)
                 .Replace("{OTP Code}", code)
                 .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());

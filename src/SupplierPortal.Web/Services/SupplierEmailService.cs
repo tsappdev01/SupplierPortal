@@ -16,6 +16,26 @@ public class SupplierEmailService(
     private static string BrandLine(string? name) =>
         $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name)}</div>";
 
+    /// <summary>The email header brand block: the respective Business Unit's <b>logo</b> when one is on
+    /// file (embedded as a base64 data URI, so it renders without an external image host), plus the brand
+    /// name as text underneath. Falls back to the text-only brand line when the unit has no logo.</summary>
+    private static string BrandBlock(string? logoDataUri, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(logoDataUri))
+        {
+            return BrandLine(name);
+        }
+
+        var safeName = System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name);
+        return $"<img src=\"{logoDataUri}\" alt=\"{safeName}\" style=\"max-height:48px;max-width:220px;display:block;margin-bottom:8px\" />" + BrandLine(name);
+    }
+
+    /// <summary>Resolves the logo for a record's Business Unit first (the "respective" unit the user asked
+    /// to see on the email), falling back to the acting user's company logo.</summary>
+    private async Task<string?> BusinessUnitLogoAsync(int? businessUnitId, string actorUsername) =>
+        await branding.GetBusinessUnitLogoDataUriAsync(businessUnitId)
+        ?? await branding.GetLogoDataUriAsync(actorUsername, businessUnitId);
+
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/supplier_update_notification.html";
     private const string SubmissionTemplateRelativePath = "doc/supplier_submission_notification.html";
@@ -49,10 +69,19 @@ public class SupplierEmailService(
         var linkBase = string.IsNullOrWhiteSpace(portalUrl) ? baseUrl : portalUrl;
         var link = $"{linkBase.TrimEnd('/')}/supplier/self-service/{rawToken}";
 
-        var brand = await branding.GetBrandNameAsync(actorUsername, null);
+        // Load the supplier's Business Unit so the email is branded with that unit's logo.
+        int? businessUnitId;
+        await using (var buDb = await dbFactory.CreateDbContextAsync())
+        {
+            businessUnitId = await buDb.Suppliers.Where(s => s.Id == supplierId)
+                .Select(s => s.BusinessUnitId).FirstOrDefaultAsync();
+        }
+
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        var logo = await BusinessUnitLogoAsync(businessUnitId, actorUsername);
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
-            .Replace("{CompanyLogo}", BrandLine(brand))
+            .Replace("{CompanyLogo}", BrandBlock(logo, brand))
             .Replace("{Supplier Name}", supplierName)
             .Replace("{Link}", link);
 
@@ -117,9 +146,10 @@ public class SupplierEmailService(
 
         var link = $"{baseUrl.TrimEnd('/')}/supplier/edit/{supplier.Id}";
         var brand = await branding.GetBrandNameAsync(requestedByUsername, supplier.BusinessUnitId);
+        var logo = await BusinessUnitLogoAsync(supplier.BusinessUnitId, requestedByUsername);
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
-            .Replace("{CompanyLogo}", BrandLine(brand))
+            .Replace("{CompanyLogo}", BrandBlock(logo, brand))
             .Replace("{Supplier Name}", supplier.SupplierName)
             .Replace("{Link}", link);
 
@@ -159,10 +189,11 @@ public class SupplierEmailService(
         }
 
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        var logo = await BusinessUnitLogoAsync(businessUnitId, actorUsername);
         var safeName = System.Net.WebUtility.HtmlEncode(supplierName);
         var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
   <div style=""max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
-    <div style=""background:#1a2233;padding:18px 24px"">{BrandLine(brand)}
+    <div style=""background:#1a2233;padding:18px 24px"">{BrandBlock(logo, brand)}
       <div style=""color:#cfd6e6;font-size:13px"">Supplier Data Gathering Portal</div>
     </div>
     <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">

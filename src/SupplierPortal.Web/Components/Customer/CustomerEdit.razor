@@ -18,32 +18,40 @@
 }
 else
 {
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-            <h1 class="mb-1">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "New Customer" : customer.LegalName)</h1>
-            <span class="badge @StatusClass(customer.Status)">@customer.Status</span>
-            @if (customer.CustomerId is not null) { <span class="text-muted ms-2">@customer.CustomerId</span> }
+<div class="di-form-page">
+    <div class="di-form-topbar">
+        <div class="di-form-headings">
+            <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "New Customer" : customer.LegalName)</h1>
+            <p class="di-form-sub">
+                <span class="di-status-badge @StatusClass(customer.Status)">@customer.Status</span>
+                @if (customer.CustomerId is not null) { <span class="ms-2">@customer.CustomerId</span> }
+            </p>
         </div>
-        <a class="btn btn-outline-secondary" href="/admin/customers">← Back to list</a>
+        <a class="di-btn di-btn-secondary" href="/admin/customers">← Back to list</a>
     </div>
 
-    @* ---------- Chevron stepper ---------- *@
-    <div class="di-chevrons">
+    @* ---------- Stepper (matches the Supplier form) ---------- *@
+    <div class="di-stepper">
         @for (var i = 0; i < steps.Count; i++)
         {
             var idx = i;
+            var reached = idx <= current;
             <button type="button"
-                    class="di-chevron @(idx == current ? "is-active" : "") @(idx < current ? "is-done" : "")"
+                    class="di-stepper-item @(idx == current ? "active" : "") @(reached ? "reached" : "")"
                     @onclick="() => JumpToAsync(idx)">
-                <span class="di-chevron-n">@(idx < current ? "✓" : (idx + 1).ToString())</span>
-                <span class="di-chevron-t">@steps[idx].Title</span>
+                <span class="di-stepper-num">@(idx < current ? "✓" : (idx + 1).ToString())</span>
+                <span class="di-stepper-label">@steps[idx].Title</span>
+                @if (idx < steps.Count - 1)
+                {
+                    <svg class="di-stepper-chevron" width="9" height="14" viewBox="0 0 9 14" fill="none"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                }
             </button>
         }
     </div>
 
     @if (message is not null)
     {
-        <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3">@message</div>
+        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
     }
 
     var step = steps[current];
@@ -51,41 +59,65 @@ else
     @if (!step.IsReview)
     {
         var entity = step.Section == "Account" ? (object)customer : contact;
-        <div class="di-field-settings-section mt-3">
-            <div class="di-field-settings-header">@step.Title</div>
-            <div class="row g-3 p-3">
+        <div class="di-section">
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M9.05.435c-.58-.58-1.52-.58-2.1 0L.436 6.95c-.58.58-.58 1.519 0 2.098l6.516 6.516c.58.58 1.519.58 2.098 0l6.516-6.516c.58-.58.58-1.519 0-2.098L9.05.435z"/></svg>
+                </span>
+                <div class="di-section-heading">
+                    <span class="di-section-title">@step.Title</span>
+                    <span class="di-section-desc">@(step.Section == "Account" ? "Company / account details" : "Primary contact details")</span>
+                </div>
+            </div>
+            <div class="di-section-body">
                 @foreach (var f in FieldsFor(step))
                 {
                     var cfg = f;
                     var target = entity;
                     var editable = !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
-                    <div class="col-md-4">
-                        <label class="form-label">
+                    var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
+                    <div class="di-field">
+                        <label>
                             @cfg.DisplayLabel
-                            @if (cfg.IsRequired) { <span class="text-danger">*</span> }
-                            @if (cfg.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
+                            @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                            @if (cfg.FieldKind == "lookup") { <span class="di-lov-badge">LOV</span> }
                         </label>
                         @if (!editable)
                         {
-                            <div class="form-control-plaintext border rounded px-2 bg-body-secondary">@CustomerFieldAccessor.GetDisplay(target, cfg.FieldKey)</div>
+                            <input type="text" class="di-frozen" value="@CustomerFieldAccessor.GetDisplay(target, cfg.FieldKey)" disabled />
                         }
                         else if (cfg.FieldKind == "date")
                         {
-                            <input type="date" class="form-control" value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
+                            <input type="date" value="@cur"
                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                         }
                         else if (cfg.FieldKind == "yesno")
                         {
-                            <select class="form-select" value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
-                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
-                                <option value="">—</option>
-                                <option value="true">Yes</option>
-                                <option value="false">No</option>
+                            <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                <option value="">— Select —</option>
+                                <option value="true" selected="@(cur == "true")">Yes</option>
+                                <option value="false" selected="@(cur == "false")">No</option>
+                            </select>
+                        }
+                        else if (cfg.FieldKind == "lookup")
+                        {
+                            var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                            <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                <option value="">— Select —</option>
+                                @foreach (var o in opts)
+                                {
+                                    <option value="@o" selected="@(o == cur)">@o</option>
+                                }
+                                @* Preserve any previously-stored value that is not in the current list. *@
+                                @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                {
+                                    <option value="@cur" selected>@cur</option>
+                                }
                             </select>
                         }
                         else
                         {
-                            <input type="text" class="form-control" value="@CustomerFieldAccessor.GetString(target, cfg.FieldKey)"
+                            <input type="text" value="@cur"
                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                         }
                     </div>
@@ -96,28 +128,30 @@ else
     else
     {
         @* ---------- Review step ---------- *@
-        <p class="text-muted mt-3">Review everything captured, then save or submit for review.</p>
+        <p class="di-form-sub mb-3">Review everything captured, then save or submit for review.</p>
         @foreach (var g in steps.Where(s => !s.IsReview))
         {
             var entity = g.Section == "Account" ? (object)customer : contact;
             var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey))).ToList();
-            <div class="di-field-settings-section mb-3">
-                <div class="di-field-settings-header d-flex justify-content-between">
-                    <span>@g.Title</span>
-                    <button type="button" class="btn btn-sm btn-link p-0" @onclick="() => JumpToAsync(steps.IndexOf(g))">Edit</button>
+            <div class="di-section">
+                <div class="di-section-header">
+                    <div class="di-section-heading">
+                        <span class="di-section-title">@g.Title</span>
+                    </div>
+                    <button type="button" class="di-btn di-btn-secondary di-btn-sm ms-auto" @onclick="() => JumpToAsync(steps.IndexOf(g))">Edit</button>
                 </div>
-                <div class="row g-2 p-3">
+                <div class="di-section-body">
                     @if (filled.Count == 0)
                     {
-                        <div class="text-muted">Nothing entered.</div>
+                        <div class="di-review-empty">Nothing entered.</div>
                     }
                     else
                     {
                         @foreach (var f in filled)
                         {
-                            <div class="col-md-4">
-                                <div class="small text-muted">@f.DisplayLabel</div>
-                                <div>@CustomerFieldAccessor.GetDisplay(entity, f.FieldKey)</div>
+                            <div class="di-review-item">
+                                <div class="di-review-label">@f.DisplayLabel</div>
+                                <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(entity, f.FieldKey)</div>
                             </div>
                         }
                     }
@@ -127,47 +161,31 @@ else
     }
 
     @* ---------- Wizard footer ---------- *@
-    <div class="d-flex justify-content-between align-items-center gap-2 my-4">
-        <button type="button" class="btn btn-outline-secondary" disabled="@(current == 0 || busy)" @onclick="BackAsync">← Back</button>
-        <div class="d-flex gap-2">
-            @if (savedTick) { <span class="text-success small align-self-center">Saved ✓</span> }
+    <div class="di-form-footer">
+        <button type="button" class="di-btn di-btn-secondary" disabled="@(current == 0 || busy)" @onclick="BackAsync">← Back</button>
+        <div class="di-form-footer-right">
+            @if (savedTick) { <span class="di-saved-tick">Saved ✓</span> }
             @if (!steps[current].IsReview)
             {
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="NextAsync">Save &amp; Next →</button>
+                <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="NextAsync">Save &amp; Next →</button>
             }
             else
             {
-                <button type="button" class="btn btn-primary" disabled="@busy" @onclick="() => SaveAsync(false)">Save</button>
+                <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="() => SaveAsync(false)">Save</button>
                 @if (customer.Status is CustomerStatuses.NotSubmitted or CustomerStatuses.AwaitingCustomerResponse or CustomerStatuses.Returned)
                 {
-                    <button type="button" class="btn btn-di-gold" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.ForReview)">Submit for review</button>
+                    <button type="button" class="di-btn di-btn-gold" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.ForReview)">Submit for review</button>
                 }
                 @if (customer.Status == CustomerStatuses.ForReview)
                 {
-                    <button type="button" class="btn btn-success" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Complete)">Mark completed</button>
-                    <button type="button" class="btn btn-outline-danger" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Returned)">Return</button>
+                    <button type="button" class="di-btn di-btn-success" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Complete)">Mark completed</button>
+                    <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Returned)">Return</button>
                 }
             }
         </div>
     </div>
+</div>
 }
-
-<style>
-    .di-chevrons { display: flex; flex-wrap: wrap; gap: 4px; }
-    .di-chevron { position: relative; border: 1px solid var(--di-border); background: var(--di-surface);
-        color: var(--di-text-soft); padding: .5rem .9rem .5rem 1.1rem; font-size: .8rem; font-weight: 600;
-        display: inline-flex; align-items: center; gap: .45rem; cursor: pointer;
-        clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%); }
-    .di-chevron:first-child { clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%); padding-left: .9rem; }
-    .di-chevron-n { width: 20px; height: 20px; border-radius: 50%; background: var(--di-surface-2);
-        display: grid; place-items: center; font-size: .72rem; flex: none; }
-    .di-chevron.is-active { background: #0f766e; color: #fff; border-color: #0f766e; }
-    .di-chevron.is-active .di-chevron-n { background: rgba(255,255,255,.25); color: #fff; }
-    .di-chevron.is-done { color: #0b5a54; border-color: #bfe3de; background: #e7f4f2; }
-    [data-theme="dark"] .di-chevron.is-done { color: #8fe6db; background: #123833; border-color: #1c4d47; }
-    [data-theme="dark"] .di-chevron.is-active { background: #2bb3a3; border-color: #2bb3a3; color: #05201d; }
-    .di-chevron.is-done .di-chevron-n { background: #0f766e; color: #fff; }
-</style>
 
 @code {
     [Parameter] public int Id { get; set; }
