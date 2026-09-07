@@ -260,11 +260,13 @@
     background: #f1f8f3;
 }
 
+/* NOTE: type=tel is deliberately excluded — those inputs belong to the PhoneField control, which
+   lays them out itself (borderless, inside one bordered group). Styling them as full-width bordered
+   boxes here breaks that control. PhoneField sets its own black text colour. */
 .di-field ::deep input[type=text],
 .di-field ::deep input[type=email],
 .di-field ::deep input[type=date],
 .di-field ::deep input[type=number],
-.di-field ::deep input[type=tel],
 .di-field ::deep textarea,
 .di-field ::deep select {
     padding: 10px 12px;
@@ -286,14 +288,22 @@
     border-color: #c3ccdb;
 }
 
-.di-field ::deep input:focus,
+.di-field ::deep input[type=text]:focus,
+.di-field ::deep input[type=email]:focus,
+.di-field ::deep input[type=date]:focus,
+.di-field ::deep input[type=number]:focus,
+.di-field ::deep textarea:focus,
 .di-field ::deep select:focus {
     outline: none;
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15);
 }
 
-.di-field ::deep input:disabled {
+.di-field ::deep input[type=text]:disabled,
+.di-field ::deep input[type=email]:disabled,
+.di-field ::deep input[type=date]:disabled,
+.di-field ::deep input[type=number]:disabled,
+.di-field ::deep select:disabled {
     background: var(--bg);
     color: #97a1b3;
 }
