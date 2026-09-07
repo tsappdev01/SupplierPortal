@@ -22,9 +22,9 @@
     </div>;
     fieldFragments["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")">
         <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
-        @* Frozen (read-only) like the Supplier Number — the value is set from master data / import
-           and must not be changed on the form. *@
-        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="true" class="di-frozen">
+        @* Editable for internal admins/staff, but frozen (read-only) on the supplier self-service
+           portal so suppliers cannot change a value set by the business. *@
+        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="@SupplierFacing" class="@(SupplierFacing ? "di-frozen" : null)">
             <option value="">— Select —</option>
             @foreach (var lov in taxOrgTypes)
             {
