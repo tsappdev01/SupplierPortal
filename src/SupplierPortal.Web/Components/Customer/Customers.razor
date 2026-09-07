@@ -41,14 +41,22 @@
 </div>
 
 <div class="d-flex gap-2 mb-3 no-print align-items-center flex-wrap">
-    <button type="button" class="di-export-btn" @onclick='() => ComingSoon("Excel export")' title="Export to Excel">
+    <a class="di-export-btn" href="@ExportUrl("xlsx")" title="Export to Excel">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#2e7d32" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#a5d6a7" stroke="#2e7d32" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round"/><rect x="5" y="33" width="34" height="15" rx="3" fill="#2e7d32"/><text x="22" y="44.5" font-family="Arial" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">XLS</text></svg>
         <span>Excel</span>
-    </button>
-    <button type="button" class="di-export-btn" @onclick='() => ComingSoon("PDF export")' title="Export to PDF">
+    </a>
+    <a class="di-export-btn" href="@ExportUrl("xlsx-full")" title="Export to Excel — all customer fields">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#1b5e20" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#a5d6a7" stroke="#1b5e20" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h16M12 33h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round"/><rect x="5" y="37" width="34" height="12" rx="3" fill="#1b5e20"/><text x="22" y="46.5" font-family="Arial" font-size="8.5" font-weight="800" fill="#fff" text-anchor="middle">ALL</text></svg>
+        <span>Excel (All Fields)</span>
+    </a>
+    <a class="di-export-btn" href="/customers/export/template" title="Generate a blank customer upload template">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#1565c0" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#90caf9" stroke="#1565c0" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 16h16M12 22h16M12 28h16M12 34h9" stroke="#90caf9" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Generate Template</span>
+    </a>
+    <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#c62828" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#ef9a9a" stroke="#c62828" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h9" stroke="#ef9a9a" stroke-width="2" stroke-linecap="round"/><rect x="5" y="33" width="34" height="15" rx="3" fill="#c62828"/><text x="22" y="44.5" font-family="Arial" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">PDF</text></svg>
         <span>PDF</span>
-    </button>
+    </a>
     <button type="button" class="di-export-btn" @onclick="PrintAsync" title="Print">
         <svg width="28" height="30" viewBox="0 0 48 48" fill="none"><path d="M14 6h20v11H14z" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="16" width="34" height="17" rx="3.5" fill="#607d8b"/><rect x="14" y="29" width="20" height="13" rx="1.5" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><path d="M18 34h12M18 38h8" stroke="#455a64" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Print</span>
@@ -242,6 +250,17 @@
     }
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+
+    /// <summary>Builds an export URL carrying the current list filters (business unit, status, search) so
+    /// the download matches what the grid shows. BU/status scope is re-checked server-side.</summary>
+    private string ExportUrl(string format)
+    {
+        var q = new List<string>();
+        if (filterBusinessUnitId > 0) q.Add($"businessUnitId={filterBusinessUnitId}");
+        if (!string.IsNullOrWhiteSpace(statusFilter)) q.Add($"status={Uri.EscapeDataString(statusFilter)}");
+        if (!string.IsNullOrWhiteSpace(searchName)) q.Add($"search={Uri.EscapeDataString(searchName)}");
+        return q.Count > 0 ? $"/customers/export/{format}?{string.Join("&", q)}" : $"/customers/export/{format}";
+    }
 
     private void ComingSoon(string what) => ToastService.ShowInfo($"{what} is coming in the next update.");
 

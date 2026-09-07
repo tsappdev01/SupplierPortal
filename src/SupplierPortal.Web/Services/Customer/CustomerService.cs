@@ -46,6 +46,34 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return (items, total);
     }
 
+    /// <summary>All customers matching the current list filters (BU scope + business unit + status +
+    /// search), with their contact, for export. No paging — the whole filtered set is returned.</summary>
+    public async Task<List<Customer>> GetForExportAsync(
+        string? search, string? status, int? businessUnitId, List<int> scopeBusinessUnitIds)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var q = db.Customers.AsNoTracking().Include(c => c.BusinessUnit).Include(c => c.Contact).AsQueryable();
+
+        if (scopeBusinessUnitIds.Count > 0)
+            q = q.Where(c => c.BusinessUnitId == null || scopeBusinessUnitIds.Contains(c.BusinessUnitId.Value));
+        if (businessUnitId is int bu)
+            q = q.Where(c => c.BusinessUnitId == bu);
+        if (!string.IsNullOrWhiteSpace(status))
+            q = q.Where(c => c.Status == status);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim();
+            q = q.Where(c =>
+                (c.LegalName != null && c.LegalName.Contains(s)) ||
+                (c.CommercialName != null && c.CommercialName.Contains(s)) ||
+                (c.CustomerId != null && c.CustomerId.Contains(s)) ||
+                (c.BaanRef != null && c.BaanRef.Contains(s)) ||
+                (c.TRNNumber != null && c.TRNNumber.Contains(s)));
+        }
+
+        return await q.OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt).ToListAsync();
+    }
+
     /// <summary>A lightweight row for the Manage Customer dashboard (mirrors the supplier list columns).</summary>
     public record CustomerRow(int Id, string Number, string Name, string? FirstName, string? Email,
         string Status, DateTime Updated, int? BusinessUnitId);

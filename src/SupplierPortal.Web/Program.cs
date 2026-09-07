@@ -71,6 +71,7 @@ builder.Services.AddScoped<SupplierFieldSettingService>();
 builder.Services.AddScoped<CustomerFieldConfigService>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerImportService>();
+builder.Services.AddScoped<CustomerExportService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
@@ -345,6 +346,43 @@ app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpC
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         populate == true ? "Supplier Template (Populated).xlsx" : "Supplier Template (Blank).xlsx");
 }).RequireAuthorization();
+
+// Manage Customer exports — mirror the supplier toolbar (Excel, Excel all-fields, PDF) honoring the
+// same list filters and business-unit scope.
+app.MapGet("/customers/export/{format}", async (string format, int? businessUnitId, string? status, string? search,
+    HttpContext ctx, CustomerService customerService, CustomerFieldConfigService fieldConfig, CustomerExportService export) =>
+{
+    const string xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    var scope = ResolveExportScope(ctx, businessUnitId) ?? new List<int>();
+    var customers = await customerService.GetForExportAsync(search, status, businessUnitId, scope);
+    var config = await fieldConfig.GetAllAsync();
+
+    return format.ToLowerInvariant() switch
+    {
+        "xlsx" => Results.File(export.ExportToExcel(customers, config, allFields: false), xlsxMime, "Customers.xlsx"),
+        "xlsx-full" => Results.File(export.ExportToExcel(customers, config, allFields: true), xlsxMime, "Customers - All Fields.xlsx"),
+        "pdf" => Results.File(export.ExportToPdf(customers), "application/pdf", "customers.pdf"),
+        _ => Results.BadRequest("Unsupported export format.")
+    };
+}).RequireAuthorization("Portal.Customer");
+
+// Generates a customer upload template (importer-compatible positional columns). Optionally pre-populated
+// with the filtered customers so the business can update and re-upload; otherwise a blank sheet.
+app.MapGet("/customers/export/template", async (int? businessUnitId, bool? populate,
+    HttpContext ctx, CustomerService customerService, CustomerFieldConfigService fieldConfig, CustomerExportService export) =>
+{
+    const string xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    var customers = new List<SupplierPortal.Web.Models.Customer.Customer>();
+    if (populate == true)
+    {
+        var scope = ResolveExportScope(ctx, businessUnitId) ?? new List<int>();
+        customers = await customerService.GetForExportAsync(null, null, businessUnitId, scope);
+    }
+    var config = await fieldConfig.GetAllAsync();
+
+    return Results.File(export.ExportUploadTemplate(customers, config), xlsxMime,
+        populate == true ? "Customer Template (Populated).xlsx" : "Customer Template (Blank).xlsx");
+}).RequireAuthorization("Portal.Customer");
 
 // Effective business-unit scope for exports: an administrator with no business-unit assignment sees
 // all suppliers (null); everyone else — including administrators assigned to specific business units —
