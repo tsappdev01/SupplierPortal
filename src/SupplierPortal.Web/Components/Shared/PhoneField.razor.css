@@ -19,7 +19,7 @@
     border: none;
     border-right: 1px solid #e2e5ea;
     background: #f7f9fc;
-    color: #1a2233;
+    color: #000;
     font: inherit;
     font-size: 15px;
     padding: 0 0.5rem;
@@ -43,7 +43,7 @@
     border-right: 1px solid #e2e5ea;
     padding: 0 0.5rem;
     background: transparent;
-    color: #1a2233;
+    color: #000;
     font: inherit;
     font-size: 15px;
     text-align: center;
@@ -69,7 +69,7 @@
     border: none;
     padding: 0 0.6rem 0 0;
     background: transparent;
-    color: #1a2233;
+    color: #000;
     font: inherit;
     font-size: 15px;
     border-radius: 0 8px 8px 0;
