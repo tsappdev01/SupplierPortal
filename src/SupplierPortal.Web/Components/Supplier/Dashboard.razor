@@ -465,34 +465,42 @@ else if (TotalPages > 1)
             }
             else
             {
-                var current = modalDocuments[modalDocIndex];
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <button class="btn btn-sm btn-outline-primary" @onclick="ModalPrevDoc" disabled="@(modalDocIndex == 0)">&larr; Previous</button>
-                    <span class="fw-semibold text-truncate px-2">
-                        @(modalDocIndex + 1) / @modalDocuments.Count &mdash; @current.FileName
-                        <span class="badge bg-light text-dark">@SplitDocType(current.DocumentType)</span>
-                    </span>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="ModalNextDoc" disabled="@(modalDocIndex == modalDocuments.Count - 1)">Next &rarr;</button>
-                </div>
-                <div class="text-center di-doc-stage">
-                    @if (IsImage(current))
-                    {
-                        <img src="/suppliers/documents/@current.Id" alt="@current.FileName" class="di-doc-image" />
-                    }
-                    else
-                    {
-                        <iframe src="/suppliers/documents/@current.Id" class="di-doc-frame" title="@current.FileName"></iframe>
-                    }
-                </div>
-                <div class="d-flex gap-2 mt-2 flex-wrap">
-                    @if (IsImage(current))
-                    {
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => ModalPrintAsync(current.Id)">Print</button>
-                    }
-                    <a class="btn btn-sm btn-outline-secondary" href="/suppliers/documents/@current.Id" target="_blank">Open / download original</a>
+                <div class="di-docsall-toolbar">
+                    <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
                     <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@docsSupplierId/documents.pdf" target="_blank">All images as PDF</a>
                 </div>
-                <div class="small text-muted mt-1">Tip: use the &larr; and &rarr; arrow keys to move between documents; Esc closes.</div>
+                <div class="di-docsall-grid">
+                    @foreach (var doc in modalDocuments)
+                    {
+                        <div class="di-docsall-card">
+                            <div class="di-docsall-preview">
+                                @if (IsImage(doc))
+                                {
+                                    <img src="/suppliers/documents/@doc.Id" alt="@doc.FileName" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <iframe src="/suppliers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"></iframe>
+                                }
+                            </div>
+                            <div class="di-docsall-info">
+                                <span class="di-docsall-type badge">@SplitDocType(doc.DocumentType)</span>
+                                <span class="di-docsall-name" title="@doc.FileName">@doc.FileName</span>
+                            </div>
+                            <div class="di-docsall-actions">
+                                <a class="btn btn-sm btn-outline-primary" href="/suppliers/documents/@doc.Id" target="_blank" title="Open in a new tab">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
+                                    Open
+                                </a>
+                                <a class="btn btn-sm btn-primary" href="/suppliers/documents/@doc.Id?download=1" title="Download the original file">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" /></svg>
+                                    Download
+                                </a>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="small text-muted mt-2">Tip: click a preview's Open to view full size, or Download to save the original. Esc closes.</div>
             }
         </div>
     </div>
@@ -555,7 +563,7 @@ else if (TotalPages > 1)
     .di-modal-backdrop { position: fixed; inset: 0; z-index: 1055; background: rgba(0, 0, 0, 0.45); }
     .di-modal {
         position: fixed; z-index: 1060; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        width: min(900px, 94vw); max-height: 90vh; display: flex; flex-direction: column;
+        width: min(1160px, 95vw); max-height: 92vh; display: flex; flex-direction: column;
         background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     }
     .di-modal-head {
@@ -563,9 +571,36 @@ else if (TotalPages > 1)
         padding: 12px 16px; border-bottom: 1px solid var(--di-border, #e2e5ea);
     }
     .di-modal-body { padding: 12px 16px; overflow: auto; outline: none; }
-    .di-doc-stage { background: #f6f7f9; border: 1px solid #e2e5ea; border-radius: 6px; padding: 8px; }
-    .di-doc-image { max-width: 100%; max-height: 65vh; object-fit: contain; }
-    .di-doc-frame { width: 100%; height: 65vh; border: 0; }
+
+    /* All-documents grid (preview + open + download on one screen) */
+    .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .di-docsall-count { font-size: 13px; font-weight: 600; color: #46506b; }
+    .di-docsall-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+    }
+    .di-docsall-card {
+        display: flex; flex-direction: column;
+        border: 1px solid #e2e5ea; border-radius: 12px; overflow: hidden; background: #fff;
+        box-shadow: 0 1px 3px rgba(20, 30, 50, 0.05);
+        transition: box-shadow 0.15s ease, transform 0.05s ease;
+    }
+    .di-docsall-card:hover { box-shadow: 0 6px 20px rgba(20, 30, 50, 0.1); }
+    .di-docsall-preview {
+        height: 220px; background: #f6f7f9; border-bottom: 1px solid #eceff3;
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
+    .di-docsall-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
+    .di-docsall-type { background: #eef1ff; color: #3b5bdb; font-weight: 600; flex: none; }
+    .di-docsall-name {
+        font-size: 13px; color: #1a2233; font-weight: 600;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .di-docsall-actions { display: flex; gap: 8px; padding: 8px 12px 12px; }
+    .di-docsall-actions .btn { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 0; justify-content: center; }
 </style>
 
 @code {

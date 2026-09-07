@@ -380,10 +380,15 @@ app.MapGet("/business-units/{id:int}/thumbnail", async (int id, BusinessUnitServ
     return thumb is null ? Results.NotFound() : Results.File(thumb.Value.Bytes, thumb.Value.ContentType);
 }).RequireAuthorization();
 
-app.MapGet("/suppliers/documents/{id:int}", async (int id, SupplierDocumentService documentService) =>
+// Without ?download=1 the file is served inline so it previews in an <img>/<iframe>; with it, as an
+// attachment (Content-Disposition: attachment) so the browser saves it.
+app.MapGet("/suppliers/documents/{id:int}", async (int id, bool? download, SupplierDocumentService documentService) =>
 {
     var file = await documentService.GetFileAsync(id);
-    return file is null ? Results.NotFound() : Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
+    if (file is null) return Results.NotFound();
+    return download == true
+        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
+        : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization();
 
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
