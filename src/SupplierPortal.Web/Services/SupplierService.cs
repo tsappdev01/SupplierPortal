@@ -14,7 +14,12 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     [
         nameof(Supplier.Id), nameof(Supplier.SupplierNumber), nameof(Supplier.BusinessUnitId),
         nameof(Supplier.IsDraft), nameof(Supplier.IsActive),
-        nameof(Supplier.CreatedAt), nameof(Supplier.CreatedBy), nameof(Supplier.UpdatedAt), nameof(Supplier.UpdatedBy)
+        nameof(Supplier.CreatedAt), nameof(Supplier.CreatedBy), nameof(Supplier.UpdatedAt), nameof(Supplier.UpdatedBy),
+        // Submission/workflow artifacts, not editable fields — and the declaration text is far larger than
+        // the change-tracking value column, so tracking it as a "field change" breaks the save.
+        nameof(Supplier.DisclaimerText), nameof(Supplier.DisclaimerSignature),
+        nameof(Supplier.DisclaimerAcknowledged), nameof(Supplier.DisclaimerAcknowledgedAt),
+        nameof(Supplier.DisclaimerAcknowledgedBy), nameof(Supplier.ReviewRemarks), nameof(Supplier.StatusId)
     ];
 
     private static readonly PropertyInfo[] DiffableProperties = typeof(Supplier).GetProperties()
@@ -601,7 +606,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
             if (existing is not null)
             {
-                existing.NewValue = newValue;
+                existing.NewValue = CapChangeValue(newValue);
                 existing.ChangedAt = DateTime.UtcNow;
                 existing.ChangedBy = changedBy;
                 existing.SupplierAccessTokenId = accessTokenId;
@@ -614,8 +619,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                     SupplierAccessTokenId = accessTokenId,
                     FieldKey = property.Name,
                     DisplayLabel = FormatDisplayLabel(property.Name),
-                    OldValue = oldValue,
-                    NewValue = newValue,
+                    OldValue = CapChangeValue(oldValue),
+                    NewValue = CapChangeValue(newValue),
                     ChangedAt = DateTime.UtcNow,
                     ChangedBy = changedBy
                 });
@@ -624,6 +629,11 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
         await db.SaveChangesAsync();
     }
+
+    /// <summary>Caps a change-tracking value to the SupplierFieldChange.OldValue/NewValue column length
+    /// (500) so a long field value (e.g. a multi-line list) can never overflow and break the save.</summary>
+    private static string? CapChangeValue(string? value) =>
+        value is { Length: > 500 } ? value[..499] + "…" : value;
 
     private static string SplitCamelCase(string value) =>
         System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", " $1");

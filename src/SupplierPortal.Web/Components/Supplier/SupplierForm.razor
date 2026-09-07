@@ -1532,6 +1532,15 @@
             maxStepReached = VisiblePages.Count;
         }
 
+        // Default Taxpayer Country and Account Country Code to UAE, and Account Currency Code to AED,
+        // whenever they are not already set — applies to new suppliers and to existing records left blank.
+        var uaeCountry = countries.FirstOrDefault(c => c.DisplayName.Contains("United Arab Emirates", StringComparison.OrdinalIgnoreCase));
+        formModel.TaxpayerCountryId ??= uaeCountry?.Id;
+        formModel.AccountCountryCodeId ??= uaeCountry?.Id;
+        var aed = currencies.FirstOrDefault(c => string.Equals(c.Code, "AED", StringComparison.OrdinalIgnoreCase))
+                  ?? currencies.FirstOrDefault(c => c.DisplayName.Contains("Dirham", StringComparison.OrdinalIgnoreCase));
+        formModel.AccountCurrencyCodeId ??= aed?.Id;
+
         if (Supplier.Id != 0)
         {
             documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
@@ -1895,6 +1904,13 @@
             }
         }
 
+        // Validate the IBAN format on its assigned tab when a value is entered.
+        if (step == StepOf("Iban", 5) && !IsHiddenFromSupplier("Iban")
+            && !string.IsNullOrWhiteSpace(model.Iban) && !IsValidIban(model.Iban))
+        {
+            errors.Add("IBAN is not valid — check the country code, length and check digits (e.g. AE07 0331 2345 6789 0123 456).");
+        }
+
         return errors;
     }
 
@@ -1904,6 +1920,38 @@
         string s => string.IsNullOrWhiteSpace(s),
         _ => false
     };
+
+    /// <summary>The innermost exception message — EF's DbUpdateException hides the real SQL cause in its
+    /// inner exception, so surface that in the toast instead of the generic wrapper.</summary>
+    private static string DeepestMessage(Exception ex)
+    {
+        var current = ex;
+        while (current.InnerException is not null)
+        {
+            current = current.InnerException;
+        }
+        return current.Message;
+    }
+
+    /// <summary>Validates an IBAN per ISO 13616: 2-letter country + 2 check digits + alphanumeric BBAN,
+    /// length 15-34, passing the mod-97 check. Spaces/dashes are ignored.</summary>
+    private static bool IsValidIban(string? iban)
+    {
+        if (string.IsNullOrWhiteSpace(iban)) return true;
+        var s = iban.Replace(" ", "").Replace("-", "").ToUpperInvariant();
+        if (s.Length < 15 || s.Length > 34) return false;
+        if (!System.Text.RegularExpressions.Regex.IsMatch(s, "^[A-Z]{2}[0-9]{2}[A-Z0-9]+$")) return false;
+
+        // Move the first four characters to the end, then compute mod 97 piecewise (letters -> 10..35).
+        var rearranged = s[4..] + s[..4];
+        var remainder = 0;
+        foreach (var ch in rearranged)
+        {
+            var val = ch >= '0' && ch <= '9' ? ch - '0' : ch - 'A' + 10;
+            remainder = val > 9 ? (remainder * 100 + val) % 97 : (remainder * 10 + val) % 97;
+        }
+        return remainder == 1;
+    }
 
     private async Task PersistAsync(bool submitting = false)
     {
@@ -1995,7 +2043,7 @@
         }
         catch (Exception ex)
         {
-            ToastService.ShowError($"Save failed: {ex.Message}");
+            ToastService.ShowError($"Save failed: {DeepestMessage(ex)}");
         }
         finally
         {
@@ -2104,7 +2152,7 @@
         }
         catch (Exception ex)
         {
-            ToastService.ShowError($"Save failed: {ex.Message}");
+            ToastService.ShowError($"Save failed: {DeepestMessage(ex)}");
         }
         finally
         {
