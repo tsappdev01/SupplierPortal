@@ -650,12 +650,19 @@
 
 /* ================= Rich document upload cards ================= */
 .di-documents-grid {
-    display: flex;
-    flex-direction: column;
+    /* Span the full width of the section grid and lay the cards out two-per-row (so three docs
+       become two rows) instead of a single narrow column. */
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
     margin-top: 18px;
     padding-top: 18px;
     border-top: 1px solid var(--border);
+}
+
+@media (max-width: 720px) {
+    .di-documents-grid { grid-template-columns: 1fr; }
 }
 
 .di-doccard {

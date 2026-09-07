@@ -151,7 +151,7 @@
                 <div class="di-tmpl-field">
                     <label>Business Unit</label>
                     <select @bind="templateBuId">
-                        <option value="0">@(isAdministrator ? "All Business Units" : "All My Business Units")</option>
+                        <option value="0">@(SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")</option>
                         @foreach (var bu in businessUnits)
                         {
                             <option value="@bu.Id">@bu.Name</option>
@@ -245,7 +245,7 @@
                     <div class="di-bu-backdrop" @onclick="CloseBuDropdown"></div>
                     <div class="di-bu-menu">
                         <button type="button" class="di-bu-item @(filterBusinessUnitId == 0 ? "active" : "")" @onclick="() => SelectBuAsync(0)">
-                            <span class="di-bu-text">@(isAdministrator ? "All Business Units" : "All My Business Units")</span>
+                            <span class="di-bu-text">@(SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")</span>
                         </button>
                         @foreach (var businessUnit in businessUnits)
                         {
@@ -615,7 +615,7 @@ else if (TotalPages > 1)
 
                 IReadOnlyCollection<int>? businessUnitIds = templateBuId != 0
                     ? [templateBuId]
-                    : (isAdministrator ? null : userBusinessUnitIds);
+                    : (SeesAllBusinessUnits ? null : userBusinessUnitIds);
                 suppliers = await SupplierService.GetSuppliersAsync(businessUnitIds);
             }
 
@@ -654,6 +654,12 @@ else if (TotalPages > 1)
     private List<BusinessUnit> businessUnits = [];
     private bool isAdministrator;
     private List<int> userBusinessUnitIds = [];
+
+    /// <summary>Whether the user sees every business unit's suppliers. Only an administrator with NO
+    /// business-unit assignment is org-wide; a user (administrator or not) assigned to specific
+    /// business units is scoped to those, matching the "Business Unit(s)" access on their account.</summary>
+    private bool SeesAllBusinessUnits => isAdministrator && userBusinessUnitIds.Count == 0;
+
     private int filterBusinessUnitId;
     private string supplierNameFilter = "";
     private string statusFilter = "";   // default: "All Statuses"
@@ -678,14 +684,14 @@ else if (TotalPages > 1)
     private bool focusDocsPending;
 
     private string SelectedBuLabel => filterBusinessUnitId == 0
-        ? (isAdministrator ? "All Business Units" : "All My Business Units")
+        ? (SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")
         : businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "";
 
     // Human-readable scope for the "Notify" action, matching the current business-unit filter: a single
     // subsidiary when one is selected, otherwise all subsidiaries in view. The supplier list itself is
     // already filtered to this scope, so the notification only ever reaches suppliers in it.
     private string NotifyScopeLabel => filterBusinessUnitId == 0
-        ? (isAdministrator ? "all subsidiaries" : "all your business units")
+        ? (SeesAllBusinessUnits ? "all subsidiaries" : "all your business units")
         : SelectedBuLabel;
 
     // Suppliers matching the selected workflow-status filter (empty = all statuses).
@@ -716,7 +722,7 @@ else if (TotalPages > 1)
         currentUser = state.User.Identity?.Name ?? "unknown";
 
         var allBusinessUnits = await BusinessUnitService.GetAllAsync();
-        businessUnits = isAdministrator
+        businessUnits = SeesAllBusinessUnits
             ? allBusinessUnits
             : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
 
@@ -734,7 +740,7 @@ else if (TotalPages > 1)
         }
         else
         {
-            businessUnitIds = isAdministrator ? null : userBusinessUnitIds;
+            businessUnitIds = SeesAllBusinessUnits ? null : userBusinessUnitIds;
         }
 
         await Loading.RunAsync(async () =>

@@ -185,6 +185,9 @@ else
         currentUser = state.User.Identity?.Name ?? "unknown";
         var isAdministrator = state.User.IsAdministrator();
         var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        // Only an administrator with no business-unit assignment sees every business unit; a user
+        // (administrator or not) assigned to specific business units is scoped to those.
+        var seesAllBusinessUnits = isAdministrator && userBusinessUnitIds.Count == 0;
 
         var loaded = await SupplierService.GetByIdAsync(Id);
         if (loaded is null)
@@ -193,7 +196,7 @@ else
             return;
         }
 
-        if (!isAdministrator && !userBusinessUnitIds.Contains(loaded.BusinessUnitId))
+        if (!seesAllBusinessUnits && !userBusinessUnitIds.Contains(loaded.BusinessUnitId))
         {
             forbidden = true;
             return;

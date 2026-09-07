@@ -314,10 +314,7 @@ app.MapPost("/api/breakglass", async (BreakGlassRequest body, BreakGlassService 
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {
-    var isAdministrator = ctx.User.IsAdministrator();
-    var effectiveBusinessUnitIds = isAdministrator
-        ? (businessUnitId.HasValue ? new List<int> { businessUnitId.Value } : null)
-        : ctx.User.GetBusinessUnitIds();
+    var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
 
     var suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds, statusName: status);
 
@@ -340,10 +337,7 @@ app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpC
     var suppliers = new List<Supplier>();
     if (populate == true)
     {
-        var isAdministrator = ctx.User.IsAdministrator();
-        var effectiveBusinessUnitIds = isAdministrator
-            ? (businessUnitId.HasValue ? new List<int> { businessUnitId.Value } : null)
-            : ctx.User.GetBusinessUnitIds();
+        var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
         suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds);
     }
 
@@ -351,6 +345,22 @@ app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpC
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         populate == true ? "Supplier Template (Populated).xlsx" : "Supplier Template (Blank).xlsx");
 }).RequireAuthorization();
+
+// Effective business-unit scope for exports: an administrator with no business-unit assignment sees
+// all suppliers (null); everyone else — including administrators assigned to specific business units —
+// is restricted to their assigned business units, honoring a requested BU only when it is one of theirs.
+static List<int>? ResolveExportScope(HttpContext ctx, int? businessUnitId)
+{
+    var userBuIds = ctx.User.GetBusinessUnitIds();
+    var seesAll = ctx.User.IsAdministrator() && userBuIds.Count == 0;
+    if (seesAll)
+    {
+        return businessUnitId.HasValue ? new List<int> { businessUnitId.Value } : null;
+    }
+    return businessUnitId.HasValue && userBuIds.Contains(businessUnitId.Value)
+        ? new List<int> { businessUnitId.Value }
+        : userBuIds;
+}
 
 app.MapGet("/users/{id:int}/photo", async (int id, UserService userService) =>
 {
