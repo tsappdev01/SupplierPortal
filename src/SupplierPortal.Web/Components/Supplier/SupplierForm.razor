@@ -546,9 +546,13 @@
                         <label>Trade License @if (SupplierFacing){<span class="di-req">*</span>}</label>
                         @if (GetDocument(SupplierDocumentType.TradeLicense) is { } tradeLicenseDoc)
                         {
-                            <div class="di-document-current">Uploaded: @tradeLicenseDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tradeLicenseDoc.Id)" disabled="@viewingDocument">View</button></div>
+                            <div class="di-document-current">
+                                <span class="di-document-tick">✓</span>
+                                <span class="di-document-name" title="@tradeLicenseDoc.FileName">@tradeLicenseDoc.FileName</span>
+                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tradeLicenseDoc.Id)" disabled="@viewingDocument">View</button>
+                            </div>
                         }
-                        <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                         @if (SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument())
                         {
                             <div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>
@@ -558,9 +562,13 @@
                         <label>VAT Certificate @if (SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber)){<span class="di-req">*</span>}</label>
                         @if (GetDocument(SupplierDocumentType.VatCertification) is { } vatDoc)
                         {
-                            <div class="di-document-current">Uploaded: @vatDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vatDoc.Id)" disabled="@viewingDocument">View</button></div>
+                            <div class="di-document-current">
+                                <span class="di-document-tick">✓</span>
+                                <span class="di-document-name" title="@vatDoc.FileName">@vatDoc.FileName</span>
+                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vatDoc.Id)" disabled="@viewingDocument">View</button>
+                            </div>
                         }
-                        <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.VatCertification)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.VatCertification)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                         @if (SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate())
                         {
                             <div class="text-danger" style="font-size:0.85em;">Required — attach the VAT Certificate when a TRN/VAT number is provided.</div>
@@ -571,12 +579,13 @@
                         @foreach (var doc in OtherDocuments)
                         {
                             <div class="di-document-current">
-                                @doc.FileName
+                                <span class="di-document-tick">✓</span>
+                                <span class="di-document-name" title="@doc.FileName">@doc.FileName</span>
                                 <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
                                 <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
                             </div>
                         }
-                        <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
                     </div>
                 </div>
                 @if (Supplier.Id == 0)

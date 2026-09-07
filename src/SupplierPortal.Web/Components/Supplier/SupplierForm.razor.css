@@ -497,18 +497,18 @@
     padding: 14px 16px;
 }
 
-/* The file picker is rendered by the <InputFile> component, so its <input> needs ::deep to style. */
+/* The file picker is rendered by the <InputFile> component, so its <input> needs ::deep to style.
+   font-size:0 hides the browser's native "No file chosen" / filename text (it duplicated the green
+   "uploaded" chip and looked cluttered); the button keeps its own size via ::file-selector-button. */
 .di-document-slot ::deep input[type="file"] {
     width: 100%;
     max-width: 100%;
-    /* Push the picker to the bottom of the card so every slot's button aligns on one line,
-       regardless of how many "Uploaded: …" rows appear above it. */
+    /* Push the button to the bottom of the card so every slot's button aligns on one line. */
     margin-top: auto;
     padding: 0;
     border: none;
     background: transparent;
-    color: #46506b;
-    font-size: 13px;
+    font-size: 0;
     cursor: pointer;
 }
 
@@ -572,17 +572,42 @@
 .di-document-current {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: 14px;
+    gap: 8px;
+    font-size: 13.5px;
     color: #1e7e34;
-    background: #f1f8f3;
-    border-radius: 4px;
-    padding: 4px 8px;
-    margin-bottom: 6px;
+    background: #eef8f1;
+    border: 1px solid #cbe9d5;
+    border-radius: 6px;
+    padding: 6px 8px 6px 10px;
+    margin-bottom: 10px;
+}
+
+.di-document-tick {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #1e7e34;
+    color: #fff;
+    font-size: 11px;
+    line-height: 1;
+}
+
+.di-document-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #16632a;
+    font-weight: 600;
 }
 
 .di-document-remove {
+    flex: none;
     background: none;
     border: none;
     color: #c0392b;
@@ -592,7 +617,7 @@
 }
 
 .di-document-view {
-    margin-left: auto;
+    flex: none;
     background: none;
     border: 1px solid #1e7e34;
     color: #1e7e34;
