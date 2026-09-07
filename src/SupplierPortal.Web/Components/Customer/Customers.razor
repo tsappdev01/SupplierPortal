@@ -49,10 +49,10 @@
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#1b5e20" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#a5d6a7" stroke="#1b5e20" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h16M12 33h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round"/><rect x="5" y="37" width="34" height="12" rx="3" fill="#1b5e20"/><text x="22" y="46.5" font-family="Arial" font-size="8.5" font-weight="800" fill="#fff" text-anchor="middle">ALL</text></svg>
         <span>Excel (All Fields)</span>
     </a>
-    <a class="di-export-btn" href="/customers/export/template" title="Generate a blank customer upload template">
+    <button type="button" class="di-export-btn" @onclick="OpenTemplateDialog" title="Generate a customer upload template">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#1565c0" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#90caf9" stroke="#1565c0" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 16h16M12 22h16M12 28h16M12 34h9" stroke="#90caf9" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Generate Template</span>
-    </a>
+    </button>
     <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#c62828" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#ef9a9a" stroke="#c62828" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h9" stroke="#ef9a9a" stroke-width="2" stroke-linecap="round"/><rect x="5" y="33" width="34" height="15" rx="3" fill="#c62828"/><text x="22" y="44.5" font-family="Arial" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">PDF</text></svg>
         <span>PDF</span>
@@ -75,6 +75,44 @@
         <span>Upload Customer Data</span>
     </a>
 </div>
+
+@if (showTemplateDialog)
+{
+    <div class="di-tmpl-backdrop" @onclick="CloseTemplateDialog">
+        <div class="di-tmpl-modal" @onclick:stopPropagation>
+            <h5 class="di-tmpl-title">Generate Customer Template</h5>
+            <p class="di-tmpl-text">
+                Download an Excel template for the business to fill in and re-upload. On upload,
+                existing customers (by Customer Unique Number) are updated rather than duplicated.
+            </p>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="custTmplMode" checked="@(!templatePopulate)" @onchange="() => templatePopulate = false" />
+                <span>Blank template (headers only)</span>
+            </label>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="custTmplMode" checked="@templatePopulate" @onchange="() => templatePopulate = true" />
+                <span>Populate with existing customer data</span>
+            </label>
+            @if (templatePopulate)
+            {
+                <div class="di-tmpl-field">
+                    <label>Business Unit</label>
+                    <select @bind="templateBuId">
+                        <option value="0">@(seesAllBusinessUnits ? "All Business Units" : "All My Business Units")</option>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <option value="@bu.Id">@bu.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div class="di-tmpl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CloseTemplateDialog">Cancel</button>
+                <a class="di-btn di-btn-primary" href="@TemplateUrl()" @onclick="CloseTemplateDialog">Download</a>
+            </div>
+        </div>
+    </div>
+}
 
 <div class="row g-2 mb-3 no-print">
     @if (businessUnits.Count > 1 || isAdministrator)
@@ -176,6 +214,23 @@
     </table>
 </div>
 
+<style>
+    .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
+    .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+    .di-tmpl-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #1a2233; }
+    .di-tmpl-text { margin: 0 0 16px; font-size: 13.5px; color: #6b7280; }
+    .di-tmpl-radio { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14.5px; color: #26303f; cursor: pointer; }
+    .di-tmpl-field { margin: 10px 0 4px; display: flex; flex-direction: column; gap: 5px; }
+    .di-tmpl-field label { font-size: 13px; font-weight: 600; color: #46618f; }
+    .di-tmpl-field select { padding: 9px 11px; border: 1px solid #e2e5ea; border-radius: 8px; font-size: 15px; color: #1a2233; background: #fff; font-family: inherit; }
+    .di-tmpl-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .di-tmpl-actions .di-btn { display: inline-flex; align-items: center; gap: 7px; font-family: inherit; font-size: 15px; font-weight: 700; padding: 10px 22px; border-radius: 8px; cursor: pointer; border: none; text-decoration: none; }
+    .di-tmpl-actions .di-btn-primary { background: #3b5bdb; color: #fff; }
+    .di-tmpl-actions .di-btn-primary:hover { background: #2f4bc4; }
+    .di-tmpl-actions .di-btn-secondary { background: #fff; color: #1a2233; border: 1px solid #e2e5ea; }
+    .di-tmpl-actions .di-btn-secondary:hover { background: #f5f7fc; }
+</style>
+
 @code {
     private List<CustomerService.CustomerRow> rows = [];
     private List<BusinessUnit> businessUnits = [];
@@ -188,7 +243,13 @@
     private readonly HashSet<int> selectedIds = [];
     private bool loading = true;
     private bool isAdministrator;
+    private bool seesAllBusinessUnits;
     private string currentUser = "unknown";
+
+    // "Generate Template" dialog state.
+    private bool showTemplateDialog;
+    private bool templatePopulate;
+    private int templateBuId;
 
     // ---- derived collections ----
     private List<CustomerService.CustomerRow> buFiltered =>
@@ -224,10 +285,10 @@
         // Only an administrator with no business-unit assignment sees all customers; a user (admin or
         // not) assigned to specific business units is scoped to those — both in the list and the filter.
         var ids = state.User.GetBusinessUnitIds();
-        var seesAll = isAdministrator && ids.Count == 0;
-        var scope = seesAll ? new List<int>() : ids;
+        seesAllBusinessUnits = isAdministrator && ids.Count == 0;
+        var scope = seesAllBusinessUnits ? new List<int>() : ids;
         var allBu = await BusinessUnitService.GetAllAsync();
-        businessUnits = seesAll ? allBu : allBu.Where(b => ids.Contains(b.Id)).ToList();
+        businessUnits = seesAllBusinessUnits ? allBu : allBu.Where(b => ids.Contains(b.Id)).ToList();
         rows = await CustomerService.GetDashboardAsync(scope);
         loading = false;
     }
@@ -250,6 +311,26 @@
     }
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+
+    private void OpenTemplateDialog()
+    {
+        templatePopulate = false;
+        // Default the populate scope to the business unit currently filtered in the list.
+        templateBuId = filterBusinessUnitId;
+        showTemplateDialog = true;
+    }
+
+    private void CloseTemplateDialog() => showTemplateDialog = false;
+
+    /// <summary>The template download URL: a blank sheet, or one pre-populated with the chosen business
+    /// unit's customers (0 = all the user is allowed to see). Scope is re-checked server-side.</summary>
+    private string TemplateUrl()
+    {
+        if (!templatePopulate) return "/customers/export/template";
+        return templateBuId > 0
+            ? $"/customers/export/template?populate=true&businessUnitId={templateBuId}"
+            : "/customers/export/template?populate=true";
+    }
 
     /// <summary>Builds an export URL carrying the current list filters (business unit, status, search) so
     /// the download matches what the grid shows. BU/status scope is re-checked server-side.</summary>
