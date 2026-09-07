@@ -96,16 +96,12 @@
         uploadedBy = state.User.Identity?.Name ?? "unknown";
 
         var all = await BusinessUnitService.GetAllAsync();
-        if (isAdministrator)
-        {
-            businessUnits = all;
-        }
-        else
-        {
-            var ids = state.User.GetBusinessUnitIds();
-            businessUnits = all.Where(b => ids.Contains(b.Id)).ToList();
-            if (businessUnits.Count == 1) selectedBusinessUnitId = businessUnits[0].Id;
-        }
+        // Only an administrator with no business-unit assignment sees all; a user (admin or not)
+        // assigned to specific business units is scoped to those.
+        var ids = state.User.GetBusinessUnitIds();
+        var seesAll = isAdministrator && ids.Count == 0;
+        businessUnits = seesAll ? all : all.Where(b => ids.Contains(b.Id)).ToList();
+        if (businessUnits.Count == 1) selectedBusinessUnitId = businessUnits[0].Id;
     }
 
     private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)

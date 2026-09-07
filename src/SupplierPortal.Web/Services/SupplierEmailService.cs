@@ -146,4 +146,57 @@ public class SupplierEmailService(
             // point, so a failed courtesy email to the requestor must not surface as an error to them.
         }
     }
+
+    /// <summary>Sends the supplier a "thank you" email once their record is marked Complete, confirming
+    /// their registration is finalised. Takes primitives so the dashboard can call it from its list
+    /// projection without loading the full Supplier graph.</summary>
+    public async Task<(bool Success, string? Error)> NotifySupplierCompletedAsync(
+        int supplierId, string supplierName, string? contactEmail, string actorUsername, int? businessUnitId)
+    {
+        if (string.IsNullOrWhiteSpace(contactEmail))
+        {
+            return (false, "This supplier has no Contact Email on file.");
+        }
+
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        var safeName = System.Net.WebUtility.HtmlEncode(supplierName);
+        var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
+  <div style=""max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
+    <div style=""background:#1a2233;padding:18px 24px"">{BrandLine(brand)}
+      <div style=""color:#cfd6e6;font-size:13px"">Supplier Data Gathering Portal</div>
+    </div>
+    <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
+      <h2 style=""margin:0 0 12px;color:#1a2233;font-size:19px"">Thank you, {safeName}</h2>
+      <p style=""margin:0 0 12px"">We're pleased to let you know that your supplier registration has been
+        <strong>reviewed and completed</strong>. No further action is required from you at this time.</p>
+      <p style=""margin:0 0 12px"">Thank you for taking the time to provide your information and for partnering with us.</p>
+      <p style=""margin:18px 0 0;color:#7b8697;font-size:13px"">This is an automated message — please do not reply.</p>
+    </div>
+  </div>
+</div>";
+
+        var subject = $"Supplier Registration Completed — {supplierName}";
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync($@"
+                EXEC msdb.dbo.sp_send_dbmail
+                    @profile_name = {MailProfileName},
+                    @recipients = {contactEmail},
+                    @subject = {subject},
+                    @body = {body},
+                    @body_format = 'HTML';");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Database Mail send failed: {ex.Message}");
+        }
+
+        await auditService.LogAsync(
+            actorUsername, AuditAction.Notify, "Supplier", supplierId,
+            $"Sent completion thank-you email to {contactEmail}");
+
+        return (true, null);
+    }
 }

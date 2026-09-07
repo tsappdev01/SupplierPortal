@@ -1040,7 +1040,20 @@ else if (TotalPages > 1)
     private async Task MarkCompleteAsync(SupplierListItem supplier)
     {
         await SupplierService.MarkCompleteAsync(supplier.Id, currentUser);
-        ToastService.ShowSuccess($"{supplier.SupplierName} marked Complete.");
+
+        // Notify the supplier that their registration is finalised with a thank-you email.
+        var (emailed, emailError) = await SupplierEmailService.NotifySupplierCompletedAsync(
+            supplier.Id, supplier.SupplierName, supplier.ContactEmail, currentUser, supplier.BusinessUnitId);
+
+        if (emailed)
+        {
+            ToastService.ShowSuccess($"{supplier.SupplierName} marked Complete — thank-you email sent to {supplier.ContactEmail}.");
+        }
+        else
+        {
+            ToastService.ShowWarning($"{supplier.SupplierName} marked Complete, but the thank-you email was not sent: {emailError}");
+        }
+
         await ReloadAsync();
     }
 

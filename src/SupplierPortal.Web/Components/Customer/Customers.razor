@@ -213,8 +213,13 @@
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
         isAdministrator = state.User.IsAdministrator();
-        var scope = isAdministrator ? new List<int>() : state.User.GetBusinessUnitIds();
-        businessUnits = await BusinessUnitService.GetAllAsync();
+        // Only an administrator with no business-unit assignment sees all customers; a user (admin or
+        // not) assigned to specific business units is scoped to those — both in the list and the filter.
+        var ids = state.User.GetBusinessUnitIds();
+        var seesAll = isAdministrator && ids.Count == 0;
+        var scope = seesAll ? new List<int>() : ids;
+        var allBu = await BusinessUnitService.GetAllAsync();
+        businessUnits = seesAll ? allBu : allBu.Where(b => ids.Contains(b.Id)).ToList();
         rows = await CustomerService.GetDashboardAsync(scope);
         loading = false;
     }
