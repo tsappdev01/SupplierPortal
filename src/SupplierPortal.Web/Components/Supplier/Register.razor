@@ -47,16 +47,15 @@ else if (errorMessage is not null)
         isAdministrator = state.User.IsAdministrator();
         currentUser = state.User.Identity?.Name ?? "unknown";
 
-        if (isAdministrator)
-        {
-            businessUnits = await BusinessUnitService.GetAllAsync();
-        }
-        else
-        {
-            var userBusinessUnitIds = state.User.GetBusinessUnitIds();
-            var allBusinessUnits = await BusinessUnitService.GetAllAsync();
-            businessUnits = allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
+        // Only an administrator with no business-unit assignment sees all; a user (admin or not)
+        // assigned to specific business units is scoped to those.
+        var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        var seesAll = isAdministrator && userBusinessUnitIds.Count == 0;
+        var allBusinessUnits = await BusinessUnitService.GetAllAsync();
+        businessUnits = seesAll ? allBusinessUnits : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
 
+        if (!seesAll)
+        {
             if (businessUnits.Count == 1)
             {
                 supplier = new Supplier { BusinessUnitId = businessUnits[0].Id, CreatedBy = currentUser };
