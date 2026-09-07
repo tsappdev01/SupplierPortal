@@ -541,51 +541,50 @@
                     </div>
                 }
 
-                <div class="di-documents-row">
-                    <div class="di-document-slot">
-                        <label>Trade License @if (SupplierFacing){<span class="di-req">*</span>}</label>
-                        @if (GetDocument(SupplierDocumentType.TradeLicense) is { } tradeLicenseDoc)
-                        {
-                            <div class="di-document-current">
-                                <span class="di-document-tick">✓</span>
-                                <span class="di-document-name" title="@tradeLicenseDoc.FileName">@tradeLicenseDoc.FileName</span>
-                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tradeLicenseDoc.Id)" disabled="@viewingDocument">View</button>
-                            </div>
-                        }
-                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.TradeLicense)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
-                        @if (SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument())
-                        {
-                            <div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>
-                        }
-                    </div>
-                    <div class="di-document-slot">
-                        <label>VAT Certificate @if (SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber)){<span class="di-req">*</span>}</label>
-                        @if (GetDocument(SupplierDocumentType.VatCertification) is { } vatDoc)
-                        {
-                            <div class="di-document-current">
-                                <span class="di-document-tick">✓</span>
-                                <span class="di-document-name" title="@vatDoc.FileName">@vatDoc.FileName</span>
-                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vatDoc.Id)" disabled="@viewingDocument">View</button>
-                            </div>
-                        }
-                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.VatCertification)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
-                        @if (SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate())
-                        {
-                            <div class="text-danger" style="font-size:0.85em;">Required — attach the VAT Certificate when a TRN/VAT number is provided.</div>
-                        }
-                    </div>
-                    <div class="di-document-slot">
-                        <label>Other Documents</label>
-                        @foreach (var doc in OtherDocuments)
-                        {
-                            <div class="di-document-current">
-                                <span class="di-document-tick">✓</span>
-                                <span class="di-document-name" title="@doc.FileName">@doc.FileName</span>
-                                <button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
-                                <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
-                            </div>
-                        }
-                        <InputFile class="di-file" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
+                <div class="di-documents-grid">
+                    @(DocCard("Trade License", SupplierDocumentType.TradeLicense, "di-thumb-red",
+                             SupplierFacing,
+                             SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument(),
+                             "Required — attach the Trade License before submitting."))
+                    @(DocCard("VAT Certificate", SupplierDocumentType.VatCertification, "di-thumb-green",
+                             SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber),
+                             SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate(),
+                             "Required — attach the VAT Certificate when a TRN/VAT number is provided."))
+
+                    <div class="di-doccard">
+                        @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
+                        <div class="di-doccard-thumb di-thumb-amber">
+                            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+                            <span class="di-doccard-ext">FILES</span>
+                        </div>
+                        <div class="di-doccard-main">
+                            <div class="di-doccard-title">Other Documents</div>
+                            @if (OtherDocuments.Count == 0)
+                            {
+                                <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var doc in OtherDocuments)
+                                {
+                                    <div class="di-doccard-chip">
+                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                        <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                                        <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                        <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <div class="di-doccard-upload">
+                            <label class="di-doccard-choose @(otherDisabled ? "is-disabled" : null)" for="docfile-Other">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                <span>Choose File</span>
+                                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+                            </label>
+                            <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@otherDisabled" />
+                            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+                        </div>
                     </div>
                 </div>
                 @if (Supplier.Id == 0)
@@ -902,19 +901,11 @@
                     </button>
                 </div>
 
-                <div class="di-documents-row">
-                    <div class="di-document-slot">
-                        <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
-                        @if (GetDocument(SupplierDocumentType.BankConfirmationLetter) is { } bankLetterDoc)
-                        {
-                            <div class="di-document-current">Uploaded: @bankLetterDoc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bankLetterDoc.Id)" disabled="@viewingDocument">View</button></div>
-                        }
-                        <InputFile OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.BankConfirmationLetter)" disabled="@(Supplier.Id == 0 || uploadingDocument)" />
-                        @if (RequiresBankConfirmationLetter())
-                        {
-                            <div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>
-                        }
-                    </div>
+                <div class="di-documents-grid">
+                    @(DocCard("Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
+                             RequiresBankConfirmationLetter(),
+                             RequiresBankConfirmationLetter(),
+                             "Required: you changed the bank account, so a Bank Confirmation Letter must be attached."))
                 </div>
             </div>
         </div>
@@ -1394,6 +1385,85 @@
     private SupplierDocument? GetDocument(SupplierDocumentType type) =>
         documents.FirstOrDefault(d => d.DocumentType == type);
 
+    /// <summary>Maximum size (MB) allowed for an uploaded document. Shown in the card hint and enforced
+    /// on upload.</summary>
+    private const int MaxUploadMb = 10;
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes <= 0) return "0 KB";
+        double kb = bytes / 1024.0;
+        return kb < 1024 ? $"{kb:0} KB" : $"{kb / 1024.0:0.0} MB";
+    }
+
+    private static string FileExtLabel(string? fileName)
+    {
+        var ext = System.IO.Path.GetExtension(fileName ?? "").TrimStart('.').ToUpperInvariant();
+        if (string.IsNullOrEmpty(ext)) return "FILE";
+        return ext.Length > 4 ? ext[..4] : ext;
+    }
+
+    /// <summary>A rich upload card for a single-document slot (Trade License, VAT Certificate, Bank
+    /// Confirmation Letter). Shows a coloured file thumbnail, the uploaded file with date/size, a View
+    /// action and a branded Choose File button with supported-format hints.</summary>
+    private RenderFragment DocCard(string title, SupplierDocumentType type, string thumbClass, bool showStar, bool showRequiredMsg, string requiredMsg)
+    {
+        return @<div class="di-doccard">
+        @{
+            var doc = GetDocument(type);
+            var inputId = $"docfile-{type}";
+            var disabled = Supplier.Id == 0 || uploadingDocument;
+        }
+        <div class="di-doccard-thumb @thumbClass">
+            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+            <span class="di-doccard-ext">@(doc is null ? "FILE" : FileExtLabel(doc.FileName))</span>
+        </div>
+        <div class="di-doccard-main">
+            <div class="di-doccard-title">@title @if (showStar){<span class="di-req">*</span>}</div>
+            @if (doc is not null)
+            {
+                <div class="di-doccard-chip">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                    <span class="di-doccard-uplabel">Uploaded:</span>
+                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                </div>
+                <div class="di-doccard-meta">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z" /></svg>
+                    <span>Uploaded on: @doc.UploadedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    <span class="di-doccard-sep"></span>
+                    <span>Size: @FormatSize(doc.FileSizeBytes)</span>
+                </div>
+            }
+            else
+            {
+                <div class="di-doccard-meta di-doccard-empty">No file uploaded yet.</div>
+            }
+            @if (showRequiredMsg)
+            {
+                <div class="di-doccard-required">@requiredMsg</div>
+            }
+        </div>
+        @if (doc is not null)
+        {
+            <div class="di-doccard-actions">
+                <button type="button" class="di-doccard-viewbtn" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
+                    View
+                </button>
+            </div>
+        }
+        <div class="di-doccard-upload">
+            <label class="di-doccard-choose @(disabled ? "is-disabled" : null)" for="@inputId">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                <span>Choose File</span>
+                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+            </label>
+            <InputFile id="@inputId" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, type)" disabled="@disabled" />
+            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+        </div>
+    </div>;
+    }
+
     protected override async Task OnInitializedAsync()
     {
         // Mandatory-field validation applies only to the supplier-facing self-service portal. Every
@@ -1521,9 +1591,9 @@
             return;
         }
 
-        if (e.File.Size > 10 * 1024 * 1024)
+        if (e.File.Size > MaxUploadMb * 1024L * 1024L)
         {
-            ToastService.ShowError($"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the 10 MB limit. Please attach a smaller file.");
+            ToastService.ShowError($"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the {MaxUploadMb} MB limit. Please attach a smaller file.");
             return;
         }
 
