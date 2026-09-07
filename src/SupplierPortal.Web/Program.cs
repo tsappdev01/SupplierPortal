@@ -476,6 +476,35 @@ app.MapPost("/api/leasing/circularo/webhook", async (
     return ok ? Results.Ok(new { handled = true }) : Results.NotFound();
 }).AllowAnonymous();
 
+// Download all of a supplier's attachments (originals, any type) as a single zip archive.
+app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentService documentService) =>
+{
+    var files = await documentService.GetAllFilesAsync(id);
+    if (files.Count == 0) return Results.NotFound("This supplier has no attachments.");
+
+    using var ms = new MemoryStream();
+    using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+    {
+        var used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (bytes, fileName) in files)
+        {
+            // De-duplicate names (several docs can share a file name) by appending " (n)" before the extension.
+            var name = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
+            if (used.TryGetValue(name, out var n))
+            {
+                used[name] = ++n;
+                name = $"{Path.GetFileNameWithoutExtension(name)} ({n}){Path.GetExtension(name)}";
+            }
+            else { used[name] = 0; }
+
+            var entry = archive.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
+            await using var entryStream = entry.Open();
+            await entryStream.WriteAsync(bytes);
+        }
+    }
+    return Results.File(ms.ToArray(), "application/zip", $"supplier-{id}-documents.zip");
+}).RequireAuthorization();
+
 // Combine a supplier's attached images into a single PDF / Excel workbook.
 app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
 {

@@ -67,6 +67,7 @@ else
             <div class="d-flex gap-2 mb-2 flex-wrap">
                 <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.pdf" target="_blank">Download images as PDF</a>
                 <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.xlsx">Download images as Excel</a>
+                <a class="btn btn-sm btn-dark" href="/suppliers/@supplier.Id/documents.zip">Download all (zip)</a>
             </div>
 
             <div class="di-doc-viewer" tabindex="0" @ref="viewerRef" @onkeydown="OnViewerKeyDown" @onkeydown:preventDefault="true">

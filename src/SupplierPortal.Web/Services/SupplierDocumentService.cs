@@ -359,6 +359,28 @@ public class SupplierDocumentService(
         return result;
     }
 
+    /// <summary>Every attachment for a supplier as (bytes, original file name), of any content type -
+    /// used to build the "download all" zip. Skips any record whose physical file is missing.</summary>
+    public async Task<List<(byte[] Bytes, string FileName)>> GetAllFilesAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var docs = await db.SupplierDocuments
+            .Where(d => d.SupplierId == supplierId)
+            .OrderBy(d => d.DocumentType).ThenBy(d => d.UploadedAt)
+            .ToListAsync();
+
+        var result = new List<(byte[] Bytes, string FileName)>();
+        foreach (var doc in docs)
+        {
+            var fullPath = Path.Combine(DocumentsDirectory(supplierId), doc.StoredFileName);
+            if (File.Exists(fullPath))
+            {
+                result.Add((await File.ReadAllBytesAsync(fullPath), doc.FileName));
+            }
+        }
+        return result;
+    }
+
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
