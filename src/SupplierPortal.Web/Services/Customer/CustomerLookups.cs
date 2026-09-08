@@ -325,6 +325,8 @@ public static class CustomerLookups
         ("Contact", "Nationality") => CountryNames,
         ("Contact", "Country") => CountryNames,
         ("Contact", "IssueCountry") => CountryNames,
+        ("Contact", "PassportIssuePlaceCountry") => CountryNames,
+        ("Contact", "PassportIssueCountryCode") => CountryCodes,
         ("Contact", "TypeOfCustomer") => new[] { "Normal", "VIP" },
 
         _ => Empty
