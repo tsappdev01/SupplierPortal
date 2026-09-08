@@ -175,6 +175,20 @@
 }
 
 /* ---- Fields ---- */
+/* Full-width sub-section heading inside a step's field grid (e.g. Passport / Visa / Government ID). */
+.di-subheading {
+    grid-column: 1 / -1;
+    margin: 8px 0 2px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--blue);
+}
+.di-subheading:first-child { margin-top: 0; }
+
 .di-field { display: flex; flex-direction: column; min-width: 0; }
 .di-field input, .di-field select { min-width: 0; max-width: 100%; }
 

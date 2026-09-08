@@ -94,6 +94,7 @@
                         </div>
                     </div>
                     <div class="di-section-body">
+                        @{ var lastSub = (string?)null; }
                         @foreach (var f in FieldsFor(step))
                         {
                             var cfg = f;
@@ -102,6 +103,12 @@
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                             var editable = !string.Equals(cfg.CustomerControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                             var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
+                            var sub = step.Group == "Identification" ? Subcategory(cfg.FieldKey) : null;
+                            if (sub is not null && sub != lastSub)
+                            {
+                                lastSub = sub;
+                                <div class="di-subheading">@sub</div>
+                            }
                             <div class="di-field">
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
@@ -284,6 +291,19 @@
 
     private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
         config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group).OrderBy(f => f.Sequence);
+
+    private static string? Subcategory(string fieldKey) => fieldKey switch
+    {
+        "Passport" or "PassportNumber" or "PassportIssueDate" or "PassportExpiryDate"
+            or "PassportIssueCountryCode" or "PassportIssuePlaceCountry"
+            or "DualPassport" or "DualPassportNumber" or "DualPassportIssueDate" or "DualPassportExpiryDate"
+            => "Passport Information",
+        "VISAExpiryDate" or "VISANumber" => "Visa Information",
+        "TypeOfID" or "CountryGovtIDNumber" or "CountryGovtIDIssueDate" or "CountryGovtIDExpiryDate"
+            or "EmirateID" or "EmirateIDExpiryDate" or "EmiratesIDIssueDate" or "IssueCountry"
+            => "Government / National ID",
+        _ => null
+    };
 
     private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
 
