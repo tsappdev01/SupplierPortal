@@ -444,6 +444,34 @@ app.MapGet("/customers/documents/{id:int}", async (int id, bool? download, Custo
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization("Portal.Customer");
 
+// Download all of a customer's KYC attachments as a single zip archive.
+app.MapGet("/customers/{id:int}/documents.zip", async (int id, CustomerDocumentService documentService) =>
+{
+    var files = await documentService.GetAllFilesAsync(id);
+    if (files.Count == 0) return Results.NotFound("This customer has no attachments.");
+
+    using var ms = new MemoryStream();
+    using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+    {
+        var used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (bytes, fileName) in files)
+        {
+            var name = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
+            if (used.TryGetValue(name, out var n))
+            {
+                used[name] = ++n;
+                name = $"{Path.GetFileNameWithoutExtension(name)} ({n}){Path.GetExtension(name)}";
+            }
+            else { used[name] = 0; }
+
+            var entry = archive.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
+            await using var entryStream = entry.Open();
+            await entryStream.WriteAsync(bytes);
+        }
+    }
+    return Results.File(ms.ToArray(), "application/zip", $"customer-{id}-documents.zip");
+}).RequireAuthorization("Portal.Customer");
+
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
 // Without ?download=1 the file is served inline (preview); with it, as an attachment.
 app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>

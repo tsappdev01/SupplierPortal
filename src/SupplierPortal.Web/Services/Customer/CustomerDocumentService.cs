@@ -149,6 +149,19 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
         return (true, null);
     }
 
+    /// <summary>Every attachment for a customer as (bytes, file name), for the "download all" zip.</summary>
+    public async Task<List<(byte[] Bytes, string FileName)>> GetAllFilesAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return (await db.CustomerDocuments.AsNoTracking()
+                .Where(d => d.CustomerId == customerId)
+                .OrderBy(d => d.DocumentType)
+                .Select(d => new { d.Content, d.FileName })
+                .ToListAsync())
+            .Select(d => (d.Content, d.FileName))
+            .ToList();
+    }
+
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

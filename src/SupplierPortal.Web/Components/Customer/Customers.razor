@@ -9,6 +9,7 @@
 @inject CustomerService CustomerService
 @inject CustomerExportService CustomerExport
 @inject CustomerEmailService CustomerEmailService
+@inject CustomerDocumentService DocumentService
 @inject CustomerFieldConfigService FieldConfigService
 @inject BusinessUnitService BusinessUnitService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -217,9 +218,9 @@
                         <td>@row.Email</td>
                         <td><span class="badge @StatusClass(row.Status)">@row.Status</span></td>
                         <td class="no-print">
-                            <a class="btn btn-sm btn-outline-secondary" href="/admin/customers/@row.Id" title="View / open">
+                            <button class="btn btn-sm btn-outline-secondary" title="View attached documents" @onclick="() => ShowDocumentsAsync(row)">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 11 4.5h1.5L9.5 1.5V3zM5 8.5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H5z"/></svg>
-                            </a>
+                            </button>
                             <a class="btn btn-sm btn-outline-primary" href="/admin/customers/@row.Id" title="Edit">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/></svg>
                             </a>
@@ -234,7 +235,82 @@
     </table>
 </div>
 
+@if (showDocsModal)
+{
+    <div class="di-modal-backdrop no-print" @onclick="CloseDocsModal"></div>
+    <div class="di-modal no-print" role="dialog" aria-modal="true">
+        <div class="di-modal-head">
+            <h2 class="h6 mb-0 text-truncate">Attached Documents &mdash; @docsCustomerName</h2>
+            <button type="button" class="btn-close" aria-label="Close" @onclick="CloseDocsModal"></button>
+        </div>
+        <div class="di-modal-body">
+            @if (modalDocsLoading)
+            {
+                <p><em>Documents are being retrieved, please wait…</em></p>
+            }
+            else if (modalDocuments.Count == 0)
+            {
+                <p><em>No documents have been uploaded for this customer.</em></p>
+            }
+            else
+            {
+                <div class="di-docsall-toolbar">
+                    <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
+                    <div class="di-docsall-toolbar-actions">
+                        <a class="btn btn-sm btn-dark" href="/customers/@docsCustomerId/documents.zip">⬇ Download all (zip)</a>
+                    </div>
+                </div>
+                <div class="di-docsall-grid">
+                    @foreach (var doc in modalDocuments)
+                    {
+                        <div class="di-docsall-card">
+                            <div class="di-docsall-preview">
+                                @if (doc.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <img src="/customers/documents/@doc.Id" alt="@doc.FileName" loading="lazy" />
+                                }
+                                else
+                                {
+                                    <iframe src="/customers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"></iframe>
+                                }
+                            </div>
+                            <div class="di-docsall-info">
+                                <span class="di-docsall-type badge">@doc.DocumentType</span>
+                                <span class="di-docsall-name" title="@doc.FileName">@doc.FileName</span>
+                            </div>
+                            <div class="di-docsall-actions">
+                                <a class="btn btn-sm btn-outline-primary" href="/customers/documents/@doc.Id" target="_blank" title="Open in a new tab">Open</a>
+                                <a class="btn btn-sm btn-primary" href="/customers/documents/@doc.Id?download=1" title="Download the original file">Download</a>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="small text-muted mt-2">Tip: click a preview's Open to view full size, or Download to save the original.</div>
+            }
+        </div>
+    </div>
+}
+
 <style>
+    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); z-index: 1080; }
+    .di-modal { position: fixed; inset: 24px; z-index: 1081; background: #fff; border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0,0,0,0.35); overflow: hidden; }
+    .di-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #e2e5ea; }
+    .di-modal-body { padding: 16px 18px; overflow: auto; }
+    .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-docsall-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .di-docsall-count { font-size: 13px; font-weight: 600; color: #46506b; }
+    .di-docsall-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .di-docsall-card { border: 1px solid #e2e5ea; border-radius: 10px; overflow: hidden; background: #fff; transition: box-shadow .15s ease; }
+    .di-docsall-card:hover { box-shadow: 0 6px 20px rgba(20, 30, 50, 0.1); }
+    .di-docsall-preview { height: 200px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
+    .di-docsall-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
+    .di-docsall-type { background: #eef1ff; color: #3b5bdb; font-weight: 600; flex: none; }
+    .di-docsall-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .di-docsall-actions { display: flex; gap: 8px; padding: 8px 12px 12px; }
+    .di-docsall-actions .btn { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 0; justify-content: center; }
+
     .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
     .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
     .di-tmpl-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #1a2233; }
@@ -336,6 +412,26 @@
     }
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+
+    // Attached-documents viewer modal.
+    private bool showDocsModal;
+    private int docsCustomerId;
+    private string docsCustomerName = "";
+    private List<CustomerDocument> modalDocuments = [];
+    private bool modalDocsLoading;
+
+    private async Task ShowDocumentsAsync(CustomerService.CustomerRow row)
+    {
+        docsCustomerId = row.Id;
+        docsCustomerName = row.Name;
+        modalDocuments = [];
+        modalDocsLoading = true;
+        showDocsModal = true;
+        modalDocuments = await DocumentService.GetDocumentsAsync(row.Id);
+        modalDocsLoading = false;
+    }
+
+    private void CloseDocsModal() => showDocsModal = false;
 
     private int? notifyingId;
     private bool bulkSending;
