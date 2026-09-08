@@ -6,6 +6,8 @@
 @inject SupplierAccessTokenService AccessTokenService
 @inject SupplierService SupplierService
 @inject SupplierEmailService SupplierEmailService
+@inject EmailBrandingService Branding
+@inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
 @inject NavigationManager NavigationManager
 
@@ -87,6 +89,11 @@
         {
             supplier = await SupplierService.GetByIdAsync(accessToken.SupplierId);
             actorLabel = $"Supplier Self-Service ({supplier?.ContactEmail})";
+            // Keep the public header branded with the supplier's business unit logo.
+            if (supplier is not null)
+            {
+                PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId));
+            }
         }
 
         loading = false;

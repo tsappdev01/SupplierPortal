@@ -4,6 +4,8 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierAccessTokenService AccessTokenService
+@inject EmailBrandingService Branding
+@inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
 @inject NavigationManager NavigationManager
 
@@ -81,6 +83,13 @@
     protected override async Task OnInitializedAsync()
     {
         token = await AccessTokenService.GetValidTokenAsync(Token);
+
+        // Brand the public header with the supplier's business unit logo (its hosted Logo URL, else the
+        // uploaded logo as a data URI) instead of the default Dubai Investments logo.
+        if (token?.Supplier is not null)
+        {
+            PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(token.Supplier.BusinessUnitId));
+        }
 
         if (token is not null && NeedsFreshOtp(token))
         {

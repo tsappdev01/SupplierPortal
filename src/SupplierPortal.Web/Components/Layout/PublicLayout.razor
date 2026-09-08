@@ -1,9 +1,7 @@
 @inherits LayoutComponentBase
 
 <div class="public-layout">
-    <div class="public-header">
-        <img src="/images/di-logo.png" alt="Dubai Investments" class="public-brand-logo" />
-    </div>
+    <PublicBrandHeader @rendermode="InteractiveServer" />
     <div class="public-content">
         @Body
     </div>
