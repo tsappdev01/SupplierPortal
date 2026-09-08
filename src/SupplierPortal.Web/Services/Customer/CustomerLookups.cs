@@ -316,6 +316,7 @@ public static class CustomerLookups
         ("Account", "Owner2Nationality") => CountryNames,
         ("Account", "PaymentTerms") => new[] { "30 Net", "IMMEDIATE", "NET 45", "Net 3", "15 Net", "NET 120", "NET 90" },
 
+        ("Contact", "Title") => new[] { "Mr", "Mrs", "Ms", "M/s", "Dr" },
         ("Contact", "Gender") => new[] { "Male", "Female" },
         ("Contact", "MaritalStatus") => new[] { "Single", "Married" },
         ("Contact", "PreferredLanguage") => new[] { "Arabic", "English", "French", "Hindi/Urdu" },
