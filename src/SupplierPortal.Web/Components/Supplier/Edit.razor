@@ -121,24 +121,24 @@ else
                 <table class="table table-striped table-sm">
                     <thead>
                         <tr>
-                            <th>Sent On (UTC)</th>
+                            <th>Sent On</th>
                             <th>Sent By</th>
                             <th>Type</th>
                             <th>Code Verified</th>
                             <th>Submitted</th>
-                            <th>Link Expires (UTC)</th>
+                            <th>Link Expires</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var entry in emailHistory)
                         {
                             <tr>
-                                <td>@entry.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@Local(entry.CreatedAt)</td>
                                 <td>@entry.CreatedBy</td>
                                 <td>@(entry.IsAdminTest ? "Admin test" : "Supplier")</td>
-                                <td>@(entry.OtpVerifiedAt is null ? "—" : entry.OtpVerifiedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
-                                <td>@(entry.UsedAt is null ? "—" : entry.UsedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
-                                <td>@entry.ExpiresAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@(entry.OtpVerifiedAt is null ? "—" : Local(entry.OtpVerifiedAt.Value))</td>
+                                <td>@(entry.UsedAt is null ? "—" : Local(entry.UsedAt.Value))</td>
+                                <td>@Local(entry.ExpiresAt)</td>
                             </tr>
                         }
                     </tbody>
@@ -174,6 +174,10 @@ else
 
     private List<SupplierAccessToken> emailHistory = [];
     private bool emailHistoryLoaded;
+
+    /// <summary>Formats a stored UTC timestamp in the server's local time zone.</summary>
+    private static string Local(DateTime utc) =>
+        DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 
     private SupplierDocument CurrentDoc => documents[currentDocIndex];
     private static bool IsImage(SupplierDocument d) => d.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
