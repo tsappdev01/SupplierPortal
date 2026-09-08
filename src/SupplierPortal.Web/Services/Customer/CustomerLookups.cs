@@ -311,6 +311,7 @@ public static class CustomerLookups
         ("Account", "CountryName") => CountryNames,
         ("Account", "CountrySubdivision") => Emirates,
         ("Account", "LicensingAuthorityName") => LicensingAuthorities,
+        ("Account", "TradeLicenseIssuingBody") => new[] { "Mainland", "Free Zone" },
         ("Account", "Owner1Nationality") => CountryNames,
         ("Account", "Owner2Nationality") => CountryNames,
         ("Account", "PaymentTerms") => new[] { "30 Net", "IMMEDIATE", "NET 45", "Net 3", "15 Net", "NET 120", "NET 90" },
