@@ -769,6 +769,37 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("CustomerDocuments");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerDocumentType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Requirement")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomerDocumentTypes");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerAccessToken", b =>
                 {
                     b.Property<int>("Id")

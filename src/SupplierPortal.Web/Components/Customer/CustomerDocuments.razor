@@ -1,0 +1,167 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerDocumentService DocumentService
+@inject ToastService ToastService
+@inject IJSRuntime JS
+
+@* KYC document checklist: one card per master document type, with upload + view/download/remove.
+   Required types are flagged; the parent wizard blocks submit until they are uploaded. *@
+<div class="di-docs-grid">
+    @foreach (var type in types)
+    {
+        var doc = documents.FirstOrDefault(d => d.DocumentType == type.Name);
+        var inputId = $"cust-doc-{type.Id}";
+        <div class="di-doc-card @(doc is not null ? "is-done" : (type.IsRequired ? "is-required" : ""))">
+            <div class="di-doc-head">
+                <span class="di-doc-name">
+                    @type.Name
+                    @if (type.IsRequired) { <span class="di-doc-req">*</span> }
+                </span>
+                @if (doc is not null)
+                {
+                    <span class="di-doc-badge">Uploaded</span>
+                }
+                else if (type.IsRequired)
+                {
+                    <span class="di-doc-badge di-doc-badge-req">Required</span>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(type.Requirement))
+            {
+                <div class="di-doc-hint">@type.Requirement</div>
+            }
+
+            @if (doc is not null)
+            {
+                <div class="di-doc-file">
+                    <span class="di-doc-file-name" title="@doc.FileName">@doc.FileName</span>
+                </div>
+                <div class="di-doc-actions">
+                    <button type="button" class="di-doc-btn" @onclick="() => ViewAsync(doc)">View</button>
+                    <button type="button" class="di-doc-btn" @onclick="() => DownloadAsync(doc)">Download</button>
+                    @if (!ReadOnly)
+                    {
+                        <button type="button" class="di-doc-btn di-doc-btn-danger" @onclick="() => RemoveAsync(doc)">Remove</button>
+                    }
+                </div>
+            }
+            else if (!ReadOnly)
+            {
+                <label class="di-doc-choose" for="@inputId">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+                    <span>Upload</span>
+                </label>
+                <InputFile id="@inputId" class="di-doc-input" accept=".pdf,.jpg,.jpeg,.png"
+                           OnChange="e => UploadAsync(type.Name, e)" />
+            }
+            else
+            {
+                <div class="di-doc-empty">Not uploaded</div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .di-docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .di-doc-card { border: 1px solid #e2e5ea; border-left: 3px solid #c3ccdb; border-radius: 10px; padding: 14px 16px; background: #fff; display: flex; flex-direction: column; gap: 8px; }
+    .di-doc-card.is-done { border-left-color: #2f9e44; }
+    .di-doc-card.is-required { border-left-color: #c0392b; }
+    .di-doc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .di-doc-name { font-weight: 700; font-size: 14.5px; color: #1a2233; }
+    .di-doc-req { color: #c0392b; margin-left: 2px; }
+    .di-doc-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e7f7ee; color: #12a150; flex: none; }
+    .di-doc-badge-req { background: #fdecec; color: #c0392b; }
+    .di-doc-hint { font-size: 12px; color: #7b8697; line-height: 1.4; }
+    .di-doc-file { display: flex; align-items: center; gap: 6px; background: #eef8f1; border: 1px solid #cbe9d5; border-radius: 8px; padding: 6px 10px; }
+    .di-doc-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: #16632a; }
+    .di-doc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .di-doc-btn { border: 1px solid #1e7e34; color: #1e7e34; background: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .di-doc-btn:hover { background: #1e7e34; color: #fff; }
+    .di-doc-btn-danger { border-color: #c0392b; color: #c0392b; }
+    .di-doc-btn-danger:hover { background: #c0392b; color: #fff; }
+    .di-doc-choose { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: #3b5bdb; color: #fff; border-radius: 8px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+    .di-doc-choose:hover { background: #2f4bc4; }
+    .di-doc-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+    .di-doc-empty { font-size: 13px; color: #97a1b3; font-style: italic; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public int CustomerId { get; set; }
+    [Parameter] public string CurrentUser { get; set; } = "unknown";
+    /// <summary>When true, view/download go through the JS blob path instead of the authorized endpoint
+    /// (used on the public self-service page where the customer has no cookie session).</summary>
+    [Parameter] public bool SelfService { get; set; }
+    /// <summary>When true, uploads/removes are hidden (read-only review).</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private List<CustomerDocumentType> types = [];
+    private List<CustomerDocument> documents = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        types = await DocumentService.GetTypesAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        documents = await DocumentService.GetDocumentsAsync(CustomerId);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task UploadAsync(string documentType, InputFileChangeEventArgs e)
+    {
+        var (ok, err) = await DocumentService.UploadAsync(CustomerId, documentType, e.File, CurrentUser);
+        if (ok)
+        {
+            ToastService.ShowSuccess($"{documentType} uploaded.");
+            await ReloadAsync();
+        }
+        else
+        {
+            ToastService.ShowError(err ?? "Upload failed.");
+        }
+    }
+
+    private async Task RemoveAsync(CustomerDocument doc)
+    {
+        await DocumentService.DeleteAsync(doc.Id, CurrentUser);
+        ToastService.ShowInfo($"{doc.DocumentType} removed.");
+        await ReloadAsync();
+    }
+
+    private async Task ViewAsync(CustomerDocument doc)
+    {
+        if (SelfService)
+        {
+            var file = await DocumentService.GetFileAsync(doc.Id);
+            if (file is not null)
+            {
+                await JS.InvokeVoidAsync("ssDoc.open", file.Value.ContentType, Convert.ToBase64String(file.Value.Bytes));
+            }
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("open", $"/customers/documents/{doc.Id}", "_blank");
+        }
+    }
+
+    private async Task DownloadAsync(CustomerDocument doc)
+    {
+        if (SelfService)
+        {
+            var file = await DocumentService.GetFileAsync(doc.Id);
+            if (file is not null)
+            {
+                await JS.InvokeVoidAsync("ssDoc.download", file.Value.FileName, file.Value.ContentType, Convert.ToBase64String(file.Value.Bytes));
+            }
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("open", $"/customers/documents/{doc.Id}?download=1", "_self");
+        }
+    }
+}

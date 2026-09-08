@@ -23,6 +23,19 @@ window.ssDoc = {
     },
     revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } },
 
+    // Open base64-encoded bytes in a new browser tab (preview). Used on the public self-service page
+    // where the authorized document endpoint isn't reachable, so bytes come through the Blazor circuit.
+    open: function (contentType, base64) {
+        var binary = atob(base64);
+        var len = binary.length;
+        var view = new Uint8Array(len);
+        for (var i = 0; i < len; i++) { view[i] = binary.charCodeAt(i); }
+        var blob = new Blob([view], { type: contentType || 'application/octet-stream' });
+        var url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 60000);
+    },
+
     // Save base64-encoded bytes (generated server-side) as a downloaded file. Used so the app can
     // show a progress indicator while the file is being built, then hand the finished file to the browser.
     download: function (fileName, contentType, base64) {

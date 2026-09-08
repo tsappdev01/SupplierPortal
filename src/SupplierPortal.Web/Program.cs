@@ -75,6 +75,7 @@ builder.Services.AddScoped<CustomerImportService>();
 builder.Services.AddScoped<CustomerExportService>();
 builder.Services.AddScoped<CustomerAccessTokenService>();
 builder.Services.AddScoped<CustomerEmailService>();
+builder.Services.AddScoped<CustomerDocumentService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
@@ -431,6 +432,17 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, bool? download, Suppl
         ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization();
+
+// Customer KYC document preview/download (admin reviewers). Without ?download=1 the file is served
+// inline (preview); with it, as an attachment.
+app.MapGet("/customers/documents/{id:int}", async (int id, bool? download, CustomerDocumentService documentService) =>
+{
+    var file = await documentService.GetFileAsync(id);
+    if (file is null) return Results.NotFound();
+    return download == true
+        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
+        : Results.File(file.Value.Bytes, file.Value.ContentType);
+}).RequireAuthorization("Portal.Customer");
 
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
 // Without ?download=1 the file is served inline (preview); with it, as an attachment.

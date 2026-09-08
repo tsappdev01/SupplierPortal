@@ -7,6 +7,7 @@
 @using SupplierPortal.Web.Services
 @inject CustomerService CustomerService
 @inject CustomerFieldConfigService FieldConfigService
+@inject CustomerDocumentService DocumentService
 @inject CustomerEmailService CustomerEmailService
 @inject ToastService ToastService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -58,7 +59,24 @@ else
 
     @{ var step = steps[current]; }
 
-    @if (!step.IsReview)
+    @if (step.Group == "Documents")
+    {
+        <div class="di-section">
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0H4zm5 1.5V4a1 1 0 0 0 1 1h2.5L9 1.5z"/></svg>
+                </span>
+                <div class="di-section-heading">
+                    <span class="di-section-title">KYC Documents</span>
+                    <span class="di-section-desc">Upload the required identity &amp; verification documents.</span>
+                </div>
+            </div>
+            <div class="di-section-body" style="grid-template-columns: 1fr;">
+                <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" />
+            </div>
+        </div>
+    }
+    else if (!step.IsReview)
     {
         var entity = step.Section == "Account" ? (object)customer : contact;
         <div class="di-section">
@@ -153,7 +171,7 @@ else
     {
         @* ---------- Review step ---------- *@
         <p class="di-form-sub mb-3">Review everything captured, then save or submit for review.</p>
-        @foreach (var g in steps.Where(s => !s.IsReview))
+        @foreach (var g in steps.Where(s => !s.IsReview && s.Group != "Documents"))
         {
             var entity = g.Section == "Account" ? (object)customer : contact;
             var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey))).ToList();
@@ -257,6 +275,7 @@ else
         foreach (var g in ContactOrder)
             if (config.Any(f => f.IsVisible && f.Section == "Contact" && f.GroupName == g))
                 list.Add(new Step(g, "Contact", g, false));
+        list.Add(new Step("Documents", "", "Documents", false));
         list.Add(new Step("Review & Save", "", null, true));
         steps = list;
     }
@@ -331,6 +350,17 @@ else
         message = null;
     }
 
+    private void OnDocsChanged() => StateHasChanged();
+
+    /// <summary>Required KYC document types that have not been uploaded for this customer.</summary>
+    private async Task<List<string>> MissingRequiredDocsAsync()
+    {
+        if (customer is null) return [];
+        var docTypes = await DocumentService.GetTypesAsync();
+        var have = (await DocumentService.GetDocumentsAsync(customer.Id)).Select(d => d.DocumentType).ToHashSet();
+        return docTypes.Where(t => t.IsRequired && !have.Contains(t.Name)).Select(t => t.Name).ToList();
+    }
+
     private async Task SaveAndSetStatus(string status)
     {
         if (customer is null) return;
@@ -345,6 +375,13 @@ else
             {
                 isError = true;
                 message = "Please complete the required field(s): " + string.Join(", ", missing);
+                return;
+            }
+            var missingDocs = await MissingRequiredDocsAsync();
+            if (missingDocs.Count > 0)
+            {
+                isError = true;
+                message = "Please upload the required document(s): " + string.Join(", ", missingDocs);
                 return;
             }
         }
