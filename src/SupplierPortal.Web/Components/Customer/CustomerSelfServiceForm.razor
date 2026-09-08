@@ -313,8 +313,7 @@
         var missing = MissingRequired(steps[current]);
         if (missing.Count > 0)
         {
-            isError = true;
-            message = "Please complete the required field(s): " + string.Join(", ", missing);
+            ToastService.ShowErrors(missing.Select(m => $"{m} is required."));
             return;
         }
         if (current < steps.Count - 1) current++;
@@ -359,8 +358,7 @@
             .Select(f => f.DisplayLabel).ToList();
         if (missing.Count > 0)
         {
-            isError = true;
-            message = "Please complete the required field(s): " + string.Join(", ", missing);
+            ToastService.ShowErrors(missing.Select(m => $"{m} is required."));
             return;
         }
 
@@ -369,8 +367,7 @@
         var missingDocs = docTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name)).Select(t => t.Name).ToList();
         if (missingDocs.Count > 0)
         {
-            isError = true;
-            message = "Please upload the required document(s): " + string.Join(", ", missingDocs);
+            ToastService.ShowErrors(missingDocs.Select(d => $"{d} document is required."));
             return;
         }
 
