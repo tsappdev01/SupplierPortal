@@ -141,6 +141,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             {
                 Id = s.Id,
                 SupplierNumber = s.SupplierNumber,
+                Priority = s.Priority,
                 SupplierName = s.SupplierName,
                 TaxOrganizationTypeName = s.TaxOrganizationType != null ? s.TaxOrganizationType.DisplayName : null,
                 FirstName = s.FirstName,
@@ -312,6 +313,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         }
 
         supplier.SupplierNumber = updated.SupplierNumber;
+        supplier.Priority = updated.Priority;
         supplier.SupplierName = updated.SupplierName;
         supplier.Email = updated.Email;
         supplier.TaxOrganizationTypeId = updated.TaxOrganizationTypeId;

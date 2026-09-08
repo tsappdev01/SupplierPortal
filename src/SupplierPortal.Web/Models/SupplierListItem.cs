@@ -8,6 +8,7 @@ public class SupplierListItem
 {
     public int Id { get; set; }
     public string SupplierNumber { get; set; } = string.Empty;
+    public string? Priority { get; set; }
     public string SupplierName { get; set; } = string.Empty;
     public string? TaxOrganizationTypeName { get; set; }
     public string? FirstName { get; set; }

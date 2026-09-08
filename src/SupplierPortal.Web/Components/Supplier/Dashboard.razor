@@ -273,6 +273,15 @@
             }
         </select>
     </div>
+    <div class="col-auto" style="min-width: 160px;">
+        <label class="form-label">Priority</label>
+        <select class="form-select" @bind="priorityFilter" @bind:after="OnPriorityFilterChanged">
+            <option value="">All Priorities</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+        </select>
+    </div>
 </div>
 
 <ul class="nav nav-tabs no-print mb-3">
@@ -333,6 +342,7 @@ else
         <tr>
             <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
             <th>Supplier Number</th>
+            <th>Priority</th>
             <th>Supplier Name</th>
             <th>First Name</th>
             <th>Contact Email</th>
@@ -346,6 +356,12 @@ else
             <tr>
                 <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(supplier.Id)" @onchange="() => ToggleSelected(supplier.Id)" /></td>
                 <td>@supplier.SupplierNumber</td>
+                <td>
+                    @if (!string.IsNullOrWhiteSpace(supplier.Priority))
+                    {
+                        <span class="di-priority di-priority-@supplier.Priority.ToLowerInvariant()">@supplier.Priority</span>
+                    }
+                </td>
                 <td>
                     <img src="/business-units/@supplier.BusinessUnitId/logo" alt="" class="di-row-bu-logo" onerror="this.style.display='none'" />
                     @supplier.SupplierName
@@ -562,6 +578,10 @@ else if (TotalPages > 1)
     .di-bu-item:hover, .di-bu-item.active { background: #eef1ff; }
     .di-bu-opt-logo { width: 26px; height: 22px; object-fit: contain; flex: 0 0 auto; }
     .di-row-bu-logo { width: 22px; height: 18px; object-fit: contain; margin-right: 8px; vertical-align: middle; }
+    .di-priority { display: inline-block; min-width: 30px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .di-priority-p1 { background: #fdecec; color: #c0392b; }
+    .di-priority-p2 { background: #fdf0dd; color: #b5892f; }
+    .di-priority-p3 { background: #e9edfb; color: #3b5bdb; }
     .di-bu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* Attached-documents viewer modal */
@@ -704,6 +724,7 @@ else if (TotalPages > 1)
     private int filterBusinessUnitId;
     private string supplierNameFilter = "";
     private string statusFilter = "";   // default: "All Statuses"
+    private string priorityFilter = ""; // default: "All Priorities"
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
@@ -735,9 +756,11 @@ else if (TotalPages > 1)
         ? (SeesAllBusinessUnits ? "all subsidiaries" : "all your business units")
         : SelectedBuLabel;
 
-    // Suppliers matching the selected workflow-status filter (empty = all statuses).
+    // Suppliers matching the selected workflow-status and priority filters (empty = all).
     private IEnumerable<SupplierListItem> StatusFiltered =>
-        string.IsNullOrEmpty(statusFilter) ? suppliers : suppliers.Where(s => s.StatusName == statusFilter);
+        suppliers
+            .Where(s => string.IsNullOrEmpty(statusFilter) || s.StatusName == statusFilter)
+            .Where(s => string.IsNullOrEmpty(priorityFilter) || s.Priority == priorityFilter);
 
     private IEnumerable<SupplierListItem> TabFilteredSuppliers => activeTab switch
     {
@@ -746,10 +769,22 @@ else if (TotalPages > 1)
         _ => StatusFiltered.Where(IsEverythingElse)
     };
 
+    // Sort by priority (P1 → P2 → P3, then unset), keeping most-recently-updated first within each.
+    private IEnumerable<SupplierListItem> SortedSuppliers =>
+        TabFilteredSuppliers.OrderBy(s => PriorityRank(s.Priority)).ThenByDescending(EffectiveUpdated);
+
+    private static int PriorityRank(string? priority) => priority switch
+    {
+        "P1" => 1,
+        "P2" => 2,
+        "P3" => 3,
+        _ => 4
+    };
+
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFilteredSuppliers.Count() / (double)pageSize));
 
     private List<SupplierListItem> PagedSuppliers =>
-        TabFilteredSuppliers.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+        SortedSuppliers.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
 
     private bool AllOnPageSelected => PagedSuppliers.Count > 0 && PagedSuppliers.All(s => selectedIds.Contains(s.Id));
 
@@ -800,6 +835,12 @@ else if (TotalPages > 1)
     }
 
     private void OnStatusFilterChanged()
+    {
+        currentPage = 1;
+        selectedIds.Clear();
+    }
+
+    private void OnPriorityFilterChanged()
     {
         currentPage = 1;
         selectedIds.Clear();

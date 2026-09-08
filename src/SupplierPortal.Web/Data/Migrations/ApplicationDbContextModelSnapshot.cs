@@ -1153,6 +1153,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("Priority")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
                     b.Property<int?>("StatusId")
                         .HasColumnType("int");
 

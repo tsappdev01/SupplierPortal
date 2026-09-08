@@ -12,6 +12,9 @@ public class SupplierFormModel
     // -- Step 1: Business / Organization Information --
     public string? SupplierNumber { get; set; }
 
+    /// <summary>Internal triage priority: P1 / P2 / P3.</summary>
+    public string? Priority { get; set; }
+
     [Required(ErrorMessage = "Supplier Name is required.")]
     public string SupplierName { get; set; } = "";
 
@@ -158,6 +161,7 @@ public class SupplierFormModel
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         SupplierNumber = s.SupplierNumber,
+        Priority = s.Priority,
         SupplierName = s.SupplierName,
         PrefixId = s.PrefixId,
         TaxOrganizationTypeId = s.TaxOrganizationTypeId,
@@ -265,6 +269,7 @@ public class SupplierFormModel
     public void ApplyTo(Supplier s)
     {
         s.SupplierName = SupplierName;
+        s.Priority = Priority;
         s.PrefixId = PrefixId;
         s.TaxOrganizationTypeId = TaxOrganizationTypeId;
         s.FirstName = FirstName;
