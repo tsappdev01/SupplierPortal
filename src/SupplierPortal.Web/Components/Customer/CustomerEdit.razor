@@ -540,9 +540,11 @@ else
         busy = false; isError = false;
         message = $"Saved and moved to “{status}”.";
 
-        // On completion, send the customer a thank-you email (mirrors the supplier flow).
+        // On completion, expire the self-service link so it can no longer be opened, and send the
+        // customer a thank-you email (mirrors the supplier flow).
         if (status == CustomerStatuses.Complete)
         {
+            await AccessTokenService.ExpireTokensForCustomerAsync(customer.Id);
             var (ok, err) = await CustomerEmailService.NotifyCustomerCompletedAsync(
                 customer.Id, customer.LegalName ?? "Customer",
                 CustomerAccessTokenService.EmailFor(customer), currentUser, customer.BusinessUnitId);

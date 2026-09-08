@@ -181,6 +181,26 @@ public class CustomerAccessTokenService(
         return token.SessionTokenHash == Hash(rawSession) ? token : null;
     }
 
+    /// <summary>Expires every still-valid self-service link (and session) for a customer — used once the
+    /// record is completed, so the emailed link can no longer be opened.</summary>
+    public async Task ExpireTokensForCustomerAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+        var tokens = await db.CustomerAccessTokens
+            .Where(t => t.CustomerId == customerId && (t.ExpiresAt > now || (t.SessionExpiresAt != null && t.SessionExpiresAt > now)))
+            .ToListAsync();
+        foreach (var t in tokens)
+        {
+            t.ExpiresAt = now;
+            t.SessionExpiresAt = now;
+        }
+        if (tokens.Count > 0)
+        {
+            await db.SaveChangesAsync();
+        }
+    }
+
     public async Task MarkUsedAsync(int tokenId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
