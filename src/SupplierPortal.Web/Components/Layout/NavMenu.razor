@@ -125,14 +125,6 @@
                             Manage Customer
                         </NavLink>
                     </div>
-                    @if (isAdministrator)
-                    {
-                        <div class="nav-item px-3 di-sub-item">
-                            <NavLink class="nav-link" href="admin/customer-documents">
-                                Document Types
-                            </NavLink>
-                        </div>
-                    }
                 }
             }
 
@@ -164,6 +156,11 @@
                     <div class="nav-item px-3 di-sub-item">
                         <NavLink class="nav-link" href="admin/customer-fields">
                             Customer Fields
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/customer-documents">
+                            Document Types
                         </NavLink>
                     </div>
                     <div class="nav-item px-3 di-sub-item">
@@ -239,9 +236,10 @@
         bool In(string s) => uri.Contains(s, StringComparison.OrdinalIgnoreCase);
         supplierExpanded = In("/supplier") || !(In("/admin/"));
         landlordExpanded = In("/admin/land-register") || In("/admin/landlords") || !In("/admin/");
-        customerExpanded = In("/admin/customers") || In("/customer") || In("/admin/customer-documents");
+        customerExpanded = In("/admin/customers") || In("/customer");
         setupExpanded = In("/admin/business-units") || In("/admin/users")
-            || In("/admin/supplier-fields") || In("/admin/customer-fields") || In("/admin/audit-log");
+            || In("/admin/supplier-fields") || In("/admin/customer-fields")
+            || In("/admin/customer-documents") || In("/admin/audit-log");
     }
 
     private void ToggleSetup()
