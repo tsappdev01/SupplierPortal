@@ -276,6 +276,7 @@ public static class CustomerLookups
     public static IReadOnlyList<string> For(string section, string fieldKey) => (section, fieldKey) switch
     {
         ("Account", "AccountType") => new[] { "Internal", "External" },
+        ("Account", "VATStructure") => new[] { "VAT Group", "Individual VAT" },
         ("Account", "TypeOfCustomer") => new[] { "Individual", "Organization" },
         ("Account", "TypeOfOrganization") => new[] { "Business to Business", "Business to Government" },
         ("Account", "EINvoicingWaveApplicability") => new[] { "Wave 1", "Wave 2" },
