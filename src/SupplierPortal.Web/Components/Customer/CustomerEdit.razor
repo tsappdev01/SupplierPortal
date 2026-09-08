@@ -7,6 +7,8 @@
 @using SupplierPortal.Web.Services
 @inject CustomerService CustomerService
 @inject CustomerFieldConfigService FieldConfigService
+@inject CustomerEmailService CustomerEmailService
+@inject ToastService ToastService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Nav
 
@@ -329,6 +331,16 @@ else
         customer.Status = status;
         busy = false; isError = false;
         message = $"Saved and moved to “{status}”.";
+
+        // On completion, send the customer a thank-you email (mirrors the supplier flow).
+        if (status == CustomerStatuses.Complete)
+        {
+            var (ok, err) = await CustomerEmailService.NotifyCustomerCompletedAsync(
+                customer.Id, customer.LegalName ?? "Customer",
+                CustomerAccessTokenService.EmailFor(customer), currentUser, customer.BusinessUnitId);
+            if (ok) ToastService.ShowSuccess("Completion thank-you email sent to the customer.");
+            else ToastService.ShowError(err ?? "Could not send the completion email.");
+        }
     }
 
     private static string StatusClass(string status) => status switch

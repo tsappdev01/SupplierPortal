@@ -1,0 +1,337 @@
+@page "/customer/self-service/{Token}/form"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerAccessTokenService AccessTokenService
+@inject CustomerEmailService CustomerEmailService
+@inject CustomerService CustomerService
+@inject CustomerFieldConfigService FieldConfigService
+@inject EmailBrandingService Branding
+@inject PublicBrandingState PublicBranding
+@inject ToastService ToastService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Customer Information - Customer Portal</PageTitle>
+
+<div class="di-selfservice-wrap">
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (customer is null)
+    {
+        <div class="di-ss-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">
+                Your verification session is no longer valid. Please use the link from your email
+                again to restart verification.
+            </p>
+        </div>
+    }
+    else if (completed)
+    {
+        <div class="di-ss-card">
+            <h1>Thank You</h1>
+            <p class="text-muted">
+                Your information has been submitted successfully. Our team will review the changes shortly.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="di-form-page">
+            <div class="di-form-topbar">
+                <div class="di-form-headings">
+                    <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "Your Information" : customer.LegalName)</h1>
+                    <p class="di-form-sub">Please review and update your information below.</p>
+                </div>
+            </div>
+
+            <div class="di-stepper">
+                @for (var i = 0; i < steps.Count; i++)
+                {
+                    var idx = i;
+                    var reached = idx <= current;
+                    <button type="button"
+                            class="di-stepper-item @(idx == current ? "active" : "") @(reached ? "reached" : "")"
+                            @onclick="() => JumpToAsync(idx)">
+                        <span class="di-stepper-num">@(idx < current ? "✓" : (idx + 1).ToString())</span>
+                        <span class="di-stepper-label">@steps[idx].Title</span>
+                    </button>
+                }
+            </div>
+
+            @if (message is not null)
+            {
+                <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+            }
+
+            @{ var step = steps[current]; }
+
+            @if (!step.IsReview)
+            {
+                var entity = step.Section == "Account" ? (object)customer : contact;
+                <div class="di-section">
+                    <div class="di-section-header">
+                        <div class="di-section-heading">
+                            <span class="di-section-title">@step.Title</span>
+                        </div>
+                    </div>
+                    <div class="di-section-body">
+                        @foreach (var f in FieldsFor(step))
+                        {
+                            var cfg = f;
+                            if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
+                            var target = entity;
+                            var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
+                            var editable = !string.Equals(cfg.CustomerControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
+                            var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
+                            <div class="di-field">
+                                <label>
+                                    @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
+                                    @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                                </label>
+                                @if (!editable)
+                                {
+                                    <input type="text" class="di-frozen" value="@CustomerFieldAccessor.GetDisplay(target, cfg.FieldKey)" disabled />
+                                }
+                                else if (cfg.FieldKind == "date")
+                                {
+                                    <input type="date" value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                                else if (cfg.FieldKind == "yesno")
+                                {
+                                    <div class="di-toggle" role="group">
+                                        <button type="button" class="di-toggle-btn @(cur == "true" ? "is-yes" : "")"
+                                                @onclick='() => OnChange(target, cfg.FieldKey, cur == "true" ? "" : "true")'>Yes</button>
+                                        <button type="button" class="di-toggle-btn @(cur == "false" ? "is-no" : "")"
+                                                @onclick='() => OnChange(target, cfg.FieldKey, cur == "false" ? "" : "false")'>No</button>
+                                    </div>
+                                }
+                                else if (isCombinedCountry)
+                                {
+                                    <select value="@cur" @onchange="e => OnCountryChange(target, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var c in CustomerLookups.Countries)
+                                        {
+                                            <option value="@c.Code" selected="@(c.Code == cur)">@c.Code - @c.Name</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.Countries.Any(c => c.Code == cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else if (cfg.FieldKind == "lookup")
+                                {
+                                    var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                                    <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var o in opts)
+                                        {
+                                            <option value="@o" selected="@(o == cur)">@o</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="text" value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="di-form-sub mb-3">Review everything captured, then submit.</p>
+                @foreach (var g in steps.Where(s => !s.IsReview))
+                {
+                    var entity = g.Section == "Account" ? (object)customer : contact;
+                    var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey))).ToList();
+                    <div class="di-section">
+                        <div class="di-section-header">
+                            <div class="di-section-heading"><span class="di-section-title">@g.Title</span></div>
+                            <button type="button" class="di-btn di-btn-secondary di-btn-sm ms-auto" @onclick="() => JumpToAsync(steps.IndexOf(g))">Edit</button>
+                        </div>
+                        <div class="di-section-body">
+                            @if (filled.Count == 0)
+                            {
+                                <div class="di-review-empty">Nothing entered.</div>
+                            }
+                            else
+                            {
+                                @foreach (var f in filled)
+                                {
+                                    <div class="di-review-item">
+                                        <div class="di-review-label">@f.DisplayLabel</div>
+                                        <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(entity, f.FieldKey)</div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="di-form-footer">
+                <button type="button" class="di-btn di-btn-secondary" disabled="@(current == 0 || busy)" @onclick="BackAsync">← Back</button>
+                <div class="di-form-footer-right">
+                    @if (savedTick) { <span class="di-saved-tick">Saved ✓</span> }
+                    @if (!steps[current].IsReview)
+                    {
+                        <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="NextAsync">Save &amp; Next →</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="di-btn di-btn-gold" disabled="@busy" @onclick="SubmitAsync">Submit</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .di-selfservice-wrap { width: 100%; display: flex; justify-content: center; }
+    .di-selfservice-wrap .di-form-page { width: 100%; max-width: 1000px; }
+    .di-ss-card { width: 100%; max-width: 420px; background: #fff; border-radius: 8px; border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 2rem; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private record Step(string Title, string Section, string? Group, bool IsReview);
+
+    private static readonly string[] AccountOrder =
+        ["Company Identity & Classification", "Tax, Trade License & Registration", "Contact & Address", "Ownership, Banking & Payment"];
+    private static readonly string[] ContactOrder =
+        ["Personal Details", "Identification", "Contact & UAE Pass", "Employment & Other"];
+
+    private CustomerAccessToken? accessToken;
+    private Customer? customer;
+    private CustomerContact contact = new();
+    private List<CustomerFieldConfig> config = [];
+    private List<Step> steps = [];
+    private int current;
+    private string currentUser = "Customer Self-Service";
+    private string? message;
+    private bool isError;
+    private bool busy;
+    private bool savedTick;
+    private bool loading = true;
+    private bool completed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SessionToken))
+        {
+            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+        }
+
+        if (accessToken is not null)
+        {
+            config = await FieldConfigService.GetAllAsync();
+            customer = await CustomerService.GetAsync(accessToken.CustomerId);
+            if (customer is not null)
+            {
+                contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+                currentUser = $"Customer Self-Service ({CustomerAccessTokenService.EmailFor(customer)})";
+                PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(customer.BusinessUnitId));
+                BuildSteps();
+            }
+        }
+
+        loading = false;
+    }
+
+    private void BuildSteps()
+    {
+        var list = new List<Step>();
+        foreach (var g in AccountOrder)
+            if (config.Any(f => f.IsVisible && f.Section == "Account" && f.GroupName == g))
+                list.Add(new Step(g, "Account", g, false));
+        foreach (var g in ContactOrder)
+            if (config.Any(f => f.IsVisible && f.Section == "Contact" && f.GroupName == g))
+                list.Add(new Step(g, "Contact", g, false));
+        list.Add(new Step("Review & Submit", "", null, true));
+        steps = list;
+    }
+
+    private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
+        config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group).OrderBy(f => f.Sequence);
+
+    private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
+
+    private void OnCountryChange(object entity, string? code)
+    {
+        CustomerFieldAccessor.SetString(entity, "CountryCode", code);
+        var name = CustomerLookups.Countries.FirstOrDefault(c => c.Code == code).Name;
+        CustomerFieldAccessor.SetString(entity, "CountryName", string.IsNullOrWhiteSpace(code) ? null : name);
+    }
+
+    private async Task SaveAsync(bool silent)
+    {
+        if (customer is null) return;
+        busy = true;
+        if (!silent) message = null;
+        customer.Contact = contact;
+        await CustomerService.SaveAsync(customer, currentUser);
+        busy = false;
+        savedTick = true;
+    }
+
+    private async Task NextAsync()
+    {
+        await SaveAsync(true);
+        if (current < steps.Count - 1) current++;
+        message = null;
+    }
+
+    private async Task BackAsync()
+    {
+        await SaveAsync(true);
+        if (current > 0) current--;
+        message = null;
+    }
+
+    private async Task JumpToAsync(int index)
+    {
+        if (index == current) return;
+        await SaveAsync(true);
+        current = Math.Clamp(index, 0, steps.Count - 1);
+        message = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (customer is null || accessToken is null) return;
+
+        var missing = config.Where(f => f.IsVisible && f.IsRequired)
+            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+                f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
+            .Select(f => f.DisplayLabel).ToList();
+        if (missing.Count > 0)
+        {
+            isError = true;
+            message = "Please complete the required field(s): " + string.Join(", ", missing);
+            return;
+        }
+
+        busy = true; message = null;
+        customer.Contact = contact;
+        await CustomerService.SaveAsync(customer, currentUser);
+        await CustomerService.SetStatusAsync(customer.Id, CustomerStatuses.ForReview, currentUser);
+        await AccessTokenService.MarkUsedAsync(accessToken.Id);
+        await CustomerEmailService.NotifyRequestorOfSubmissionAsync(customer, accessToken.CreatedBy, NavigationManager.BaseUri);
+        busy = false;
+        completed = true;
+        ToastService.ShowSuccess("Your information has been submitted.");
+    }
+}

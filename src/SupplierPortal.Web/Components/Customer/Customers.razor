@@ -8,6 +8,7 @@
 @using SupplierPortal.Web.Services
 @inject CustomerService CustomerService
 @inject CustomerExportService CustomerExport
+@inject CustomerEmailService CustomerEmailService
 @inject CustomerFieldConfigService FieldConfigService
 @inject BusinessUnitService BusinessUnitService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -64,7 +65,7 @@
         <span>Print</span>
     </button>
 
-    <button type="button" class="di-action-btn is-notify ms-auto" @onclick='() => ComingSoon("Notify all customers")' title="Email a notification to customers">
+    <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync" title="Email a self-service update link to the customers in view">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4.5" width="19" height="14" rx="2.5" fill="#e3f6fb" stroke="#0aa2c0" stroke-width="1.7"/><path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0aa2c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2"/><path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span>Notify All Customers</span>
     </button>
@@ -222,7 +223,7 @@
                             <a class="btn btn-sm btn-outline-primary" href="/admin/customers/@row.Id" title="Edit">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/></svg>
                             </a>
-                            <button class="btn btn-sm btn-outline-secondary" title="Send link / notify customer" @onclick='() => ComingSoon("Send link to customer")'>
+                            <button class="btn btn-sm btn-outline-secondary" title="Send self-service update link to customer" disabled="@(notifyingId == row.Id)" @onclick="() => SendLinkAsync(row)">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
                             </button>
                         </td>
@@ -335,6 +336,58 @@
     }
 
     private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+
+    private int? notifyingId;
+    private bool bulkSending;
+
+    /// <summary>Reloads the dashboard rows after a status-changing action (e.g. a link send moves the
+    /// customer to "Awaiting Customer Response").</summary>
+    private async Task ReloadRowsAsync()
+    {
+        var scope = seesAllBusinessUnits ? new List<int>() : userBuIds;
+        rows = await CustomerService.GetDashboardAsync(scope);
+    }
+
+    /// <summary>Sends one customer a secure self-service update link (mirrors the supplier flow): the
+    /// customer verifies via OTP and updates their own information, moving the record to review.</summary>
+    private async Task SendLinkAsync(CustomerService.CustomerRow row)
+    {
+        notifyingId = row.Id;
+        var (ok, err) = await CustomerEmailService.NotifyCustomerAsync(row.Id, row.Name, row.Email, currentUser, Nav.BaseUri);
+        notifyingId = null;
+        if (ok)
+        {
+            ToastService.ShowSuccess($"Update link sent to {row.Name}.");
+            await ReloadRowsAsync();
+        }
+        else
+        {
+            ToastService.ShowError(err ?? "Could not send the update link.");
+        }
+    }
+
+    /// <summary>Emails a self-service update link to every customer currently in view (after the business
+    /// unit / status / search filters), skipping those without an email.</summary>
+    private async Task NotifyAllAsync()
+    {
+        var targets = statusFiltered.ToList();
+        if (targets.Count == 0)
+        {
+            ToastService.ShowInfo("There are no customers in the current view to notify.");
+            return;
+        }
+
+        bulkSending = true;
+        int sent = 0, failed = 0;
+        foreach (var row in targets)
+        {
+            var (ok, _) = await CustomerEmailService.NotifyCustomerAsync(row.Id, row.Name, row.Email, currentUser, Nav.BaseUri);
+            if (ok) sent++; else failed++;
+        }
+        bulkSending = false;
+        await ReloadRowsAsync();
+        ToastService.ShowSuccess($"Update link sent to {sent} customer(s)." + (failed > 0 ? $" {failed} skipped (no email or send error)." : ""));
+    }
 
     private void OpenTemplateDialog()
     {

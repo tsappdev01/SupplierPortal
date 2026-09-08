@@ -28,6 +28,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<CustomerContact> CustomerContacts => Set<CustomerContact>();
     public DbSet<CustomerDocument> CustomerDocuments => Set<CustomerDocument>();
     public DbSet<CustomerFieldConfig> CustomerFieldConfigs => Set<CustomerFieldConfig>();
+    public DbSet<CustomerAccessToken> CustomerAccessTokens => Set<CustomerAccessToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

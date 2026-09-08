@@ -765,6 +765,75 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("CustomerDocuments");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerAccessToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAdminTest")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OtpAttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtpCodeHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("OtpExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OtpGeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OtpSendCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("OtpVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SessionExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SessionTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("CustomerAccessTokens");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerFieldConfig", b =>
                 {
                     b.Property<int>("Id")
@@ -1880,6 +1949,17 @@ namespace SupplierPortal.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("BusinessUnit");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerAccessToken", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Customer.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerContact", b =>
