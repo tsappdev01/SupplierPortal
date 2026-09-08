@@ -310,10 +310,11 @@
     private async Task NextAsync()
     {
         await SaveAsync(true);
-        var missing = MissingRequired(steps[current]);
-        if (missing.Count > 0)
+        var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
+            .Concat(DateErrorsForStep(steps[current])).ToList();
+        if (problems.Count > 0)
         {
-            ToastService.ShowErrors(missing.Select(m => $"{m} is required."));
+            ToastService.ShowErrors(problems);
             return;
         }
         if (current < steps.Count - 1) current++;
@@ -330,6 +331,29 @@
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
             .Select(f => f.DisplayLabel)
             .ToList();
+    }
+
+    private List<string> TradeLicenseDateErrors()
+    {
+        var errs = new List<string>();
+        if (customer is null) return errs;
+        if (customer.TradeLicenseIssueDate is DateTime issue && issue.Date > DateTime.Today)
+        {
+            errs.Add("Trade License Issue Date cannot be a future date.");
+        }
+        if (customer.TradeLicenseIssueDate is DateTime iss && customer.TradeLicenseExpiryDate is DateTime exp
+            && exp.Date < iss.Date)
+        {
+            errs.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+        }
+        return errs;
+    }
+
+    private List<string> DateErrorsForStep(Step step)
+    {
+        if (step.IsReview || step.Section != "Account") return [];
+        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group && f.FieldKey == "TradeLicenseIssueDate");
+        return onThisStep ? TradeLicenseDateErrors() : [];
     }
 
     private async Task BackAsync()
@@ -359,6 +383,13 @@
         if (missing.Count > 0)
         {
             ToastService.ShowErrors(missing.Select(m => $"{m} is required."));
+            return;
+        }
+
+        var dateErrors = TradeLicenseDateErrors();
+        if (dateErrors.Count > 0)
+        {
+            ToastService.ShowErrors(dateErrors);
             return;
         }
 
