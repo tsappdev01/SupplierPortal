@@ -140,13 +140,33 @@
     {
         <div class="col-auto" style="min-width: 240px;">
             <label class="form-label">Business Unit</label>
-            <select class="form-select" @bind="filterBusinessUnitId" @bind:after="OnFilterChanged">
-                <option value="0">All Business Units</option>
-                @foreach (var bu in businessUnits)
+            @* Custom dropdown so each option can show the business unit logo before its name. *@
+            <div class="di-bu-select">
+                <button type="button" class="form-select di-bu-toggle" @onclick="ToggleBuDropdown">
+                    @if (filterBusinessUnitId != 0)
+                    {
+                        <img src="/business-units/@filterBusinessUnitId/logo" alt="" class="di-bu-opt-logo" onerror="this.style.display='none'" />
+                    }
+                    <span class="di-bu-text">@SelectedBuLabel</span>
+                    <span class="di-bu-caret">&#9662;</span>
+                </button>
+                @if (buDropdownOpen)
                 {
-                    <option value="@bu.Id">@bu.Name</option>
+                    <div class="di-bu-backdrop" @onclick="CloseBuDropdown"></div>
+                    <div class="di-bu-menu">
+                        <button type="button" class="di-bu-item @(filterBusinessUnitId == 0 ? "active" : "")" @onclick="() => SelectBu(0)">
+                            <span class="di-bu-text">@(seesAllBusinessUnits ? "All Business Units" : "All My Business Units")</span>
+                        </button>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <button type="button" class="di-bu-item @(filterBusinessUnitId == bu.Id ? "active" : "")" @onclick="() => SelectBu(bu.Id)">
+                                <img src="/business-units/@bu.Id/logo" alt="" class="di-bu-opt-logo" onerror="this.style.display='none'" />
+                                <span class="di-bu-text">@bu.Name</span>
+                            </button>
+                        }
+                    </div>
                 }
-            </select>
+            </div>
         </div>
     }
     <div class="col-auto" style="min-width: 240px;">
@@ -311,6 +331,16 @@
     .di-docsall-actions { display: flex; gap: 8px; padding: 8px 12px 12px; }
     .di-docsall-actions .btn { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 0; justify-content: center; }
 
+    .di-bu-select { position: relative; }
+    .di-bu-toggle { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer; }
+    .di-bu-caret { margin-left: auto; color: #6c757d; }
+    .di-bu-backdrop { position: fixed; inset: 0; z-index: 1040; background: transparent; }
+    .di-bu-menu { position: absolute; z-index: 1041; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; box-shadow: 0 8px 24px rgba(20,30,50,0.12); max-height: 320px; overflow: auto; padding: 4px; }
+    .di-bu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none; background: transparent; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; color: #1a2233; }
+    .di-bu-item:hover, .di-bu-item.active { background: #eef1ff; }
+    .di-bu-opt-logo { width: 26px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+    .di-bu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
     .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
     .di-tmpl-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #1a2233; }
@@ -332,6 +362,15 @@
     private List<CustomerService.CustomerRow> rows = [];
     private List<BusinessUnit> businessUnits = [];
     private int filterBusinessUnitId;
+    private bool buDropdownOpen;
+
+    private string SelectedBuLabel => filterBusinessUnitId == 0
+        ? (seesAllBusinessUnits ? "All Business Units" : "All My Business Units")
+        : businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "";
+
+    private void ToggleBuDropdown() => buDropdownOpen = !buDropdownOpen;
+    private void CloseBuDropdown() => buDropdownOpen = false;
+    private void SelectBu(int id) { buDropdownOpen = false; filterBusinessUnitId = id; OnFilterChanged(); }
     private string? searchName;
     private string statusFilter = "";
     private int activeTab;
