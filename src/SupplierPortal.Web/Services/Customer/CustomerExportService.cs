@@ -61,8 +61,10 @@ public class CustomerExportService
     /// is non-empty the rows are pre-filled, otherwise a single blank example row is written.</summary>
     public byte[] ExportUploadTemplate(IReadOnlyList<Customer> customers, IReadOnlyList<CustomerFieldConfig> config)
     {
-        var account = FieldsFor(config, "Account", includeHidden: true);
-        var contact = FieldsFor(config, "Contact", includeHidden: true);
+        // Visible fields only, so the template's columns match the wizard and the importer (which reads
+        // the same visible set positionally) exactly.
+        var account = FieldsFor(config, "Account", includeHidden: false);
+        var contact = FieldsFor(config, "Contact", includeHidden: false);
 
         using var wb = new XLWorkbook();
         var ws = wb.AddWorksheet("Customer Data Template");

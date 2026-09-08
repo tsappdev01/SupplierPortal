@@ -23,8 +23,10 @@ public class CustomerImportService(
         var success = 0;
 
         var config = await fieldConfig.GetAllAsync();
-        var accountKeys = config.Where(c => c.Section == "Account").OrderBy(c => c.Sequence).Select(c => c.FieldKey).ToList();
-        var contactKeys = config.Where(c => c.Section == "Contact").OrderBy(c => c.Sequence).Select(c => c.FieldKey).ToList();
+        // Only visible fields form the column layout, matching the generated upload template exactly
+        // (hidden fields are excluded from both, so the two stay aligned).
+        var accountKeys = config.Where(c => c.Section == "Account" && c.IsVisible).OrderBy(c => c.Sequence).Select(c => c.FieldKey).ToList();
+        var contactKeys = config.Where(c => c.Section == "Contact" && c.IsVisible).OrderBy(c => c.Sequence).Select(c => c.FieldKey).ToList();
 
         // Column layout (1-based): 1 Baan Ref#, 2 Customer Unique Number, then account fields;
         // 2 blank; then contact Baan/Unique (2); then contact fields.
