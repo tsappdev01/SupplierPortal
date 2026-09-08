@@ -26,7 +26,7 @@ else
             <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "New Customer" : customer.LegalName)</h1>
             <p class="di-form-sub">
                 <span class="di-status-badge @StatusClass(customer.Status)">@customer.Status</span>
-                @if (customer.CustomerId is not null) { <span class="ms-2">@customer.CustomerId</span> }
+                @if (!string.IsNullOrWhiteSpace(customer.CustomerCode)) { <span class="ms-2">@customer.CustomerCode</span> }
             </p>
         </div>
         <a class="di-btn di-btn-secondary" href="/admin/customers">← Back to list</a>

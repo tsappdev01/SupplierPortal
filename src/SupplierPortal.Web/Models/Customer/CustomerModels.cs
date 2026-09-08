@@ -28,6 +28,9 @@ public class Customer
     /// <summary>Customer Unique Number / Customer Id (sheet: hidden internal key).</summary>
     [MaxLength(60)] public string? CustomerId { get; set; }
 
+    /// <summary>Customer Code — a short human-readable code for the customer. Optional.</summary>
+    [MaxLength(60)] public string? CustomerCode { get; set; }
+
     [MaxLength(40)] public string Status { get; set; } = CustomerStatuses.NotSubmitted;
     public int? BusinessUnitId { get; set; }
     public BusinessUnit? BusinessUnit { get; set; }

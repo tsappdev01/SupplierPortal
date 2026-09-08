@@ -236,6 +236,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("CustomerCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
                     b.Property<string>("CustomerId")
                         .HasMaxLength(60)
                         .HasColumnType("nvarchar(60)");
