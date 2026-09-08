@@ -270,6 +270,31 @@ public static class CustomerLookups
     private static readonly string[] Emirates =
         { "Abu Dhabi", "Dubai", "Sharjah", "Umm Al Quwain", "Fujairah", "Ajman", "Ras Al Khaimah" };
 
+    /// <summary>UAE trade-license issuing authorities (economic departments + free zones), from the workbook.</summary>
+    private static readonly string[] LicensingAuthorities =
+    {
+        "Dubai Department of Economy and Tourism (DET) (formerly DED)",
+        "Abu Dhabi Department of Economic Development (ADDED)",
+        "Sharjah Economic Development Department (SEDD)",
+        "Ajman Department of Economic Development (Ajman DED)",
+        "Ras Al Khaimah Department of Economic Development (RAK DED)",
+        "Fujairah Municipality – Commercial Licensing Department",
+        "Umm Al Quwain Department of Economic Development",
+        "Jebel Ali Free Zone Authority (JAFZA)",
+        "Dubai Multi Commodities Centre (DMCC)",
+        "Dubai Airport Freezone Authority (DAFZA)",
+        "Dubai Silicon Oasis Authority",
+        "Dubai South",
+        "International Free Zone Authority (IFZA)",
+        "Sharjah Airport International Free Zone (SAIF Zone)",
+        "Sharjah Media City (Shams)",
+        "Ras Al Khaimah Economic Zone (RAKEZ)",
+        "Ajman Free Zone",
+        "Abu Dhabi Global Market (ADGM)",
+        "Khalifa Economic Zones Abu Dhabi (KEZAD)",
+        "Others",
+    };
+
     private static readonly string[] Empty = Array.Empty<string>();
 
     /// <summary>The option list for a lookup field, or an empty list when the key isn't a known lookup.</summary>
@@ -285,10 +310,12 @@ public static class CustomerLookups
         ("Account", "CountryCode") => CountryCodes,
         ("Account", "CountryName") => CountryNames,
         ("Account", "CountrySubdivision") => Emirates,
+        ("Account", "LicensingAuthorityName") => LicensingAuthorities,
         ("Account", "Owner1Nationality") => CountryNames,
         ("Account", "Owner2Nationality") => CountryNames,
         ("Account", "PaymentTerms") => new[] { "30 Net", "IMMEDIATE", "NET 45", "Net 3", "15 Net", "NET 120", "NET 90" },
 
+        ("Contact", "Gender") => new[] { "Male", "Female" },
         ("Contact", "MaritalStatus") => new[] { "Single", "Married" },
         ("Contact", "PreferredLanguage") => new[] { "Arabic", "English", "French", "Hindi/Urdu" },
         ("Contact", "BuyingRole") => new[] { "Key decision maker", "Secondary decision maker", "Supporting role", "Does not matter" },
