@@ -1800,9 +1800,26 @@
     {
         var errors = new List<string>();
 
+        // Trade License date sanity checks apply to everyone (a data-quality rule, not a self-service-only
+        // mandatory-field rule): the issue date can't be in the future, and the expiry can't precede it.
+        // Skipped only for a self-service supplier who can't see the field (so they aren't blocked on a
+        // value they can't edit).
+        if (step == StepOf("TradeLicenseIssueDate", 1) && !(SupplierFacing && IsHiddenFromSupplier("TradeLicenseIssueDate")))
+        {
+            if (model.TradeLicenseIssueDate is DateTime issueDate && issueDate.Date > DateTime.Today)
+            {
+                errors.Add("Trade License Issue Date cannot be a future date.");
+            }
+            if (model.TradeLicenseIssueDate is DateTime iss && model.TradeLicenseExpiryDate is DateTime exp
+                && exp.Date < iss.Date)
+            {
+                errors.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+            }
+        }
+
         // Required/conditional/document checks apply ONLY to suppliers updating via the self-service
         // portal. Internal users (administrators and other staff alike) edit with everything open —
-        // no mandatory-field enforcement — so this returns no errors for any non-self-service view.
+        // no mandatory-field enforcement — so this returns no further errors for any non-self-service view.
         if (!SupplierFacing)
         {
             return errors;
@@ -1992,7 +2009,7 @@
         var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
-            ToastService.ShowError(string.Join(" ", errors));
+            ToastService.ShowErrors(errors);
             return;
         }
 
@@ -2029,7 +2046,7 @@
         var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
-            ToastService.ShowError(string.Join(" ", errors));
+            ToastService.ShowErrors(errors);
             return;
         }
 
@@ -2053,7 +2070,8 @@
                 }
             }
 
-            ToastService.ShowError("Complete all required fields before submitting: " + string.Join(" ", errors));
+            ToastService.ShowError("Complete all required fields before submitting.");
+            ToastService.ShowErrors(errors);
             return;
         }
 

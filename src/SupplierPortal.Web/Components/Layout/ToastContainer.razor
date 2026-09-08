@@ -32,7 +32,8 @@
         padding: 0.7rem 0.9rem;
         border-radius: 8px;
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-        font-size: 0.85rem;
+        font-size: 0.92rem;
+        font-weight: 500;
         color: #fff;
         animation: di-toast-in 0.15s ease-out;
     }
@@ -77,9 +78,11 @@
 
     private void HandleChange()
     {
+        // Every toast (including errors/warnings) auto-dismisses after 2 seconds so messages clear on
+        // their own; multiple validation errors then appear one per toast and each fades after 2s.
         foreach (var toast in ToastService.Toasts)
         {
-            if ((toast.Level is ToastLevel.Success or ToastLevel.Info) && autoTimersStarted.Add(toast.Id))
+            if (autoTimersStarted.Add(toast.Id))
             {
                 var id = toast.Id;
                 _ = AutoDismissAsync(id);
@@ -91,7 +94,7 @@
 
     private async Task AutoDismissAsync(Guid id)
     {
-        await Task.Delay(5000);
+        await Task.Delay(2000);
         await InvokeAsync(() => ToastService.Dismiss(id));
     }
 
