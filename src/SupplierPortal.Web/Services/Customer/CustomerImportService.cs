@@ -101,7 +101,20 @@ public class CustomerImportService(
             }
         }
 
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Surface the innermost SQL cause (EF's DbUpdateException hides it) instead of the generic
+            // "See the inner exception" wrapper, and report zero imported since the batch rolled back.
+            var current = ex;
+            while (current.InnerException is not null) current = current.InnerException;
+            errors.Add(new ImportRowError(0, $"Save failed: {current.Message}"));
+            return new ImportResult(0, errors, warnings);
+        }
+
         await audit.LogAsync(uploadedBy, AuditAction.Create, "Customer", null,
             $"Bulk-imported {success} customer(s) from Excel ({errors.Count} rejected)");
 

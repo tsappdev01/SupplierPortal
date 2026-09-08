@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Reflection;
 
@@ -55,7 +56,7 @@ public static class CustomerFieldAccessor
             return;
         }
 
-        if (t == typeof(string)) { prop.SetValue(entity, raw); return; }
+        if (t == typeof(string)) { prop.SetValue(entity, TruncateToMax(prop, raw)); return; }
         if (t == typeof(DateTime))
         {
             if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
@@ -69,6 +70,20 @@ public static class CustomerFieldAccessor
             return;
         }
         // fallback: assign as string if the property is object/other
-        prop.SetValue(entity, raw);
+        prop.SetValue(entity, TruncateToMax(prop, raw));
+    }
+
+    private static readonly ConcurrentDictionary<PropertyInfo, int> MaxLenCache = new();
+
+    /// <summary>Truncates a string to the property's declared max length ([MaxLength]/[StringLength]) so a
+    /// value longer than the database column (e.g. an over-length imported cell) is trimmed rather than
+    /// failing the save with a truncation error.</summary>
+    private static string TruncateToMax(PropertyInfo prop, string value)
+    {
+        var max = MaxLenCache.GetOrAdd(prop, p =>
+            p.GetCustomAttribute<MaxLengthAttribute>()?.Length
+            ?? p.GetCustomAttribute<StringLengthAttribute>()?.MaximumLength
+            ?? int.MaxValue);
+        return max > 0 && value.Length > max ? value[..max] : value;
     }
 }
