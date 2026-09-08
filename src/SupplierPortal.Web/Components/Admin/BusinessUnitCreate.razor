@@ -31,6 +31,10 @@
         <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. dipark.com" />
     </div>
     <div class="mb-3">
+        <label class="form-label">Logo URL <span class="text-muted small">(used in emails &amp; external links)</span></label>
+        <InputText class="form-control" @bind-Value="Input.LogoUrl" placeholder="e.g. https://cdn.dipark.com/logo.png" />
+    </div>
+    <div class="mb-3">
         <label class="form-label">Logo <span class="text-muted small">(full-size)</span></label>
         <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
         @if (logoPreview is not null)
@@ -102,7 +106,7 @@
     private async Task SaveAsync()
     {
         var (success, error) = await Loading.RunAsync(
-            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser));
+            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, Input.LogoUrl, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser));
         if (!success)
         {
             errorMessage = error;
@@ -120,5 +124,8 @@
         public string? Code { get; set; }
 
         public string? Domain { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(500)]
+        public string? LogoUrl { get; set; }
     }
 }

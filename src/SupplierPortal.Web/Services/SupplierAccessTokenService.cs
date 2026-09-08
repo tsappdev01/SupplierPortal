@@ -121,8 +121,9 @@ public class SupplierAccessTokenService(
             var brand = System.Net.WebUtility.HtmlEncode(
                 await branding.GetBusinessUnitNameAsync(token.Supplier.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
             var brandLine = $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
-            // Brand the header with the respective Business Unit's logo (embedded data URI) when available.
-            var logo = await branding.GetBusinessUnitLogoDataUriAsync(token.Supplier.BusinessUnitId);
+            // Brand the header with the respective Business Unit's logo (hosted Logo URL when set, else the
+            // embedded logo) when available.
+            var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Supplier.BusinessUnitId);
             var brandBlock = string.IsNullOrWhiteSpace(logo)
                 ? brandLine
                 : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block;margin-bottom:8px\" />" + brandLine;

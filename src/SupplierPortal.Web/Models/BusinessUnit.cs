@@ -16,6 +16,13 @@ public class BusinessUnit
     [MaxLength(200)]
     public string? Domain { get; set; }
 
+    /// <summary>Absolute URL of the unit's logo hosted on a public server, e.g.
+    /// "https://cdn.dipark.com/logo.png". When set it is used as the brand image in emails and other
+    /// external links (a hosted URL renders more reliably in mail clients than an embedded image), taking
+    /// precedence over the uploaded <see cref="Logo"/>/<see cref="Thumbnail"/>. Optional.</summary>
+    [MaxLength(500)]
+    public string? LogoUrl { get; set; }
+
     /// <summary>The original uploaded logo, stored as-is.</summary>
     public byte[]? Logo { get; set; }
 

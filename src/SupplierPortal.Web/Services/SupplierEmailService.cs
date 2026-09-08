@@ -31,10 +31,11 @@ public class SupplierEmailService(
     }
 
     /// <summary>Resolves the logo for a record's Business Unit first (the "respective" unit the user asked
-    /// to see on the email), falling back to the acting user's company logo.</summary>
+    /// to see on the email) — its hosted Logo URL when set, else the embedded logo — falling back to the
+    /// acting user's company logo.</summary>
     private async Task<string?> BusinessUnitLogoAsync(int? businessUnitId, string actorUsername) =>
-        await branding.GetBusinessUnitLogoDataUriAsync(businessUnitId)
-        ?? await branding.GetLogoDataUriAsync(actorUsername, businessUnitId);
+        await branding.GetBusinessUnitLogoSrcAsync(businessUnitId)
+        ?? await branding.GetLogoSrcAsync(actorUsername, businessUnitId);
 
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/supplier_update_notification.html";

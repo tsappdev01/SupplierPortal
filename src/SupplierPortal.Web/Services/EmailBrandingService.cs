@@ -42,6 +42,48 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
     public async Task<string?> GetLogoDataUriAsync(string? actorUsername, int? fallbackBusinessUnitId)
         => await GetCompanyLogoDataUriAsync(actorUsername) ?? await GetBusinessUnitLogoDataUriAsync(fallbackBusinessUnitId);
 
+    /// <summary>The logo <c>src</c> for a Business Unit: the hosted <see cref="Models.BusinessUnit.LogoUrl"/>
+    /// when set (renders most reliably in email clients and works in external links), otherwise the
+    /// uploaded logo as an embedded data URI. Null when the unit has neither.</summary>
+    public async Task<string?> GetBusinessUnitLogoSrcAsync(int? businessUnitId)
+    {
+        if (businessUnitId is not int id)
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var bu = await db.BusinessUnits.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        if (bu is null)
+        {
+            return null;
+        }
+
+        return !string.IsNullOrWhiteSpace(bu.LogoUrl) ? bu.LogoUrl : DataUri(bu);
+    }
+
+    /// <summary>The acting user's company logo <c>src</c> (hosted URL preferred, then embedded data URI).</summary>
+    public async Task<string?> GetCompanyLogoSrcAsync(string? actorUsername)
+    {
+        if (string.IsNullOrWhiteSpace(actorUsername))
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var companyId = await db.Users.AsNoTracking()
+            .Where(u => u.Username == actorUsername)
+            .Select(u => u.CompanyBusinessUnitId)
+            .FirstOrDefaultAsync();
+
+        return companyId is int id ? await GetBusinessUnitLogoSrcAsync(id) : null;
+    }
+
+    /// <summary>The logo <c>src</c> to brand a communication: the acting user's company first, then the
+    /// record's Business Unit (hosted URL preferred over embedded data URI at each step), else null.</summary>
+    public async Task<string?> GetLogoSrcAsync(string? actorUsername, int? fallbackBusinessUnitId)
+        => await GetCompanyLogoSrcAsync(actorUsername) ?? await GetBusinessUnitLogoSrcAsync(fallbackBusinessUnitId);
+
     /// <summary>Default brand name used when the user has no company and no record Business Unit applies.</summary>
     public const string DefaultBrandName = "Dubai Investments";
 
@@ -82,11 +124,12 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
     private static async Task<string?> LogoDataUriAsync(ApplicationDbContext db, int businessUnitId)
     {
         var bu = await db.BusinessUnits.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessUnitId);
-        if (bu is null)
-        {
-            return null;
-        }
+        return bu is null ? null : DataUri(bu);
+    }
 
+    /// <summary>The unit's uploaded logo as a data URI (thumbnail preferred over the original), or null.</summary>
+    private static string? DataUri(Models.BusinessUnit bu)
+    {
         // Prefer the normalised 640×640 thumbnail; fall back to the original logo.
         var bytes = bu.Thumbnail ?? bu.Logo;
         var contentType = bu.Thumbnail is not null ? bu.ThumbnailContentType : bu.LogoContentType;

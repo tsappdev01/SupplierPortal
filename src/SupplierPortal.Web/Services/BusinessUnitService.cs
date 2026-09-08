@@ -16,7 +16,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> AddAsync(
-        string name, string? code, string? domain, byte[]? logo, string? logoContentType,
+        string name, string? code, string? domain, string? logoUrl, byte[]? logo, string? logoContentType,
         byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
@@ -40,6 +40,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
             Name = name,
             Code = finalCode,
             Domain = NormalizeDomain(domain),
+            LogoUrl = NormalizeUrl(logoUrl),
             Logo = logo,
             LogoContentType = logoContentType,
             Thumbnail = thumb,
@@ -60,7 +61,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     }
 
     public async Task<(bool Success, string? Error)> UpdateAsync(
-        int id, string name, string code, string? domain, byte[]? logo, string? logoContentType,
+        int id, string name, string code, string? domain, string? logoUrl, byte[]? logo, string? logoContentType,
         byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
@@ -86,6 +87,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         businessUnit.Name = name;
         businessUnit.Code = code;
         businessUnit.Domain = NormalizeDomain(domain);
+        businessUnit.LogoUrl = NormalizeUrl(logoUrl);
         // Logo and thumbnail are independent uploads: each is replaced only when a new file is supplied.
         if (logo is not null)
         {
@@ -192,6 +194,23 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
             d = d[..slash];
         }
         return d.Trim().TrimEnd('.').ToLowerInvariant();
+    }
+
+    /// <summary>Normalises a logo URL: trims it and prefixes "https://" when no scheme was given, so the
+    /// value is a usable absolute URL in emails. Returns null when blank.</summary>
+    private static string? NormalizeUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var u = url.Trim();
+        if (!u.Contains("://", StringComparison.Ordinal))
+        {
+            u = "https://" + u.TrimStart('/');
+        }
+        return u;
     }
 
     /// <summary>Initials-based code from a business unit name, e.g. "Dubai Investments Park Development" -> "DIPD".</summary>
