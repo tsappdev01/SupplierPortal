@@ -45,6 +45,17 @@ public class CustomerAccessTokenService(
         return raw;
     }
 
+    /// <summary>All self-service notification emails ever sent for a customer (most recent first), for the
+    /// Email History tab on the customer edit screen.</summary>
+    public async Task<List<CustomerAccessToken>> GetHistoryForCustomerAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerAccessTokens
+            .Where(t => t.CustomerId == customerId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<CustomerAccessToken?> GetValidTokenAsync(string rawToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

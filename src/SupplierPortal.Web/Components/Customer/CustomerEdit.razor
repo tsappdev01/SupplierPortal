@@ -8,6 +8,7 @@
 @inject CustomerService CustomerService
 @inject CustomerFieldConfigService FieldConfigService
 @inject CustomerDocumentService DocumentService
+@inject CustomerAccessTokenService AccessTokenService
 @inject CustomerEmailService CustomerEmailService
 @inject ToastService ToastService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -21,6 +22,25 @@
 }
 else
 {
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == Tab.Details ? "active" : "")" @onclick="() => activeTab = Tab.Details">
+            Customer Details
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == Tab.Documents ? "active" : "")" @onclick="() => activeTab = Tab.Documents">
+            Documents@(docCount > 0 ? $" ({docCount})" : "")
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == Tab.EmailHistory ? "active" : "")" @onclick="ShowEmailHistoryAsync">
+            Email History@(emailHistory.Count > 0 ? $" ({emailHistory.Count})" : "")
+        </button>
+    </li>
+</ul>
+
+<div style="display:@(activeTab == Tab.Details ? "block" : "none")">
 <div class="di-form-page">
     <div class="di-form-topbar">
         <div class="di-form-headings">
@@ -227,10 +247,64 @@ else
         </div>
     </div>
 </div>
+</div>
+
+<div style="display:@(activeTab == Tab.Documents ? "block" : "none")">
+    <h2 class="h5 mb-1">KYC Documents</h2>
+    <p class="text-muted">Upload and review the customer's identity &amp; verification documents.</p>
+    <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" />
+</div>
+
+<div style="display:@(activeTab == Tab.EmailHistory ? "block" : "none")">
+    <h2 class="h5 mb-1">Notification Email History</h2>
+    <p class="text-muted">Every self-service update link sent for this customer.</p>
+    @if (!emailHistoryLoaded)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (emailHistory.Count == 0)
+    {
+        <p><em>No notification emails have been sent for this customer yet.</em></p>
+    }
+    else
+    {
+        <div style="overflow-x:auto;">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Sent On (UTC)</th>
+                        <th>Sent By</th>
+                        <th>Code Verified</th>
+                        <th>Submitted</th>
+                        <th>Link Expires (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in emailHistory)
+                    {
+                        <tr>
+                            <td>@entry.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@entry.CreatedBy</td>
+                            <td>@(entry.OtpVerifiedAt is null ? "—" : entry.OtpVerifiedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
+                            <td>@(entry.UsedAt is null ? "—" : entry.UsedAt.Value.ToString("yyyy-MM-dd HH:mm"))</td>
+                            <td>@entry.ExpiresAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 }
 
 @code {
     [Parameter] public int Id { get; set; }
+
+    private enum Tab { Details, Documents, EmailHistory }
+    private Tab activeTab = Tab.Details;
+    private int docCount;
+    private List<CustomerAccessToken> emailHistory = [];
+    private bool emailHistoryLoaded;
 
     private record Step(string Title, string Section, string? Group, bool IsReview);
 
@@ -257,6 +331,20 @@ else
         config = await FieldConfigService.GetAllAsync();
         await LoadAsync();
         BuildSteps();
+        if (customer is not null)
+        {
+            docCount = (await DocumentService.GetDocumentsAsync(customer.Id)).Count;
+        }
+    }
+
+    private async Task ShowEmailHistoryAsync()
+    {
+        activeTab = Tab.EmailHistory;
+        if (!emailHistoryLoaded && customer is not null)
+        {
+            emailHistory = await AccessTokenService.GetHistoryForCustomerAsync(customer.Id);
+            emailHistoryLoaded = true;
+        }
     }
 
     private async Task LoadAsync()
@@ -275,7 +363,6 @@ else
         foreach (var g in ContactOrder)
             if (config.Any(f => f.IsVisible && f.Section == "Contact" && f.GroupName == g))
                 list.Add(new Step(g, "Contact", g, false));
-        list.Add(new Step("Documents", "", "Documents", false));
         list.Add(new Step("Review & Save", "", null, true));
         steps = list;
     }
@@ -350,7 +437,14 @@ else
         message = null;
     }
 
-    private void OnDocsChanged() => StateHasChanged();
+    private async Task OnDocsChanged()
+    {
+        if (customer is not null)
+        {
+            docCount = (await DocumentService.GetDocumentsAsync(customer.Id)).Count;
+        }
+        StateHasChanged();
+    }
 
     /// <summary>Required KYC document types that have not been uploaded for this customer.</summary>
     private async Task<List<string>> MissingRequiredDocsAsync()
