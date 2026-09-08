@@ -265,6 +265,8 @@ public static class CustomerLookups
 
     private static readonly string[] CountryNames = Countries.Select(c => c.Name).ToArray();
     private static readonly string[] CountryCodes = Countries.Select(c => c.Code).ToArray();
+    /// <summary>Combined "Code - Name" options, e.g. "AE - United Arab Emirates".</summary>
+    private static readonly string[] CountryCodeNames = Countries.Select(c => $"{c.Code} - {c.Name}").ToArray();
 
     /// <summary>UAE emirates — the Country Subdivision list.</summary>
     private static readonly string[] Emirates =
@@ -310,6 +312,7 @@ public static class CustomerLookups
         ("Account", "CountryCode") => CountryCodes,
         ("Account", "CountryName") => CountryNames,
         ("Account", "CountrySubdivision") => Emirates,
+        ("Account", "IncorporationCountry") => CountryCodeNames,
         ("Account", "LicensingAuthorityName") => LicensingAuthorities,
         ("Account", "TradeLicenseIssuingBody") => new[] { "Mainland", "Free Zone" },
         ("Account", "Owner1Nationality") => CountryNames,
@@ -325,8 +328,7 @@ public static class CustomerLookups
         ("Contact", "Nationality") => CountryNames,
         ("Contact", "Country") => CountryNames,
         ("Contact", "IssueCountry") => CountryNames,
-        ("Contact", "PassportIssuePlaceCountry") => CountryNames,
-        ("Contact", "PassportIssueCountryCode") => CountryCodes,
+        ("Contact", "PassportIssuePlaceCountry") => CountryCodeNames,
         ("Contact", "TypeOfCustomer") => new[] { "Normal", "VIP" },
 
         _ => Empty
