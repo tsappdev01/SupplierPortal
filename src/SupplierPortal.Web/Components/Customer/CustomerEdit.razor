@@ -73,12 +73,16 @@ else
                 @foreach (var f in FieldsFor(step))
                 {
                     var cfg = f;
+                    // Country Name is merged into the combined Country Code dropdown below, so don't render
+                    // it as its own field.
+                    if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
                     var target = entity;
+                    var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                     var editable = !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                     var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
                     <div class="di-field">
                         <label>
-                            @cfg.DisplayLabel
+                            @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                             @if (cfg.IsRequired) { <span class="di-req">*</span> }
                         </label>
                         @if (!editable)
@@ -92,10 +96,27 @@ else
                         }
                         else if (cfg.FieldKind == "yesno")
                         {
-                            <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                            <div class="di-toggle" role="group">
+                                <button type="button" class="di-toggle-btn @(cur == "true" ? "is-yes" : "")"
+                                        @onclick='() => OnChange(target, cfg.FieldKey, cur == "true" ? "" : "true")'>Yes</button>
+                                <button type="button" class="di-toggle-btn @(cur == "false" ? "is-no" : "")"
+                                        @onclick='() => OnChange(target, cfg.FieldKey, cur == "false" ? "" : "false")'>No</button>
+                            </div>
+                        }
+                        else if (isCombinedCountry)
+                        {
+                            @* Combined Country dropdown: shows "AE - United Arab Emirates"; stores the code in
+                               CountryCode and the matching name in CountryName. *@
+                            <select value="@cur" @onchange="e => OnCountryChange(target, e.Value?.ToString())">
                                 <option value="">— Select —</option>
-                                <option value="true" selected="@(cur == "true")">Yes</option>
-                                <option value="false" selected="@(cur == "false")">No</option>
+                                @foreach (var c in CustomerLookups.Countries)
+                                {
+                                    <option value="@c.Code" selected="@(c.Code == cur)">@c.Code - @c.Name</option>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.Countries.Any(c => c.Code == cur))
+                                {
+                                    <option value="@cur" selected>@cur</option>
+                                }
                             </select>
                         }
                         else if (cfg.FieldKind == "lookup")
@@ -241,6 +262,15 @@ else
               .OrderBy(f => f.Sequence);
 
     private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
+
+    /// <summary>Combined Country dropdown: stores the selected code in CountryCode and the matching
+    /// country name in CountryName, so the two underlying fields stay in sync from one control.</summary>
+    private void OnCountryChange(object entity, string? code)
+    {
+        CustomerFieldAccessor.SetString(entity, "CountryCode", code);
+        var name = CustomerLookups.Countries.FirstOrDefault(c => c.Code == code).Name;
+        CustomerFieldAccessor.SetString(entity, "CountryName", string.IsNullOrWhiteSpace(code) ? null : name);
+    }
 
     private async Task SaveAsync(bool silent)
     {

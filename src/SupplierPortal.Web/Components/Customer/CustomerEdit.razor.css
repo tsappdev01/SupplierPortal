@@ -240,6 +240,33 @@
     color: #97a1b3;
 }
 
+/* Yes/No segmented toggle (replaces the yes/no dropdown). */
+.di-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    align-self: flex-start;
+}
+
+.di-toggle-btn {
+    appearance: none;
+    border: none;
+    background: #fff;
+    color: #46506b;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 22px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.di-toggle-btn + .di-toggle-btn { border-left: 1px solid var(--border); }
+.di-toggle-btn:hover:not(.is-yes):not(.is-no) { background: #f1f4fb; }
+.di-toggle-btn.is-yes { background: #2f9e44; color: #fff; }
+.di-toggle-btn.is-no { background: #c0392b; color: #fff; }
+
 /* Frozen (read-only) control — e.g. a field the business marked Read-only for this role. */
 .di-frozen {
     background: #eef1f6 !important;
