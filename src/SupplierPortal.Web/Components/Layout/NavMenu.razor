@@ -127,7 +127,7 @@
                     </div>
                     <div class="nav-item px-3 di-sub-item">
                         <NavLink class="nav-link" href="admin/customers">
-                            Customer Registrations
+                            Manage Customer
                         </NavLink>
                     </div>
                     @if (isAdministrator)
@@ -135,6 +135,11 @@
                         <div class="nav-item px-3 di-sub-item">
                             <NavLink class="nav-link" href="admin/customer-fields">
                                 Field Settings
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3 di-sub-item">
+                            <NavLink class="nav-link" href="admin/customer-documents">
+                                Document Types
                             </NavLink>
                         </div>
                     }
@@ -239,6 +244,8 @@
         bool In(string s) => uri.Contains(s, StringComparison.OrdinalIgnoreCase);
         supplierExpanded = In("/supplier") || !(In("/admin/"));
         landlordExpanded = In("/admin/land-register") || In("/admin/landlords") || !In("/admin/");
+        customerExpanded = In("/admin/customers") || In("/customer")
+            || In("/admin/customer-fields") || In("/admin/customer-documents");
         setupExpanded = In("/admin/business-units") || In("/admin/users")
             || In("/admin/supplier-fields") || In("/admin/audit-log");
     }

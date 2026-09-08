@@ -24,6 +24,61 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
             .ToListAsync();
     }
 
+    /// <summary>All document types (active and inactive) for the admin management screen, in order.</summary>
+    public async Task<List<CustomerDocumentType>> GetAllTypesAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerDocumentTypes.AsNoTracking()
+            .OrderBy(t => t.Sequence).ThenBy(t => t.Name)
+            .ToListAsync();
+    }
+
+    /// <summary>Applies the admin edits to the document-type master list: updates existing rows, inserts new
+    /// ones (Id == 0) and deletes rows the admin removed. Blank names are skipped.</summary>
+    public async Task SaveTypesAsync(IReadOnlyList<CustomerDocumentType> edits, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var rows = await db.CustomerDocumentTypes.ToListAsync();
+
+        // Delete rows no longer present in the edit set.
+        var keepIds = edits.Where(e => e.Id != 0).Select(e => e.Id).ToHashSet();
+        foreach (var row in rows.Where(r => !keepIds.Contains(r.Id)).ToList())
+        {
+            db.CustomerDocumentTypes.Remove(row);
+        }
+
+        foreach (var edit in edits)
+        {
+            if (string.IsNullOrWhiteSpace(edit.Name))
+            {
+                continue;
+            }
+            if (edit.Id != 0 && rows.FirstOrDefault(r => r.Id == edit.Id) is { } row)
+            {
+                row.Name = edit.Name.Trim();
+                row.Requirement = string.IsNullOrWhiteSpace(edit.Requirement) ? null : edit.Requirement.Trim();
+                row.IsRequired = edit.IsRequired;
+                row.Sequence = edit.Sequence;
+                row.IsActive = edit.IsActive;
+            }
+            else if (edit.Id == 0)
+            {
+                db.CustomerDocumentTypes.Add(new CustomerDocumentType
+                {
+                    Name = edit.Name.Trim(),
+                    Requirement = string.IsNullOrWhiteSpace(edit.Requirement) ? null : edit.Requirement.Trim(),
+                    IsRequired = edit.IsRequired,
+                    Sequence = edit.Sequence,
+                    IsActive = edit.IsActive
+                });
+            }
+        }
+
+        await db.SaveChangesAsync();
+        await audit.LogAsync(actorUsername, AuditAction.Update, "CustomerDocumentType", null,
+            "Updated customer document-type master list");
+    }
+
     /// <summary>Uploaded documents for a customer (without the file bytes).</summary>
     public async Task<List<CustomerDocument>> GetDocumentsAsync(int customerId)
     {
