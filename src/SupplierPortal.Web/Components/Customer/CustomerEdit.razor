@@ -291,8 +291,29 @@ else
     private async Task NextAsync()
     {
         await SaveAsync(true);
+        var missing = MissingRequired(steps[current]);
+        if (missing.Count > 0)
+        {
+            isError = true;
+            message = "Please complete the required field(s): " + string.Join(", ", missing);
+            return;
+        }
         if (current < steps.Count - 1) current++;
         message = null;
+    }
+
+    /// <summary>Required, visible fields on a step that are still empty (by display label). The merged
+    /// Country Name is excluded — it is filled from the combined Country dropdown.</summary>
+    private List<string> MissingRequired(Step step)
+    {
+        if (step.IsReview || customer is null) return [];
+        var entity = step.Section == "Account" ? (object)customer : contact;
+        return config
+            .Where(f => f.IsVisible && f.IsRequired && f.Section == step.Section && f.GroupName == step.Group)
+            .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
+            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
+            .Select(f => f.DisplayLabel)
+            .ToList();
     }
 
     private async Task BackAsync()
@@ -316,6 +337,7 @@ else
         if (status == CustomerStatuses.ForReview)
         {
             var missing = config.Where(f => f.IsVisible && f.IsRequired)
+                .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
                 .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                     f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
                 .Select(f => f.DisplayLabel).ToList();
