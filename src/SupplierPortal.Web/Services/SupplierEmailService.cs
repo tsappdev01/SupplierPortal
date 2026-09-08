@@ -17,17 +17,18 @@ public class SupplierEmailService(
         $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name)}</div>";
 
     /// <summary>The email header brand block: the respective Business Unit's <b>logo</b> when one is on
-    /// file (embedded as a base64 data URI, so it renders without an external image host), plus the brand
-    /// name as text underneath. Falls back to the text-only brand line when the unit has no logo.</summary>
-    private static string BrandBlock(string? logoDataUri, string? name)
+    /// file (its hosted Logo URL, or the uploaded logo embedded as a base64 data URI). The logo alone is
+    /// shown - the brand name is not repeated as text underneath it. Falls back to the text-only brand
+    /// line when the unit has no logo.</summary>
+    private static string BrandBlock(string? logoSrc, string? name)
     {
-        if (string.IsNullOrWhiteSpace(logoDataUri))
+        if (string.IsNullOrWhiteSpace(logoSrc))
         {
             return BrandLine(name);
         }
 
         var safeName = System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name);
-        return $"<img src=\"{logoDataUri}\" alt=\"{safeName}\" style=\"max-height:48px;max-width:220px;display:block;margin-bottom:8px\" />" + BrandLine(name);
+        return $"<img src=\"{logoSrc}\" alt=\"{safeName}\" style=\"max-height:48px;max-width:220px;display:block\" />";
     }
 
     /// <summary>Resolves the logo for a record's Business Unit first (the "respective" unit the user asked

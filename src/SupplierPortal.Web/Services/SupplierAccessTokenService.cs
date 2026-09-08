@@ -124,9 +124,10 @@ public class SupplierAccessTokenService(
             // Brand the header with the respective Business Unit's logo (hosted Logo URL when set, else the
             // embedded logo) when available.
             var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Supplier.BusinessUnitId);
+            // When a logo image is available, show it alone (the brand name is not repeated as text).
             var brandBlock = string.IsNullOrWhiteSpace(logo)
                 ? brandLine
-                : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block;margin-bottom:8px\" />" + brandLine;
+                : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block\" />";
             body = body!
                 .Replace("{CompanyLogo}", brandBlock)
                 .Replace("{Supplier Name}", token.Supplier.SupplierName)
