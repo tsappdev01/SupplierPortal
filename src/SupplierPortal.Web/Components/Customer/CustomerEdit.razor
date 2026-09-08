@@ -248,7 +248,7 @@ else
                 @if (customer.Status == CustomerStatuses.ForReview)
                 {
                     <button type="button" class="di-btn di-btn-success" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Complete)">Mark completed</button>
-                    <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Returned)">Return</button>
+                    <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="ReturnToCustomerAsync">Return to customer</button>
                 }
             }
         </div>
@@ -502,6 +502,33 @@ else
         var docTypes = await DocumentService.GetTypesAsync();
         var have = (await DocumentService.GetDocumentsAsync(customer.Id)).Select(d => d.DocumentType).ToHashSet();
         return docTypes.Where(t => t.IsRequired && !have.Contains(t.Name)).Select(t => t.Name).ToList();
+    }
+
+    /// <summary>Returns the record to the customer: saves, emails a fresh self-service link (which moves
+    /// the status to "Awaiting Customer Response") so they can correct and resubmit.</summary>
+    private async Task ReturnToCustomerAsync()
+    {
+        if (customer is null) return;
+        busy = true; message = null;
+        customer.Contact = contact;
+        await CustomerService.SaveAsync(customer, currentUser);
+        var (ok, err) = await CustomerEmailService.NotifyCustomerAsync(
+            customer.Id, customer.LegalName ?? "Customer",
+            CustomerAccessTokenService.EmailFor(customer), currentUser, Nav.BaseUri);
+        busy = false;
+        if (ok)
+        {
+            customer.Status = CustomerStatuses.AwaitingCustomerResponse;
+            isError = false;
+            message = "A self-service link was sent to the customer and the status is now “Awaiting Customer Response”.";
+            ToastService.ShowSuccess("Returned to customer — update link sent.");
+        }
+        else
+        {
+            isError = true;
+            message = err ?? "Could not send the update link.";
+            ToastService.ShowError(err ?? "Could not send the update link.");
+        }
     }
 
     private async Task SaveAndSetStatus(string status)
