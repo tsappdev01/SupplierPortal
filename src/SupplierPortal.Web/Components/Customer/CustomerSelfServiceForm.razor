@@ -331,7 +331,8 @@
     {
         await SaveAsync(true);
         var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
-            .Concat(DateErrorsForStep(steps[current])).ToList();
+            .Concat(DateErrorsForStep(steps[current]))
+            .Concat(FormatErrors(FieldsFor(steps[current]))).ToList();
         if (problems.Count > 0)
         {
             ToastService.ShowErrors(problems);
@@ -339,6 +340,39 @@
         }
         if (current < steps.Count - 1) current++;
         message = null;
+    }
+
+    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+
+    private static bool IsDigits(string value, int length)
+    {
+        var d = value.Replace(" ", "").Replace("-", "");
+        return d.Length == length && d.All(char.IsDigit);
+    }
+
+    private List<string> FormatErrors(IEnumerable<CustomerFieldConfig> fields)
+    {
+        var errs = new List<string>();
+        if (customer is null) return errs;
+        foreach (var f in fields)
+        {
+            var entity = f.Section == "Account" ? (object)customer : contact;
+            var val = CustomerFieldAccessor.GetString(entity, f.FieldKey);
+            if (string.IsNullOrWhiteSpace(val)) continue;
+            if (f.FieldKey.Contains("Email", StringComparison.OrdinalIgnoreCase) && !EmailValidator.IsValid(val))
+            {
+                errs.Add($"{f.DisplayLabel} is not a valid email address.");
+            }
+            else if (f.FieldKey == "CustomerBuyerTIN" && !IsDigits(val, 10))
+            {
+                errs.Add("Customer/Buyer TIN must be exactly 10 digits.");
+            }
+            else if (f.FieldKey == "TRNNumber" && !IsDigits(val, 15))
+            {
+                errs.Add("TRN Number must be exactly 15 digits.");
+            }
+        }
+        return errs;
     }
 
     private List<string> MissingRequired(Step step)
@@ -410,6 +444,13 @@
         if (dateErrors.Count > 0)
         {
             ToastService.ShowErrors(dateErrors);
+            return;
+        }
+
+        var formatErrors = FormatErrors(config.Where(f => f.IsVisible));
+        if (formatErrors.Count > 0)
+        {
+            ToastService.ShowErrors(formatErrors);
             return;
         }
 
