@@ -68,13 +68,19 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(
-        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null)
+        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null,
+        int? assignedToUserId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = IncludeLookups(db.Suppliers).AsNoTracking();
         if (businessUnitIds is { Count: > 0 })
         {
             query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
+        }
+        // Non-administrators are limited to the suppliers assigned to them (mirrors the dashboard list).
+        if (assignedToUserId is not null)
+        {
+            query = query.Where(s => s.AssignedToUserId == assignedToUserId);
         }
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
@@ -122,13 +128,20 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     /// lookup names the list actually renders (2 joins) instead of materializing the full Supplier
     /// graph (~20 joins) that <see cref="GetSuppliersAsync"/> loads for edit/export use, which was
     /// the main cause of the list page loading slowly.</summary>
-    public async Task<List<SupplierListItem>> GetSupplierListAsync(IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null)
+    public async Task<List<SupplierListItem>> GetSupplierListAsync(
+        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, int? assignedToUserId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = db.Suppliers.AsNoTracking().AsQueryable();
         if (businessUnitIds is { Count: > 0 })
         {
             query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
+        }
+        // When set, restrict the list to suppliers assigned to this user (non-administrators see only
+        // their own assigned records, not the whole business unit).
+        if (assignedToUserId is not null)
+        {
+            query = query.Where(s => s.AssignedToUserId == assignedToUserId);
         }
         if (!string.IsNullOrWhiteSpace(supplierName))
         {

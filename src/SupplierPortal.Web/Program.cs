@@ -321,7 +321,8 @@ app.MapGet("/export/{format}", async (string format, int? businessUnitId, string
 {
     var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
 
-    var suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds, statusName: status);
+    var suppliers = await supplierService.GetSuppliersAsync(
+        effectiveBusinessUnitIds, statusName: status, assignedToUserId: ResolveAssigneeScope(ctx));
 
     return format.ToLowerInvariant() switch
     {
@@ -343,7 +344,8 @@ app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpC
     if (populate == true)
     {
         var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
-        suppliers = await supplierService.GetSuppliersAsync(effectiveBusinessUnitIds);
+        suppliers = await supplierService.GetSuppliersAsync(
+            effectiveBusinessUnitIds, assignedToUserId: ResolveAssigneeScope(ctx));
     }
 
     return Results.File(exportService.ExportToExcelUploadTemplate(suppliers),
@@ -391,6 +393,18 @@ app.MapGet("/customers/export/template", async (int? businessUnitId, bool? popul
 // Effective business-unit scope for exports: an administrator with no business-unit assignment sees
 // all suppliers (null); everyone else — including administrators assigned to specific business units —
 // is restricted to their assigned business units, honoring a requested BU only when it is one of theirs.
+// Non-administrators may export only the suppliers assigned to them (mirrors the dashboard list);
+// administrators export the whole in-scope set. Returns null (no assignee filter) for administrators.
+static int? ResolveAssigneeScope(HttpContext ctx)
+{
+    if (ctx.User.IsAdministrator())
+    {
+        return null;
+    }
+    var userId = ctx.User.GetUserId();
+    return userId > 0 ? userId : -1; // -1 => match nothing when the id can't be resolved
+}
+
 static List<int>? ResolveExportScope(HttpContext ctx, int? businessUnitId)
 {
     var userBuIds = ctx.User.GetBusinessUnitIds();

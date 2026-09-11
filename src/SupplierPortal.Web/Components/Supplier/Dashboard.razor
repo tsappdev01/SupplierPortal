@@ -639,7 +639,8 @@ else if (TotalPages > 1)
                 IReadOnlyCollection<int>? businessUnitIds = templateBuId != 0
                     ? [templateBuId]
                     : (SeesAllBusinessUnits ? null : userBusinessUnitIds);
-                suppliers = await SupplierService.GetSuppliersAsync(businessUnitIds);
+                suppliers = await SupplierService.GetSuppliersAsync(
+                    businessUnitIds, assignedToUserId: AssigneeScope);
             }
 
             templateProgress = templatePopulate
@@ -676,7 +677,13 @@ else if (TotalPages > 1)
     private bool initialLoad = true;
     private List<BusinessUnit> businessUnits = [];
     private bool isAdministrator;
+    private int? currentUserId;
     private List<int> userBusinessUnitIds = [];
+
+    /// <summary>Assignee scope for list/export queries: null for administrators (no restriction); for a
+    /// normal user, their own id — falling back to -1 (match nothing) if the id can't be resolved, so a
+    /// missing id never leaks the full list.</summary>
+    private int? AssigneeScope => isAdministrator ? null : (currentUserId ?? -1);
 
     /// <summary>Whether the user sees every business unit's suppliers. Only an administrator with NO
     /// business-unit assignment is org-wide; a user (administrator or not) assigned to specific
@@ -768,6 +775,10 @@ else if (TotalPages > 1)
         isAdministrator = state.User.IsAdministrator();
         userBusinessUnitIds = state.User.GetBusinessUnitIds();
         currentUser = state.User.Identity?.Name ?? "unknown";
+        // Non-administrators see only the suppliers assigned to them; administrators see the full list
+        // (scoped to their business units) so they can review and assign.
+        var uid = state.User.GetUserId();
+        currentUserId = uid > 0 ? uid : null;
 
         var allBusinessUnits = await BusinessUnitService.GetAllAsync();
         businessUnits = SeesAllBusinessUnits
@@ -823,7 +834,7 @@ else if (TotalPages > 1)
 
         await Loading.RunAsync(async () =>
         {
-            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter);
+            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter, AssigneeScope);
         });
         initialLoad = false;
         currentPage = 1;
