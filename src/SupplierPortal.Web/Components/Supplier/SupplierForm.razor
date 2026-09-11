@@ -101,20 +101,32 @@
             <option value="No">No</option>
         </InputSelect>
     </div>;
-    fieldFragments["TaxRegistrationNumber"] = @<div class="di-field @FieldClass("TaxRegistrationNumber")">
-        <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label>
-        <InputText @bind-Value="formModel.TaxRegistrationNumber" />
-    </div>;
-    fieldFragments["VatRegistrationTypeId"] = @<div class="di-field @FieldClass("VatRegistrationTypeId")">
-        <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
-        <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
-            <option value="">— Select —</option>
-            @foreach (var lov in vatRegistrationTypes)
-            {
-                <option value="@lov.Id">@lov.DisplayName</option>
-            }
-        </InputSelect>
-    </div>;
+    @* TRN/VAT Registration Number and VAT Registration Type are only relevant when the supplier is
+       VAT-registered, so they are hidden entirely when VAT Registered? = No. *@
+    fieldFragments["TaxRegistrationNumber"] = @<text>
+        @if (IsVatRegistered)
+        {
+            <div class="di-field @FieldClass("TaxRegistrationNumber")">
+                <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label>
+                <InputText @bind-Value="formModel.TaxRegistrationNumber" />
+            </div>
+        }
+    </text>;
+    fieldFragments["VatRegistrationTypeId"] = @<text>
+        @if (IsVatRegistered)
+        {
+            <div class="di-field @FieldClass("VatRegistrationTypeId")">
+                <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
+                <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
+                    <option value="">— Select —</option>
+                    @foreach (var lov in vatRegistrationTypes)
+                    {
+                        <option value="@lov.Id">@lov.DisplayName</option>
+                    }
+                </InputSelect>
+            </div>
+        }
+    </text>;
     fieldFragments["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")">
         <label>Supplier TIN@(Req("SupplierTin"))</label>
         <InputText @bind-Value="formModel.SupplierTin" />
@@ -1942,7 +1954,7 @@
         {
             errors.Add("Supplier TIN must be exactly 10 digits.");
         }
-        if (step == StepOf("TaxRegistrationNumber", 1) && !IsHiddenFromSupplier("TaxRegistrationNumber")
+        if (step == StepOf("TaxRegistrationNumber", 1) && !IsHiddenFromSupplier("TaxRegistrationNumber") && IsVatRegistered
             && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
         {
             errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
