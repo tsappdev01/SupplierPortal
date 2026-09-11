@@ -282,7 +282,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             $"Rejected supplier '{supplier.SupplierName}': {supplier.ReviewRemarks}");
     }
 
-    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null, bool markForReview = false)
+    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null, bool markComplete = false)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var supplier = await IncludeLookups(db.Suppliers)
@@ -525,12 +525,12 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 change.AcknowledgedBy = updatedBy;
             }
         }
-        else if (markForReview)
+        else if (markComplete)
         {
-            // A supplier self-service *submission* moves the record to "For Review" so the business
-            // knows there are supplier-made changes waiting to be checked. Intermediate saves as the
-            // supplier steps through the wizard (markForReview == false) must not flip the status.
-            supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.ForReview) ?? supplier.StatusId;
+            // A supplier self-service *submission* is treated as final: the record is auto-marked
+            // "Completed" with no further review step. Intermediate saves as the supplier steps
+            // through the wizard (markComplete == false) must not flip the status.
+            supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Complete) ?? supplier.StatusId;
         }
 
         await db.SaveChangesAsync();

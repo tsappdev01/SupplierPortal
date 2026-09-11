@@ -34,10 +34,6 @@
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.AwaitingSupplierResponse)</div>
         <div class="di-stat-label">Awaiting Supplier Response</div>
     </div>
-    <div class="di-stat-tile di-stat-review">
-        <div class="di-stat-value">@CountByStatus(SupplierStatuses.ForReview)</div>
-        <div class="di-stat-label">For Review</div>
-    </div>
     <div class="di-stat-tile di-stat-complete">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.Complete)</div>
         <div class="di-stat-label">Completed</div>
@@ -415,13 +411,7 @@ else
                                 </svg>
                             }
                         </button>
-                        @if (supplier.StatusName == SupplierStatuses.ForReview)
-                        {
-                            <button class="btn btn-sm btn-outline-success" title="Mark review complete" @onclick="() => MarkCompleteAsync(supplier)">
-                                Mark Complete
-                            </button>
-                        }
-                        else if (supplier.StatusName == SupplierStatuses.Complete)
+                        @if (supplier.StatusName == SupplierStatuses.Complete)
                         {
                             <button class="btn btn-sm btn-outline-danger" title="Reject and send back with remarks" @onclick="() => OpenRejectDialog(supplier)">
                                 Reject

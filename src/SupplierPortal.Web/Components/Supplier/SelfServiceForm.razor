@@ -104,7 +104,11 @@
         if (accessToken is not null)
         {
             await AccessTokenService.MarkUsedAsync(accessToken.Id);
+            // Submission is final — the record was auto-marked Completed on save (no review step).
+            // Let the internal requestor know, and confirm to the supplier that their response was received.
             await SupplierEmailService.NotifyRequestorOfSubmissionAsync(updated, accessToken.CreatedBy, NavigationManager.BaseUri);
+            await SupplierEmailService.NotifySupplierCompletedAsync(
+                updated.Id, updated.SupplierName, updated.ContactEmail, "Supplier Self-Service", updated.BusinessUnitId);
         }
         completed = true;
         ToastService.ShowSuccess("Your supplier information has been submitted.");

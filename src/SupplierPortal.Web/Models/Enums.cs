@@ -65,9 +65,12 @@ public static class SupplierStatuses
     // display text stored in LookupValues and shown in the UI is "Not Submitted"/"Completed".
     public const string New = "Not Submitted";
     public const string AwaitingSupplierResponse = "Awaiting Supplier Response";
+    // Retained only so legacy records/transition code referencing "For Review" still resolve. It is no
+    // longer part of the active workflow: a supplier submission auto-completes the record (see
+    // SupplierService.UpdateAsync), so this status is excluded from All / filters / stats.
     public const string ForReview = "For Review";
     public const string Complete = "Completed";
     public const string Rejected = "Rejected";
 
-    public static readonly string[] All = [New, AwaitingSupplierResponse, ForReview, Complete, Rejected];
+    public static readonly string[] All = [New, AwaitingSupplierResponse, Complete, Rejected];
 }

@@ -200,8 +200,8 @@ public class SupplierEmailService(
     </div>
     <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
       <h2 style=""margin:0 0 12px;color:#1a2233;font-size:19px"">Thank you, {safeName}</h2>
-      <p style=""margin:0 0 12px"">We're pleased to let you know that your supplier registration has been
-        <strong>reviewed and completed</strong>. No further action is required from you at this time.</p>
+      <p style=""margin:0 0 12px"">We're pleased to confirm that your response has been <strong>received and updated</strong>,
+        and your supplier registration is now <strong>complete</strong>. No further action is required from you at this time.</p>
       <p style=""margin:0 0 12px"">Thank you for taking the time to provide your information and for partnering with us.</p>
       <p style=""margin:18px 0 0;color:#7b8697;font-size:13px"">This is an automated message — please do not reply.</p>
     </div>

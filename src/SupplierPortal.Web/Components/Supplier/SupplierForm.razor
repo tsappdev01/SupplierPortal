@@ -2071,7 +2071,7 @@
             }
             else
             {
-                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId, markForReview: submitting);
+                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId, markComplete: submitting);
             }
         });
 
