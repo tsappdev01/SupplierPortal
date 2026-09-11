@@ -1902,6 +1902,37 @@
             errors.Add("Please provide the address as per your VAT Certificate.");
         }
 
+        // Format checks are data-quality rules (like the date checks above) and apply to EVERY view —
+        // internal admin/user edits and the self-service portal alike — so a malformed value can never
+        // be saved from either place. They only fire when a value is present; emptiness is a separate
+        // mandatory-field concern handled below for the self-service flow.
+
+        // Email fields assigned to this step must be a valid address when filled.
+        foreach (var (key, label, defaultStep) in EmailFields)
+        {
+            if (step != StepOf(key, defaultStep) || IsHiddenFromSupplier(key))
+            {
+                continue;
+            }
+            var value = typeof(SupplierFormModel).GetProperty(key)?.GetValue(model) as string;
+            if (!string.IsNullOrWhiteSpace(value) && !IsValidEmail(value))
+            {
+                errors.Add($"{label} is not a valid email address.");
+            }
+        }
+
+        // Supplier TIN must be exactly 10 digits; TRN/VAT Registration Number exactly 15 digits (when entered).
+        if (step == StepOf("SupplierTin", 1) && !IsHiddenFromSupplier("SupplierTin")
+            && !string.IsNullOrWhiteSpace(model.SupplierTin) && !IsDigits(model.SupplierTin, 10))
+        {
+            errors.Add("Supplier TIN must be exactly 10 digits.");
+        }
+        if (step == StepOf("TaxRegistrationNumber", 1) && !IsHiddenFromSupplier("TaxRegistrationNumber") && IsVatRegistered
+            && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
+        {
+            errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
+        }
+
         // Required/conditional/document checks apply ONLY to suppliers updating via the self-service
         // portal. Internal users (administrators and other staff alike) edit with everything open —
         // no mandatory-field enforcement — so this returns no further errors for any non-self-service view.
@@ -1988,34 +2019,6 @@
             {
                 errors.Add($"{setting.DisplayLabel} is required.");
             }
-        }
-
-        // Validate the format of any email field assigned to this step that has a value (a
-        // required-but-empty email is already reported above; here we catch present-but-malformed
-        // entries). Follows the field's assigned tab so it works after a field is moved.
-        foreach (var (key, label, defaultStep) in EmailFields)
-        {
-            if (step != StepOf(key, defaultStep) || IsHiddenFromSupplier(key))
-            {
-                continue;
-            }
-            var value = typeof(SupplierFormModel).GetProperty(key)?.GetValue(model) as string;
-            if (!string.IsNullOrWhiteSpace(value) && !IsValidEmail(value))
-            {
-                errors.Add($"{label} is not a valid email address.");
-            }
-        }
-
-        // Supplier TIN must be exactly 10 digits, TRN/VAT Registration Number exactly 15 digits (when entered).
-        if (step == StepOf("SupplierTin", 1) && !IsHiddenFromSupplier("SupplierTin")
-            && !string.IsNullOrWhiteSpace(model.SupplierTin) && !IsDigits(model.SupplierTin, 10))
-        {
-            errors.Add("Supplier TIN must be exactly 10 digits.");
-        }
-        if (step == StepOf("TaxRegistrationNumber", 1) && !IsHiddenFromSupplier("TaxRegistrationNumber") && IsVatRegistered
-            && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
-        {
-            errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
         }
 
         return errors;
