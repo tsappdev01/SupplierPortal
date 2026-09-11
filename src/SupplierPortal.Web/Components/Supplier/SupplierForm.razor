@@ -108,7 +108,8 @@
         {
             <div class="di-field @FieldClass("TaxRegistrationNumber")">
                 <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label>
-                <InputText @bind-Value="formModel.TaxRegistrationNumber" />
+                <InputText @bind-Value="formModel.TaxRegistrationNumber" maxlength="15"
+                           inputmode="numeric" pattern="[0-9]*" title="15 digits" />
             </div>
         }
     </text>;
@@ -129,7 +130,8 @@
     </text>;
     fieldFragments["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")">
         <label>Supplier TIN@(Req("SupplierTin"))</label>
-        <InputText @bind-Value="formModel.SupplierTin" />
+        <InputText @bind-Value="formModel.SupplierTin" maxlength="10"
+                   inputmode="numeric" pattern="[0-9]*" title="10 digits" />
     </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
         <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>

@@ -164,7 +164,10 @@
                                 }
                                 else
                                 {
-                                    <input type="text" value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                    <input type="text" value="@cur"
+                                           maxlength="@MaxLenFor(cfg.FieldKey)"
+                                           inputmode="@(MaxLenFor(cfg.FieldKey) is null ? null : "numeric")"
+                                           @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                                 }
                             </div>
                         }
@@ -350,6 +353,15 @@
 
     private static bool IsValidEmail(string? value) =>
         !string.IsNullOrWhiteSpace(value) && EmailRegex.IsMatch(value.Trim());
+
+    /// <summary>Input maxlength for the fixed-length numeric identifiers (null = no cap, attribute omitted):
+    /// Buyer TIN is 10 digits, the TRN 15 digits.</summary>
+    private static int? MaxLenFor(string fieldKey) => fieldKey switch
+    {
+        "CustomerBuyerTIN" => 10,
+        "TRNNumber" => 15,
+        _ => null
+    };
 
     private static bool IsDigits(string value, int length)
     {
