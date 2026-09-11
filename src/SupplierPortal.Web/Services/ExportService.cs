@@ -363,15 +363,10 @@ public class ExportService
         ("Intermediary IBAN", s => s.IntermediaryIban ?? ""),
         ("Intermediary BIC/Swift Code", s => s.IntermediaryBicSwiftCode ?? ""),
 
-        // -- Status / audit --
+        // -- Status / assignment --
         ("Status", s => s.Status?.DisplayName ?? ""),
         ("Department User Name", s => s.CreatedBy ?? ""),
-        ("Draft", s => YesNo(s.IsDraft)),
-        ("Active", s => YesNo(s.IsActive)),
-        ("Created At", s => DT(s.CreatedAt)),
-        ("Created By", s => s.CreatedBy ?? ""),
-        ("Updated At", s => DT(s.UpdatedAt)),
-        ("Updated By", s => s.UpdatedBy ?? ""),
+        ("Username", s => s.AssignedToUser?.Username ?? ""),
     ];
 
     /// <summary>Exports every supplier attribute (including the fields added after the original Oracle

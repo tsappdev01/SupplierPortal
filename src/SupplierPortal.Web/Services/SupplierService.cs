@@ -64,7 +64,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.TradeLicenseIssuingBody)
             .Include(s => s.MobileCountryCode)
             .Include(s => s.BusinessPhoneCountryCode)
-            .Include(s => s.IntermediaryCountry);
+            .Include(s => s.IntermediaryCountry)
+            .Include(s => s.AssignedToUser);
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(
