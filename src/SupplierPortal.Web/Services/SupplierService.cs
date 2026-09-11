@@ -214,6 +214,14 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .ToHashSet();
     }
 
+    /// <summary>Lightweight lookup of just a supplier's name (e.g. to name a download), avoiding the full
+    /// entity graph that <see cref="GetByIdAsync"/> loads.</summary>
+    public async Task<string?> GetNameAsync(int id)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Suppliers.Where(s => s.Id == id).Select(s => s.SupplierName).FirstOrDefaultAsync();
+    }
+
     public async Task<Supplier?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

@@ -393,6 +393,20 @@ app.MapGet("/customers/export/template", async (int? businessUnitId, bool? popul
 // Effective business-unit scope for exports: an administrator with no business-unit assignment sees
 // all suppliers (null); everyone else — including administrators assigned to specific business units —
 // is restricted to their assigned business units, honoring a requested BU only when it is one of theirs.
+// Turns an arbitrary label (e.g. a supplier name) into a filesystem-safe file name: invalid characters
+// are replaced with a space, runs of whitespace collapsed, and the result trimmed and length-capped.
+// Falls back to the supplied default when nothing usable remains.
+static string SafeFileName(string? raw, string fallback)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return fallback;
+    var invalid = System.IO.Path.GetInvalidFileNameChars();
+    var chars = raw.Select(c => invalid.Contains(c) ? ' ' : c).ToArray();
+    var cleaned = System.Text.RegularExpressions.Regex.Replace(new string(chars), @"\s+", " ").Trim();
+    cleaned = cleaned.Trim('.'); // avoid trailing dots (Windows drops them)
+    if (cleaned.Length > 120) cleaned = cleaned[..120].Trim();
+    return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned;
+}
+
 // Non-administrators may export only the suppliers assigned to them (mirrors the dashboard list);
 // administrators export the whole in-scope set. Returns null (no assignee filter) for administrators.
 static int? ResolveAssigneeScope(HttpContext ctx)
@@ -572,10 +586,14 @@ app.MapPost("/api/leasing/circularo/webhook", async (
 }).AllowAnonymous();
 
 // Download all of a supplier's attachments (originals, any type) as a single zip archive.
-app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentService documentService) =>
+app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentService documentService, SupplierService supplierService) =>
 {
     var files = await documentService.GetAllFilesAsync(id);
     if (files.Count == 0) return Results.NotFound("This supplier has no attachments.");
+
+    // Name the archive after the supplier (sanitized to a filesystem-safe name), falling back to the id.
+    var supplierName = await supplierService.GetNameAsync(id);
+    var zipName = SafeFileName(supplierName, $"supplier-{id}") + ".zip";
 
     using var ms = new MemoryStream();
     using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
@@ -597,7 +615,7 @@ app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentS
             await entryStream.WriteAsync(bytes);
         }
     }
-    return Results.File(ms.ToArray(), "application/zip", $"supplier-{id}-documents.zip");
+    return Results.File(ms.ToArray(), "application/zip", zipName);
 }).RequireAuthorization();
 
 // Combine a supplier's attached images into a single PDF / Excel workbook.
