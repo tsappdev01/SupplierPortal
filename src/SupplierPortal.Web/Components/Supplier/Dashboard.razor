@@ -180,34 +180,6 @@
     </div>
 }
 
-@if (rejectTarget is not null)
-{
-    <div class="di-tmpl-backdrop" @onclick="CloseRejectDialog">
-        <div class="di-tmpl-modal" @onclick:stopPropagation>
-            <h5 class="di-tmpl-title">Reject Supplier</h5>
-            <p class="di-tmpl-text">Rejecting <strong>@rejectTarget.SupplierName</strong> sends it back for correction. Add remarks explaining what needs to change.</p>
-            <div class="di-tmpl-field">
-                <label>Review Remarks</label>
-                <textarea rows="4" @bind="rejectRemarks" placeholder="Describe the issues to be corrected…"></textarea>
-            </div>
-            <div class="di-tmpl-actions">
-                <button type="button" class="di-btn di-btn-secondary" @onclick="CloseRejectDialog" disabled="@rejecting">Cancel</button>
-                <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmRejectAsync" disabled="@(rejecting || string.IsNullOrWhiteSpace(rejectRemarks))">
-                    @if (rejecting)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span>Rejecting…</span>
-                    }
-                    else
-                    {
-                        <span>Reject &amp; Send Back</span>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
 <style>
     .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
     .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
@@ -376,12 +348,7 @@ else
                 <td>
                     @if (!string.IsNullOrEmpty(supplier.StatusName))
                     {
-                        <span class="badge @WorkflowBadgeClass(supplier.StatusName)"
-                              title="@(supplier.StatusName == SupplierStatuses.Rejected ? supplier.ReviewRemarks : null)">@supplier.StatusName</span>
-                        @if (supplier.StatusName == SupplierStatuses.Rejected && !string.IsNullOrWhiteSpace(supplier.ReviewRemarks))
-                        {
-                            <div class="di-reject-remarks" title="@supplier.ReviewRemarks">@supplier.ReviewRemarks</div>
-                        }
+                        <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
                     }
                 </td>
                 <td class="no-print">
@@ -411,26 +378,6 @@ else
                                 </svg>
                             }
                         </button>
-                        @if (supplier.StatusName == SupplierStatuses.Complete)
-                        {
-                            <button class="btn btn-sm btn-outline-danger" title="Reject and send back with remarks" @onclick="() => OpenRejectDialog(supplier)">
-                                Reject
-                            </button>
-                        }
-                        else if (supplier.StatusName == SupplierStatuses.Rejected)
-                        {
-                            <button class="btn btn-sm btn-outline-primary" title="Resubmit to the supplier for correction"
-                                    disabled="@(notifyingSupplierId == supplier.Id)" @onclick="() => ResubmitAsync(supplier)">
-                                @if (notifyingSupplierId == supplier.Id)
-                                {
-                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                }
-                                else
-                                {
-                                    <span>Resubmit</span>
-                                }
-                            </button>
-                        }
                     }
                 </td>
             </tr>
@@ -1094,57 +1041,11 @@ else if (TotalPages > 1)
         await ReloadAsync();
     }
 
-    // --- Reject / resubmit workflow ---
-    private SupplierListItem? rejectTarget;
-    private string rejectRemarks = "";
-    private bool rejecting;
-
-    private void OpenRejectDialog(SupplierListItem supplier)
-    {
-        rejectTarget = supplier;
-        rejectRemarks = supplier.ReviewRemarks ?? "";
-        rejecting = false;
-    }
-
-    private void CloseRejectDialog()
-    {
-        if (rejecting)
-        {
-            return;
-        }
-        rejectTarget = null;
-    }
-
-    private async Task ConfirmRejectAsync()
-    {
-        if (rejectTarget is null || string.IsNullOrWhiteSpace(rejectRemarks) || rejecting)
-        {
-            return;
-        }
-
-        rejecting = true;
-        var target = rejectTarget;
-        await SupplierService.RejectAsync(target.Id, rejectRemarks, currentUser);
-        rejecting = false;
-        rejectTarget = null;
-        ToastService.ShowSuccess($"{target.SupplierName} rejected and sent back for correction.");
-        await ReloadAsync();
-    }
-
-    private async Task ResubmitAsync(SupplierListItem supplier)
-    {
-        // Resubmitting sends the record back to the supplier (issues a new link and moves the status
-        // to "Awaiting Supplier Response").
-        await NotifyAsync(supplier);
-    }
-
     private static string WorkflowBadgeClass(string? statusName) => statusName switch
     {
         SupplierStatuses.New => "bg-secondary",
         SupplierStatuses.AwaitingSupplierResponse => "bg-info text-dark",
-        SupplierStatuses.ForReview => "bg-warning text-dark",
         SupplierStatuses.Complete => "bg-success",
-        SupplierStatuses.Rejected => "bg-danger",
         _ => "bg-light text-dark"
     };
 
