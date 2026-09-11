@@ -795,9 +795,14 @@ else if (TotalPages > 1)
     // assigned to. Scoped per row to the supplier's own Business Unit.
     private List<User> assignableUsers = [];
 
-    /// <summary>Users assignable to this supplier: every active user (from Manage Users). Ordered by
-    /// display name.</summary>
-    private IEnumerable<User> AssignableFor(SupplierListItem supplier) => assignableUsers;
+    /// <summary>Users assignable to this supplier: active Supplier-portal users in the supplier's Business
+    /// Unit. The currently-assigned user is always included so the dropdown reflects the saved value even
+    /// if their access/BU later changed.</summary>
+    private IEnumerable<User> AssignableFor(SupplierListItem supplier) =>
+        assignableUsers
+            .Where(u => u.BusinessUnits.Any(b => b.Id == supplier.BusinessUnitId)
+                        || u.Id == supplier.AssignedToUserId)
+            .OrderBy(u => u.FullName ?? u.Username);
 
     private async Task AssignAsync(SupplierListItem supplier, string? value)
     {

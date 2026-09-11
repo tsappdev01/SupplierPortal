@@ -13,14 +13,14 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         return await db.Users.Include(u => u.BusinessUnits).OrderBy(u => u.Username).ToListAsync();
     }
 
-    /// <summary>Active users who can be assigned a supplier — every active account from Manage Users, each
-    /// with their Business Units loaded (the dashboard picker lists them all).</summary>
+    /// <summary>Active users who can be assigned a supplier: those with Supplier portal access, each with
+    /// their Business Units loaded so the caller can scope the picker to the supplier's own BU.</summary>
     public async Task<List<User>> GetSupplierAssignableUsersAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Users
             .Include(u => u.BusinessUnits)
-            .Where(u => u.IsActive)
+            .Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Supplier))
             .OrderBy(u => u.FullName ?? u.Username)
             .ToListAsync();
     }
