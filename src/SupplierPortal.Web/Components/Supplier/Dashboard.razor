@@ -6,6 +6,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierService SupplierService
+@inject UserService UserService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierDocumentService SupplierDocumentService
 @inject SupplierEmailService SupplierEmailService
@@ -250,6 +251,17 @@
             <option value="P3">P3</option>
         </select>
     </div>
+    <div class="col-auto" style="min-width: 180px;">
+        <label class="form-label">Assigned To</label>
+        <select class="form-select" @bind="assignedFilter" @bind:after="OnAssignedFilterChanged">
+            <option value="">All Assignees</option>
+            <option value="unassigned">— Unassigned —</option>
+            @foreach (var u in assignableUsers)
+            {
+                <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+            }
+        </select>
+    </div>
 </div>
 
 <ul class="nav nav-tabs no-print mb-3">
@@ -315,6 +327,7 @@ else
             <th>First Name</th>
             <th>Contact Email</th>
             <th>Status</th>
+            <th class="no-print">Assigned To</th>
             <th class="no-print">Actions</th>
         </tr>
     </thead>
@@ -350,6 +363,17 @@ else
                     {
                         <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
                     }
+                </td>
+                <td class="no-print">
+                    <select class="form-select form-select-sm di-assign-select"
+                            value="@supplier.AssignedToUserId"
+                            @onchange="e => AssignAsync(supplier, e.Value?.ToString())">
+                        <option value="">— Unassigned —</option>
+                        @foreach (var u in AssignableFor(supplier))
+                        {
+                            <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                        }
+                    </select>
                 </td>
                 <td class="no-print">
                     <button class="btn btn-sm btn-outline-secondary" title="@(supplier.DocumentCount > 0 ? $"View {supplier.DocumentCount} attached document(s)" : "No documents attached")"
@@ -516,6 +540,7 @@ else if (TotalPages > 1)
     .di-bu-opt-logo { width: 26px; height: 22px; object-fit: contain; flex: 0 0 auto; }
     .di-row-bu-logo { width: 22px; height: 18px; object-fit: contain; margin-right: 8px; vertical-align: middle; }
     .di-priority { display: inline-block; min-width: 30px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .di-assign-select { min-width: 150px; max-width: 200px; font-size: 13px; padding: 2px 6px; }
     .di-priority-p1 { background: #fdecec; color: #c0392b; }
     .di-priority-p2 { background: #fdf0dd; color: #b5892f; }
     .di-priority-p3 { background: #e9edfb; color: #3b5bdb; }
@@ -662,6 +687,7 @@ else if (TotalPages > 1)
     private string supplierNameFilter = "";
     private string statusFilter = "";   // default: "All Statuses"
     private string priorityFilter = ""; // default: "All Priorities"
+    private string assignedFilter = ""; // default: "All Assignees"; "unassigned" or a user id
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
@@ -693,11 +719,20 @@ else if (TotalPages > 1)
         ? (SeesAllBusinessUnits ? "all subsidiaries" : "all your business units")
         : SelectedBuLabel;
 
-    // Suppliers matching the selected workflow-status and priority filters (empty = all).
+    // Suppliers matching the selected workflow-status, priority and assignee filters (empty = all).
     private IEnumerable<SupplierListItem> StatusFiltered =>
         suppliers
             .Where(s => string.IsNullOrEmpty(statusFilter) || s.StatusName == statusFilter)
-            .Where(s => string.IsNullOrEmpty(priorityFilter) || s.Priority == priorityFilter);
+            .Where(s => string.IsNullOrEmpty(priorityFilter) || s.Priority == priorityFilter)
+            .Where(MatchesAssignedFilter);
+
+    private bool MatchesAssignedFilter(SupplierListItem s) => assignedFilter switch
+    {
+        "" => true,
+        "unassigned" => s.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => s.AssignedToUserId == uid,
+        _ => true
+    };
 
     private IEnumerable<SupplierListItem> TabFilteredSuppliers => activeTab switch
     {
@@ -740,8 +775,38 @@ else if (TotalPages > 1)
             : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
 
         pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
+        assignableUsers = await UserService.GetSupplierAssignableUsersAsync();
 
         await ReloadAsync();
+    }
+
+    // Active users with Supplier portal access (each with their Business Units) that a supplier can be
+    // assigned to. Scoped per row to the supplier's own Business Unit.
+    private List<User> assignableUsers = [];
+
+    /// <summary>Users assignable to this supplier: active Supplier-portal users in the supplier's Business
+    /// Unit. The currently-assigned user is always included so the dropdown reflects the saved value even
+    /// if their access/BU later changed.</summary>
+    private IEnumerable<User> AssignableFor(SupplierListItem supplier) =>
+        assignableUsers
+            .Where(u => u.BusinessUnits.Any(b => b.Id == supplier.BusinessUnitId)
+                        || u.Id == supplier.AssignedToUserId)
+            .OrderBy(u => u.FullName ?? u.Username);
+
+    private async Task AssignAsync(SupplierListItem supplier, string? value)
+    {
+        int? userId = int.TryParse(value, out var id) ? id : null;
+        if (supplier.AssignedToUserId == userId)
+        {
+            return;
+        }
+        await SupplierService.AssignAsync(supplier.Id, userId, currentUser);
+        supplier.AssignedToUserId = userId;
+        supplier.AssignedToUserName = userId is null
+            ? null
+            : assignableUsers.Where(u => u.Id == userId).Select(u => u.FullName ?? u.Username).FirstOrDefault();
+        var who = userId is null ? "unassigned" : $"assigned to {supplier.AssignedToUserName}";
+        ToastService.ShowSuccess($"{supplier.SupplierName} {who}.");
     }
 
     private async Task ReloadAsync()
@@ -778,6 +843,12 @@ else if (TotalPages > 1)
     }
 
     private void OnPriorityFilterChanged()
+    {
+        currentPage = 1;
+        selectedIds.Clear();
+    }
+
+    private void OnAssignedFilterChanged()
     {
         currentPage = 1;
         selectedIds.Clear();

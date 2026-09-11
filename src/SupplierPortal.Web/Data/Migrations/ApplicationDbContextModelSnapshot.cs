@@ -1021,6 +1021,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("AllowInternationalPayments")
                         .HasColumnType("bit");
 
+                    b.Property<int?>("AssignedToUserId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("BankBranchId")
                         .HasColumnType("int");
 
@@ -1365,6 +1368,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("AccountCountryCodeId");
 
                     b.HasIndex("AccountCurrencyCodeId");
+
+                    b.HasIndex("AssignedToUserId");
 
                     b.HasIndex("BankBranchId");
 
@@ -2056,6 +2061,11 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("AccountCurrencyCodeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.User", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SupplierPortal.Web.Models.BankBranch", "BankBranch")
                         .WithMany()
                         .HasForeignKey("BankBranchId")
@@ -2210,6 +2220,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("AccountCountryCode");
 
                     b.Navigation("AccountCurrencyCode");
+
+                    b.Navigation("AssignedToUser");
 
                     b.Navigation("Bank");
 

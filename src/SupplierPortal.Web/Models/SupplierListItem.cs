@@ -21,6 +21,12 @@ public class SupplierListItem
     public bool IsActive { get; set; }
     public bool IsDraft { get; set; }
     public int BusinessUnitId { get; set; }
+
+    /// <summary>The user this supplier is assigned to (from Manage Users), and a display name for the
+    /// dashboard column. Null when unassigned.</summary>
+    public int? AssignedToUserId { get; set; }
+    public string? AssignedToUserName { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

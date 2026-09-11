@@ -369,6 +369,11 @@ public class Supplier
     public int BusinessUnitId { get; set; }
     public BusinessUnit? BusinessUnit { get; set; }
 
+    /// <summary>The internal user (from Manage Users) this supplier is assigned to / owned by. Optional;
+    /// set to null (unassigned) if the user is later removed.</summary>
+    public int? AssignedToUserId { get; set; }
+    public User? AssignedToUser { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

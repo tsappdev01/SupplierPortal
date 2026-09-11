@@ -154,6 +154,10 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 IsActive = s.IsActive,
                 IsDraft = s.IsDraft,
                 BusinessUnitId = s.BusinessUnitId,
+                AssignedToUserId = s.AssignedToUserId,
+                AssignedToUserName = s.AssignedToUser != null
+                    ? (s.AssignedToUser.FullName ?? s.AssignedToUser.Username)
+                    : null,
                 CreatedAt = s.CreatedAt,
                 UpdatedAt = s.UpdatedAt,
                 PendingSupplierChangeCount = db.SupplierFieldChanges.Count(
@@ -161,6 +165,28 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 DocumentCount = db.SupplierDocuments.Count(d => d.SupplierId == s.Id)
             })
             .ToListAsync();
+    }
+
+    /// <summary>Assigns (or, with a null userId, un-assigns) the supplier to an internal user from Manage
+    /// Users. Records the change in the audit log.</summary>
+    public async Task AssignAsync(int supplierId, int? userId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null || supplier.AssignedToUserId == userId)
+        {
+            return;
+        }
+
+        supplier.AssignedToUserId = userId;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = actorUsername;
+        await db.SaveChangesAsync();
+
+        var detail = userId is null
+            ? $"Unassigned supplier '{supplier.SupplierName}'"
+            : $"Assigned supplier '{supplier.SupplierName}' to {(await db.Users.Where(u => u.Id == userId).Select(u => u.FullName ?? u.Username).FirstOrDefaultAsync()) ?? "user #" + userId}";
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, detail);
     }
 
     /// <summary>Field keys (Supplier property names) with an unacknowledged, supplier-originated
