@@ -431,7 +431,14 @@ else
         message = null;
     }
 
-    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+    // Stricter than DataAnnotations' EmailAddressAttribute (which accepts "a@b" with no domain dot):
+    // requires a local part, "@", and a domain with a dot and a 2+ character TLD.
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static bool IsValidEmail(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && EmailRegex.IsMatch(value.Trim());
 
     /// <summary>True when the value is exactly <paramref name="length"/> digits (spaces/dashes ignored).</summary>
     private static bool IsDigits(string value, int length)
@@ -452,7 +459,7 @@ else
             var val = CustomerFieldAccessor.GetString(entity, f.FieldKey);
             if (string.IsNullOrWhiteSpace(val)) continue;
 
-            if (f.FieldKey.Contains("Email", StringComparison.OrdinalIgnoreCase) && !EmailValidator.IsValid(val))
+            if (f.FieldKey.Contains("Email", StringComparison.OrdinalIgnoreCase) && !IsValidEmail(val))
             {
                 errs.Add($"{f.DisplayLabel} is not a valid email address.");
             }

@@ -1860,7 +1860,15 @@
         ("RemitAdviceEmail", "Remit Advice Email", 5)
     ];
 
-    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+    // Stricter than DataAnnotations' EmailAddressAttribute, which accepts a bare "user@host" with no
+    // domain dot (e.g. "nay@jdj"). This requires a local part, an "@", and a domain with at least one
+    // dot and a 2+ character top-level domain, so malformed entries are rejected.
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static bool IsValidEmail(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && EmailRegex.IsMatch(value.Trim());
 
     private List<string> ValidateStep(SupplierFormModel model, int step)
     {
@@ -1990,7 +1998,7 @@
                 continue;
             }
             var value = typeof(SupplierFormModel).GetProperty(key)?.GetValue(model) as string;
-            if (!string.IsNullOrWhiteSpace(value) && !EmailValidator.IsValid(value))
+            if (!string.IsNullOrWhiteSpace(value) && !IsValidEmail(value))
             {
                 errors.Add($"{label} is not a valid email address.");
             }
