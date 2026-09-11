@@ -1011,6 +1011,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("AddressPurposeRfqBidding")
                         .HasColumnType("bit");
 
+                    b.Property<bool?>("AddressSameAsTradeLicense")
+                        .HasColumnType("bit");
+
                     b.Property<string>("AdministrativeContact")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -1321,6 +1324,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VatCertificateAddress")
+                        .HasMaxLength(600)
+                        .HasColumnType("nvarchar(600)");
 
                     b.Property<int?>("VatCodeId")
                         .HasColumnType("int");

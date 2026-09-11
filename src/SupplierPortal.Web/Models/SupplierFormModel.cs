@@ -69,6 +69,8 @@ public class SupplierFormModel
     // -- Step 2: Contact Information --
     public string? AddressLine1 { get; set; }
     public string? AddressLine2 { get; set; }
+    public bool? AddressSameAsTradeLicense { get; set; }
+    public string? VatCertificateAddress { get; set; }
 
     [Required(ErrorMessage = "City is required.")]
     public int? CityId { get; set; }
@@ -206,6 +208,8 @@ public class SupplierFormModel
 
         AddressLine1 = s.AddressLine1,
         AddressLine2 = s.AddressLine2,
+        AddressSameAsTradeLicense = s.AddressSameAsTradeLicense,
+        VatCertificateAddress = s.VatCertificateAddress,
         CityId = s.CityId,
         CityText = s.CityText,
         AddressPurposeOrdering = s.AddressPurposeOrdering,
@@ -301,6 +305,9 @@ public class SupplierFormModel
 
         s.AddressLine1 = AddressLine1;
         s.AddressLine2 = AddressLine2;
+        s.AddressSameAsTradeLicense = AddressSameAsTradeLicense;
+        // Only persist the alternate VAT-certificate address when the answer is "No"; clear it otherwise.
+        s.VatCertificateAddress = AddressSameAsTradeLicense == false ? VatCertificateAddress : null;
         s.CityId = CityId;
         s.CityText = CityText;
         s.AddressPurposeOrdering = AddressPurposeOrdering;

@@ -1149,3 +1149,38 @@
         display: none;
     }
 }
+
+/* Yes/No switch toggle: green = Yes (knob right), red = No (knob left), grey = not set. */
+.di-switch-wrap { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding-top: 4px; }
+
+.di-switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex: none;
+    border: none;
+    border-radius: 999px;
+    background: #c7ccd6;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+
+.di-switch.on { background: #2f9e44; }
+.di-switch.off { background: #c0392b; }
+
+.di-switch-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: left 0.15s ease;
+}
+
+.di-switch.on .di-switch-knob { left: 23px; }
+
+.di-switch-text { font-size: 14px; font-weight: 600; color: #46506b; min-width: 26px; }

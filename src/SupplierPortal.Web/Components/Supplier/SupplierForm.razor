@@ -638,6 +638,29 @@
                 {
                     @fieldFragments[key]
                 }
+
+                <!-- Is the address above the same as on the Trade License and VAT Certificate?
+                     When "No", the supplier must give the alternate address per their VAT Certificate. -->
+                <div class="di-field di-full">
+                    <label>Is your address the same as your Trade License and VAT Certificate?</label>
+                    <div class="di-switch-wrap">
+                        <button type="button" role="switch"
+                                aria-checked="@(formModel.AddressSameAsTradeLicense == true ? "true" : "false")"
+                                class="di-switch @(formModel.AddressSameAsTradeLicense == true ? "on" : "") @(formModel.AddressSameAsTradeLicense == false ? "off" : "")"
+                                @onclick="ToggleAddressSameAsTradeLicense">
+                            <span class="di-switch-knob"></span>
+                        </button>
+                        <span class="di-switch-text">@(formModel.AddressSameAsTradeLicense == true ? "Yes" : formModel.AddressSameAsTradeLicense == false ? "No" : "—")</span>
+                    </div>
+                </div>
+                @if (formModel.AddressSameAsTradeLicense == false)
+                {
+                    <div class="di-field di-full">
+                        <label>Address as per VAT Certificate<span class="di-req">*</span></label>
+                        <InputTextArea @bind-Value="formModel.VatCertificateAddress" rows="3"
+                                       placeholder="Enter the address exactly as it appears on your VAT Certificate" />
+                    </div>
+                }
                 @if (AddressPurposeKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
                 {
                 <div class="di-field di-full">
@@ -1184,6 +1207,22 @@
 
     /// <summary>True when the supplier is VAT registered (drives which declaration is shown).</summary>
     private bool IsVatRegistered => formModel.VatRegistered == true;
+
+    /// <summary>Cycles the "address same as Trade License / VAT Certificate" toggle. Starts unset (—),
+    /// then Yes, then No. Clears the alternate VAT-certificate address whenever the answer is not "No".</summary>
+    private void ToggleAddressSameAsTradeLicense()
+    {
+        formModel.AddressSameAsTradeLicense = formModel.AddressSameAsTradeLicense switch
+        {
+            true => false,
+            false => true,
+            null => true,
+        };
+        if (formModel.AddressSameAsTradeLicense != false)
+        {
+            formModel.VatCertificateAddress = null;
+        }
+    }
 
     private string DeclarationTitle => IsVatRegistered ? "VAT Registered Supplier Declaration" : "Non-VAT Registration Declaration";
 
@@ -1842,6 +1881,15 @@
             {
                 errors.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
             }
+        }
+
+        // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
+        // address is mandatory. This is a data-quality rule (like the dates above) so it applies to every
+        // view — the toggle is shown on the Address step (2) to internal users and self-service alike.
+        if (step == 2 && model.AddressSameAsTradeLicense == false
+            && string.IsNullOrWhiteSpace(model.VatCertificateAddress))
+        {
+            errors.Add("Please provide the address as per your VAT Certificate.");
         }
 
         // Required/conditional/document checks apply ONLY to suppliers updating via the self-service
