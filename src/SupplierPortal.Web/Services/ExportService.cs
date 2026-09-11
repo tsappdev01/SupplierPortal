@@ -263,6 +263,7 @@ public class ExportService
     [
         // -- Business / Organization --
         ("Supplier Number", s => s.SupplierNumber),
+        ("Priority", s => s.Priority ?? ""),
         ("Supplier Name", s => s.SupplierName),
         ("Business E-Mail", s => s.Email ?? ""),
         ("Tax Organization Type", s => s.TaxOrganizationType?.DisplayName ?? ""),
@@ -364,6 +365,7 @@ public class ExportService
 
         // -- Status / audit --
         ("Status", s => s.Status?.DisplayName ?? ""),
+        ("Department User Name", s => s.CreatedBy ?? ""),
         ("Draft", s => YesNo(s.IsDraft)),
         ("Active", s => YesNo(s.IsActive)),
         ("Created At", s => DT(s.CreatedAt)),
@@ -409,7 +411,7 @@ public class ExportService
     // Full field set for CSV (opened in Excel, width is not a concern).
     private static readonly string[] CsvColumns =
     [
-        "Supplier Number", "Supplier Name", "Email", "Tax Organization Type", "Supplier Type",
+        "Supplier Number", "Priority", "Supplier Name", "Email", "Tax Organization Type", "Supplier Type",
         "Taxpayer Country", "Country Name", "Tax Registration Number", "Trade License Number",
         "D-U-N-S Number", "Corporate Web Site", "Business Relationship", "One-Time Supplier",
         "Address Name", "Address Line 1", "Address Line 2", "City", "State",
@@ -420,20 +422,21 @@ public class ExportService
         "Payment Method", "Payment Terms", "Payment Method Code", "Remit Advice Email", "VAT Code", "Currency",
         "Bank Name", "Branch Name", "Account Country Code", "Account Name", "Account Number",
         "Account Currency Code", "Swift Code", "IBAN", "Account Start Date", "Allow International Payments",
-        "Status", "Active"
+        "Status", "Department User Name", "Active"
     ];
 
     // Curated subset for PDF (landscape A4 page) so columns stay legible.
     private static readonly string[] PdfColumns =
     [
-        "Supplier Number", "Supplier Name", "Email", "Tax Organization Type", "Supplier Type",
+        "Supplier Number", "Priority", "Supplier Name", "Email", "Tax Organization Type", "Supplier Type",
         "Taxpayer Country", "Country Name", "Tax Registration Number", "Address Line 1",
-        "Address Line 2", "City", "Country", "Status", "Active"
+        "Address Line 2", "City", "Country", "Status", "Department User Name", "Active"
     ];
 
     private static IEnumerable<string> ToCsvRow(Supplier s) =>
     [
         s.SupplierNumber,
+        s.Priority ?? "",
         s.SupplierName,
         s.Email ?? "",
         s.TaxOrganizationType?.DisplayName ?? "",
@@ -489,12 +492,14 @@ public class ExportService
         s.AccountStartDate?.ToString("yyyy-MM-dd") ?? "",
         s.AllowInternationalPayments ? "Yes" : "No",
         s.Status?.DisplayName ?? "",
+        s.CreatedBy ?? "",
         s.IsActive ? "Yes" : "No"
     ];
 
     private static IEnumerable<string> ToPdfRow(Supplier s) =>
     [
         s.SupplierNumber,
+        s.Priority ?? "",
         s.SupplierName,
         s.Email ?? "",
         s.TaxOrganizationType?.DisplayName ?? "",
@@ -507,6 +512,7 @@ public class ExportService
         s.City?.DisplayName ?? "",
         s.Country?.DisplayName ?? "",
         s.Status?.DisplayName ?? "",
+        s.CreatedBy ?? "",
         s.IsActive ? "Yes" : "No"
     ];
 
