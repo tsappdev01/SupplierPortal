@@ -14,7 +14,7 @@ public class SupplierEmailService(
     /// <summary>Renders the associated Business Unit name as the email header brand line (text renders
     /// reliably in every email client, unlike an embedded image).</summary>
     private static string BrandLine(string? name) =>
-        $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name)}</div>";
+        $"<div style=\"color:#0b2545;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name)}</div>";
 
     /// <summary>The email header brand block: the respective Business Unit's <b>logo</b> when one is on
     /// file (its hosted Logo URL, or the uploaded logo embedded as a base64 data URI). The logo alone is
