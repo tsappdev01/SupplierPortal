@@ -111,13 +111,29 @@ public class Supplier
     public string? AddressLine2 { get; set; }
 
     /// <summary>Whether the address above is the same as on the Trade License and VAT Certificate.
-    /// When false, the supplier must provide the alternate address in <see cref="VatCertificateAddress"/>.</summary>
+    /// When false, the supplier must provide the full alternate address (the Vat* fields below) exactly
+    /// as it appears on the VAT Certificate.</summary>
     public bool? AddressSameAsTradeLicense { get; set; }
 
-    /// <summary>The address exactly as it appears on the VAT Certificate, captured only when the main
-    /// address differs from the Trade License / VAT Certificate address.</summary>
-    [MaxLength(600)]
-    public string? VatCertificateAddress { get; set; }
+    // -- Alternate "Address (As per VAT Certificate)" — captured only when AddressSameAsTradeLicense == false.
+    //    Mirrors the main address fields above. --
+    [MaxLength(300)]
+    public string? VatAddressLine1 { get; set; }
+
+    [MaxLength(300)]
+    public string? VatAddressLine2 { get; set; }
+
+    /// <summary>Emirate (LOV) for the VAT-certificate address when the country is the UAE.</summary>
+    public int? VatCityId { get; set; }
+
+    /// <summary>Free-text city for the VAT-certificate address when the country is not the UAE.</summary>
+    [MaxLength(150)]
+    public string? VatCityText { get; set; }
+
+    public int? VatCountryId { get; set; }
+
+    [MaxLength(20)]
+    public string? VatPostalCode { get; set; }
 
     /// <summary>The Emirate (LOV) when the country is the UAE — selected from the Emirates list.</summary>
     public int? CityId { get; set; }

@@ -658,9 +658,49 @@
                 @if (formModel.AddressSameAsTradeLicense == false)
                 {
                     <div class="di-field di-full">
-                        <label>Address as per VAT Certificate<span class="di-req">*</span></label>
-                        <InputTextArea @bind-Value="formModel.VatCertificateAddress" rows="3"
-                                       placeholder="Enter the address exactly as it appears on your VAT Certificate" />
+                        <div class="di-subsection-header">
+                            <svg class="di-subsection-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
+                            Address (As per VAT Certificate)
+                        </div>
+                    </div>
+                    <div class="di-field di-full">
+                        <label>Address Line 1<span class="di-req">*</span></label>
+                        <InputText @bind-Value="formModel.VatAddressLine1" />
+                    </div>
+                    <div class="di-field di-full">
+                        <label>Address Line 2</label>
+                        <InputText @bind-Value="formModel.VatAddressLine2" />
+                    </div>
+                    <div class="di-field">
+                        <label>Country<span class="di-req">*</span></label>
+                        <InputSelect @bind-Value="formModel.VatCountryId">
+                            <option value="">— Select —</option>
+                            @foreach (var lov in countries)
+                            {
+                                <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="di-field">
+                        <label>City / Emirate<span class="di-req">*</span></label>
+                        @if (IsVatUaeCountry)
+                        {
+                            <InputSelect @bind-Value="formModel.VatCityId">
+                                <option value="">— Select Emirate —</option>
+                                @foreach (var lov in provinces)
+                                {
+                                    <option value="@lov.Id">@lov.DisplayName</option>
+                                }
+                            </InputSelect>
+                        }
+                        else
+                        {
+                            <InputText @bind-Value="formModel.VatCityText" placeholder="Enter city" />
+                        }
+                    </div>
+                    <div class="di-field">
+                        <label>PO Box / Postal Code</label>
+                        <InputText @bind-Value="formModel.VatPostalCode" />
                     </div>
                 }
                 @if (AddressPurposeKeys.Any(k => !hiddenFromSupplierKeys.Contains(k)))
@@ -1222,7 +1262,12 @@
         };
         if (formModel.AddressSameAsTradeLicense != false)
         {
-            formModel.VatCertificateAddress = null;
+            formModel.VatAddressLine1 = null;
+            formModel.VatAddressLine2 = null;
+            formModel.VatCityId = null;
+            formModel.VatCityText = null;
+            formModel.VatCountryId = null;
+            formModel.VatPostalCode = null;
         }
     }
 
@@ -1371,6 +1416,9 @@
     /// <summary>True when the selected country is the UAE — the City field is then the Emirate LOV; otherwise
     /// it is a free-text city input. A not-yet-chosen country defaults to UAE (the form's default).</summary>
     private bool IsUaeCountry => formModel.CountryId is null || formModel.CountryId == UaeCountryId;
+
+    /// <summary>UAE test for the alternate VAT-certificate address (drives its Emirate-LOV vs free-text city).</summary>
+    private bool IsVatUaeCountry => formModel.VatCountryId is null || formModel.VatCountryId == UaeCountryId;
 
     /// <summary>Pre-fills the (freely editable) Supplier Site with a copy of the Address Name when it is
     /// still blank, so the user lands on a concrete value they can keep or overwrite.</summary>
@@ -1896,10 +1944,23 @@
         // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
         // address is mandatory. This is a data-quality rule (like the dates above) so it applies to every
         // view — the toggle is shown on the Address step (2) to internal users and self-service alike.
-        if (step == 2 && model.AddressSameAsTradeLicense == false
-            && string.IsNullOrWhiteSpace(model.VatCertificateAddress))
+        if (step == 2 && model.AddressSameAsTradeLicense == false)
         {
-            errors.Add("Please provide the address as per your VAT Certificate.");
+            if (string.IsNullOrWhiteSpace(model.VatAddressLine1))
+            {
+                errors.Add("Address (As per VAT Certificate): Address Line 1 is required.");
+            }
+            if (model.VatCountryId is null)
+            {
+                errors.Add("Address (As per VAT Certificate): Country is required.");
+            }
+            // City follows the same UAE-vs-other rule as the main address: Emirate LOV for the UAE,
+            // free-text city otherwise.
+            var vatIsUae = model.VatCountryId is null || model.VatCountryId == UaeCountryId;
+            if (vatIsUae ? model.VatCityId is null : string.IsNullOrWhiteSpace(model.VatCityText))
+            {
+                errors.Add("Address (As per VAT Certificate): City / Emirate is required.");
+            }
         }
 
         // Format checks are data-quality rules (like the date checks above) and apply to EVERY view —

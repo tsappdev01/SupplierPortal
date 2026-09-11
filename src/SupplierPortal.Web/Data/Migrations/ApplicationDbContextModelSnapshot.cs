@@ -1325,16 +1325,34 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("VatCertificateAddress")
-                        .HasMaxLength(600)
-                        .HasColumnType("nvarchar(600)");
+                    b.Property<string>("VatAddressLine1")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("VatAddressLine2")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int?>("VatCityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VatCityText")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<int?>("VatCodeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("VatCountryId")
                         .HasColumnType("int");
 
                     b.Property<string>("VatGroupEntityNames")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("VatPostalCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<bool?>("VatRegistered")
                         .HasColumnType("bit");

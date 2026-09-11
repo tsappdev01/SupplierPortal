@@ -70,7 +70,12 @@ public class SupplierFormModel
     public string? AddressLine1 { get; set; }
     public string? AddressLine2 { get; set; }
     public bool? AddressSameAsTradeLicense { get; set; }
-    public string? VatCertificateAddress { get; set; }
+    public string? VatAddressLine1 { get; set; }
+    public string? VatAddressLine2 { get; set; }
+    public int? VatCityId { get; set; }
+    public string? VatCityText { get; set; }
+    public int? VatCountryId { get; set; }
+    public string? VatPostalCode { get; set; }
 
     [Required(ErrorMessage = "City is required.")]
     public int? CityId { get; set; }
@@ -209,7 +214,12 @@ public class SupplierFormModel
         AddressLine1 = s.AddressLine1,
         AddressLine2 = s.AddressLine2,
         AddressSameAsTradeLicense = s.AddressSameAsTradeLicense,
-        VatCertificateAddress = s.VatCertificateAddress,
+        VatAddressLine1 = s.VatAddressLine1,
+        VatAddressLine2 = s.VatAddressLine2,
+        VatCityId = s.VatCityId,
+        VatCityText = s.VatCityText,
+        VatCountryId = s.VatCountryId,
+        VatPostalCode = s.VatPostalCode,
         CityId = s.CityId,
         CityText = s.CityText,
         AddressPurposeOrdering = s.AddressPurposeOrdering,
@@ -307,7 +317,13 @@ public class SupplierFormModel
         s.AddressLine2 = AddressLine2;
         s.AddressSameAsTradeLicense = AddressSameAsTradeLicense;
         // Only persist the alternate VAT-certificate address when the answer is "No"; clear it otherwise.
-        s.VatCertificateAddress = AddressSameAsTradeLicense == false ? VatCertificateAddress : null;
+        var keepVat = AddressSameAsTradeLicense == false;
+        s.VatAddressLine1 = keepVat ? VatAddressLine1 : null;
+        s.VatAddressLine2 = keepVat ? VatAddressLine2 : null;
+        s.VatCityId = keepVat ? VatCityId : null;
+        s.VatCityText = keepVat ? VatCityText : null;
+        s.VatCountryId = keepVat ? VatCountryId : null;
+        s.VatPostalCode = keepVat ? VatPostalCode : null;
         s.CityId = CityId;
         s.CityText = CityText;
         s.AddressPurposeOrdering = AddressPurposeOrdering;
