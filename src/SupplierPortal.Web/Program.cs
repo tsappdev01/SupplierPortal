@@ -80,6 +80,13 @@ builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
+
+// Deployment mode (Internal vs DMZ) and the self-service gateway seam. Both modes currently resolve to
+// the Local (database-backed) gateway; Stage 2 registers the DMZ HTTP-client gateway when Mode == Dmz.
+builder.Services.Configure<SupplierPortal.Web.Services.SelfService.DeploymentOptions>(
+    builder.Configuration.GetSection(SupplierPortal.Web.Services.SelfService.DeploymentOptions.SectionName));
+builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
+    SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceAccessGateway>();
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddSingleton<LicenseQrService>();

@@ -3,8 +3,8 @@
 @rendermode InteractiveServer
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
-@inject SupplierAccessTokenService AccessTokenService
-@inject EmailBrandingService Branding
+@using SupplierPortal.Web.Services.SelfService
+@inject ISupplierSelfServiceAccessGateway Access
 @inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
 @inject NavigationManager NavigationManager
@@ -16,7 +16,7 @@
     {
         <p><em>Loading...</em></p>
     }
-    else if (token is null)
+    else if (link is null || !link.Valid)
     {
         <h1>Link Not Available</h1>
         <p class="text-muted">
@@ -29,7 +29,7 @@
         <h1>Verify Your Identity</h1>
         <p class="text-muted">
             We've sent a 4-digit verification code to the email address on file for
-            <strong>@token.Supplier?.SupplierName</strong>. Enter it below to continue.
+            <strong>@link.SupplierName</strong>. Enter it below to continue.
         </p>
 
         @if (errorMessage is not null)
@@ -73,7 +73,7 @@
 @code {
     [Parameter] public string Token { get; set; } = "";
 
-    private SupplierAccessToken? token;
+    private SsLinkInfo? link;
     private bool loading = true;
     private bool verifying;
     private bool resending;
@@ -82,38 +82,35 @@
 
     protected override async Task OnInitializedAsync()
     {
-        token = await AccessTokenService.GetValidTokenAsync(Token);
+        link = await Access.ResolveAsync(Token);
 
-        // Brand the public header with the supplier's business unit logo (its hosted Logo URL, else the
-        // uploaded logo as a data URI) instead of the default Dubai Investments logo.
-        if (token?.Supplier is not null)
+        if (link.Valid)
         {
-            PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(token.Supplier.BusinessUnitId));
-        }
+            // Brand the public header with the supplier's business unit logo (its hosted Logo URL, else the
+            // uploaded logo as a data URI) instead of the default logo.
+            PublicBranding.SetLogo(link.LogoSrc);
 
-        if (token is not null && NeedsFreshOtp(token))
-        {
-            var (success, error) = await AccessTokenService.GenerateAndSendOtpAsync(token.Id);
-            if (!success)
+            if (link.NeedsFreshOtp)
             {
-                errorMessage = error;
+                var (success, error) = await Access.SendOtpAsync(Token);
+                if (!success)
+                {
+                    errorMessage = error;
+                }
             }
         }
 
         loading = false;
     }
 
-    private static bool NeedsFreshOtp(SupplierAccessToken t) =>
-        t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
-
     private async Task VerifyAsync()
     {
-        if (token is null) return;
+        if (link is null || !link.Valid) return;
 
         verifying = true;
         errorMessage = null;
 
-        var (success, error, sessionToken) = await AccessTokenService.VerifyOtpAsync(token.Id, enteredCode);
+        var (success, error, sessionToken) = await Access.VerifyOtpAsync(Token, enteredCode);
         if (success && sessionToken is not null)
         {
             NavigationManager.NavigateTo($"/supplier/self-service/{Token}/form?s={sessionToken}");
@@ -126,12 +123,12 @@
 
     private async Task ResendAsync()
     {
-        if (token is null) return;
+        if (link is null || !link.Valid) return;
 
         resending = true;
         errorMessage = null;
 
-        var (success, error) = await AccessTokenService.GenerateAndSendOtpAsync(token.Id);
+        var (success, error) = await Access.SendOtpAsync(Token);
         if (success)
         {
             ToastService.ShowSuccess("A new verification code has been sent.");
