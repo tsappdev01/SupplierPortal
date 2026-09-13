@@ -81,12 +81,44 @@ builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
 builder.Services.AddScoped<SupplierDocumentService>();
 
-// Deployment mode (Internal vs DMZ) and the self-service gateway seam. Both modes currently resolve to
-// the Local (database-backed) gateway; Stage 2 registers the DMZ HTTP-client gateway when Mode == Dmz.
+// Deployment mode (Internal vs DMZ) and the self-service gateway seam. Internal mode resolves the
+// gateways to the Local (database-backed) implementations; DMZ mode resolves them to HTTP-client
+// implementations that call the internal Self-Service API.
 builder.Services.Configure<SupplierPortal.Web.Services.SelfService.DeploymentOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.SelfService.DeploymentOptions.SectionName));
-builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
-    SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceAccessGateway>();
+builder.Services.Configure<SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions>(
+    builder.Configuration.GetSection(SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions.SectionName));
+
+var deployment = builder.Configuration
+    .GetSection(SupplierPortal.Web.Services.SelfService.DeploymentOptions.SectionName)
+    .Get<SupplierPortal.Web.Services.SelfService.DeploymentOptions>()
+    ?? new SupplierPortal.Web.Services.SelfService.DeploymentOptions();
+
+if (deployment.IsDmz)
+{
+    // DMZ: no database. A typed HttpClient carries the API base URL + shared key; the gateways call the
+    // internal Self-Service API.
+    var apiOptions = builder.Configuration
+        .GetSection(SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions.SectionName)
+        .Get<SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions>()
+        ?? new SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions();
+
+    builder.Services.AddHttpClient("SelfServiceApi", c =>
+    {
+        if (!string.IsNullOrWhiteSpace(apiOptions.BaseUrl)) { c.BaseAddress = new Uri(apiOptions.BaseUrl); }
+        if (!string.IsNullOrWhiteSpace(apiOptions.ApiKey))
+        {
+            c.DefaultRequestHeaders.Add(SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions.ApiKeyHeader, apiOptions.ApiKey);
+        }
+    });
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
+        SupplierPortal.Web.Services.SelfService.HttpSupplierSelfServiceAccessGateway>();
+}
+else
+{
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
+        SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceAccessGateway>();
+}
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddSingleton<LicenseQrService>();
@@ -323,6 +355,46 @@ app.MapPost("/api/breakglass", async (BreakGlassRequest body, BreakGlassService 
             : Results.Problem("Emergency access was not granted.", statusCode: StatusCodes.Status401Unauthorized))
     .AllowAnonymous()
     .RequireRateLimiting("credential");
+
+// ---------------------------------------------------------------------------------------------------
+// Self-Service API (/api/ss/*) — consumed by the DMZ public front-end so it needs no database access.
+// Secured by (a) the shared API key in the X-SelfService-Key header (prefer mutual TLS in production too)
+// and (b) the opaque link/session token inside each request, which scopes every call to one supplier.
+// Anonymous to the app's user policy (the DMZ is not an authenticated app user).
+// ---------------------------------------------------------------------------------------------------
+var ss = app.MapGroup("/api/ss/supplier").AllowAnonymous();
+ss.AddEndpointFilter(async (ctx, next) =>
+{
+    var opts = ctx.HttpContext.RequestServices
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions>>().Value;
+    var provided = ctx.HttpContext.Request.Headers[SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions.ApiKeyHeader].ToString();
+    // Require a configured key and a constant-time match. If no key is configured the API is closed.
+    if (string.IsNullOrEmpty(opts.ApiKey) ||
+        !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(provided), System.Text.Encoding.UTF8.GetBytes(opts.ApiKey)))
+    {
+        return Results.Unauthorized();
+    }
+    return await next(ctx);
+});
+
+ss.MapPost("/resolve", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway gateway) =>
+    Results.Ok(await gateway.ResolveAsync(body.Token)));
+
+ss.MapPost("/otp/send", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway gateway) =>
+{
+    var (success, error) = await gateway.SendOtpAsync(body.Token);
+    return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsResult(success, error));
+}).RequireRateLimiting("credential");
+
+ss.MapPost("/otp/verify", async (SupplierPortal.Web.Services.SelfService.SsOtpVerifyRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway gateway) =>
+{
+    var (success, error, session) = await gateway.VerifyOtpAsync(body.Token, body.Code);
+    return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsVerifyResult(success, error, session));
+}).RequireRateLimiting("credential");
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {
