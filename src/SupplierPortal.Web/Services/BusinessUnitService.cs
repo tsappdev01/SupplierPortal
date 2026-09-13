@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
@@ -7,12 +8,18 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService)
+public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache)
 {
+    private const string AllCacheKey = "ref:businessunits";
+
     public async Task<List<BusinessUnit>> GetAllAsync()
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.BusinessUnits.OrderBy(b => b.Name).ToListAsync();
+        return (await cache.GetOrCreateAsync(AllCacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.BusinessUnits.OrderBy(b => b.Name).ToListAsync();
+        }))!;
     }
 
     public async Task<(bool Success, string? Error)> AddAsync(
@@ -48,6 +55,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         };
         db.BusinessUnits.Add(businessUnit);
         await db.SaveChangesAsync();
+        cache.Remove(AllCacheKey);
 
         await auditService.LogAsync(actorUsername, AuditAction.Create, "BusinessUnit", businessUnit.Id, $"Created business unit '{businessUnit.Name}'");
 
@@ -101,6 +109,7 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         }
 
         await db.SaveChangesAsync();
+        cache.Remove(AllCacheKey);
         await auditService.LogAsync(actorUsername, AuditAction.Update, "BusinessUnit", businessUnit.Id, $"Updated business unit '{businessUnit.Name}'");
 
         return (true, null);

@@ -1,11 +1,23 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService)
+public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache)
 {
+    private const string FieldsCacheKey = "ref:fieldsettings:all";
+    private const string TabsCacheKey = "ref:fieldsettings:tabs";
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
+    /// <summary>Drops the cached field settings and tabs so a save is reflected immediately.</summary>
+    private void InvalidateCaches()
+    {
+        cache.Remove(FieldsCacheKey);
+        cache.Remove(TabsCacheKey);
+    }
+
     /// <summary>Reserved FieldKey used to persist the dashboard "records per page" value (stored in
     /// the row's <see cref="SupplierFieldSetting.Sequence"/>). Kept as a row on the existing table so
     /// the setting needs no new table/migration; excluded from the field grid and wizard logic.</summary>
@@ -44,9 +56,13 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     /// <summary>Fields that drive the supplier form: excludes reserved rows and any admin-removed field.</summary>
     public async Task<List<SupplierFieldSetting>> GetAllAsync()
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var all = await db.SupplierFieldSettings.OrderBy(f => f.Step).ThenBy(f => f.Sequence).ToListAsync();
-        return all.Where(f => !IsHidden(f.FieldKey) && !f.IsRemoved).ToList();
+        return (await cache.GetOrCreateAsync(FieldsCacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = CacheTtl;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var all = await db.SupplierFieldSettings.OrderBy(f => f.Step).ThenBy(f => f.Sequence).ToListAsync();
+            return all.Where(f => !IsHidden(f.FieldKey) && !f.IsRemoved).ToList();
+        }))!;
     }
 
     /// <summary>All configurable fields for the admin field manager — includes removed fields so they
@@ -130,6 +146,7 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         }
 
         await db.SaveChangesAsync();
+        InvalidateCaches();
         await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, "Updated supplier field mandatory/visibility settings");
     }
 
@@ -171,6 +188,7 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         }
 
         await db.SaveChangesAsync();
+        InvalidateCaches();
         await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierFieldSetting", null, "Updated supplier field layout (tabs / order / visibility / removed)");
     }
 
@@ -191,26 +209,30 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     /// defaults on first use so the table is self-initialising without a separate seeding pass.</summary>
     public async Task<List<SupplierTabSetting>> GetTabsAsync()
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
-
-        var missing = DefaultTabTitles.Keys.Where(step => tabs.All(t => t.Step != step)).ToList();
-        if (missing.Count > 0)
+        return (await cache.GetOrCreateAsync(TabsCacheKey, async entry =>
         {
-            foreach (var step in missing)
-            {
-                db.SupplierTabSettings.Add(new SupplierTabSetting
-                {
-                    Step = step,
-                    Title = DefaultTabTitles[step],
-                    IsVisible = true
-                });
-            }
-            await db.SaveChangesAsync();
-            tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
-        }
+            entry.AbsoluteExpirationRelativeToNow = CacheTtl;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
 
-        return tabs;
+            var missing = DefaultTabTitles.Keys.Where(step => tabs.All(t => t.Step != step)).ToList();
+            if (missing.Count > 0)
+            {
+                foreach (var step in missing)
+                {
+                    db.SupplierTabSettings.Add(new SupplierTabSetting
+                    {
+                        Step = step,
+                        Title = DefaultTabTitles[step],
+                        IsVisible = true
+                    });
+                }
+                await db.SaveChangesAsync();
+                tabs = await db.SupplierTabSettings.OrderBy(t => t.Step).ToListAsync();
+            }
+
+            return tabs;
+        }))!;
     }
 
     /// <summary>One tab's editable state from the admin manager.</summary>
@@ -240,6 +262,7 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         }
 
         await db.SaveChangesAsync();
+        InvalidateCaches();
         await auditService.LogAsync(actorUsername, AuditAction.Update, "SupplierTabSetting", null, "Updated supplier wizard tab titles/visibility");
     }
 }

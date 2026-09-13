@@ -1,12 +1,16 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService)
+public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache)
 {
+    // Reference data (lookups, banks) is shared across users and changes rarely, so it is cached to avoid
+    // re-querying on every form open. TTL keeps admin changes appearing within a few minutes.
+    private static readonly TimeSpan ReferenceCacheTtl = TimeSpan.FromMinutes(10);
     /// <summary>Fields excluded from change-tracking: identity/ownership metadata that isn't
     /// meaningful "what did the supplier/admin change" content, or that legitimately changes on
     /// every save (UpdatedAt/UpdatedBy) and would otherwise show up as noise on every update.</summary>
@@ -226,26 +230,37 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     public async Task<Supplier?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        // Split query: the three child collections combined with the many reference includes would
+        // otherwise form one large cartesian join. Splitting keeps a single-supplier load fast.
         return await IncludeLookups(db.Suppliers)
             .Include(s => s.Contacts)
             .Include(s => s.BankAccounts)
             .Include(s => s.VatGroupEntities)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == id);
     }
 
     public async Task<List<LookupValue>> GetLookupsAsync(LookupCategory category)
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.LookupValues
-            .Where(l => l.Category == category && l.IsActive)
-            .OrderBy(l => l.DisplayName)
-            .ToListAsync();
+        return (await cache.GetOrCreateAsync($"ref:lookups:{category}", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = ReferenceCacheTtl;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.LookupValues
+                .Where(l => l.Category == category && l.IsActive)
+                .OrderBy(l => l.DisplayName)
+                .ToListAsync();
+        }))!;
     }
 
     public async Task<List<Bank>> GetBanksAsync()
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.Banks.Include(b => b.Branches).OrderBy(b => b.Name).ToListAsync();
+        return (await cache.GetOrCreateAsync("ref:banks", async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = ReferenceCacheTtl;
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Banks.Include(b => b.Branches).OrderBy(b => b.Name).ToListAsync();
+        }))!;
     }
 
     /// <summary>Generates "{BusinessUnit.Code}-{6-digit sequence}", e.g. "DIPD-000123".</summary>

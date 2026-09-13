@@ -62,6 +62,7 @@ builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSect
 builder.Services.AddSingleton<ActiveDirectoryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
+builder.Services.AddMemoryCache(); // caches reference data (lookups, banks, business units, field settings)
 builder.Services.AddScoped<EmailBrandingService>();
 builder.Services.AddScoped<PublicBrandingState>();
 builder.Services.AddScoped<BusinessUnitService>();

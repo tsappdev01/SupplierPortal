@@ -8,6 +8,12 @@
 @inject LoadingService Loading
 @inject IJSRuntime JS
 
+@if (loading)
+{
+    <LoadingIndicator Message="Loading supplier form…" />
+}
+else
+{
 <div class="di-form-page">
 @{
     // Registry of movable fields keyed by FieldKey. Each step renders the fields the admin field
@@ -1153,6 +1159,7 @@
         color: var(--di-text, inherit);
     }
 </style>
+}
 
 @code {
     [Parameter, EditorRequired] public Supplier Supplier { get; set; } = default!;
@@ -1238,6 +1245,9 @@
         }
     }
     private bool isSaving;
+    // Form data loads after the first render (see OnAfterRenderAsync); until then a loading indicator shows.
+    private bool loading = true;
+    private bool dataLoaded;
 
     // ---- Declaration pop-up (shown to self-service suppliers on Submit) ----
 
@@ -1580,36 +1590,78 @@
     </div>;
     }
 
-    protected override async Task OnInitializedAsync()
+    // Render a loading indicator first, then load the form data after the first render so the user sees
+    // progress instead of a blank panel while the (cached) reference data is fetched.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Mandatory-field validation applies only to the supplier-facing self-service portal. Every
-        // internal view (SupplierFacing == false) — for administrators and other staff alike — edits
-        // with all fields open, so there is no per-role check to make here.
+        if (!firstRender || dataLoaded)
+        {
+            return;
+        }
+        dataLoaded = true;
+        try
+        {
+            await LoadAsync();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
 
-        taxOrgTypes = await SupplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType);
-        supplierTypes = await SupplierService.GetLookupsAsync(LookupCategory.SupplierType);
-        countries = await SupplierService.GetLookupsAsync(LookupCategory.Country);
+    private async Task LoadAsync()
+    {
+        // Reference data is independent and cached server-side; load it concurrently (each call uses its
+        // own DbContext) so opening the form is fast instead of ~20 sequential round-trips.
+        var tTaxOrg = SupplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType);
+        var tSupplierTypes = SupplierService.GetLookupsAsync(LookupCategory.SupplierType);
+        var tCountries = SupplierService.GetLookupsAsync(LookupCategory.Country);
+        var tBusinessRel = SupplierService.GetLookupsAsync(LookupCategory.BusinessRelationship);
+        var tProvinces = SupplierService.GetLookupsAsync(LookupCategory.Province);
+        var tVatCodes = SupplierService.GetLookupsAsync(LookupCategory.VatCode);
+        var tPayMethods = SupplierService.GetLookupsAsync(LookupCategory.PaymentMethod);
+        var tPayTerms = SupplierService.GetLookupsAsync(LookupCategory.PaymentTerms);
+        var tPrefixes = SupplierService.GetLookupsAsync(LookupCategory.Prefix);
+        var tComm = SupplierService.GetLookupsAsync(LookupCategory.CommunicationMethod);
+        var tCurrencies = SupplierService.GetLookupsAsync(LookupCategory.Currency);
+        var tVatRegTypes = SupplierService.GetLookupsAsync(LookupCategory.VatRegistrationType);
+        var tBpTypes = SupplierService.GetLookupsAsync(LookupCategory.BusinessPartnerType);
+        var tBlTypes = SupplierService.GetLookupsAsync(LookupCategory.BusinessLocationType);
+        var tEinv = SupplierService.GetLookupsAsync(LookupCategory.EInvoicingWave);
+        var tLicensing = SupplierService.GetLookupsAsync(LookupCategory.LicensingAuthority);
+        var tBanks = SupplierService.GetBanksAsync();
+        var tBUs = BusinessUnitService.GetAllAsync();
+        var tFieldSettings = SupplierFieldSettingService.GetAllAsync();
+        var tTabs = SupplierFieldSettingService.GetTabsAsync();
+
+        await Task.WhenAll(tTaxOrg, tSupplierTypes, tCountries, tBusinessRel, tProvinces, tVatCodes,
+            tPayMethods, tPayTerms, tPrefixes, tComm, tCurrencies, tVatRegTypes, tBpTypes, tBlTypes,
+            tEinv, tLicensing, tBanks, tBUs, tFieldSettings, tTabs);
+
+        taxOrgTypes = tTaxOrg.Result;
+        supplierTypes = tSupplierTypes.Result;
+        countries = tCountries.Result;
         countriesWithPhoneCode = countries.Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode)).ToList();
-        businessRelationships = await SupplierService.GetLookupsAsync(LookupCategory.BusinessRelationship);
-        provinces = await SupplierService.GetLookupsAsync(LookupCategory.Province);
-        vatCodes = await SupplierService.GetLookupsAsync(LookupCategory.VatCode);
-        paymentMethods = await SupplierService.GetLookupsAsync(LookupCategory.PaymentMethod);
-        paymentTerms = await SupplierService.GetLookupsAsync(LookupCategory.PaymentTerms);
-        prefixes = await SupplierService.GetLookupsAsync(LookupCategory.Prefix);
-        communicationMethods = await SupplierService.GetLookupsAsync(LookupCategory.CommunicationMethod);
-        currencies = await SupplierService.GetLookupsAsync(LookupCategory.Currency);
-        vatRegistrationTypes = await SupplierService.GetLookupsAsync(LookupCategory.VatRegistrationType);
-        businessPartnerTypes = await SupplierService.GetLookupsAsync(LookupCategory.BusinessPartnerType);
-        businessLocationTypes = await SupplierService.GetLookupsAsync(LookupCategory.BusinessLocationType);
-        eInvoicingWaves = await SupplierService.GetLookupsAsync(LookupCategory.EInvoicingWave);
-        licensingAuthorities = await SupplierService.GetLookupsAsync(LookupCategory.LicensingAuthority);
-        banks = await SupplierService.GetBanksAsync();
-        businessUnits = await BusinessUnitService.GetAllAsync();
-
-        fieldSettings = await SupplierFieldSettingService.GetAllAsync();
+        businessRelationships = tBusinessRel.Result;
+        provinces = tProvinces.Result;
+        vatCodes = tVatCodes.Result;
+        paymentMethods = tPayMethods.Result;
+        paymentTerms = tPayTerms.Result;
+        prefixes = tPrefixes.Result;
+        communicationMethods = tComm.Result;
+        currencies = tCurrencies.Result;
+        vatRegistrationTypes = tVatRegTypes.Result;
+        businessPartnerTypes = tBpTypes.Result;
+        businessLocationTypes = tBlTypes.Result;
+        eInvoicingWaves = tEinv.Result;
+        licensingAuthorities = tLicensing.Result;
+        banks = tBanks.Result;
+        businessUnits = tBUs.Result;
+        fieldSettings = tFieldSettings.Result;
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
-        tabSettings = await SupplierFieldSettingService.GetTabsAsync();
+        tabSettings = tTabs.Result;
 
         // Pre-fill the signature if this record was already signed before.
         declarationSignature = Supplier.DisclaimerSignature ?? "";
@@ -1659,8 +1711,11 @@
 
         if (Supplier.Id != 0)
         {
-            documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
-            changedFieldKeys = await SupplierService.GetPendingSupplierEditedFieldsAsync(Supplier.Id);
+            var tDocs = SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
+            var tChanged = SupplierService.GetPendingSupplierEditedFieldsAsync(Supplier.Id);
+            await Task.WhenAll(tDocs, tChanged);
+            documents = tDocs.Result;
+            changedFieldKeys = tChanged.Result;
         }
     }
 
