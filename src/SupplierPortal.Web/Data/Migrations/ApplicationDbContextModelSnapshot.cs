@@ -1114,6 +1114,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("DunsNumber")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1396,6 +1399,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("CountryNameId");
 
                     b.HasIndex("CurrencyId");
+
+                    b.HasIndex("DepartmentId");
 
                     b.HasIndex("EInvoicingWaveId");
 
@@ -2097,6 +2102,11 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("AssignedToUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("SupplierPortal.Web.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SupplierPortal.Web.Models.BankBranch", "BankBranch")
                         .WithMany()
                         .HasForeignKey("BankBranchId")
@@ -2277,6 +2287,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Country");
 
                     b.Navigation("CountryName");
+
+                    b.Navigation("Department");
 
                     b.Navigation("Currency");
 

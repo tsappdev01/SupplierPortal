@@ -27,6 +27,10 @@ public class SupplierListItem
     public int? AssignedToUserId { get; set; }
     public string? AssignedToUserName { get; set; }
 
+    /// <summary>The department that owns this supplier, and its name for the dashboard column.</summary>
+    public int? DepartmentId { get; set; }
+    public string? DepartmentName { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

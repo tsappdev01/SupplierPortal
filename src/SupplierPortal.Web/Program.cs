@@ -455,12 +455,13 @@ ss.MapPost("/documents/delete", async (SupplierPortal.Web.Services.SelfService.S
     SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
     Results.Ok(await data.DeleteDocumentAsync(body.Token, body.Session, body.DocumentId)));
 
-app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
+app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, UserService userService, ExportService exportService) =>
 {
     var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
 
     var suppliers = await supplierService.GetSuppliersAsync(
-        effectiveBusinessUnitIds, statusName: status, assignedToUserId: ResolveAssigneeScope(ctx));
+        effectiveBusinessUnitIds, statusName: status, assignedToUserId: ResolveAssigneeScope(ctx),
+        visibleToDepartmentId: await ResolveDepartmentScopeAsync(ctx, userService));
 
     return format.ToLowerInvariant() switch
     {
@@ -476,14 +477,15 @@ app.MapGet("/export/{format}", async (string format, int? businessUnitId, string
 
 // Generates a supplier upload template (importer-compatible columns). Optionally pre-populated with a
 // business unit's existing suppliers so the business can update and re-upload; otherwise a blank sheet.
-app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
+app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpContext ctx, SupplierService supplierService, UserService userService, ExportService exportService) =>
 {
     var suppliers = new List<Supplier>();
     if (populate == true)
     {
         var effectiveBusinessUnitIds = ResolveExportScope(ctx, businessUnitId);
         suppliers = await supplierService.GetSuppliersAsync(
-            effectiveBusinessUnitIds, assignedToUserId: ResolveAssigneeScope(ctx));
+            effectiveBusinessUnitIds, assignedToUserId: ResolveAssigneeScope(ctx),
+            visibleToDepartmentId: await ResolveDepartmentScopeAsync(ctx, userService));
     }
 
     return Results.File(exportService.ExportToExcelUploadTemplate(suppliers),
@@ -555,6 +557,18 @@ static int? ResolveAssigneeScope(HttpContext ctx)
     }
     var userId = ctx.User.GetUserId();
     return userId > 0 ? userId : -1; // -1 => match nothing when the id can't be resolved
+}
+
+// A non-administrator also sees their department's suppliers on exports (mirrors the dashboard). Requires a
+// lookup of the user's department. Administrators are unrestricted (null).
+static async Task<int?> ResolveDepartmentScopeAsync(HttpContext ctx, UserService userService)
+{
+    if (ctx.User.IsAdministrator())
+    {
+        return null;
+    }
+    var userId = ctx.User.GetUserId();
+    return userId > 0 ? (await userService.GetByIdAsync(userId))?.DepartmentId : null;
 }
 
 static List<int>? ResolveExportScope(HttpContext ctx, int? businessUnitId)

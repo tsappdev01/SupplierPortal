@@ -74,7 +74,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(
         IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null,
-        int? assignedToUserId = null)
+        int? assignedToUserId = null, int? visibleToDepartmentId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = IncludeLookups(db.Suppliers).AsNoTracking();
@@ -82,10 +82,13 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         {
             query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
         }
-        // Non-administrators are limited to the suppliers assigned to them (mirrors the dashboard list).
-        if (assignedToUserId is not null)
+        // Non-administrators are limited to suppliers assigned to them or owned by their department
+        // (mirrors the dashboard list).
+        if (assignedToUserId is not null || visibleToDepartmentId is not null)
         {
-            query = query.Where(s => s.AssignedToUserId == assignedToUserId);
+            query = query.Where(s =>
+                (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
+                (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId));
         }
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
@@ -134,7 +137,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     /// graph (~20 joins) that <see cref="GetSuppliersAsync"/> loads for edit/export use, which was
     /// the main cause of the list page loading slowly.</summary>
     public async Task<List<SupplierListItem>> GetSupplierListAsync(
-        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, int? assignedToUserId = null)
+        IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, int? assignedToUserId = null,
+        int? visibleToDepartmentId = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = db.Suppliers.AsNoTracking().AsQueryable();
@@ -142,11 +146,13 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         {
             query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
         }
-        // When set, restrict the list to suppliers assigned to this user (non-administrators see only
-        // their own assigned records, not the whole business unit).
-        if (assignedToUserId is not null)
+        // Non-administrators see the suppliers assigned to them OR owned by their department (so a
+        // department's members manage their department's suppliers). Administrators pass neither.
+        if (assignedToUserId is not null || visibleToDepartmentId is not null)
         {
-            query = query.Where(s => s.AssignedToUserId == assignedToUserId);
+            query = query.Where(s =>
+                (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
+                (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId));
         }
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
@@ -176,6 +182,8 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 AssignedToUserName = s.AssignedToUser != null
                     ? (s.AssignedToUser.FullName ?? s.AssignedToUser.Username)
                     : null,
+                DepartmentId = s.DepartmentId,
+                DepartmentName = s.Department != null ? s.Department.Name : null,
                 CreatedAt = s.CreatedAt,
                 UpdatedAt = s.UpdatedAt,
                 PendingSupplierChangeCount = db.SupplierFieldChanges.Count(
@@ -204,6 +212,28 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         var detail = userId is null
             ? $"Unassigned supplier '{supplier.SupplierName}'"
             : $"Assigned supplier '{supplier.SupplierName}' to {(await db.Users.Where(u => u.Id == userId).Select(u => u.FullName ?? u.Username).FirstOrDefaultAsync()) ?? "user #" + userId}";
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, detail);
+    }
+
+    /// <summary>Assigns (or, with a null departmentId, un-assigns) the supplier to a department, so that
+    /// department's users can manage it. Recorded in the audit log.</summary>
+    public async Task AssignDepartmentAsync(int supplierId, int? departmentId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null || supplier.DepartmentId == departmentId)
+        {
+            return;
+        }
+
+        supplier.DepartmentId = departmentId;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = actorUsername;
+        await db.SaveChangesAsync();
+
+        var detail = departmentId is null
+            ? $"Removed department from supplier '{supplier.SupplierName}'"
+            : $"Set department of supplier '{supplier.SupplierName}' to {(await db.Departments.Where(d => d.Id == departmentId).Select(d => d.Name).FirstOrDefaultAsync()) ?? "#" + departmentId}";
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, detail);
     }
 

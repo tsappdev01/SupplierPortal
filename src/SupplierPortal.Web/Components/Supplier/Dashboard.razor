@@ -328,6 +328,7 @@ else
             <th>Contact Email</th>
             <th>Status</th>
             <th class="no-print">Assigned To</th>
+            <th class="no-print">Department</th>
             <th class="no-print">Actions</th>
         </tr>
     </thead>
@@ -372,6 +373,17 @@ else
                         @foreach (var u in AssignableFor(supplier))
                         {
                             <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                        }
+                    </select>
+                </td>
+                <td class="no-print">
+                    <select class="form-select form-select-sm di-assign-select"
+                            value="@supplier.DepartmentId"
+                            @onchange="e => AssignDepartmentAsync(supplier, e.Value?.ToString())">
+                        <option value="">— None —</option>
+                        @foreach (var d in departments)
+                        {
+                            <option value="@d.Id">@d.Name</option>
                         }
                     </select>
                 </td>
@@ -640,7 +652,7 @@ else if (TotalPages > 1)
                     ? [templateBuId]
                     : (SeesAllBusinessUnits ? null : userBusinessUnitIds);
                 suppliers = await SupplierService.GetSuppliersAsync(
-                    businessUnitIds, assignedToUserId: AssigneeScope);
+                    businessUnitIds, assignedToUserId: AssigneeScope, visibleToDepartmentId: DepartmentScope);
             }
 
             templateProgress = templatePopulate
@@ -678,12 +690,18 @@ else if (TotalPages > 1)
     private List<BusinessUnit> businessUnits = [];
     private bool isAdministrator;
     private int? currentUserId;
+    private int? currentDepartmentId;
+    private List<Department> departments = [];
     private List<int> userBusinessUnitIds = [];
 
     /// <summary>Assignee scope for list/export queries: null for administrators (no restriction); for a
     /// normal user, their own id — falling back to -1 (match nothing) if the id can't be resolved, so a
     /// missing id never leaks the full list.</summary>
     private int? AssigneeScope => isAdministrator ? null : (currentUserId ?? -1);
+
+    /// <summary>Department scope: null for administrators; the normal user's own department (so they also
+    /// see their department's suppliers). Null when the user has no department.</summary>
+    private int? DepartmentScope => isAdministrator ? null : currentDepartmentId;
 
     /// <summary>Whether the user sees every business unit's suppliers. Only an administrator with NO
     /// business-unit assignment is org-wide; a user (administrator or not) assigned to specific
@@ -775,10 +793,15 @@ else if (TotalPages > 1)
         isAdministrator = state.User.IsAdministrator();
         userBusinessUnitIds = state.User.GetBusinessUnitIds();
         currentUser = state.User.Identity?.Name ?? "unknown";
-        // Non-administrators see only the suppliers assigned to them; administrators see the full list
-        // (scoped to their business units) so they can review and assign.
+        // Non-administrators see the suppliers assigned to them or owned by their department; administrators
+        // see the full list (scoped to their business units) so they can review and assign.
         var uid = state.User.GetUserId();
         currentUserId = uid > 0 ? uid : null;
+        departments = await UserService.GetDepartmentsAsync();
+        if (currentUserId is int meId)
+        {
+            currentDepartmentId = (await UserService.GetByIdAsync(meId))?.DepartmentId;
+        }
 
         var allBusinessUnits = await BusinessUnitService.GetAllAsync();
         businessUnits = SeesAllBusinessUnits
@@ -820,6 +843,21 @@ else if (TotalPages > 1)
         ToastService.ShowSuccess($"{supplier.SupplierName} {who}.");
     }
 
+    private async Task AssignDepartmentAsync(SupplierListItem supplier, string? value)
+    {
+        int? departmentId = int.TryParse(value, out var id) ? id : null;
+        if (supplier.DepartmentId == departmentId)
+        {
+            return;
+        }
+        await SupplierService.AssignDepartmentAsync(supplier.Id, departmentId, currentUser);
+        supplier.DepartmentId = departmentId;
+        supplier.DepartmentName = departmentId is null ? null : departments.FirstOrDefault(d => d.Id == departmentId)?.Name;
+        ToastService.ShowSuccess(departmentId is null
+            ? $"{supplier.SupplierName} department removed."
+            : $"{supplier.SupplierName} assigned to {supplier.DepartmentName}.");
+    }
+
     private async Task ReloadAsync()
     {
         List<int>? businessUnitIds;
@@ -834,7 +872,7 @@ else if (TotalPages > 1)
 
         await Loading.RunAsync(async () =>
         {
-            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter, AssigneeScope);
+            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter, AssigneeScope, DepartmentScope);
         });
         initialLoad = false;
         currentPage = 1;

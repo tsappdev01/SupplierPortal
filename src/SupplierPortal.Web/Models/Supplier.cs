@@ -374,6 +374,11 @@ public class Supplier
     public int? AssignedToUserId { get; set; }
     public User? AssignedToUser { get; set; }
 
+    /// <summary>The department that owns this supplier. Users belonging to this department can manage the
+    /// supplier. Optional; cleared if the department is removed.</summary>
+    public int? DepartmentId { get; set; }
+    public Department? Department { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }
