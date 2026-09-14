@@ -125,6 +125,25 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
             return (false, $"Could not read the file: {ex.Message}");
         }
 
+        return await UploadBytesAsync(customerId, documentType, bytes, file.Name, file.ContentType, uploadedBy);
+    }
+
+    /// <summary>Bytes-based upload path shared by the Blazor upload and the Self-Service API (which receives
+    /// the bytes over HTTP). Validates the extension/size, then stores the document (replacing any existing
+    /// one of the same type).</summary>
+    public async Task<(bool Success, string? Error)> UploadBytesAsync(
+        int customerId, string documentType, byte[] bytes, string fileName, string? contentType, string uploadedBy)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (!AllowedExtensions.Contains(ext))
+        {
+            return (false, "Only PDF, JPG or PNG files are allowed.");
+        }
+        if (bytes.LongLength > MaxFileSize)
+        {
+            return (false, $"'{fileName}' is over the {MaxFileSize / (1024 * 1024)} MB limit.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
         // Replace any existing document of the same type for this customer.
         var existing = await db.CustomerDocuments
@@ -137,15 +156,15 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
         {
             CustomerId = customerId,
             DocumentType = documentType,
-            FileName = file.Name,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+            FileName = fileName,
+            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
             Content = bytes,
             UploadedBy = uploadedBy,
             UploadedAt = DateTime.UtcNow
         });
         await db.SaveChangesAsync();
         await audit.LogAsync(uploadedBy, AuditAction.Create, "CustomerDocument", customerId,
-            $"Uploaded {documentType}: {file.Name}");
+            $"Uploaded {documentType}: {fileName}");
         return (true, null);
     }
 
