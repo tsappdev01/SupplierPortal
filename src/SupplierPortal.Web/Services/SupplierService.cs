@@ -237,6 +237,47 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, detail);
     }
 
+    /// <summary>Assign (or clear, when <paramref name="departmentId"/> is null) the department of many suppliers
+    /// at once. Only suppliers whose department actually changes are updated. Returns the number changed.</summary>
+    public async Task<int> BulkAssignDepartmentAsync(IReadOnlyCollection<int> supplierIds, int? departmentId, string actorUsername)
+    {
+        if (supplierIds.Count == 0)
+        {
+            return 0;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var suppliers = await db.Suppliers
+            .Where(s => supplierIds.Contains(s.Id) && s.DepartmentId != departmentId)
+            .ToListAsync();
+        if (suppliers.Count == 0)
+        {
+            return 0;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var supplier in suppliers)
+        {
+            supplier.DepartmentId = departmentId;
+            supplier.UpdatedAt = now;
+            supplier.UpdatedBy = actorUsername;
+        }
+        await db.SaveChangesAsync();
+
+        var departmentName = departmentId is null
+            ? null
+            : await db.Departments.Where(d => d.Id == departmentId).Select(d => d.Name).FirstOrDefaultAsync();
+        foreach (var supplier in suppliers)
+        {
+            var detail = departmentId is null
+                ? $"Removed department from supplier '{supplier.SupplierName}'"
+                : $"Set department of supplier '{supplier.SupplierName}' to {departmentName ?? "#" + departmentId}";
+            await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplier.Id, detail);
+        }
+
+        return suppliers.Count;
+    }
+
     /// <summary>Field keys (Supplier property names) with an unacknowledged, supplier-originated
     /// change pending review - drives the green "edited by supplier" highlight in the form.</summary>
     public async Task<HashSet<string>> GetPendingSupplierEditedFieldsAsync(int supplierId)

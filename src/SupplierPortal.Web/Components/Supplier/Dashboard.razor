@@ -297,6 +297,25 @@
                 <text>Send Notification to Selected</text>
             }
         </button>
+        <span class="vr d-none d-sm-inline"></span>
+        <select class="form-select form-select-sm di-assign-select" disabled="@bulkSending" @bind="bulkDepartmentId">
+            <option value="">— None (remove department) —</option>
+            @foreach (var d in departments)
+            {
+                <option value="@d.Id">@d.Name</option>
+            }
+        </select>
+        <button class="btn btn-sm btn-outline-primary" disabled="@bulkSending" @onclick="BulkAssignDepartmentAsync">
+            @if (bulkSending)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <text> Assigning...</text>
+            }
+            else
+            {
+                <text>Assign Department to Selected</text>
+            }
+        </button>
         <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="ClearSelection">Clear Selection</button>
     </div>
 }
@@ -719,6 +738,7 @@ else if (TotalPages > 1)
     private int currentPage = 1;
     private HashSet<int> selectedIds = [];
     private bool bulkSending;
+    private string? bulkDepartmentId;
 
     // Business Unit filter is a custom dropdown so each option can show the BU logo before its name.
     private bool buDropdownOpen;
@@ -1044,6 +1064,48 @@ else if (TotalPages > 1)
         else
         {
             ToastService.ShowSuccess(summary);
+        }
+
+        selectedIds.Clear();
+        bulkSending = false;
+    }
+
+    private async Task BulkAssignDepartmentAsync()
+    {
+        if (selectedIds.Count == 0)
+        {
+            return;
+        }
+
+        int? departmentId = int.TryParse(bulkDepartmentId, out var id) ? id : null;
+        var ids = suppliers.Where(s => selectedIds.Contains(s.Id)).Select(s => s.Id).ToList();
+
+        bulkSending = true;
+        StateHasChanged();
+
+        var changed = 0;
+        await Loading.RunAsync(async () =>
+        {
+            changed = await SupplierService.BulkAssignDepartmentAsync(ids, departmentId, currentUser);
+        });
+
+        // Reflect the new department locally so the grid updates without a full reload.
+        var departmentName = departmentId is null ? null : departments.FirstOrDefault(d => d.Id == departmentId)?.Name;
+        foreach (var supplier in suppliers.Where(s => selectedIds.Contains(s.Id)))
+        {
+            supplier.DepartmentId = departmentId;
+            supplier.DepartmentName = departmentName;
+        }
+
+        if (changed == 0)
+        {
+            ToastService.ShowInfo("No suppliers changed (already set to that department).");
+        }
+        else
+        {
+            ToastService.ShowSuccess(departmentId is null
+                ? $"Removed department from {changed} supplier(s)."
+                : $"{changed} supplier(s) assigned to {departmentName}.");
         }
 
         selectedIds.Clear();
