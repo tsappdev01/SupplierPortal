@@ -1116,19 +1116,18 @@ else
                     <div class="di-decl-subtitle">@DeclarationSubtitle</div>
                 </div>
                 <div class="di-decl-body">
-                    @foreach (var para in DeclarationParagraphs)
+                    <p class="di-decl-section">Declaration (For true and correct information provided):</p>
+                    <p>@GeneralDeclaration</p>
+
+                    @if (!IsVatRegistered)
                     {
-                        <p>@para</p>
+                        <p class="di-decl-section">Declaration &ndash; Non-Registration for VAT:</p>
+                        @foreach (var para in VatNonRegistrationParagraphs)
+                        {
+                            <p>@para</p>
+                        }
                     }
-                    @if (DeclarationBullets.Length > 0)
-                    {
-                        <ol class="di-decl-list">
-                            @foreach (var b in DeclarationBullets)
-                            {
-                                <li>@b</li>
-                            }
-                        </ol>
-                    }
+
                     <p class="di-decl-certify">@DeclarationCertify</p>
 
                     <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
@@ -1148,6 +1147,8 @@ else
 </div>
 
 <style>
+    .di-decl-section { font-weight: 700; color: #0b2545; margin: 14px 0 4px; }
+    .di-decl-section:first-child { margin-top: 0; }
     .di-hidden-field { display: none !important; }
     .di-subsection-header {
         grid-column: 1 / -1;
@@ -1293,44 +1294,57 @@ else
         }
     }
 
-    private string DeclarationTitle => IsVatRegistered ? "VAT Registered Supplier Declaration" : "Non-VAT Registration Declaration";
+    private const string CompanyName = "Dubai Investments PJSC";
 
-    private string DeclarationSubtitle => IsVatRegistered
-        ? "Supplier Data Gathering Portal — VAT Registered Supplier"
-        : "Supplier Data Gathering Portal — Non-VAT Registered Supplier";
+    private string DeclarationTitle => "Supplier Declaration";
 
-    private string[] DeclarationParagraphs => IsVatRegistered
-        ?
-        [
-            "I/We, the undersigned, hereby declare that our organization is registered for Value Added Tax (VAT) in the United Arab Emirates (UAE) and that the VAT Registration Number (TRN) provided during supplier registration is valid and active.",
-            "I/We further declare that all information, documents, and details submitted through the Supplier Data Gathering Portal, including but not limited to company, contact, address, banking, tax, and business information, are true, accurate, current, and complete to the best of our knowledge.",
-            "We undertake to promptly notify the Company of any changes to this information and acknowledge that any false, misleading, or incomplete information may result in the rejection, suspension, or review of our supplier registration."
-        ]
-        :
-        [
-            "I/We, the undersigned, hereby declare that our organization is currently not registered for Value Added Tax (VAT) in the United Arab Emirates (UAE).",
-            "We confirm that our annual taxable turnover and taxable supplies do not exceed the mandatory VAT registration threshold of AED 375,000, as prescribed under the applicable UAE VAT regulations.",
-            "We further acknowledge and confirm that:"
-        ];
+    private string DeclarationSubtitle => "Supplier Data Gathering Portal";
 
-    private string[] DeclarationBullets => IsVatRegistered
-        ? []
-        :
-        [
-            "The information provided in this declaration is true, accurate, and complete to the best of our knowledge.",
-            "Should our taxable turnover exceed the mandatory VAT registration threshold in the future, we undertake to register for VAT and promptly provide our VAT Registration Number (TRN) to the Company. We understand that any false or misleading information may result in rejection or suspension of our supplier registration."
-        ];
+    private string SupplierDisplayName =>
+        string.IsNullOrWhiteSpace(Supplier.SupplierName) ? "the Supplier" : Supplier.SupplierName.Trim();
 
-    private string DeclarationCertify => IsVatRegistered
-        ? "By signing below, we confirm our acceptance of and compliance with the above declaration."
-        : "By signing below, we certify that the above statement is true and correct.";
+    /// <summary>General declaration (true &amp; correct information), shown to every supplier.</summary>
+    private string GeneralDeclaration =>
+        "I/We hereby declare that the information and data provided in this form are true, correct, and " +
+        "complete to the best of our knowledge, and are furnished in compliance with the applicable UAE " +
+        "e-invoicing requirements issued by the Ministry of Finance / Federal Tax Authority. We undertake " +
+        $"to promptly inform {CompanyName} of any changes to the above.";
+
+    /// <summary>Additional declaration shown only when the supplier is NOT registered for VAT.</summary>
+    private string[] VatNonRegistrationParagraphs =>
+    [
+        $"I/We, the undersigned, being an authorized signatory of {SupplierDisplayName} (\"the Supplier\"), " +
+        "hereby declare that our taxable supplies and imports have not exceeded the mandatory VAT " +
+        "registration threshold of AED 375,000 during the previous 12 months, and we have therefore not " +
+        "obtained registration for Value Added Tax (VAT) with the Federal Tax Authority (FTA) under UAE " +
+        "Federal Decree-Law No. 8 of 2017 (as amended).",
+
+        $"We undertake to immediately notify {CompanyName} in writing, and to obtain VAT registration within " +
+        "the timeline prescribed by law, should our taxable supplies and imports exceed the mandatory " +
+        $"registration threshold at any point in the future. Until such registration is obtained, we confirm " +
+        $"that we shall not charge VAT on any supplies made to {CompanyName}.",
+
+        "We confirm that the above is true and correct to the best of our knowledge."
+    ];
+
+    private string DeclarationCertify =>
+        "By signing below, I/We acknowledge and accept the declaration(s) set out above.";
 
     /// <summary>The full declaration text stored with the submission (wording preserved for audit).</summary>
     private string DeclarationFullText()
     {
-        var parts = new List<string> { DeclarationTitle, DeclarationSubtitle };
-        parts.AddRange(DeclarationParagraphs);
-        parts.AddRange(DeclarationBullets.Select((b, i) => $"{i + 1}. {b}"));
+        var parts = new List<string>
+        {
+            DeclarationTitle,
+            DeclarationSubtitle,
+            "Declaration (For true and correct information provided):",
+            GeneralDeclaration
+        };
+        if (!IsVatRegistered)
+        {
+            parts.Add("Declaration – Non-Registration for VAT:");
+            parts.AddRange(VatNonRegistrationParagraphs);
+        }
         parts.Add(DeclarationCertify);
         return string.Join("\n\n", parts);
     }
