@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using SupplierPortal.Web.Models.Customer
 @using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.SelfService
 @inject CustomerDocumentService DocumentService
 @inject ToastService ToastService
 @inject IJSRuntime JS
@@ -97,24 +98,53 @@
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
+    /// <summary>When set, all document operations route through the self-service data gateway (DMZ = internal API,
+    /// Internal = database) instead of the injected <see cref="CustomerDocumentService"/>. Set together with
+    /// <see cref="SsToken"/>/<see cref="SsSession"/> on the public self-service page so the DMZ build stays database-less.</summary>
+    [Parameter] public ICustomerSelfServiceDataGateway? SsGateway { get; set; }
+    [Parameter] public string? SsToken { get; set; }
+    [Parameter] public string? SsSession { get; set; }
+    /// <summary>Master document types. When supplied (from the self-service form bundle) they are used as-is so the
+    /// component does not hit the database on the DMZ; otherwise they are loaded via the document service.</summary>
+    [Parameter] public List<CustomerDocumentType>? Types { get; set; }
+
+    private bool ViaGateway => SsGateway is not null;
+
     private List<CustomerDocumentType> types = [];
     private List<CustomerDocument> documents = [];
 
     protected override async Task OnInitializedAsync()
     {
-        types = await DocumentService.GetTypesAsync();
+        types = Types ?? await DocumentService.GetTypesAsync();
         await ReloadAsync();
     }
 
     private async Task ReloadAsync()
     {
-        documents = await DocumentService.GetDocumentsAsync(CustomerId);
+        documents = ViaGateway
+            ? await SsGateway!.ListDocumentsAsync(SsToken ?? "", SsSession ?? "")
+            : await DocumentService.GetDocumentsAsync(CustomerId);
         await OnChanged.InvokeAsync();
     }
 
     private async Task UploadAsync(string documentType, InputFileChangeEventArgs e)
     {
-        var (ok, err) = await DocumentService.UploadAsync(CustomerId, documentType, e.File, CurrentUser);
+        bool ok;
+        string? err;
+        if (ViaGateway)
+        {
+            using var ms = new MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024).CopyToAsync(ms);
+            var r = await SsGateway!.UploadDocumentAsync(
+                SsToken ?? "", SsSession ?? "", documentType, e.File.Name, e.File.ContentType, ms.ToArray());
+            ok = r.Success;
+            err = r.Error;
+        }
+        else
+        {
+            (ok, err) = await DocumentService.UploadAsync(CustomerId, documentType, e.File, CurrentUser);
+        }
+
         if (ok)
         {
             ToastService.ShowSuccess($"{documentType} uploaded.");
@@ -128,7 +158,19 @@
 
     private async Task RemoveAsync(CustomerDocument doc)
     {
-        await DocumentService.DeleteAsync(doc.Id, CurrentUser);
+        if (ViaGateway)
+        {
+            var r = await SsGateway!.DeleteDocumentAsync(SsToken ?? "", SsSession ?? "", doc.Id);
+            if (!r.Success)
+            {
+                ToastService.ShowError(r.Error ?? "Remove failed.");
+                return;
+            }
+        }
+        else
+        {
+            await DocumentService.DeleteAsync(doc.Id, CurrentUser);
+        }
         ToastService.ShowInfo($"{doc.DocumentType} removed.");
         await ReloadAsync();
     }
@@ -137,10 +179,10 @@
     {
         if (SelfService)
         {
-            var file = await DocumentService.GetFileAsync(doc.Id);
-            if (file is not null)
+            var (bytes, contentType, _) = await LoadFileAsync(doc.Id);
+            if (bytes is not null)
             {
-                await JS.InvokeVoidAsync("ssDoc.open", file.Value.ContentType, Convert.ToBase64String(file.Value.Bytes));
+                await JS.InvokeVoidAsync("ssDoc.open", contentType, Convert.ToBase64String(bytes));
             }
         }
         else
@@ -153,15 +195,27 @@
     {
         if (SelfService)
         {
-            var file = await DocumentService.GetFileAsync(doc.Id);
-            if (file is not null)
+            var (bytes, contentType, fileName) = await LoadFileAsync(doc.Id);
+            if (bytes is not null)
             {
-                await JS.InvokeVoidAsync("ssDoc.download", file.Value.FileName, file.Value.ContentType, Convert.ToBase64String(file.Value.Bytes));
+                await JS.InvokeVoidAsync("ssDoc.download", fileName, contentType, Convert.ToBase64String(bytes));
             }
         }
         else
         {
             await JS.InvokeVoidAsync("open", $"/customers/documents/{doc.Id}?download=1", "_self");
         }
+    }
+
+    private async Task<(byte[]? Bytes, string ContentType, string FileName)> LoadFileAsync(int documentId)
+    {
+        if (ViaGateway)
+        {
+            var f = await SsGateway!.GetDocumentFileAsync(SsToken ?? "", SsSession ?? "", documentId);
+            return f is null ? (null, "", "") : (Convert.FromBase64String(f.BytesBase64), f.ContentType, f.FileName);
+        }
+
+        var file = await DocumentService.GetFileAsync(documentId);
+        return file is null ? (null, "", "") : (file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
     }
 }

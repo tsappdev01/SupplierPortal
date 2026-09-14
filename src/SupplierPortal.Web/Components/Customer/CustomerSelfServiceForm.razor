@@ -3,15 +3,11 @@
 @rendermode InteractiveServer
 @using SupplierPortal.Web.Models.Customer
 @using SupplierPortal.Web.Services
-@inject CustomerAccessTokenService AccessTokenService
-@inject CustomerEmailService CustomerEmailService
-@inject CustomerService CustomerService
-@inject CustomerFieldConfigService FieldConfigService
-@inject CustomerDocumentService DocumentService
-@inject EmailBrandingService Branding
+@using SupplierPortal.Web.Services.Customer
+@using SupplierPortal.Web.Services.SelfService
+@inject ICustomerSelfServiceDataGateway DataGateway
 @inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
-@inject NavigationManager NavigationManager
 
 <PageTitle>Customer Information - Customer Portal</PageTitle>
 
@@ -80,7 +76,9 @@
                         </div>
                     </div>
                     <div class="di-section-body" style="grid-template-columns: 1fr;">
-                        <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser" OnChanged="OnDocsChanged" />
+                        <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser"
+                                           Types="docTypes"
+                                           SsGateway="DataGateway" SsToken="Token" SsSession="SessionToken" OnChanged="OnDocsChanged" />
                     </div>
                 </div>
             }
@@ -241,10 +239,10 @@
     private static readonly string[] ContactOrder =
         ["Personal Details", "Identification", "Contact & UAE Pass", "Employment & Other"];
 
-    private CustomerAccessToken? accessToken;
     private Customer? customer;
     private CustomerContact contact = new();
     private List<CustomerFieldConfig> config = [];
+    private List<CustomerDocumentType> docTypes = [];
     private List<Step> steps = [];
     private int current;
     private string currentUser = "Customer Self-Service";
@@ -257,22 +255,23 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // All data comes through the gateway — the database on the internal side, or the internal API on
+        // the DMZ. No direct database access here.
+        SsCustomerFormData? bundle = null;
         if (!string.IsNullOrWhiteSpace(SessionToken))
         {
-            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+            bundle = await DataGateway.LoadFormAsync(Token, SessionToken);
         }
 
-        if (accessToken is not null)
+        if (bundle is not null)
         {
-            config = await FieldConfigService.GetAllAsync();
-            customer = await CustomerService.GetAsync(accessToken.CustomerId);
-            if (customer is not null)
-            {
-                contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
-                currentUser = $"Customer Self-Service ({CustomerAccessTokenService.EmailFor(customer)})";
-                PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(customer.BusinessUnitId));
-                BuildSteps();
-            }
+            customer = bundle.Customer;
+            config = bundle.Config;
+            docTypes = bundle.DocTypes;
+            contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+            currentUser = $"Customer Self-Service ({CustomerAccessTokenService.EmailFor(customer)})";
+            PublicBranding.SetLogo(bundle.LogoSrc);
+            BuildSteps();
         }
 
         loading = false;
@@ -325,7 +324,12 @@
         busy = true;
         if (!silent) message = null;
         customer.Contact = contact;
-        await CustomerService.SaveAsync(customer, currentUser);
+        var result = await DataGateway.SaveAsync(Token, SessionToken ?? "", customer, complete: false);
+        // Sync the 1:1 contact's database id so a subsequent save updates the same row.
+        if (result.Success && result.Saved?.Contact is { Id: > 0 } savedContact)
+        {
+            contact.Id = savedContact.Id;
+        }
         busy = false;
         savedTick = true;
     }
@@ -446,7 +450,7 @@
 
     private async Task SubmitAsync()
     {
-        if (customer is null || accessToken is null) return;
+        if (customer is null) return;
 
         var missing = config.Where(f => f.IsVisible && f.IsRequired)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
@@ -473,8 +477,7 @@
             return;
         }
 
-        var docTypes = await DocumentService.GetTypesAsync();
-        var haveDocs = (await DocumentService.GetDocumentsAsync(customer.Id)).Select(d => d.DocumentType).ToHashSet();
+        var haveDocs = (await DataGateway.ListDocumentsAsync(Token, SessionToken ?? "")).Select(d => d.DocumentType).ToHashSet();
         var missingDocs = docTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name)).Select(t => t.Name).ToList();
         if (missingDocs.Count > 0)
         {
@@ -484,11 +487,14 @@
 
         busy = true; message = null;
         customer.Contact = contact;
-        await CustomerService.SaveAsync(customer, currentUser);
-        await CustomerService.SetStatusAsync(customer.Id, CustomerStatuses.ForReview, currentUser);
-        await AccessTokenService.MarkUsedAsync(accessToken.Id);
-        await CustomerEmailService.NotifyRequestorOfSubmissionAsync(customer, accessToken.CreatedBy, NavigationManager.BaseUri);
+        // Final submit: the gateway saves, sets the status, expires the link and notifies the requestor.
+        var result = await DataGateway.SaveAsync(Token, SessionToken ?? "", customer, complete: true);
         busy = false;
+        if (!result.Success)
+        {
+            ToastService.ShowError(result.Error ?? "Submission failed. Please try again.");
+            return;
+        }
         completed = true;
         ToastService.ShowSuccess("Your information has been submitted.");
     }

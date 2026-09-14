@@ -126,6 +126,10 @@ if (deployment.IsDmz)
         SupplierPortal.Web.Services.SelfService.HttpSupplierSelfServiceAccessGateway>();
     builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway,
         SupplierPortal.Web.Services.SelfService.HttpSupplierSelfServiceDataGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway,
+        SupplierPortal.Web.Services.SelfService.HttpCustomerSelfServiceAccessGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway,
+        SupplierPortal.Web.Services.SelfService.HttpCustomerSelfServiceDataGateway>();
 }
 else
 {
@@ -133,6 +137,10 @@ else
         SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceAccessGateway>();
     builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway,
         SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceDataGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway,
+        SupplierPortal.Web.Services.SelfService.LocalCustomerSelfServiceAccessGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway,
+        SupplierPortal.Web.Services.SelfService.LocalCustomerSelfServiceDataGateway>();
 }
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
@@ -453,6 +461,74 @@ ss.MapPost("/documents/file", async (SupplierPortal.Web.Services.SelfService.SsD
 
 ss.MapPost("/documents/delete", async (SupplierPortal.Web.Services.SelfService.SsDocumentRequest body,
     SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+    Results.Ok(await data.DeleteDocumentAsync(body.Token, body.Session, body.DocumentId)));
+
+// ---- Customer self-service API (mirrors the supplier one) ----
+var csApi = app.MapGroup("/api/ss/customer").AllowAnonymous();
+csApi.AddEndpointFilter(async (ctx, next) =>
+{
+    var opts = ctx.HttpContext.RequestServices
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions>>().Value;
+    var provided = ctx.HttpContext.Request.Headers[SupplierPortal.Web.Services.SelfService.SelfServiceApiOptions.ApiKeyHeader].ToString();
+    if (string.IsNullOrEmpty(opts.ApiKey) ||
+        !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(provided), System.Text.Encoding.UTF8.GetBytes(opts.ApiKey)))
+    {
+        return Results.Unauthorized();
+    }
+    return await next(ctx);
+});
+
+csApi.MapPost("/resolve", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway gateway) =>
+    Results.Ok(await gateway.ResolveAsync(body.Token)));
+
+csApi.MapPost("/otp/send", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway gateway) =>
+{
+    var (success, error) = await gateway.SendOtpAsync(body.Token);
+    return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsResult(success, error));
+}).RequireRateLimiting("credential");
+
+csApi.MapPost("/otp/verify", async (SupplierPortal.Web.Services.SelfService.SsOtpVerifyRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway gateway) =>
+{
+    var (success, error, session) = await gateway.VerifyOtpAsync(body.Token, body.Code);
+    return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsVerifyResult(success, error, session));
+}).RequireRateLimiting("credential");
+
+csApi.MapPost("/form", async (SupplierPortal.Web.Services.SelfService.SsSessionRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
+{
+    var form = await data.LoadFormAsync(body.Token, body.Session);
+    return form is null ? Results.Unauthorized() : Results.Json(form, ssJson);
+});
+
+csApi.MapPost("/submit", async (SupplierPortal.Web.Services.SelfService.SsCustomerSubmitRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
+    Results.Json(await data.SaveAsync(body.Token, body.Session, body.Customer, body.Complete), ssJson));
+
+csApi.MapPost("/documents/list", async (SupplierPortal.Web.Services.SelfService.SsSessionRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
+    Results.Json(await data.ListDocumentsAsync(body.Token, body.Session), ssJson));
+
+csApi.MapPost("/documents/upload", async (SupplierPortal.Web.Services.SelfService.SsCustomerUploadRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
+{
+    var bytes = Convert.FromBase64String(body.BytesBase64);
+    return Results.Ok(await data.UploadDocumentAsync(
+        body.Token, body.Session, body.DocumentType, body.FileName, body.ContentType, bytes));
+});
+
+csApi.MapPost("/documents/file", async (SupplierPortal.Web.Services.SelfService.SsDocumentRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
+{
+    var file = await data.GetDocumentFileAsync(body.Token, body.Session, body.DocumentId);
+    return file is null ? Results.NotFound() : Results.Ok(file);
+});
+
+csApi.MapPost("/documents/delete", async (SupplierPortal.Web.Services.SelfService.SsDocumentRequest body,
+    SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
     Results.Ok(await data.DeleteDocumentAsync(body.Token, body.Session, body.DocumentId)));
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, UserService userService, ExportService exportService) =>
