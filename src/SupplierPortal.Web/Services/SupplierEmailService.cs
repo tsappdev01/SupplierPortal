@@ -106,7 +106,7 @@ public class SupplierEmailService(
             .Replace("{Supplier Name}", supplierName)
             .Replace("{Link}", link);
 
-        var subject = $"Supplier Information Update - {supplierName}";
+        var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";
 
         try
         {
