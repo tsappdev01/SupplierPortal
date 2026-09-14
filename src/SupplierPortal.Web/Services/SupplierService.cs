@@ -73,9 +73,9 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
     /// <summary>Applies the caller's visibility scope to a supplier query.
     /// <para>Administrators (no assignee/department scope) are filtered by business unit only.</para>
-    /// <para>Non-administrators see a supplier when it is <b>assigned to them directly</b> (regardless of
-    /// business unit), OR when it is <b>owned by their department AND within their business-unit scope</b>.
-    /// This matches "business unit + department, or assigned to me".</para></summary>
+    /// <para>Non-administrators see a supplier only when it is <b>within their business-unit scope</b> AND it is
+    /// either <b>assigned to them directly</b> OR <b>owned by their department</b>. This matches
+    /// "(assigned to me AND my business unit) or (my department AND my business unit)".</para></summary>
     private static IQueryable<Supplier> ApplyScope(
         IQueryable<Supplier> query, IReadOnlyCollection<int>? businessUnitIds,
         int? assignedToUserId, int? visibleToDepartmentId)
@@ -91,10 +91,11 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             return hasBuScope ? query.Where(s => buIds.Contains(s.BusinessUnitId)) : query;
         }
 
+        // Non-administrator: the business-unit scope gates both branches of the assignee/department OR.
         return query.Where(s =>
-            (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
-            (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId &&
-                (!hasBuScope || buIds.Contains(s.BusinessUnitId))));
+            (!hasBuScope || buIds.Contains(s.BusinessUnitId)) &&
+            ((assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
+             (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId)));
     }
 
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
