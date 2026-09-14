@@ -1294,7 +1294,16 @@ else
         }
     }
 
-    private const string CompanyName = "Dubai Investments PJSC";
+    /// <summary>The contracting entity named in the declaration — the supplier's own business unit, so the
+    /// wording differs per business unit. Falls back to a neutral label if the unit can't be resolved.</summary>
+    private string CompanyName
+    {
+        get
+        {
+            var bu = businessUnits.FirstOrDefault(b => b.Id == Supplier.BusinessUnitId)?.Name;
+            return string.IsNullOrWhiteSpace(bu) ? "the Company" : bu.Trim();
+        }
+    }
 
     private string DeclarationTitle => "Supplier Declaration";
 
