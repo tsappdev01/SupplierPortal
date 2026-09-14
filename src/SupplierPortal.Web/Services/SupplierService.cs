@@ -71,6 +71,32 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             .Include(s => s.IntermediaryCountry)
             .Include(s => s.AssignedToUser);
 
+    /// <summary>Applies the caller's visibility scope to a supplier query.
+    /// <para>Administrators (no assignee/department scope) are filtered by business unit only.</para>
+    /// <para>Non-administrators see a supplier when it is <b>assigned to them directly</b> (regardless of
+    /// business unit), OR when it is <b>owned by their department AND within their business-unit scope</b>.
+    /// This matches "business unit + department, or assigned to me".</para></summary>
+    private static IQueryable<Supplier> ApplyScope(
+        IQueryable<Supplier> query, IReadOnlyCollection<int>? businessUnitIds,
+        int? assignedToUserId, int? visibleToDepartmentId)
+    {
+        // Materialize to a non-null list so the Contains below always translates (empty => no BU restriction).
+        var buIds = businessUnitIds is { Count: > 0 } ? businessUnitIds.ToList() : new List<int>();
+        var hasBuScope = buIds.Count > 0;
+
+        var hasScope = assignedToUserId is not null || visibleToDepartmentId is not null;
+        if (!hasScope)
+        {
+            // Administrator: business-unit filter only (all units when none supplied).
+            return hasBuScope ? query.Where(s => buIds.Contains(s.BusinessUnitId)) : query;
+        }
+
+        return query.Where(s =>
+            (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
+            (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId &&
+                (!hasBuScope || buIds.Contains(s.BusinessUnitId))));
+    }
+
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(
         IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null,
@@ -78,18 +104,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = IncludeLookups(db.Suppliers).AsNoTracking();
-        if (businessUnitIds is { Count: > 0 })
-        {
-            query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
-        }
-        // Non-administrators are limited to suppliers assigned to them or owned by their department
-        // (mirrors the dashboard list).
-        if (assignedToUserId is not null || visibleToDepartmentId is not null)
-        {
-            query = query.Where(s =>
-                (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
-                (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId));
-        }
+        query = ApplyScope(query, businessUnitIds, assignedToUserId, visibleToDepartmentId);
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
             query = query.Where(s => s.SupplierName.Contains(supplierName));
@@ -142,18 +157,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = db.Suppliers.AsNoTracking().AsQueryable();
-        if (businessUnitIds is { Count: > 0 })
-        {
-            query = query.Where(s => businessUnitIds.Contains(s.BusinessUnitId));
-        }
-        // Non-administrators see the suppliers assigned to them OR owned by their department (so a
-        // department's members manage their department's suppliers). Administrators pass neither.
-        if (assignedToUserId is not null || visibleToDepartmentId is not null)
-        {
-            query = query.Where(s =>
-                (assignedToUserId != null && s.AssignedToUserId == assignedToUserId) ||
-                (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId));
-        }
+        query = ApplyScope(query, businessUnitIds, assignedToUserId, visibleToDepartmentId);
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
             query = query.Where(s => s.SupplierName.Contains(supplierName));

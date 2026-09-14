@@ -667,11 +667,8 @@ else if (TotalPages > 1)
                 templateProgress = "Loading supplier data…";
                 StateHasChanged();
 
-                IReadOnlyCollection<int>? businessUnitIds = templateBuId != 0
-                    ? [templateBuId]
-                    : (SeesAllBusinessUnits ? null : userBusinessUnitIds);
                 suppliers = await SupplierService.GetSuppliersAsync(
-                    businessUnitIds, assignedToUserId: AssigneeScope, visibleToDepartmentId: DepartmentScope);
+                    AccessBusinessUnitIds(templateBuId), assignedToUserId: AssigneeScope, visibleToDepartmentId: DepartmentScope);
             }
 
             templateProgress = templatePopulate
@@ -878,21 +875,22 @@ else if (TotalPages > 1)
             : $"{supplier.SupplierName} assigned to {supplier.DepartmentName}.");
     }
 
+    /// <summary>Business-unit scope for access queries. Administrators (and non-admins for their department
+    /// branch) are scoped to their assigned business units — an explicit picker choice narrows to that unit,
+    /// otherwise it is all their units (or null = all, for an administrator with none assigned). For a
+    /// non-administrator the service combines this with the department scope as one branch of an OR whose
+    /// other branch is "assigned to me directly", which bypasses the business-unit scope.</summary>
+    private IReadOnlyCollection<int>? AccessBusinessUnitIds(int explicitBuId)
+        => explicitBuId != 0
+            ? new[] { explicitBuId }
+            : (SeesAllBusinessUnits ? null : userBusinessUnitIds);
+
     private async Task ReloadAsync()
     {
-        List<int>? businessUnitIds;
-        if (filterBusinessUnitId != 0)
-        {
-            businessUnitIds = [filterBusinessUnitId];
-        }
-        else
-        {
-            businessUnitIds = SeesAllBusinessUnits ? null : userBusinessUnitIds;
-        }
-
         await Loading.RunAsync(async () =>
         {
-            suppliers = await SupplierService.GetSupplierListAsync(businessUnitIds, supplierNameFilter, AssigneeScope, DepartmentScope);
+            suppliers = await SupplierService.GetSupplierListAsync(
+                AccessBusinessUnitIds(filterBusinessUnitId), supplierNameFilter, AssigneeScope, DepartmentScope);
         });
         initialLoad = false;
         currentPage = 1;

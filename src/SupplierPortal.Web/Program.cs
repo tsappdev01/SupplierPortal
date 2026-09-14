@@ -647,6 +647,10 @@ static async Task<int?> ResolveDepartmentScopeAsync(HttpContext ctx, UserService
     return userId > 0 ? (await userService.GetByIdAsync(userId))?.DepartmentId : null;
 }
 
+// Business-unit scope for exports. Mirrors the dashboard: an explicit filter narrows to that unit; otherwise
+// it is the user's assigned units (null = all, for an administrator with none). For a non-administrator the
+// supplier service combines this with the department scope as one branch of an OR whose other branch is
+// "assigned to me directly", which bypasses the business-unit scope.
 static List<int>? ResolveExportScope(HttpContext ctx, int? businessUnitId)
 {
     var userBuIds = ctx.User.GetBusinessUnitIds();
