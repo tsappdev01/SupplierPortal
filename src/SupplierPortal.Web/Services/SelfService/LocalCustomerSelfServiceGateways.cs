@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using SupplierPortal.Web.Models.Customer;
-using SupplierPortal.Web.Services.Customer;
 
 namespace SupplierPortal.Web.Services.SelfService;
 
