@@ -59,9 +59,17 @@ public class CustomerEmailService(
 
         var rawToken = await accessTokenService.CreateTokenAsync(customerId, actorUsername);
 
-        // Customers are external, so the link must point at the public self-service host.
-        var portalUrl = configuration["SelfService:PortalUrl"];
-        var linkBase = string.IsNullOrWhiteSpace(portalUrl) ? baseUrl : portalUrl;
+        // Customers are external, so the link must point at the public self-service host. Precedence: the
+        // business unit's own Domain (each unit can have its own DMZ host), then the global
+        // SelfService:PortalUrl, then the caller's base URL. A bare host is turned into an https:// URL.
+        string? buDomain = null;
+        if (businessUnitId is int buId)
+        {
+            await using var buDb = await dbFactory.CreateDbContextAsync();
+            buDomain = await buDb.BusinessUnits.Where(b => b.Id == buId)
+                .Select(b => b.Domain).FirstOrDefaultAsync();
+        }
+        var linkBase = SupplierEmailService.SelfServiceLinkBase(buDomain, configuration["SelfService:PortalUrl"], baseUrl);
         var link = $"{linkBase.TrimEnd('/')}/customer/self-service/{rawToken}";
 
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);

@@ -37,8 +37,8 @@ else
             <InputText class="form-control" @bind-Value="Input.Code" />
         </div>
         <div class="mb-3">
-            <label class="form-label">Domain Name</label>
-            <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. dipark.com" />
+            <label class="form-label">Domain Name <span class="text-muted small">(public self-service host for this unit's emailed links)</span></label>
+            <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. supplier.dipark.com" />
         </div>
         <div class="mb-3">
             <label class="form-label">Logo URL <span class="text-muted small">(used in emails &amp; external links)</span></label>

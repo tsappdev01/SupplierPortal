@@ -38,6 +38,21 @@ public class SupplierEmailService(
         await branding.GetBusinessUnitLogoSrcAsync(businessUnitId)
         ?? await branding.GetLogoSrcAsync(actorUsername, businessUnitId);
 
+    /// <summary>Picks the first non-empty self-service base from the candidates (business unit domain,
+    /// global setting, request base) and turns a bare host (no scheme) into an https:// URL.</summary>
+    public static string SelfServiceLinkBase(params string?[] candidates)
+    {
+        var chosen = candidates.FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))?.Trim() ?? "";
+        if (chosen.Length == 0)
+        {
+            return "";
+        }
+        return chosen.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || chosen.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? chosen
+            : $"https://{chosen}";
+    }
+
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/supplier_update_notification.html";
     private const string SubmissionTemplateRelativePath = "doc/supplier_submission_notification.html";
@@ -64,20 +79,24 @@ public class SupplierEmailService(
         // once opened (see SupplierAccessTokenService).
         var rawToken = await accessTokenService.CreateTokenAsync(supplierId, actorUsername);
 
-        // Suppliers are external, so the link must point at the public self-service host, not the
-        // intranet URL the admin happens to be browsing. SelfService:PortalUrl (e.g. https://bps.dipark.com)
-        // overrides the base when set; otherwise fall back to the caller's base URL.
-        var portalUrl = configuration["SelfService:PortalUrl"];
-        var linkBase = string.IsNullOrWhiteSpace(portalUrl) ? baseUrl : portalUrl;
-        var link = $"{linkBase.TrimEnd('/')}/supplier/self-service/{rawToken}";
-
-        // Load the supplier's Business Unit so the email is branded with that unit's logo.
+        // Load the supplier's Business Unit so the email is branded with that unit's logo and its link is
+        // built on that unit's own self-service host (the unit's Domain).
         int? businessUnitId;
+        string? buDomain;
         await using (var buDb = await dbFactory.CreateDbContextAsync())
         {
-            businessUnitId = await buDb.Suppliers.Where(s => s.Id == supplierId)
-                .Select(s => s.BusinessUnitId).FirstOrDefaultAsync();
+            var bu = await buDb.Suppliers.Where(s => s.Id == supplierId)
+                .Select(s => new { s.BusinessUnitId, s.BusinessUnit!.Domain })
+                .FirstOrDefaultAsync();
+            businessUnitId = bu?.BusinessUnitId;
+            buDomain = bu?.Domain;
         }
+
+        // Suppliers are external, so the link must point at the public self-service host, not the intranet
+        // URL the admin happens to be browsing. Precedence: the business unit's own Domain (its DMZ host),
+        // then the global SelfService:PortalUrl, then the caller's base URL.
+        var linkBase = SelfServiceLinkBase(buDomain, configuration["SelfService:PortalUrl"], baseUrl);
+        var link = $"{linkBase.TrimEnd('/')}/supplier/self-service/{rawToken}";
 
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var logo = await BusinessUnitLogoAsync(businessUnitId, actorUsername);

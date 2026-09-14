@@ -12,7 +12,10 @@ public class BusinessUnit
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Business unit's web/email domain, e.g. "dipark.com" (no scheme). Optional.</summary>
+    /// <summary>Business unit's public self-service host / web domain, e.g. "supplier.dipark.com" (scheme
+    /// optional). When set, links emailed to this unit's suppliers/customers are built on this host so each
+    /// business unit can have its own DMZ URL; otherwise the global SelfService:PortalUrl (then the request
+    /// base) is used. Optional.</summary>
     [MaxLength(200)]
     public string? Domain { get; set; }
 
