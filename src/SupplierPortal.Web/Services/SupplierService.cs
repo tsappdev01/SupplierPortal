@@ -303,6 +303,17 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return await db.Suppliers.Where(s => s.Id == id).Select(s => s.SupplierName).FirstOrDefaultAsync();
     }
 
+    /// <summary>Lightweight lookup of a supplier's number and name (e.g. to name a download
+    /// "Supplier Number_Supplier Name.zip"), avoiding the full entity graph.</summary>
+    public async Task<(string? Number, string? Name)> GetNumberAndNameAsync(int id)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.Suppliers.Where(s => s.Id == id)
+            .Select(s => new { s.SupplierNumber, s.SupplierName })
+            .FirstOrDefaultAsync();
+        return (row?.SupplierNumber, row?.SupplierName);
+    }
+
     public async Task<Supplier?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

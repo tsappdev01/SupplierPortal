@@ -823,9 +823,11 @@ app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentS
     var files = await documentService.GetAllFilesAsync(id);
     if (files.Count == 0) return Results.NotFound("This supplier has no attachments.");
 
-    // Name the archive after the supplier (sanitized to a filesystem-safe name), falling back to the id.
-    var supplierName = await supplierService.GetNameAsync(id);
-    var zipName = SafeFileName(supplierName, $"supplier-{id}") + ".zip";
+    // Name the archive "Supplier Number_Supplier Name.zip" (sanitized), falling back to the id.
+    var (supplierNumber, supplierName) = await supplierService.GetNumberAndNameAsync(id);
+    var rawName = string.Join("_",
+        new[] { supplierNumber, supplierName }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    var zipName = SafeFileName(rawName, $"supplier-{id}") + ".zip";
 
     using var ms = new MemoryStream();
     using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
