@@ -1181,6 +1181,18 @@ else
     /// Confirmation Letter attachment.</summary>
     [Parameter] public bool SupplierFacing { get; set; }
 
+    /// <summary>Self-service data gateway supplied by the public self-service page. When set, the form
+    /// loads/saves/manages documents through this gateway (which is HTTP-backed on the DMZ) instead of the
+    /// database services — this is what lets the DMZ run with no database. Null for internal admin views.</summary>
+    [Parameter] public SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway? SsGateway { get; set; }
+    /// <summary>Pre-loaded form bundle (from the gateway) used to populate the form without touching the
+    /// database. Set together with <see cref="SsGateway"/> on the self-service page.</summary>
+    [Parameter] public SupplierPortal.Web.Services.SelfService.SsFormData? Preloaded { get; set; }
+    [Parameter] public string? SsToken { get; set; }
+    [Parameter] public string? SsSession { get; set; }
+
+    private bool ViaGateway => SsGateway is not null;
+
     // Admin-configured tab titles + visibility (one row per field-section step 1-5).
     private List<SupplierTabSetting> tabSettings = [];
 
@@ -1612,6 +1624,14 @@ else
 
     private async Task LoadAsync()
     {
+        // Self-service (DMZ or internal) supplies a pre-loaded bundle via the gateway, so the form renders
+        // without any database access here. Internal admin edit/create loads the reference data directly.
+        if (Preloaded is not null)
+        {
+            ApplyBundle(Preloaded);
+        }
+        else
+        {
         // Reference data is independent and cached server-side; load it concurrently (each call uses its
         // own DbContext) so opening the form is fast instead of ~20 sequential round-trips.
         var tTaxOrg = SupplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType);
@@ -1662,6 +1682,7 @@ else
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
         tabSettings = tTabs.Result;
+        }
 
         // Pre-fill the signature if this record was already signed before.
         declarationSignature = Supplier.DisclaimerSignature ?? "";
@@ -1709,7 +1730,9 @@ else
                   ?? currencies.FirstOrDefault(c => c.DisplayName.Contains("Dirham", StringComparison.OrdinalIgnoreCase));
         formModel.AccountCurrencyCodeId ??= aed?.Id;
 
-        if (Supplier.Id != 0)
+        // Documents and pending-edit highlights: the bundle already carried these for self-service; only
+        // the internal path needs to fetch them here.
+        if (Preloaded is null && Supplier.Id != 0)
         {
             var tDocs = SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
             var tChanged = SupplierService.GetPendingSupplierEditedFieldsAsync(Supplier.Id);
@@ -1717,6 +1740,37 @@ else
             documents = tDocs.Result;
             changedFieldKeys = tChanged.Result;
         }
+    }
+
+    /// <summary>Populates the reference-data / document fields from a pre-loaded self-service bundle,
+    /// avoiding any database access (used on the DMZ and for internal self-service).</summary>
+    private void ApplyBundle(SupplierPortal.Web.Services.SelfService.SsFormData d)
+    {
+        taxOrgTypes = d.TaxOrgTypes;
+        supplierTypes = d.SupplierTypes;
+        countries = d.Countries;
+        countriesWithPhoneCode = countries.Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode)).ToList();
+        businessRelationships = d.BusinessRelationships;
+        provinces = d.Provinces;
+        vatCodes = d.VatCodes;
+        paymentMethods = d.PaymentMethods;
+        paymentTerms = d.PaymentTerms;
+        prefixes = d.Prefixes;
+        communicationMethods = d.CommunicationMethods;
+        currencies = d.Currencies;
+        vatRegistrationTypes = d.VatRegistrationTypes;
+        businessPartnerTypes = d.BusinessPartnerTypes;
+        businessLocationTypes = d.BusinessLocationTypes;
+        eInvoicingWaves = d.EInvoicingWaves;
+        licensingAuthorities = d.LicensingAuthorities;
+        banks = d.Banks;
+        businessUnits = d.BusinessUnits;
+        fieldSettings = d.FieldSettings;
+        mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
+        hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+        tabSettings = d.TabSettings;
+        documents = d.Documents;
+        changedFieldKeys = d.ChangedFieldKeys.ToHashSet();
     }
 
     /// <summary>CSS class for a field wrapper: highlights it green when its current value came from a
@@ -1780,38 +1834,54 @@ else
         uploadingDocument = true;
         try
         {
-        var result = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
-
-        if (!result.Success)
+        bool success; string? error; string? extractedNumber; string? dunsNumber;
+        if (ViaGateway)
         {
-            ToastService.ShowError(result.Error ?? "Upload failed.");
+            await using var ms = new MemoryStream();
+            await using (var rs = e.File.OpenReadStream(MaxUploadMb * 1024L * 1024L))
+            {
+                await rs.CopyToAsync(ms);
+            }
+            var up = await SsGateway!.UploadDocumentAsync(
+                SsToken ?? "", SsSession ?? "", (int)documentType, e.File.Name, e.File.ContentType, ms.ToArray());
+            (success, error, extractedNumber, dunsNumber) = (up.Success, up.Error, up.ExtractedNumber, up.DunsNumber);
+        }
+        else
+        {
+            var result = await SupplierDocumentService.UploadAsync(Supplier.Id, documentType, e.File, CurrentUser);
+            (success, error, extractedNumber, dunsNumber) = (result.Success, result.Error, result.ExtractedNumber, result.DunsNumber);
+        }
+
+        if (!success)
+        {
+            ToastService.ShowError(error ?? "Upload failed.");
             uploadingDocument = false;
             return;
         }
 
         var message = $"'{e.File.Name}' uploaded successfully.";
-        if (result.ExtractedNumber is not null)
+        if (extractedNumber is not null)
         {
             if (documentType == SupplierDocumentType.VatCertification)
             {
-                formModel.TaxRegistrationNumber = result.ExtractedNumber;
-                message += $" Tax Registration Number '{result.ExtractedNumber}' was read from the document and filled in.";
+                formModel.TaxRegistrationNumber = extractedNumber;
+                message += $" Tax Registration Number '{extractedNumber}' was read from the document and filled in.";
             }
             else if (documentType == SupplierDocumentType.TradeLicense)
             {
-                formModel.TradeLicenseNumber = result.ExtractedNumber;
-                message += $" Trade License Number '{result.ExtractedNumber}' was read from the document and filled in.";
+                formModel.TradeLicenseNumber = extractedNumber;
+                message += $" Trade License Number '{extractedNumber}' was read from the document and filled in.";
             }
         }
 
-        if (documentType == SupplierDocumentType.TradeLicense && result.DunsNumber is not null)
+        if (documentType == SupplierDocumentType.TradeLicense && dunsNumber is not null)
         {
-            formModel.DunsNumber = result.DunsNumber;
-            message += $" D-U-N-S Number '{result.DunsNumber}' was read from the document and filled in.";
+            formModel.DunsNumber = dunsNumber;
+            message += $" D-U-N-S Number '{dunsNumber}' was read from the document and filled in.";
         }
 
         ToastService.ShowSuccess(message);
-        documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
+        documents = await LoadDocumentsAsync();
         }
         catch (Exception)
         {
@@ -1834,14 +1904,29 @@ else
         try
         {
             await CloseViewer();
-            var file = await SupplierDocumentService.GetFileAsync(documentId);
-            if (file is null)
+            byte[] bytes; string contentType; string fileName;
+            if (ViaGateway)
             {
-                ToastService.ShowError("Could not open the document. Please try again.");
-                return;
+                var f = await SsGateway!.GetDocumentFileAsync(SsToken ?? "", SsSession ?? "", documentId);
+                if (f is null)
+                {
+                    ToastService.ShowError("Could not open the document. Please try again.");
+                    return;
+                }
+                (bytes, contentType, fileName) = (Convert.FromBase64String(f.BytesBase64), f.ContentType, f.FileName);
             }
-            viewerUrl = await JS.InvokeAsync<string>("ssDoc.makeUrl", file.Value.Bytes, file.Value.ContentType);
-            viewerName = file.Value.FileName;
+            else
+            {
+                var file = await SupplierDocumentService.GetFileAsync(documentId);
+                if (file is null)
+                {
+                    ToastService.ShowError("Could not open the document. Please try again.");
+                    return;
+                }
+                (bytes, contentType, fileName) = (file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
+            }
+            viewerUrl = await JS.InvokeAsync<string>("ssDoc.makeUrl", bytes, contentType);
+            viewerName = fileName;
         }
         catch (Exception)
         {
@@ -1862,17 +1947,32 @@ else
 
     private async Task RemoveDocumentAsync(int documentId)
     {
-        var (success, error) = await SupplierDocumentService.DeleteAsync(documentId, CurrentUser);
+        bool success; string? error;
+        if (ViaGateway)
+        {
+            var r = await SsGateway!.DeleteDocumentAsync(SsToken ?? "", SsSession ?? "", documentId);
+            (success, error) = (r.Success, r.Error);
+        }
+        else
+        {
+            (success, error) = await SupplierDocumentService.DeleteAsync(documentId, CurrentUser);
+        }
         if (success)
         {
             ToastService.ShowSuccess("Document removed.");
-            documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
+            documents = await LoadDocumentsAsync();
         }
         else
         {
             ToastService.ShowError(error ?? "Could not remove the document.");
         }
     }
+
+    /// <summary>Reloads the document list via the gateway (self-service) or the database (internal).</summary>
+    private async Task<List<SupplierDocument>> LoadDocumentsAsync()
+        => ViaGateway
+            ? await SsGateway!.ListDocumentsAsync(SsToken ?? "", SsSession ?? "")
+            : await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
 
     private RenderFragment Req(string fieldKey) => builder =>
     {
@@ -2170,11 +2270,25 @@ else
     {
         formModel.ApplyTo(Supplier);
 
+        Supplier? savedViaGateway = null;
         await Loading.RunAsync(async () =>
         {
             if (PersistOverride is not null)
             {
                 await PersistOverride(Supplier);
+                return;
+            }
+
+            // Self-service (DMZ or internal) persists through the gateway (HTTP-backed on the DMZ), which
+            // handles the update, completion, notifications and token expiry on the internal side.
+            if (ViaGateway)
+            {
+                var result = await SsGateway!.SaveAsync(SsToken ?? "", SsSession ?? "", Supplier, complete: submitting);
+                if (!result.Success)
+                {
+                    throw new InvalidOperationException(result.Error ?? "Save failed.");
+                }
+                savedViaGateway = result.Saved;
                 return;
             }
 
@@ -2191,7 +2305,7 @@ else
             }
         });
 
-        await SyncPersistedChildIdsAsync();
+        await SyncPersistedChildIdsAsync(savedViaGateway);
     }
 
     /// <summary>
@@ -2199,14 +2313,15 @@ else
     /// onto the form models (matched by their persisted order) so a subsequent save updates the same rows
     /// instead of inserting duplicates.
     /// </summary>
-    private async Task SyncPersistedChildIdsAsync()
+    private async Task SyncPersistedChildIdsAsync(Supplier? preloadedSaved = null)
     {
         if (Supplier.Id == 0)
         {
             return;
         }
 
-        var saved = await SupplierService.GetByIdAsync(Supplier.Id);
+        // Self-service supplies the reloaded record (from the gateway); internal edit fetches it directly.
+        var saved = preloadedSaved ?? (ViaGateway ? null : await SupplierService.GetByIdAsync(Supplier.Id));
         if (saved is null)
         {
             return;
@@ -2248,7 +2363,7 @@ else
             await PersistAsync();
             if (Supplier.Id != 0)
             {
-                documents = await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
+                documents = await LoadDocumentsAsync();
             }
             currentStep = Math.Min(currentStep + 1, VisiblePages.Count);
             maxStepReached = Math.Max(maxStepReached, currentStep);

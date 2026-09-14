@@ -3,13 +3,10 @@
 @rendermode InteractiveServer
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
-@inject SupplierAccessTokenService AccessTokenService
-@inject SupplierService SupplierService
-@inject SupplierEmailService SupplierEmailService
-@inject EmailBrandingService Branding
+@using SupplierPortal.Web.Services.SelfService
+@inject ISupplierSelfServiceDataGateway DataGateway
 @inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
-@inject NavigationManager NavigationManager
 
 <PageTitle>Supplier Information - Supplier Portal</PageTitle>
 
@@ -46,7 +43,9 @@
                 <strong>@supplier.SupplierName</strong> are shown.
             </p>
             <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="@actorLabel"
-                          AccessTokenId="accessToken!.Id" SupplierFacing="true" OnComplete="HandleCompleteAsync" />
+                          SupplierFacing="true"
+                          SsGateway="DataGateway" Preloaded="bundle" SsToken="Token" SsSession="SessionToken"
+                          OnComplete="HandleCompleteAsync" />
         </div>
     }
 </div>
@@ -72,7 +71,7 @@
     [Parameter] public string Token { get; set; } = "";
     [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
 
-    private SupplierAccessToken? accessToken;
+    private SsFormData? bundle;
     private Supplier? supplier;
     private string actorLabel = "Supplier Self-Service";
     private bool loading = true;
@@ -80,37 +79,29 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // All data comes through the gateway — the database on the internal side, or the internal API when
+        // this page runs on the DMZ. No direct database access here.
         if (!string.IsNullOrWhiteSpace(SessionToken))
         {
-            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+            bundle = await DataGateway.LoadFormAsync(Token, SessionToken);
         }
 
-        if (accessToken is not null)
+        if (bundle is not null)
         {
-            supplier = await SupplierService.GetByIdAsync(accessToken.SupplierId);
+            supplier = bundle.Supplier;
             actorLabel = $"Supplier Self-Service ({supplier?.ContactEmail})";
-            // Keep the public header branded with the supplier's business unit logo.
-            if (supplier is not null)
-            {
-                PublicBranding.SetLogo(await Branding.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId));
-            }
+            PublicBranding.SetLogo(bundle.LogoSrc);
         }
 
         loading = false;
     }
 
-    private async Task HandleCompleteAsync(Supplier updated)
+    private Task HandleCompleteAsync(Supplier updated)
     {
-        if (accessToken is not null)
-        {
-            await AccessTokenService.MarkUsedAsync(accessToken.Id);
-            // Submission is final — the record was auto-marked Completed on save (no review step).
-            // Let the internal requestor know, and confirm to the supplier that their response was received.
-            await SupplierEmailService.NotifyRequestorOfSubmissionAsync(updated, accessToken.CreatedBy, NavigationManager.BaseUri);
-            await SupplierEmailService.NotifySupplierCompletedAsync(
-                updated.Id, updated.SupplierName, updated.ContactEmail, "Supplier Self-Service", updated.BusinessUnitId);
-        }
+        // The submission (status change, notifications, token expiry) already ran on the internal side
+        // through the gateway's SaveAsync(complete: true); nothing to do here but show the confirmation.
         completed = true;
         ToastService.ShowSuccess("Your supplier information has been submitted.");
+        return Task.CompletedTask;
     }
 }

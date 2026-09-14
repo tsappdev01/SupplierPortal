@@ -29,13 +29,23 @@ builder.Services.AddRazorComponents()
     });
 builder.Services.AddCascadingAuthenticationState();
 
+// On the DMZ there is no database — all data flows through the internal Self-Service API — but the
+// DbContext factories are still registered so DI can satisfy components that inject the domain services
+// (which the self-service path never actually calls). A placeholder connection is used when none is
+// configured; it is never opened because the DMZ skips startup migration and uses the HTTP gateways.
+var dbConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(dbConnection))
+{
+    dbConnection = "Server=(placeholder);Database=none;Trusted_Connection=False;";
+}
+
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(dbConnection));
 
 // Landlord / Leasing module — separate bounded context over the same DB (reads the dbo.Property view,
 // owns the leasing.* tables) with its own migrations history so it never clashes with ApplicationDbContext.
 builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
+    options.UseSqlServer(dbConnection,
         sql => sql.MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)));
 builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
@@ -114,11 +124,15 @@ if (deployment.IsDmz)
     });
     builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
         SupplierPortal.Web.Services.SelfService.HttpSupplierSelfServiceAccessGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway,
+        SupplierPortal.Web.Services.SelfService.HttpSupplierSelfServiceDataGateway>();
 }
 else
 {
     builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceAccessGateway,
         SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceAccessGateway>();
+    builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway,
+        SupplierPortal.Web.Services.SelfService.LocalSupplierSelfServiceDataGateway>();
 }
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
@@ -231,8 +245,11 @@ if (authOptions.Mode == AuthMode.Sso && !authOptions.Entra.Enabled)
         "Falling back to local username/password sign-in.");
 }
 
-using (var scope = app.Services.CreateScope())
+// The DMZ instance has no database — it reaches the trusted zone only through the internal Self-Service
+// API — so it must never migrate/seed or open a DbContext at startup.
+if (!deployment.IsDmz)
 {
+    using var scope = app.Services.CreateScope();
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
     await using var db = await dbFactory.CreateDbContextAsync();
     await DbSeeder.SeedAsync(db, app.Configuration);
@@ -396,6 +413,47 @@ ss.MapPost("/otp/verify", async (SupplierPortal.Web.Services.SelfService.SsOtpVe
     var (success, error, session) = await gateway.VerifyOtpAsync(body.Token, body.Code);
     return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsVerifyResult(success, error, session));
 }).RequireRateLimiting("credential");
+
+// --- Data plane (form / submit / documents) ---
+// EF entities carry navigation cycles; serialize responses with IgnoreCycles so the DMZ receives clean JSON.
+var ssJson = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+{
+    ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
+};
+
+ss.MapPost("/form", async (SupplierPortal.Web.Services.SelfService.SsSessionRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+{
+    var form = await data.LoadFormAsync(body.Token, body.Session);
+    return form is null ? Results.Unauthorized() : Results.Json(form, ssJson);
+});
+
+ss.MapPost("/submit", async (SupplierPortal.Web.Services.SelfService.SsSubmitRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+    Results.Json(await data.SaveAsync(body.Token, body.Session, body.Supplier, body.Complete), ssJson));
+
+ss.MapPost("/documents/list", async (SupplierPortal.Web.Services.SelfService.SsSessionRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+    Results.Json(await data.ListDocumentsAsync(body.Token, body.Session), ssJson));
+
+ss.MapPost("/documents/upload", async (SupplierPortal.Web.Services.SelfService.SsUploadRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+{
+    var bytes = Convert.FromBase64String(body.BytesBase64);
+    return Results.Ok(await data.UploadDocumentAsync(
+        body.Token, body.Session, body.DocumentType, body.FileName, body.ContentType, bytes));
+});
+
+ss.MapPost("/documents/file", async (SupplierPortal.Web.Services.SelfService.SsDocumentRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+{
+    var file = await data.GetDocumentFileAsync(body.Token, body.Session, body.DocumentId);
+    return file is null ? Results.NotFound() : Results.Ok(file);
+});
+
+ss.MapPost("/documents/delete", async (SupplierPortal.Web.Services.SelfService.SsDocumentRequest body,
+    SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
+    Results.Ok(await data.DeleteDocumentAsync(body.Token, body.Session, body.DocumentId)));
 
 app.MapGet("/export/{format}", async (string format, int? businessUnitId, string? status, HttpContext ctx, SupplierService supplierService, ExportService exportService) =>
 {

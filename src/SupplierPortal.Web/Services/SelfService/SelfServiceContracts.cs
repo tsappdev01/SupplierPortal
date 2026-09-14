@@ -11,6 +11,8 @@ public record SsSessionRequest(string Token, string Session);
 
 public record SsResult(bool Success, string? Error);
 public record SsVerifyResult(bool Success, string? Error, string? SessionToken);
+/// <summary>Save result carrying the reloaded record so the form can sync database-generated child ids.</summary>
+public record SsSaveResult(bool Success, string? Error, Supplier? Saved);
 
 /// <summary>Everything the self-service form needs to render, returned in one call so the DMZ makes a
 /// single round-trip instead of ~20. Lists mirror the fields the shared SupplierForm loads.</summary>
@@ -48,4 +50,4 @@ public record SsUploadRequest(string Token, string Session, int DocumentType, st
 public record SsUploadResult(bool Success, string? Error, string? ExtractedNumber, string? DunsNumber);
 public record SsDocumentRequest(string Token, string Session, int DocumentId);
 public record SsFileContent(string BytesBase64, string ContentType, string FileName);
-public record SsSubmitRequest(string Token, string Session, Supplier Supplier);
+public record SsSubmitRequest(string Token, string Session, Supplier Supplier, bool Complete);
