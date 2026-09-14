@@ -7,6 +7,7 @@ namespace SupplierPortal.Web.Data;
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+    public DbSet<Department> Departments => Set<Department>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();

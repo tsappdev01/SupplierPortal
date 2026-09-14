@@ -113,6 +113,17 @@ else
             <div class="form-text">The business unit / company this user belongs to.</div>
         </div>
         <div class="mb-3">
+            <label class="form-label">Department</label>
+            <InputSelect class="form-select" style="max-width: 360px;" @bind-Value="Input.DepartmentId">
+                <option value="">— Select —</option>
+                @foreach (var department in departments)
+                {
+                    <option value="@department.Id">@department.Name</option>
+                }
+            </InputSelect>
+            <div class="form-text">The department this user belongs to; used to scope which suppliers they manage.</div>
+        </div>
+        <div class="mb-3">
             <label class="form-label">Business Unit(s)</label>
             <div class="di-bu-checklist">
                 @foreach (var businessUnit in businessUnits)
@@ -216,6 +227,7 @@ else
         [PortalAccess.Supplier, PortalAccess.Landlord, PortalAccess.Broker, PortalAccess.Customer];
 
     private List<BusinessUnit> businessUnits = [];
+    private List<Department> departments = [];
     private HashSet<int> selectedBusinessUnitIds = [];
     private HashSet<PortalAccess> selectedPortals = [];
     private string currentUser = "unknown";
@@ -234,6 +246,7 @@ else
         currentUser = state.User.Identity?.Name ?? "unknown";
 
         businessUnits = await BusinessUnitService.GetAllAsync();
+        departments = await UserService.GetDepartmentsAsync();
 
         var user = await UserService.GetByIdAsync(Id);
         if (user is null)
@@ -255,7 +268,8 @@ else
             IsActive = user.IsActive,
             AuthSource = user.AuthSource,
             AdLogin = user.AdLogin,
-            CompanyBusinessUnitId = user.CompanyBusinessUnitId
+            CompanyBusinessUnitId = user.CompanyBusinessUnitId,
+            DepartmentId = user.DepartmentId
         };
     }
 
@@ -301,7 +315,7 @@ else
         var (success, error) = await Loading.RunAsync(() => UserService.UpdateUserAsync(
             Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
             selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword,
-            Input.AuthSource, Input.AdLogin, currentUser, SelectedPortalAccess, Input.CompanyBusinessUnitId));
+            Input.AuthSource, Input.AdLogin, currentUser, SelectedPortalAccess, Input.CompanyBusinessUnitId, Input.DepartmentId));
 
         if (!success)
         {
@@ -341,6 +355,7 @@ else
         public UserType UserType { get; set; } = UserType.NormalUser;
 
         public int? CompanyBusinessUnitId { get; set; }
+        public int? DepartmentId { get; set; }
 
         public bool IsActive { get; set; } = true;
     }

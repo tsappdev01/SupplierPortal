@@ -10,7 +10,14 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     public async Task<List<User>> GetAllAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.Users.Include(u => u.BusinessUnits).OrderBy(u => u.Username).ToListAsync();
+        return await db.Users.Include(u => u.BusinessUnits).Include(u => u.Department).OrderBy(u => u.Username).ToListAsync();
+    }
+
+    /// <summary>Active departments for the user department picker.</summary>
+    public async Task<List<Department>> GetDepartmentsAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Departments.Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync();
     }
 
     /// <summary>Active users who can be assigned a supplier: those with Supplier portal access, each with
@@ -64,7 +71,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         string username, string fullName, string? designation, string email, string? password, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string actorUsername,
         AuthSource authSource = AuthSource.Local, string? adLogin = null, PortalAccess portalAccess = PortalAccess.None,
-        int? companyBusinessUnitId = null)
+        int? companyBusinessUnitId = null, int? departmentId = null)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -103,6 +110,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
             existing.PortalAccess = portalAccess;
             existing.BusinessUnits = businessUnits;
             existing.CompanyBusinessUnitId = companyBusinessUnitId;
+            existing.DepartmentId = departmentId;
             existing.IsActive = isActive;
             existing.IsPendingRegistration = false;
             existing.AuthSource = authSource;
@@ -140,6 +148,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
                 PortalAccess = portalAccess,
                 BusinessUnits = businessUnits,
                 CompanyBusinessUnitId = companyBusinessUnitId,
+                DepartmentId = departmentId,
                 IsActive = isActive,
                 IsPendingRegistration = false,
                 ProfilePhoto = photo,
@@ -172,7 +181,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         int id, string username, string fullName, string? designation, string email, UserType userType,
         List<int> businessUnitIds, bool isActive, byte[]? photo, string? photoContentType, string? newPassword,
         AuthSource authSource, string? adLogin, string actorUsername, PortalAccess portalAccess = PortalAccess.None,
-        int? companyBusinessUnitId = null)
+        int? companyBusinessUnitId = null, int? departmentId = null)
     {
         username = username.Trim();
         fullName = fullName.Trim();
@@ -208,6 +217,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         user.AdLogin = authSource == AuthSource.ActiveDirectory ? adLogin?.Trim() : null;
         user.BusinessUnits = businessUnits;
         user.CompanyBusinessUnitId = companyBusinessUnitId;
+        user.DepartmentId = departmentId;
         user.IsActive = isActive;
         if (photo is not null)
         {

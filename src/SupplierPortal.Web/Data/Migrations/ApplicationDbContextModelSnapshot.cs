@@ -1922,6 +1922,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Designation")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
@@ -1974,10 +1977,38 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasIndex("CompanyBusinessUnitId");
 
+                    b.HasIndex("DepartmentId");
+
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Department", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("UserBusinessUnit", b =>
@@ -2424,7 +2455,14 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("CompanyBusinessUnitId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("CompanyBusinessUnit");
+
+                    b.Navigation("Department");
                 });
 
             modelBuilder.Entity("UserBusinessUnit", b =>

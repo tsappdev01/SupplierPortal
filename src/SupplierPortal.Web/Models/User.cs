@@ -15,6 +15,10 @@ public class User
     [MaxLength(150)]
     public string? Designation { get; set; }
 
+    /// <summary>The department this user belongs to (optional).</summary>
+    public int? DepartmentId { get; set; }
+    public Department? Department { get; set; }
+
     [Required, MaxLength(256)]
     public string Email { get; set; } = string.Empty;
 
