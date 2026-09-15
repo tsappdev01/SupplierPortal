@@ -2,14 +2,21 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
 public class AuthService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, ActiveDirectoryService activeDirectory)
+    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher,
+    ActiveDirectoryService activeDirectory, IMemoryCache cache)
 {
+    // Throttle password guessing: after this many failed attempts for a given login the account is
+    // temporarily locked (in-memory, per web instance). Successful sign-in clears the counter.
+    private const int MaxFailedAttempts = 5;
+    private static readonly TimeSpan LockoutWindow = TimeSpan.FromMinutes(15);
+    private static string FailKey(string login) => $"login-fail:{login.ToLowerInvariant()}";
     public async Task<(bool Success, string? Error)> RegisterAsync(string email, string password)
     {
         email = email.Trim();
@@ -38,6 +45,14 @@ public class AuthService(
     public async Task<(bool Success, string? Error, User? User)> ValidateCredentialsAsync(string email, string password)
     {
         var login = email.Trim();
+        var failKey = FailKey(login);
+        var failedCount = cache.TryGetValue(failKey, out int fc) ? fc : 0;
+        if (failedCount >= MaxFailedAttempts)
+        {
+            return (false, "Too many failed sign-in attempts. Please wait a few minutes and try again.", null);
+        }
+        void RegisterFailure() => cache.Set(failKey, failedCount + 1, LockoutWindow);
+
         await using var db = await dbFactory.CreateDbContextAsync();
 
         // Match by email or by the AD login the user was linked with.
@@ -45,6 +60,7 @@ public class AuthService(
             .FirstOrDefaultAsync(u => u.Email == login || u.AdLogin == login);
         if (user is null)
         {
+            RegisterFailure();
             return (false, "Invalid login or password.", null);
         }
 
@@ -53,11 +69,13 @@ public class AuthService(
             var (adOk, adError) = activeDirectory.ValidateCredentials(user.AdLogin ?? login, password);
             if (!adOk)
             {
+                RegisterFailure();
                 return (false, adError, null);
             }
         }
         else if (hasher.VerifyHashedPassword(user, user.PasswordHash, password) == PasswordVerificationResult.Failed)
         {
+            RegisterFailure();
             return (false, "Invalid login or password.", null);
         }
 
@@ -69,6 +87,8 @@ public class AuthService(
             return (false, message, null);
         }
 
+        // Valid credentials for an active account: clear the failed-attempt counter.
+        cache.Remove(failKey);
         return (true, null, user);
     }
 

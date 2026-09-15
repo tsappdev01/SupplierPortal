@@ -210,6 +210,40 @@ var authenticationBuilder = builder.Services.AddAuthentication(options =>
         options.AccessDeniedPath = "/account/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+        options.Events = new CookieAuthenticationEvents
+        {
+            // Revoke a live session when the user has been deactivated since sign-in (so "deactivate user"
+            // takes effect without waiting for the 8h cookie to expire). Throttled to at most one DB check
+            // every 2 minutes per request-principal to keep the auth path cheap.
+            OnValidatePrincipal = async context =>
+            {
+                var userId = context.Principal is { } principal ? principal.GetUserId() : 0;
+                if (userId <= 0) { return; }
+
+                var lastChecked = context.Properties.GetString("active-checked");
+                if (DateTimeOffset.TryParse(lastChecked, out var when)
+                    && DateTimeOffset.UtcNow - when < TimeSpan.FromMinutes(2))
+                {
+                    return;
+                }
+
+                var dbFactory = context.HttpContext.RequestServices
+                    .GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var isActive = await db.Users.Where(u => u.Id == userId)
+                    .Select(u => (bool?)u.IsActive).FirstOrDefaultAsync();
+
+                if (isActive != true)
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    return;
+                }
+
+                context.Properties.SetString("active-checked", DateTimeOffset.UtcNow.ToString("o"));
+                context.ShouldRenew = true;
+            }
+        };
     });
 
 if (useEntra)
