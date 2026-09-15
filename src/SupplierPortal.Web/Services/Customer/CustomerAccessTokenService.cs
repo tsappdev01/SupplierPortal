@@ -13,7 +13,7 @@ namespace SupplierPortal.Web.Services;
 /// deterministically (SHA-256) for lookup, while the OTP code reuses the app's salted password hasher.</summary>
 public class CustomerAccessTokenService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
-    EmailBrandingService branding)
+    EmailBrandingService branding, EmailDispatcher emailDispatcher)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(14);
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
@@ -115,19 +115,10 @@ public class CustomerAccessTokenService(
             .Replace("{OTP Code}", code)
             .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
 
-        try
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body);
+        if (!ok)
         {
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {email},
-                    @subject = {"Your Verification Code"},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            return (false, error);
         }
 
         return (true, null);

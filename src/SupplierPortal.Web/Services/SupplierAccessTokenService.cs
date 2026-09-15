@@ -14,7 +14,7 @@ namespace SupplierPortal.Web.Services;
 /// <c>AuthService</c> does for login passwords.</summary>
 public class SupplierAccessTokenService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
-    EmailBrandingService branding, ILogger<SupplierAccessTokenService> logger)
+    EmailBrandingService branding, ILogger<SupplierAccessTokenService> logger, EmailDispatcher emailDispatcher)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(14);
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
@@ -133,19 +133,11 @@ public class SupplierAccessTokenService(
                 .Replace("{Supplier Name}", token.Supplier.SupplierName)
                 .Replace("{OTP Code}", code)
                 .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
-            try
+            var (ok, error) = await emailDispatcher.SendHtmlAsync(
+                token.Supplier.ContactEmail ?? "", "Your Verification Code", body);
+            if (!ok)
             {
-                await db.Database.ExecuteSqlInterpolatedAsync($@"
-                    EXEC msdb.dbo.sp_send_dbmail
-                        @profile_name = {MailProfileName},
-                        @recipients = {token.Supplier.ContactEmail},
-                        @subject = {"Your Verification Code"},
-                        @body = {body},
-                        @body_format = 'HTML';");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Database Mail send failed: {ex.Message}", null);
+                return (false, error, null);
             }
         }
 

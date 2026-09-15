@@ -96,6 +96,7 @@ builder.Services.AddScoped<CustomerFieldConfigService>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerImportService>();
 builder.Services.AddScoped<CustomerExportService>();
+builder.Services.AddScoped<EmailDispatcher>();
 builder.Services.AddScoped<CustomerAccessTokenService>();
 builder.Services.AddScoped<CustomerEmailService>();
 builder.Services.AddScoped<CustomerDocumentService>();

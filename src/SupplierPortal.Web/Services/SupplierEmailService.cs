@@ -4,12 +4,12 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-/// <summary>Sends supplier notification emails via SQL Server Database Mail (sp_send_dbmail),
-/// using the "BP" Database Mail profile configured on the SQL Server instance.</summary>
+/// <summary>Sends supplier notification emails through <see cref="EmailDispatcher"/> (SMTP when configured,
+/// else SQL Server Database Mail), so delivery works on Azure SQL as well as local SQL Server.</summary>
 public class SupplierEmailService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     SupplierAccessTokenService accessTokenService, UserService userService, IConfiguration configuration,
-    EmailBrandingService branding)
+    EmailBrandingService branding, EmailDispatcher emailDispatcher)
 {
     /// <summary>Renders the associated Business Unit name as the email header brand line (text renders
     /// reliably in every email client, unlike an embedded image).</summary>
@@ -108,20 +108,10 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";
 
-        try
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body);
+        if (!ok)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {contactEmail},
-                    @subject = {subject},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            return (false, error);
         }
 
         await auditService.LogAsync(
@@ -176,25 +166,14 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Update Submitted - {supplier.SupplierName}";
 
-        try
+        var (ok, _) = await emailDispatcher.SendHtmlAsync(requestor.Email!, subject, body);
+        if (ok)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {requestor.Email},
-                    @subject = {subject},
-                    @body = {body},
-                    @body_format = 'HTML';");
-
+            // Best-effort: the supplier's submission has already been saved successfully by this point, so a
+            // failed courtesy email to the requestor must not surface as an error to them.
             await auditService.LogAsync(
                 "Supplier Self-Service", AuditAction.Notify, "Supplier", supplier.Id,
                 $"Notified {requestor.Email} that {supplier.SupplierName} submitted an update");
-        }
-        catch
-        {
-            // Best-effort: the supplier's submission has already been saved successfully by this
-            // point, so a failed courtesy email to the requestor must not surface as an error to them.
         }
     }
 
@@ -229,20 +208,10 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Registration Completed — {supplierName}";
 
-        try
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body);
+        if (!ok)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {contactEmail},
-                    @subject = {subject},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            return (false, error);
         }
 
         await auditService.LogAsync(

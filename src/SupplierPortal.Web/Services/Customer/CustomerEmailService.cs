@@ -11,7 +11,7 @@ namespace SupplierPortal.Web.Services;
 public class CustomerEmailService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     CustomerAccessTokenService accessTokenService, UserService userService, IConfiguration configuration,
-    EmailBrandingService branding)
+    EmailBrandingService branding, EmailDispatcher emailDispatcher)
 {
     private const string MailProfileName = "BP";
     private const string TemplateRelativePath = "doc/customer_update_notification.html";
@@ -82,20 +82,10 @@ public class CustomerEmailService(
 
         var subject = $"Customer Information Update - {customerName}";
 
-        try
+        var (sent, sendError) = await emailDispatcher.SendHtmlAsync(email, subject, body);
+        if (!sent)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {email},
-                    @subject = {subject},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            return (false, sendError);
         }
 
         await auditService.LogAsync(
@@ -140,24 +130,14 @@ public class CustomerEmailService(
   </div>
 </div>";
 
-        try
+        // Best-effort: the submission is already saved, so a failed courtesy email must not surface.
+        var (sent, _) = await emailDispatcher.SendHtmlAsync(
+            requestor.Email!, $"Customer Update Submitted - {customer.LegalName}", body);
+        if (sent)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {requestor.Email},
-                    @subject = {$"Customer Update Submitted - {customer.LegalName}"},
-                    @body = {body},
-                    @body_format = 'HTML';");
-
             await auditService.LogAsync(
                 "Customer Self-Service", AuditAction.Notify, "Customer", customer.Id,
                 $"Notified {requestor.Email} that {customer.LegalName} submitted an update");
-        }
-        catch
-        {
-            // Best-effort: the submission is already saved, so a failed courtesy email must not surface.
         }
     }
 
@@ -185,20 +165,11 @@ public class CustomerEmailService(
   </div>
 </div>";
 
-        try
+        var (sent, sendError) = await emailDispatcher.SendHtmlAsync(
+            email, $"Customer Registration Completed — {customerName}", body);
+        if (!sent)
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
-            await db.Database.ExecuteSqlInterpolatedAsync($@"
-                EXEC msdb.dbo.sp_send_dbmail
-                    @profile_name = {MailProfileName},
-                    @recipients = {email},
-                    @subject = {$"Customer Registration Completed — {customerName}"},
-                    @body = {body},
-                    @body_format = 'HTML';");
-        }
-        catch (Exception ex)
-        {
-            return (false, $"Database Mail send failed: {ex.Message}");
+            return (false, sendError);
         }
 
         await auditService.LogAsync(
