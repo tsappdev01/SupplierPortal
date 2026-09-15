@@ -242,7 +242,8 @@ public class ExcelImportService(
             var accountCountryCodeId = ResolveLookup(values, "AccountCountryCode", countries, required: false, rowErrors, rowWarnings);
             var accountCurrencyCodeId = ResolveLookup(values, "AccountCurrencyCode", currencies, required: false, rowErrors, rowWarnings);
             var phoneCountryCodeId = ResolveLookup(values, "PhoneCountryCode", countriesByPhoneCode, required: false, rowErrors, rowWarnings);
-            var supplierSiteBuId = ResolveLookup(values, "SupplierSite", businessUnits, required: false, rowErrors, rowWarnings);
+            // Supplier Site is a free-text field: take the value as-is, no lookup and no validation/warnings.
+            var supplierSite = GetOrNull(values, "SupplierSite");
             var procurementBuId = ResolveLookup(values, "ProcurementBu", businessUnits, required: false, rowErrors, rowWarnings);
             var clientBuId = ResolveLookup(values, "ClientBu", businessUnits, required: false, rowErrors, rowWarnings);
             var billToBuId = ResolveLookup(values, "BillToBu", businessUnits, required: false, rowErrors, rowWarnings);
@@ -308,7 +309,7 @@ public class ExcelImportService(
                 PhoneAreaCode = GetOrNull(values, "PhoneAreaCode"),
                 Phone = string.IsNullOrWhiteSpace(phone) ? null : phone,
 
-                SupplierSiteBuId = supplierSiteBuId,
+                SupplierSite = supplierSite,
                 ProcurementBuId = procurementBuId,
                 ClientBuId = clientBuId,
                 BillToBuId = billToBuId,

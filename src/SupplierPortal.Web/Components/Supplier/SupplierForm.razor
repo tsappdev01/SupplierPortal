@@ -1502,14 +1502,6 @@ else
 
     /// <summary>Pre-fills the (freely editable) Supplier Site with a copy of the Address Name when it is
     /// still blank, so the user lands on a concrete value they can keep or overwrite.</summary>
-    private void PrimeSupplierSite()
-    {
-        if (string.IsNullOrWhiteSpace(formModel.SupplierSite) && !string.IsNullOrWhiteSpace(formModel.AddressName))
-        {
-            formModel.SupplierSite = formModel.AddressName;
-        }
-    }
-
     // bool? -> Yes/No/"" proxy so the VAT Registered dropdown binds cleanly (unset shows "— Select —").
     private string vatRegisteredYesNo
     {
@@ -1554,6 +1546,11 @@ else
     /// • VAT-dependent fields (TRN, VAT type, TIN) — never required when VAT Registered is not "Yes".</summary>
     private bool IsFieldMandatory(string fieldKey)
     {
+        // Supplier Site is a free-text field with no validation — never required, whatever the admin setting.
+        if (fieldKey == "SupplierSite")
+        {
+            return false;
+        }
         if (fieldKey == "IssuingBodyIfOthers")
         {
             return IsIssuingBodyOthers;
@@ -2168,13 +2165,10 @@ else
         AfterNavigate();
     }
 
-    /// <summary>Runs after a page change: prime the Supplier Site when landing on the Site tab.</summary>
+    /// <summary>Runs after a page change. Supplier Site is a free-text field accepted as-is, so nothing is
+    /// auto-filled here any more.</summary>
     private void AfterNavigate()
     {
-        if (CurrentSections.Contains(4))
-        {
-            PrimeSupplierSite();
-        }
     }
 
     /// <summary>Email fields shown on each wizard step, with their display label, so their format can

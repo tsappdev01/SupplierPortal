@@ -370,8 +370,8 @@ public class SupplierFormModel
         s.IsPay = IsPay;
         s.Phone = Phone;
         s.SupplierSiteBuId = SupplierSiteBuId;
-        // Supplier Site defaults to the Address Name when the user leaves it blank.
-        s.SupplierSite = string.IsNullOrWhiteSpace(SupplierSite) ? AddressName : SupplierSite;
+        // Supplier Site is a free-text field: store exactly what was entered (may be blank), no defaulting.
+        s.SupplierSite = SupplierSite;
         s.IsSourcingOnly = IsSourcingOnly;
         s.IsPurchasing = IsPurchasing;
         s.IsPrimaryPay = IsPrimaryPay;

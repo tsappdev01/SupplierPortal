@@ -471,6 +471,7 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         supplier.PhoneAreaCode = updated.PhoneAreaCode;
         supplier.Phone = updated.Phone;
 
+        supplier.SupplierSite = updated.SupplierSite;   // free-text field, saved as entered
         supplier.SupplierSiteBuId = updated.SupplierSiteBuId;
         supplier.ProcurementBuId = updated.ProcurementBuId;
         supplier.ClientBuId = updated.ClientBuId;
