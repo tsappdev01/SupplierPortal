@@ -16,6 +16,12 @@
 
 <PageTitle>Edit Supplier - Supplier Portal</PageTitle>
 
+<div class="mb-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="BackToList">
+        &#8592; Back to Supplier List
+    </button>
+</div>
+
 @if (notFound)
 {
     <div class="alert alert-danger">Supplier not found.</div>
@@ -277,4 +283,6 @@ else
     {
         NavigationManager.NavigateTo("/supplier/dashboard");
     }
+
+    private void BackToList() => NavigationManager.NavigateTo("/supplier/dashboard");
 }
