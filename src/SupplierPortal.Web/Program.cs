@@ -142,6 +142,13 @@ else
     builder.Services.AddScoped<SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway,
         SupplierPortal.Web.Services.SelfService.LocalCustomerSelfServiceDataGateway>();
 }
+// Azure Blob Storage for user-uploaded files (documents, photos, logos). Disabled automatically when no
+// connection string is configured, in which case uploads keep using local disk / the database.
+builder.Services.Configure<SupplierPortal.Web.Services.Storage.BlobStorageOptions>(
+    builder.Configuration.GetSection(SupplierPortal.Web.Services.Storage.BlobStorageOptions.SectionName));
+builder.Services.AddSingleton<SupplierPortal.Web.Services.Storage.IFileStorageService,
+    SupplierPortal.Web.Services.Storage.AzureBlobStorageService>();
+
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddSingleton<LicenseQrService>();

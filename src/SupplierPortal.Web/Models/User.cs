@@ -27,6 +27,11 @@ public class User
     [MaxLength(100)]
     public string? ProfilePhotoContentType { get; set; }
 
+    /// <summary>Blob storage key when the photo lives in Azure Blob Storage; then <see cref="ProfilePhoto"/>
+    /// is null. Null for older photos stored directly in <see cref="ProfilePhoto"/>.</summary>
+    [MaxLength(400)]
+    public string? ProfilePhotoBlobKey { get; set; }
+
     /// <summary>Local password hash. Empty for Active Directory users (their password lives in AD).</summary>
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
