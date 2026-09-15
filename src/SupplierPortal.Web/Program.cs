@@ -466,7 +466,16 @@ ss.MapPost("/documents/list", async (SupplierPortal.Web.Services.SelfService.SsS
 ss.MapPost("/documents/upload", async (SupplierPortal.Web.Services.SelfService.SsUploadRequest body,
     SupplierPortal.Web.Services.SelfService.ISupplierSelfServiceDataGateway data) =>
 {
-    var bytes = Convert.FromBase64String(body.BytesBase64);
+    // Guard malformed base64 and an out-of-range document type so a crafted request returns a clean 400
+    // rather than an unhandled 500 (FormatException / invalid enum cast).
+    if (!Enum.IsDefined(typeof(SupplierDocumentType), body.DocumentType))
+    {
+        return Results.BadRequest("Invalid document type.");
+    }
+    byte[] bytes;
+    try { bytes = Convert.FromBase64String(body.BytesBase64 ?? ""); }
+    catch (FormatException) { return Results.BadRequest("Invalid file payload."); }
+
     return Results.Ok(await data.UploadDocumentAsync(
         body.Token, body.Session, body.DocumentType, body.FileName, body.ContentType, bytes));
 });

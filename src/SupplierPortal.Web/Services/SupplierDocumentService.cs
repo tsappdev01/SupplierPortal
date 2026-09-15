@@ -172,11 +172,20 @@ public class SupplierDocumentService(
         // Either way the local temp copy is then removed, so new uploads never linger on disk.
         var fileBytes = await File.ReadAllBytesAsync(fullPath);
         var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
-        string? blobKey = fileStore.Enabled
-            ? await fileStore.SaveAsync($"supplier/{supplierId}", fileName, fileBytes, resolvedContentType)
-            : null;
+        string? blobKey;
+        try
+        {
+            blobKey = fileStore.Enabled
+                ? await fileStore.SaveAsync($"supplier/{supplierId}", fileName, fileBytes, resolvedContentType)
+                : null;
+        }
+        finally
+        {
+            // Always remove the local temp copy, even if the blob save throws, so failed uploads never
+            // leave orphaned files accumulating under doc/supplier/{id}/.
+            try { File.Delete(fullPath); } catch { /* best-effort cleanup of the local temp copy */ }
+        }
         byte[]? contentBytes = blobKey is null ? fileBytes : null;
-        try { File.Delete(fullPath); } catch { /* best-effort cleanup of the local temp copy */ }
 
         await using var db = await dbFactory.CreateDbContextAsync();
 
