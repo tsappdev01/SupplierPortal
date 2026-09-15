@@ -1230,6 +1230,8 @@ else if (TotalPages > 1)
     {
         activeTab = tab;
         currentPage = 1;
+        // Clear any bulk selection so a bulk action can't hit rows that are no longer in the visible tab.
+        selectedIds.Clear();
     }
 
     private void OnStatusFilterChanged()

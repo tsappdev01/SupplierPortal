@@ -409,12 +409,16 @@ public class ExcelImportService(
     [
         "Id", "SupplierNumber", "BusinessUnitId", "StatusId", "IsDraft", "IsActive",
         "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "ReviewRemarks",
-        // Ownership/workflow fields that are set inside the app, never carried in the upload template.
-        // Without these, re-importing the (populated) template would null a supplier's assignment and
-        // department and wipe the signed-declaration acknowledgment audit on every matched row.
+        // Ownership/workflow fields that are set inside the app, never parsed back from the upload template.
+        // Without these, re-importing the (populated) template would null them on every matched row.
         "AssignedToUserId", "DepartmentId",
         "DisclaimerAcknowledged", "DisclaimerAcknowledgedAt", "DisclaimerAcknowledgedBy",
-        "DisclaimerText", "DisclaimerSignature"
+        "DisclaimerText", "DisclaimerSignature",
+        // App-managed fields not read by the importer (no HeaderMap entry) — skipping prevents a re-import
+        // from wiping the Priority and the "Address as per VAT Certificate" block set via the edit form.
+        "Priority", "SupplierSiteBuId",
+        "AddressSameAsTradeLicense", "VatAddressLine1", "VatAddressLine2",
+        "VatCityId", "VatCityText", "VatCountryId"
     ];
 
     /// <summary>Copies the imported scalar/lookup fields from a freshly parsed supplier onto an
