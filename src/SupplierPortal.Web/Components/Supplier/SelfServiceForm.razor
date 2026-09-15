@@ -44,7 +44,7 @@
             </p>
             <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="@actorLabel"
                           SupplierFacing="true"
-                          SsGateway="DataGateway" Preloaded="bundle" SsToken="Token" SsSession="SessionToken"
+                          SsGateway="DataGateway" Preloaded="bundle" SsToken="activeToken" SsSession="activeSession"
                           OnComplete="HandleCompleteAsync" />
         </div>
     }
@@ -77,13 +77,23 @@
     private bool loading = true;
     private bool completed;
 
+    // Pin the link + session from the first (query-bound) render. A later interactive re-render can re-bind
+    // [SupplyParameterFromQuery] to null without re-running OnInitializedAsync (so the form stays visible),
+    // which previously blanked the session passed to the child and surfaced a spurious "session expired"
+    // on document upload/save. Passing these stable copies keeps every gateway call on the loaded session.
+    private string activeToken = "";
+    private string activeSession = "";
+
     protected override async Task OnInitializedAsync()
     {
+        activeToken = Token;
+        activeSession = SessionToken ?? "";
+
         // All data comes through the gateway — the database on the internal side, or the internal API when
         // this page runs on the DMZ. No direct database access here.
-        if (!string.IsNullOrWhiteSpace(SessionToken))
+        if (!string.IsNullOrWhiteSpace(activeSession))
         {
-            bundle = await DataGateway.LoadFormAsync(Token, SessionToken);
+            bundle = await DataGateway.LoadFormAsync(activeToken, activeSession);
         }
 
         if (bundle is not null)

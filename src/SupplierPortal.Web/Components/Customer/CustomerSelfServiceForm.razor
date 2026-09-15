@@ -77,7 +77,7 @@
                     <div class="di-section-body" style="grid-template-columns: 1fr;">
                         <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser"
                                            Types="docTypes"
-                                           SsGateway="DataGateway" SsToken="Token" SsSession="SessionToken" OnChanged="OnDocsChanged" />
+                                           SsGateway="DataGateway" SsToken="activeToken" SsSession="activeSession" OnChanged="OnDocsChanged" />
                     </div>
                 </div>
             }
@@ -252,14 +252,24 @@
     private bool loading = true;
     private bool completed;
 
+    // Pin the link + session from the first (query-bound) render. A later interactive re-render can re-bind
+    // [SupplyParameterFromQuery] to null without re-running OnInitializedAsync (so the form stays visible),
+    // which would blank the session passed to gateway calls and surface a spurious "session expired" on
+    // document upload/save. Passing these stable copies keeps every gateway call on the loaded session.
+    private string activeToken = "";
+    private string activeSession = "";
+
     protected override async Task OnInitializedAsync()
     {
+        activeToken = Token;
+        activeSession = SessionToken ?? "";
+
         // All data comes through the gateway — the database on the internal side, or the internal API on
         // the DMZ. No direct database access here.
         SsCustomerFormData? bundle = null;
-        if (!string.IsNullOrWhiteSpace(SessionToken))
+        if (!string.IsNullOrWhiteSpace(activeSession))
         {
-            bundle = await DataGateway.LoadFormAsync(Token, SessionToken);
+            bundle = await DataGateway.LoadFormAsync(activeToken, activeSession);
         }
 
         if (bundle is not null)
@@ -323,7 +333,7 @@
         busy = true;
         if (!silent) message = null;
         customer.Contact = contact;
-        var result = await DataGateway.SaveAsync(Token, SessionToken ?? "", customer, complete: false);
+        var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: false);
         // Sync the 1:1 contact's database id so a subsequent save updates the same row.
         if (result.Success && result.Saved?.Contact is { Id: > 0 } savedContact)
         {
@@ -476,7 +486,7 @@
             return;
         }
 
-        var haveDocs = (await DataGateway.ListDocumentsAsync(Token, SessionToken ?? "")).Select(d => d.DocumentType).ToHashSet();
+        var haveDocs = (await DataGateway.ListDocumentsAsync(activeToken, activeSession)).Select(d => d.DocumentType).ToHashSet();
         var missingDocs = docTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name)).Select(t => t.Name).ToList();
         if (missingDocs.Count > 0)
         {
@@ -487,7 +497,7 @@
         busy = true; message = null;
         customer.Contact = contact;
         // Final submit: the gateway saves, sets the status, expires the link and notifies the requestor.
-        var result = await DataGateway.SaveAsync(Token, SessionToken ?? "", customer, complete: true);
+        var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: true);
         busy = false;
         if (!result.Success)
         {
