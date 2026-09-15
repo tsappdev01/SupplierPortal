@@ -39,15 +39,24 @@
                     <div class="di-notif-list">
                         @foreach (var item in pending)
                         {
-                            <button type="button" class="di-notif-item" @onclick="() => GoTo(item.SupplierId)">
-                                <span class="di-notif-name">@item.SupplierName</span>
-                                <span class="di-notif-meta">
-                                    @item.ChangeCount field@(item.ChangeCount == 1 ? "" : "s") changed &middot; @item.LastChangedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
-                                </span>
-                            </button>
+                            <div class="di-notif-item">
+                                <button type="button" class="di-notif-item-main" @onclick="() => GoTo(item.SupplierId)">
+                                    <span class="di-notif-name">@item.SupplierName</span>
+                                    <span class="di-notif-meta">
+                                        @item.ChangeCount field@(item.ChangeCount == 1 ? "" : "s") changed &middot; @item.LastChangedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                    </span>
+                                </button>
+                                <button type="button" class="di-notif-dismiss" title="Dismiss (mark reviewed)"
+                                        aria-label="@($"Dismiss {item.SupplierName}")" @onclick="() => DismissAsync(item.SupplierId)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                                </button>
+                            </div>
                         }
                     </div>
-                    <a class="di-notif-foot" href="/admin/supplier-activity" @onclick="Close">View all activity</a>
+                    <div class="di-notif-foot-row">
+                        <button type="button" class="di-notif-dismiss-all" @onclick="DismissAllAsync">Dismiss all</button>
+                        <a class="di-notif-foot" href="/admin/supplier-activity" @onclick="Close">View all activity</a>
+                    </div>
                 }
             </div>
         }
@@ -59,6 +68,7 @@
     private bool open;
     private bool isAdministrator;
     private List<int> businessUnitIds = [];
+    private string currentUser = "";
     private Timer? refreshTimer;
 
     protected override async Task OnInitializedAsync()
@@ -66,6 +76,7 @@
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdministrator = state.User.IsAdministrator();
         businessUnitIds = state.User.GetBusinessUnitIds();
+        currentUser = state.User.Identity?.Name ?? "";
         await ReloadAsync();
 
         // Poll every 60s so a new supplier submission surfaces without a manual refresh.
@@ -95,6 +106,20 @@
     {
         open = false;
         NavigationManager.NavigateTo($"/supplier/edit/{supplierId}");
+    }
+
+    // "Dismiss" a supplier from the awaiting-review list by acknowledging (marking reviewed) its
+    // pending supplier-originated changes. Business-unit scoped so a non-admin only affects their units.
+    private async Task DismissAsync(int supplierId)
+    {
+        await ActivityService.DismissSupplierAsync(supplierId, currentUser, Scope);
+        await ReloadAsync();
+    }
+
+    private async Task DismissAllAsync()
+    {
+        await ActivityService.DismissAllAsync(currentUser, Scope);
+        await ReloadAsync();
     }
 
     public void Dispose() => refreshTimer?.Dispose();

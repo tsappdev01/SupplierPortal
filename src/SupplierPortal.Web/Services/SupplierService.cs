@@ -420,6 +420,19 @@ public class SupplierService(
             token.SessionExpiresAt = now;
         }
 
+        // Marking the review Complete also means the business has reviewed the supplier's submitted
+        // changes, so acknowledge any pending supplier-originated field changes. Otherwise the record
+        // would keep appearing under "Awaiting review" in the notification bell even though it is done.
+        var pendingSupplierChanges = await db.SupplierFieldChanges
+            .Where(c => c.SupplierId == supplierId && !c.IsAcknowledged && c.SupplierAccessTokenId != null)
+            .ToListAsync();
+        foreach (var change in pendingSupplierChanges)
+        {
+            change.IsAcknowledged = true;
+            change.AcknowledgedAt = now;
+            change.AcknowledgedBy = actorUsername;
+        }
+
         await db.SaveChangesAsync();
 
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, $"Marked supplier '{supplier.SupplierName}' Complete");

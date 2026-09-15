@@ -333,13 +333,29 @@ table thead th {
 .di-notif-empty { padding: 18px 14px; color: var(--di-text-soft); font-size: 14px; }
 .di-notif-list { display: flex; flex-direction: column; }
 .di-notif-item {
-    display: flex; flex-direction: column; gap: 2px; text-align: left;
-    padding: 10px 14px; background: var(--di-surface); border: none; border-bottom: 1px solid var(--di-border); cursor: pointer;
+    display: flex; align-items: stretch;
+    background: var(--di-surface); border-bottom: 1px solid var(--di-border);
 }
 .di-notif-item:hover { background: var(--di-surface-2); }
+.di-notif-item-main {
+    flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left;
+    padding: 10px 6px 10px 14px; background: transparent; border: none; cursor: pointer; min-width: 0;
+}
 .di-notif-name { font-weight: 700; color: var(--di-heading); font-size: 14px; }
 .di-notif-meta { color: var(--di-text-soft); font-size: 12px; }
-.di-notif-foot { display: block; text-align: center; padding: 10px; color: var(--di-link); font-weight: 700; font-size: 13px; text-decoration: none; }
+.di-notif-dismiss {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; background: transparent; border: none; border-left: 1px solid var(--di-border);
+    color: var(--di-text-soft); cursor: pointer; transition: color .12s, background .12s;
+}
+.di-notif-dismiss:hover { color: #c0392b; background: rgba(192,57,43,.12); }
+.di-notif-foot-row { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--di-border); }
+.di-notif-dismiss-all {
+    padding: 10px 14px; background: transparent; border: none; color: var(--di-text-soft);
+    font-weight: 700; font-size: 13px; cursor: pointer; transition: color .12s, background .12s;
+}
+.di-notif-dismiss-all:hover { color: #c0392b; background: var(--di-surface-2); }
+.di-notif-foot { display: block; text-align: center; padding: 10px 14px; color: var(--di-link); font-weight: 700; font-size: 13px; text-decoration: none; }
 .di-notif-foot:hover { background: var(--di-surface-2); }
 
 /* KPI stat tiles (Manage Supplier / Manage Customer dashboards) */

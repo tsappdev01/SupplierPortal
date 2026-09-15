@@ -51,6 +51,60 @@ public class SupplierActivityService(IDbContextFactory<ApplicationDbContext> dbF
         ).Distinct().CountAsync();
     }
 
+    /// <summary>
+    /// Dismisses one supplier from the awaiting-review list by acknowledging (marking reviewed) all of its
+    /// unacknowledged, supplier-originated field changes. Business-unit scoped so a non-administrator can
+    /// only dismiss suppliers in their own units. Returns the number of change rows acknowledged.
+    /// </summary>
+    public async Task<int> DismissSupplierAsync(int supplierId, string actorUsername, IReadOnlyCollection<int>? businessUnitIds = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var rows = await (
+            from c in db.SupplierFieldChanges
+            join s in db.Suppliers on c.SupplierId equals s.Id
+            where c.SupplierId == supplierId && !c.IsAcknowledged && c.SupplierAccessTokenId != null
+                  && (businessUnitIds == null || businessUnitIds.Contains(s.BusinessUnitId))
+            select c
+        ).ToListAsync();
+
+        return await AcknowledgeAsync(db, rows, actorUsername);
+    }
+
+    /// <summary>
+    /// Dismisses every supplier awaiting review (within the given business-unit scope) by acknowledging all
+    /// their unacknowledged, supplier-originated field changes. Returns the number of change rows acknowledged.
+    /// </summary>
+    public async Task<int> DismissAllAsync(string actorUsername, IReadOnlyCollection<int>? businessUnitIds = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var rows = await (
+            from c in db.SupplierFieldChanges
+            join s in db.Suppliers on c.SupplierId equals s.Id
+            where !c.IsAcknowledged && c.SupplierAccessTokenId != null
+                  && (businessUnitIds == null || businessUnitIds.Contains(s.BusinessUnitId))
+            select c
+        ).ToListAsync();
+
+        return await AcknowledgeAsync(db, rows, actorUsername);
+    }
+
+    private static async Task<int> AcknowledgeAsync(ApplicationDbContext db, List<Models.SupplierFieldChange> rows, string actorUsername)
+    {
+        if (rows.Count == 0)
+        {
+            return 0;
+        }
+        var now = DateTime.UtcNow;
+        foreach (var change in rows)
+        {
+            change.IsAcknowledged = true;
+            change.AcknowledgedAt = now;
+            change.AcknowledgedBy = actorUsername;
+        }
+        await db.SaveChangesAsync();
+        return rows.Count;
+    }
+
     /// <summary>The full supplier-change activity feed, newest first, optionally scoped to one supplier.</summary>
     public async Task<List<SupplierActivityEntry>> GetActivityAsync(
         IReadOnlyCollection<int>? businessUnitIds = null, int? supplierId = null, int take = 300)
