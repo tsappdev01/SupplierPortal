@@ -40,13 +40,16 @@ if (string.IsNullOrWhiteSpace(dbConnection))
 }
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseSqlServer(dbConnection));
+    options.UseSqlServer(dbConnection, sql => sql.EnableRetryOnFailure()));
 
 // Landlord / Leasing module — separate bounded context over the same DB (reads the dbo.Property view,
 // owns the leasing.* tables) with its own migrations history so it never clashes with ApplicationDbContext.
+// EnableRetryOnFailure adds resiliency against Azure SQL transient faults (throttling/failover).
 builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>(options =>
     options.UseSqlServer(dbConnection,
-        sql => sql.MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)));
+        sql => sql
+            .MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)
+            .EnableRetryOnFailure()));
 builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();
