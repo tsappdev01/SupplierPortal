@@ -177,6 +177,23 @@ table thead th {
     overflow: hidden;
 }
 
+/* Manage Supplier list: scroll the table area and keep the navy header row pinned to the top so
+   column names stay visible while scrolling the list. The header already has a solid navy
+   background so it fully covers the rows scrolling underneath it. */
+.di-supplier-scroll {
+    overflow: auto;
+    max-height: calc(100vh - 300px);
+}
+.di-supplier-scroll table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+@media print {
+    /* Never clip the list when printing — show every row. */
+    .di-supplier-scroll { overflow: visible; max-height: none; }
+}
+
 /* Tabs: navy active text with a gold underline */
 .nav-tabs .nav-link {
     color: #5a6678;
