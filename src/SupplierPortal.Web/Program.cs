@@ -33,20 +33,31 @@ builder.Services.AddCascadingAuthenticationState();
 // DbContext factories are still registered so DI can satisfy components that inject the domain services
 // (which the self-service path never actually calls). A placeholder connection is used when none is
 // configured; it is never opened because the DMZ skips startup migration and uses the HTTP gateways.
-var dbConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+// Choose the database by the Database:Provider flag: "Azure" uses ConnectionStrings:AzureConnection
+// (Azure SQL Database); anything else (default "Local") uses ConnectionStrings:DefaultConnection
+// (on-prem SQL Server). Falls back to DefaultConnection if the selected one is blank.
+var useAzureSql = string.Equals(builder.Configuration["Database:Provider"], "Azure", StringComparison.OrdinalIgnoreCase);
+var dbConnection = builder.Configuration.GetConnectionString(useAzureSql ? "AzureConnection" : "DefaultConnection");
+if (string.IsNullOrWhiteSpace(dbConnection))
+{
+    dbConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+}
 if (string.IsNullOrWhiteSpace(dbConnection))
 {
     dbConnection = "Server=(placeholder);Database=none;Trusted_Connection=False;";
 }
 
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-    options.UseSqlServer(dbConnection));
+    options.UseSqlServer(dbConnection, sql => sql.EnableRetryOnFailure()));
 
 // Landlord / Leasing module — separate bounded context over the same DB (reads the dbo.Property view,
 // owns the leasing.* tables) with its own migrations history so it never clashes with ApplicationDbContext.
+// EnableRetryOnFailure adds resiliency against Azure SQL transient faults (throttling/failover).
 builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>(options =>
     options.UseSqlServer(dbConnection,
-        sql => sql.MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)));
+        sql => sql
+            .MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)
+            .EnableRetryOnFailure()));
 builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();

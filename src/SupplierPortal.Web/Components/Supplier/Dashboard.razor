@@ -108,22 +108,26 @@
             <span>@(filterBusinessUnitId == 0 ? "Notify All Suppliers" : $"Notify Suppliers in {SelectedBuLabel}")</span>
         }
     </button>
-    <a class="di-action-btn is-register" href="/supplier/register" title="Register a new supplier" aria-label="Register supplier">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" />
-            <path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round" />
-            <circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233" />
-            <path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
-        </svg>
-        <span>Register Supplier</span>
-    </a>
-    <a class="di-action-btn is-upload" href="/supplier/upload" title="Bulk-upload suppliers from an Excel file" aria-label="Upload supplier data">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round" />
-            <path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        <span>Upload Supplier Data</span>
-    </a>
+    @* Registering and bulk-uploading suppliers are administrator-only actions. *@
+    @if (isAdministrator)
+    {
+        <a class="di-action-btn is-register" href="/supplier/register" title="Register a new supplier" aria-label="Register supplier">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" />
+                <path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round" />
+                <circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233" />
+                <path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span>Register Supplier</span>
+        </a>
+        <a class="di-action-btn is-upload" href="/supplier/upload" title="Bulk-upload suppliers from an Excel file" aria-label="Upload supplier data">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round" />
+                <path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Upload Supplier Data</span>
+        </a>
+    }
 </div>
 
 @if (showTemplateDialog)
