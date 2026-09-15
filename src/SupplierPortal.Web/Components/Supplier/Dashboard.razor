@@ -104,24 +104,39 @@
 
 @if (showTemplateDialog)
 {
-    <div class="di-tmpl-backdrop" @onclick="CloseTemplateDialog">
-        <div class="di-tmpl-modal" @onclick:stopPropagation>
-            <h5 class="di-tmpl-title">Generate Supplier Template</h5>
-            <p class="di-tmpl-text">
-                Download an Excel template for the business to fill in and re-upload. On upload,
-                duplicate suppliers (by Supplier Number) are detected and skipped automatically.
-            </p>
-            <label class="di-tmpl-radio">
-                <input type="radio" name="tmplMode" checked="@(!templatePopulate)" @onchange="() => templatePopulate = false" />
-                <span>Blank template (headers only)</span>
-            </label>
-            <label class="di-tmpl-radio">
-                <input type="radio" name="tmplMode" checked="@templatePopulate" @onchange="() => templatePopulate = true" />
-                <span>Populate with existing supplier data</span>
-            </label>
+    <div class="di-print-backdrop" @onclick="CloseTemplateDialog"></div>
+    <div class="di-print-dialog" @onclick:stopPropagation role="dialog" aria-modal="true" aria-label="Generate supplier template">
+        <div class="di-print-head">
+            <div class="di-print-head-icon">
+                <svg width="22" height="22" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff"/><path d="M30 3h9v9z" fill="#cfe0f5"/><path d="M12 16h16M12 22h16M12 28h16M12 34h9" stroke="#274a7d" stroke-width="2.4" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+                <h3 class="di-print-title">Generate Supplier Template</h3>
+                <p class="di-print-sub">Download an Excel template for the business to fill in and re-upload. Duplicate suppliers (by Supplier Number) are detected and skipped automatically on upload.</p>
+            </div>
+            <button type="button" class="di-print-x" aria-label="Close" @onclick="CloseTemplateDialog">✕</button>
+        </div>
+
+        <div class="di-print-body">
+            <div class="di-opt-cards">
+                <label class="di-opt-card @(!templatePopulate ? "is-on" : "")">
+                    <input type="radio" name="tmplMode" checked="@(!templatePopulate)" @onchange="() => templatePopulate = false" />
+                    <span class="di-opt-main">
+                        <span class="di-opt-title">Blank template</span>
+                        <span class="di-opt-desc">Headers only — a clean sheet to fill in.</span>
+                    </span>
+                </label>
+                <label class="di-opt-card @(templatePopulate ? "is-on" : "")">
+                    <input type="radio" name="tmplMode" checked="@templatePopulate" @onchange="() => templatePopulate = true" />
+                    <span class="di-opt-main">
+                        <span class="di-opt-title">Populate with existing data</span>
+                        <span class="di-opt-desc">Pre-filled with current suppliers for review/update.</span>
+                    </span>
+                </label>
+            </div>
             @if (templatePopulate)
             {
-                <div class="di-tmpl-field">
+                <div class="di-print-field">
                     <label>Business Unit</label>
                     <select @bind="templateBuId">
                         <option value="0">@(SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")</option>
@@ -134,25 +149,27 @@
             }
             @if (generatingTemplate)
             {
-                <div class="di-tmpl-progress">
+                <div class="di-print-hint">
                     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                     <span>@templateProgress</span>
                 </div>
             }
-            <div class="di-tmpl-actions">
-                <button type="button" class="di-btn di-btn-secondary" @onclick="CloseTemplateDialog" disabled="@generatingTemplate">Cancel</button>
-                <button type="button" class="di-btn di-btn-primary" @onclick="DownloadTemplateAsync" disabled="@generatingTemplate">
-                    @if (generatingTemplate)
-                    {
-                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        <span>Generating…</span>
-                    }
-                    else
-                    {
-                        <span>Download</span>
-                    }
-                </button>
-            </div>
+        </div>
+
+        <div class="di-print-actions">
+            <button type="button" class="di-btn2 di-btn2-ghost" @onclick="CloseTemplateDialog" disabled="@generatingTemplate">Cancel</button>
+            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DownloadTemplateAsync" disabled="@generatingTemplate">
+                @if (generatingTemplate)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Generating…</span>
+                }
+                else
+                {
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                    <span>Download</span>
+                }
+            </button>
         </div>
     </div>
 }
@@ -817,6 +834,20 @@ else if (TotalPages > 1)
     .di-btn2-primary { background: linear-gradient(135deg, #2f6fed, #1e50c8); color: #fff; box-shadow: 0 6px 16px rgba(47, 111, 237, .32); }
     .di-btn2-primary:hover { filter: brightness(1.05); }
     .di-btn2-primary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+    /* Radio option cards + inline field, shared by the template dialog. */
+    .di-opt-cards { display: grid; gap: 10px; }
+    .di-opt-card { display: flex; align-items: flex-start; gap: 11px; padding: 13px 15px; border: 1.5px solid #e4e8f0; border-radius: 12px;
+        cursor: pointer; transition: border-color .12s, background .12s; }
+    .di-opt-card:hover { border-color: #b9c6df; }
+    .di-opt-card.is-on { border-color: #2f6fed; background: #eef4ff; }
+    .di-opt-card input { margin-top: 3px; width: 17px; height: 17px; accent-color: #2f6fed; }
+    .di-opt-main { display: flex; flex-direction: column; gap: 2px; }
+    .di-opt-title { font-size: 14px; font-weight: 700; color: #17233a; }
+    .di-opt-desc { font-size: 12.5px; color: #6b7686; }
+    .di-print-field { margin-top: 14px; }
+    .di-print-field label { display: block; font-size: 12.5px; font-weight: 600; color: #46506b; margin-bottom: 5px; }
+    .di-print-field select { width: 100%; padding: 9px 11px; border: 1.5px solid #d3dae6; border-radius: 10px; font-size: 14px; background: #fff; }
+    .di-print-field select:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47, 111, 237, .15); }
     .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px;
         border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
     @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
