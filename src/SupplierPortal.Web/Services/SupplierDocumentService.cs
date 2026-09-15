@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
@@ -313,6 +315,14 @@ public class SupplierDocumentService(
                 return null;
             }
 
+            // SSRF guard: the QR URL is attacker-controlled (decoded from an uploaded image), and this runs on
+            // the internal server, so refuse any target that resolves to a loopback/link-local/private address
+            // (e.g. the cloud metadata endpoint 169.254.169.254 or internal-only hosts).
+            if (await ResolvesToBlockedHostAsync(uri))
+            {
+                return null;
+            }
+
             var client = httpClientFactory.CreateClient("license");
             using var response = await client.GetAsync(uri);
             if (!response.IsSuccessStatusCode)
@@ -336,6 +346,48 @@ public class SupplierDocumentService(
         {
             return null;
         }
+    }
+
+    /// <summary>True when the URI's host resolves to a loopback/link-local/private/reserved address, which
+    /// must not be fetched (SSRF protection). Unresolvable hosts are treated as blocked.</summary>
+    private static async Task<bool> ResolvesToBlockedHostAsync(Uri uri)
+    {
+        IPAddress[] addresses;
+        if (IPAddress.TryParse(uri.Host, out var literal))
+        {
+            addresses = [literal];
+        }
+        else
+        {
+            try { addresses = await Dns.GetHostAddressesAsync(uri.Host); }
+            catch { return true; }
+        }
+        return addresses.Length == 0 || addresses.Any(IsPrivateOrReserved);
+    }
+
+    private static bool IsPrivateOrReserved(IPAddress ip)
+    {
+        if (IPAddress.IsLoopback(ip)) { return true; }
+
+        if (ip.IsIPv4MappedToIPv6) { ip = ip.MapToIPv4(); }
+        var b = ip.GetAddressBytes();
+
+        if (ip.AddressFamily == AddressFamily.InterNetwork)
+        {
+            return b[0] == 0                                   // 0.0.0.0/8
+                || b[0] == 10                                  // 10.0.0.0/8
+                || (b[0] == 100 && b[1] >= 64 && b[1] <= 127)  // 100.64.0.0/10 (CGNAT)
+                || b[0] == 127                                 // loopback
+                || (b[0] == 169 && b[1] == 254)                // 169.254.0.0/16 (link-local, incl. metadata)
+                || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)   // 172.16.0.0/12
+                || (b[0] == 192 && b[1] == 168);               // 192.168.0.0/16
+        }
+        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6Multicast
+                || (b[0] & 0xFE) == 0xFC;                      // fc00::/7 (unique local)
+        }
+        return true;
     }
 
     /// <summary>Reads the concatenated text layer of a PDF (best-effort). A non-PDF file, a scanned
@@ -414,11 +466,22 @@ public class SupplierDocumentService(
             var bytes = await ReadStoredBytesAsync(doc);
             if (bytes is not null)
             {
-                result.Add((bytes, doc.FileName));
+                // Prefix each zipped file with its document-type label, e.g. "Trade License _ <original name>".
+                result.Add((bytes, $"{DocumentTypeLabel(doc.DocumentType)} _ {doc.FileName}"));
             }
         }
         return result;
     }
+
+    /// <summary>Human-readable document-type label used to prefix file names in the "download all" zip.</summary>
+    private static string DocumentTypeLabel(SupplierDocumentType type) => type switch
+    {
+        SupplierDocumentType.TradeLicense => "Trade License",
+        SupplierDocumentType.VatCertification => "VAT",
+        SupplierDocumentType.BankConfirmationLetter => "Bank Confirmation Letter",
+        SupplierDocumentType.SignedDeclaration => "Signed Declaration",
+        _ => "Other"
+    };
 
     /// <summary>The owning supplier id for a document, or null when the document does not exist. Lets the
     /// download endpoint enforce per-supplier access scope before serving the file.</summary>

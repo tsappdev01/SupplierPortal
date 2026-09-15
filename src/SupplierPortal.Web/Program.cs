@@ -165,7 +165,11 @@ builder.Services.AddSingleton<SupplierPortal.Web.Services.Storage.IFileStorageSe
 builder.Services.Configure<OcrOptions>(builder.Configuration.GetSection(OcrOptions.SectionName));
 builder.Services.AddHttpClient<IDocumentOcrService, AzureDocumentIntelligenceOcrService>();
 builder.Services.AddSingleton<LicenseQrService>();
-builder.Services.AddHttpClient("license", c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddHttpClient("license", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(15);
+    c.MaxResponseContentBufferSize = 25 * 1024 * 1024; // cap the QR-fetched PDF at 25 MB (SSRF/DoS guard)
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddScoped<ExportService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<LoadingService>();
@@ -338,6 +342,18 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseHttpsRedirection();
+
+// Baseline security response headers. nosniff stops content-type sniffing (so an uploaded document can't be
+// re-interpreted as HTML/script), SAMEORIGIN blocks framing by other sites, and no-referrer keeps the
+// self-service session URL out of the Referer header sent to externally-hosted logos/links.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "SAMEORIGIN";
+    headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
 
 app.UseStaticFiles();
 app.UseRateLimiter();
@@ -698,6 +714,27 @@ static bool WantsAttachment(string? download)
         && !v.Equals("no", StringComparison.OrdinalIgnoreCase);
 }
 
+// Content types that are safe to serve INLINE (rendered in the reviewer's browser). Anything else — notably
+// text/html and image/svg+xml, which can execute script in the app origin — is forced to download instead,
+// so a supplier-uploaded document with a crafted content type cannot run as script when a reviewer opens it.
+static readonly HashSet<string> InlineSafeContentTypes = new(StringComparer.OrdinalIgnoreCase)
+{
+    "application/pdf", "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "text/plain"
+};
+
+// Serves a stored document. Attachment downloads keep their content type; inline requests are served with the
+// stored type only when it is on the safe-inline allowlist, otherwise forced to download as an octet-stream.
+static IResult ServeDocument(byte[] bytes, string contentType, string fileName, bool asAttachment)
+{
+    if (asAttachment)
+    {
+        return Results.File(bytes, contentType, fileName);
+    }
+    return InlineSafeContentTypes.Contains(contentType)
+        ? Results.File(bytes, contentType)
+        : Results.File(bytes, "application/octet-stream", fileName);
+}
+
 // Non-administrators may export only the suppliers assigned to them (mirrors the dashboard list);
 // administrators export the whole in-scope set. Returns null (no assignee filter) for administrators.
 static int? ResolveAssigneeScope(HttpContext ctx)
@@ -796,9 +833,7 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, string? download, Htt
 
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return WantsAttachment(download)
-        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
-        : Results.File(file.Value.Bytes, file.Value.ContentType);
+    return ServeDocument(file.Value.Bytes, file.Value.ContentType, file.Value.FileName, WantsAttachment(download));
 }).RequireAuthorization();
 
 // Customer KYC document preview/download (admin reviewers). Without ?download=1 the file is served
@@ -813,9 +848,7 @@ app.MapGet("/customers/documents/{id:int}", async (int id, string? download, Htt
 
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return WantsAttachment(download)
-        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
-        : Results.File(file.Value.Bytes, file.Value.ContentType);
+    return ServeDocument(file.Value.Bytes, file.Value.ContentType, file.Value.FileName, WantsAttachment(download));
 }).RequireAuthorization("Portal.Customer");
 
 // Download all of a customer's KYC attachments as a single zip archive.
@@ -856,9 +889,7 @@ app.MapGet("/landlord-documents/{id:int}", async (int id, string? download, Supp
 {
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return WantsAttachment(download)
-        ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
-        : Results.File(file.Value.Bytes, file.Value.ContentType);
+    return ServeDocument(file.Value.Bytes, file.Value.ContentType, file.Value.FileName, WantsAttachment(download));
 }).RequireAuthorization("Portal.Landlord");
 
 // Circularo signature callback: Circularo POSTs here when a document's signing status changes. Validated by
