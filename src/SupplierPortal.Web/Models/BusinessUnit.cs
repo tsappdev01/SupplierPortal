@@ -32,6 +32,14 @@ public class BusinessUnit
     [MaxLength(100)]
     public string? LogoContentType { get; set; }
 
+    /// <summary>Blob storage key when the logo lives in Azure Blob Storage; then <see cref="Logo"/> is null.</summary>
+    [MaxLength(400)]
+    public string? LogoBlobKey { get; set; }
+
+    /// <summary>Blob storage key when the thumbnail lives in Azure Blob Storage; then <see cref="Thumbnail"/> is null.</summary>
+    [MaxLength(400)]
+    public string? ThumbnailBlobKey { get; set; }
+
     /// <summary>A 640×640 PNG thumbnail derived from <see cref="Logo"/> on upload (aspect ratio preserved,
     /// padded onto a transparent square). Kept alongside the original for list/avatar rendering.</summary>
     public byte[]? Thumbnail { get; set; }

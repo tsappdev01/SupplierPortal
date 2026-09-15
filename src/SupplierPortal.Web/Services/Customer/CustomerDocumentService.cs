@@ -9,7 +9,9 @@ namespace SupplierPortal.Web.Services;
 /// <summary>Manages customer KYC document uploads: the master document-type checklist and the uploaded
 /// files (stored in the database on <see cref="CustomerDocument"/>). Uploading a type replaces any prior
 /// file of that type for the customer.</summary>
-public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService audit)
+public class CustomerDocumentService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, AuditService audit,
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     public const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
     private static readonly string[] AllowedExtensions = { ".pdf", ".jpg", ".jpeg", ".png" };
@@ -144,10 +146,22 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
             return (false, $"'{fileName}' is over the {MaxFileSize / (1024 * 1024)} MB limit.");
         }
 
+        var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+
+        // When blob storage is enabled, store the bytes in Azure Blob Storage and keep only the key in the
+        // database; otherwise the bytes are stored inline in the Content column (existing behaviour).
+        string? blobKey = fileStore.Enabled
+            ? await fileStore.SaveAsync($"customer/{customerId}", fileName, bytes, resolvedContentType)
+            : null;
+
         await using var db = await dbFactory.CreateDbContextAsync();
         // Replace any existing document of the same type for this customer.
         var existing = await db.CustomerDocuments
             .Where(d => d.CustomerId == customerId && d.DocumentType == documentType).ToListAsync();
+        foreach (var old in existing)
+        {
+            await DeleteStoredFileAsync(old);
+        }
         if (existing.Count > 0)
         {
             db.CustomerDocuments.RemoveRange(existing);
@@ -157,8 +171,9 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
             CustomerId = customerId,
             DocumentType = documentType,
             FileName = fileName,
-            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
-            Content = bytes,
+            ContentType = resolvedContentType,
+            Content = blobKey is null ? bytes : Array.Empty<byte>(),
+            BlobKey = blobKey,
             UploadedBy = uploadedBy,
             UploadedAt = DateTime.UtcNow
         });
@@ -172,20 +187,33 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
     public async Task<List<(byte[] Bytes, string FileName)>> GetAllFilesAsync(int customerId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        return (await db.CustomerDocuments.AsNoTracking()
-                .Where(d => d.CustomerId == customerId)
-                .OrderBy(d => d.DocumentType)
-                .Select(d => new { d.Content, d.FileName })
-                .ToListAsync())
-            .Select(d => (d.Content, d.FileName))
-            .ToList();
+        var docs = await db.CustomerDocuments.AsNoTracking()
+            .Where(d => d.CustomerId == customerId)
+            .OrderBy(d => d.DocumentType)
+            .ToListAsync();
+
+        var result = new List<(byte[] Bytes, string FileName)>();
+        foreach (var doc in docs)
+        {
+            var bytes = await ReadStoredBytesAsync(doc);
+            if (bytes is not null)
+            {
+                result.Add((bytes, doc.FileName));
+            }
+        }
+        return result;
     }
 
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var doc = await db.CustomerDocuments.FirstOrDefaultAsync(d => d.Id == documentId);
-        return doc is null ? null : (doc.Content, doc.ContentType, doc.FileName);
+        if (doc is null)
+        {
+            return null;
+        }
+        var bytes = await ReadStoredBytesAsync(doc);
+        return bytes is null ? null : (bytes, doc.ContentType, doc.FileName);
     }
 
     public async Task DeleteAsync(int documentId, string actor)
@@ -198,8 +226,21 @@ public class CustomerDocumentService(IDbContextFactory<ApplicationDbContext> dbF
         }
         var customerId = doc.CustomerId;
         var type = doc.DocumentType;
+        await DeleteStoredFileAsync(doc);
         db.CustomerDocuments.Remove(doc);
         await db.SaveChangesAsync();
         await audit.LogAsync(actor, AuditAction.Delete, "CustomerDocument", customerId, $"Removed {type}");
+    }
+
+    /// <summary>Reads a customer document's bytes from blob storage (when it has a key) or the Content column.</summary>
+    private async Task<byte[]?> ReadStoredBytesAsync(CustomerDocument doc)
+        => string.IsNullOrWhiteSpace(doc.BlobKey) ? doc.Content : await fileStore.ReadAsync(doc.BlobKey);
+
+    private async Task DeleteStoredFileAsync(CustomerDocument doc)
+    {
+        if (!string.IsNullOrWhiteSpace(doc.BlobKey))
+        {
+            await fileStore.DeleteAsync(doc.BlobKey);
+        }
     }
 }

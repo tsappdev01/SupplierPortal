@@ -122,6 +122,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<byte[]>("Logo")
                         .HasColumnType("varbinary(max)");
 
+                    b.Property<string>("LogoBlobKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
                     b.Property<string>("LogoContentType")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -137,6 +141,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<byte[]>("Thumbnail")
                         .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ThumbnailBlobKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
 
                     b.Property<string>("ThumbnailContentType")
                         .HasMaxLength(100)
@@ -732,6 +740,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BlobKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
 
                     b.Property<byte[]>("Content")
                         .IsRequired()
@@ -1694,6 +1706,13 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BlobKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<byte[]>("Content")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1961,6 +1980,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<byte[]>("ProfilePhoto")
                         .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ProfilePhotoBlobKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
 
                     b.Property<string>("ProfilePhotoContentType")
                         .HasMaxLength(100)

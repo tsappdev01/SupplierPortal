@@ -17,7 +17,8 @@ public record DocumentUploadResult(bool Success, string? Error, string? Extracte
 /// web-servable - with only their metadata in the database.</summary>
 public class SupplierDocumentService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
-    IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService)
+    IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService,
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -38,10 +39,25 @@ public class SupplierDocumentService(
     public async Task<List<SupplierDocument>> GetDocumentsAsync(int supplierId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        // Project without the Content bytes: the checklist only needs metadata, and this keeps large
+        // database-stored files out of the form load (and out of the DMZ self-service bundle).
         return await db.SupplierDocuments
             .Where(d => d.SupplierId == supplierId)
             .OrderBy(d => d.DocumentType)
             .ThenBy(d => d.UploadedAt)
+            .Select(d => new SupplierDocument
+            {
+                Id = d.Id,
+                SupplierId = d.SupplierId,
+                DocumentType = d.DocumentType,
+                FileName = d.FileName,
+                StoredFileName = d.StoredFileName,
+                BlobKey = d.BlobKey,
+                ContentType = d.ContentType,
+                FileSizeBytes = d.FileSizeBytes,
+                UploadedAt = d.UploadedAt,
+                UploadedBy = d.UploadedBy,
+            })
             .ToListAsync();
     }
 
@@ -150,6 +166,18 @@ public class SupplierDocumentService(
             }
         }
 
+        // The local file above was needed for QR/OCR extraction. Move the durable copy to its store:
+        //  • blob storage when enabled (record the blob key), else
+        //  • the database Content column (matching customer documents).
+        // Either way the local temp copy is then removed, so new uploads never linger on disk.
+        var fileBytes = await File.ReadAllBytesAsync(fullPath);
+        var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+        string? blobKey = fileStore.Enabled
+            ? await fileStore.SaveAsync($"supplier/{supplierId}", fileName, fileBytes, resolvedContentType)
+            : null;
+        byte[]? contentBytes = blobKey is null ? fileBytes : null;
+        try { File.Delete(fullPath); } catch { /* best-effort cleanup of the local temp copy */ }
+
         await using var db = await dbFactory.CreateDbContextAsync();
 
         // Trade License / VAT Certification are single-slot fields: a new upload replaces the
@@ -161,7 +189,7 @@ public class SupplierDocumentService(
                 .ToListAsync();
             foreach (var old in existing)
             {
-                DeletePhysicalFile(supplierId, old.StoredFileName);
+                await DeleteStoredFileAsync(old);
                 db.SupplierDocuments.Remove(old);
             }
         }
@@ -172,7 +200,9 @@ public class SupplierDocumentService(
             DocumentType = documentType,
             FileName = fileName,
             StoredFileName = storedFileName,
-            ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            Content = contentBytes,
+            BlobKey = blobKey,
+            ContentType = resolvedContentType,
             FileSizeBytes = size,
             UploadedBy = uploadedBy
         });
@@ -329,7 +359,7 @@ public class SupplierDocumentService(
             return (false, "Document not found.");
         }
 
-        DeletePhysicalFile(document.SupplierId, document.StoredFileName);
+        await DeleteStoredFileAsync(document);
         db.SupplierDocuments.Remove(document);
         await db.SaveChangesAsync();
         await auditService.LogAsync(actorUsername, AuditAction.Delete, "Supplier", document.SupplierId, $"Deleted {document.DocumentType} document '{document.FileName}'");
@@ -350,10 +380,10 @@ public class SupplierDocumentService(
         var result = new List<(byte[] Bytes, string FileName)>();
         foreach (var doc in docs)
         {
-            var fullPath = Path.Combine(DocumentsDirectory(supplierId), doc.StoredFileName);
-            if (File.Exists(fullPath))
+            var bytes = await ReadStoredBytesAsync(doc);
+            if (bytes is not null)
             {
-                result.Add((await File.ReadAllBytesAsync(fullPath), doc.FileName));
+                result.Add((bytes, doc.FileName));
             }
         }
         return result;
@@ -372,10 +402,10 @@ public class SupplierDocumentService(
         var result = new List<(byte[] Bytes, string FileName)>();
         foreach (var doc in docs)
         {
-            var fullPath = Path.Combine(DocumentsDirectory(supplierId), doc.StoredFileName);
-            if (File.Exists(fullPath))
+            var bytes = await ReadStoredBytesAsync(doc);
+            if (bytes is not null)
             {
-                result.Add((await File.ReadAllBytesAsync(fullPath), doc.FileName));
+                result.Add((bytes, doc.FileName));
             }
         }
         return result;
@@ -390,14 +420,40 @@ public class SupplierDocumentService(
             return null;
         }
 
-        var fullPath = Path.Combine(DocumentsDirectory(document.SupplierId), document.StoredFileName);
-        if (!File.Exists(fullPath))
-        {
-            return null;
-        }
+        var bytes = await ReadStoredBytesAsync(document);
+        return bytes is null ? null : (bytes, document.ContentType, document.FileName);
+    }
 
-        var bytes = await File.ReadAllBytesAsync(fullPath);
-        return (bytes, document.ContentType, document.FileName);
+    /// <summary>Reads a document's bytes from Azure Blob Storage (blob key), the database (Content column),
+    /// or the legacy local-disk copy — in that order. Returns null when the file can't be found.</summary>
+    private async Task<byte[]?> ReadStoredBytesAsync(SupplierDocument doc)
+    {
+        if (!string.IsNullOrWhiteSpace(doc.BlobKey))
+        {
+            return await fileStore.ReadAsync(doc.BlobKey);
+        }
+        if (doc.Content is { Length: > 0 })
+        {
+            return doc.Content;
+        }
+        var fullPath = Path.Combine(DocumentsDirectory(doc.SupplierId), doc.StoredFileName);
+        return File.Exists(fullPath) ? await File.ReadAllBytesAsync(fullPath) : null;
+    }
+
+    /// <summary>Deletes a document's stored file: the blob (blob key) or the legacy local-disk copy.
+    /// Database-stored bytes (Content) are removed with the document row itself.</summary>
+    private async Task DeleteStoredFileAsync(SupplierDocument doc)
+    {
+        if (!string.IsNullOrWhiteSpace(doc.BlobKey))
+        {
+            await fileStore.DeleteAsync(doc.BlobKey);
+            return;
+        }
+        if (doc.Content is { Length: > 0 })
+        {
+            return; // stored in the database — removed when the row is deleted
+        }
+        DeletePhysicalFile(doc.SupplierId, doc.StoredFileName);
     }
 
     private void DeletePhysicalFile(int supplierId, string storedFileName)

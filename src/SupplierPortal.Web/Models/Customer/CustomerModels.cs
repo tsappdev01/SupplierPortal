@@ -199,6 +199,9 @@ public class CustomerDocument
     [MaxLength(260)] public string FileName { get; set; } = "";
     [MaxLength(150)] public string ContentType { get; set; } = "";
     public byte[] Content { get; set; } = [];
+    /// <summary>Blob storage key when the file lives in Azure Blob Storage; then <see cref="Content"/> is
+    /// empty. Null for older documents whose bytes are stored in <see cref="Content"/>.</summary>
+    [MaxLength(400)] public string? BlobKey { get; set; }
     [MaxLength(150)] public string? UploadedBy { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 }
