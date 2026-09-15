@@ -103,7 +103,7 @@ public class SupplierEmailService(
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
             .Replace("{CompanyLogo}", BrandBlock(logo, brand))
-            .Replace("{Supplier Name}", supplierName)
+            .Replace("{Supplier Name}", System.Net.WebUtility.HtmlEncode(supplierName))
             .Replace("{Link}", link);
 
         var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";
@@ -161,7 +161,7 @@ public class SupplierEmailService(
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
             .Replace("{CompanyLogo}", BrandBlock(logo, brand))
-            .Replace("{Supplier Name}", supplier.SupplierName)
+            .Replace("{Supplier Name}", System.Net.WebUtility.HtmlEncode(supplier.SupplierName))
             .Replace("{Link}", link);
 
         var subject = $"Supplier Update Submitted - {supplier.SupplierName}";

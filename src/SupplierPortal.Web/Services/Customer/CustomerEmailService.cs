@@ -77,7 +77,7 @@ public class CustomerEmailService(
         var body = await File.ReadAllTextAsync(templatePath);
         body = body
             .Replace("{CompanyLogo}", BrandBlock(logo, brand))
-            .Replace("{Customer Name}", customerName)
+            .Replace("{Customer Name}", System.Net.WebUtility.HtmlEncode(customerName))
             .Replace("{Link}", link);
 
         var subject = $"Customer Information Update - {customerName}";

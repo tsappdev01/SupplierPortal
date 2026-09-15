@@ -7,6 +7,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierService SupplierService
+@inject UserService UserService
 @inject SupplierAccessTokenService SupplierAccessTokenService
 @inject SupplierDocumentService SupplierDocumentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -201,7 +202,17 @@ else
             return;
         }
 
-        if (!seesAllBusinessUnits && !userBusinessUnitIds.Contains(loaded.BusinessUnitId))
+        // Enforce the same visibility scope as the dashboard list (BU + assigned-to-me OR my-department for
+        // non-admins), not just the business unit — otherwise a non-admin could open a supplier by direct URL
+        // that the list would never show them.
+        var userId = state.User.GetUserId();
+        var buScope = seesAllBusinessUnits ? (IReadOnlyCollection<int>?)null : userBusinessUnitIds;
+        int? assigneeScope = isAdministrator ? null : (userId > 0 ? userId : -1);
+        int? departmentScope = isAdministrator || userId <= 0
+            ? null
+            : (await UserService.GetByIdAsync(userId))?.DepartmentId;
+
+        if (!await SupplierService.IsSupplierAccessibleAsync(Id, buScope, assigneeScope, departmentScope))
         {
             forbidden = true;
             return;

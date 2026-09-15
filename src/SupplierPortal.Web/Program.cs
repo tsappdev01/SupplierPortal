@@ -594,7 +594,11 @@ csApi.MapPost("/documents/list", async (SupplierPortal.Web.Services.SelfService.
 csApi.MapPost("/documents/upload", async (SupplierPortal.Web.Services.SelfService.SsCustomerUploadRequest body,
     SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceDataGateway data) =>
 {
-    var bytes = Convert.FromBase64String(body.BytesBase64);
+    // Guard malformed base64 so a crafted request returns a clean 400 rather than an unhandled 500.
+    byte[] bytes;
+    try { bytes = Convert.FromBase64String(body.BytesBase64 ?? ""); }
+    catch (FormatException) { return Results.BadRequest("Invalid file payload."); }
+
     return Results.Ok(await data.UploadDocumentAsync(
         body.Token, body.Session, body.DocumentType, body.FileName, body.ContentType, bytes));
 });

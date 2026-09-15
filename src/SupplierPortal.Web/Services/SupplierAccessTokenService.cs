@@ -104,7 +104,7 @@ public class SupplierAccessTokenService(
             body = await File.ReadAllTextAsync(templatePath);
         }
 
-        var code = RandomNumberGenerator.GetInt32(0, 10000).ToString("D4");
+        var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
         token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
         token.OtpGeneratedAt = DateTime.UtcNow;
         token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
@@ -130,7 +130,7 @@ public class SupplierAccessTokenService(
                 : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block\" />";
             body = body!
                 .Replace("{CompanyLogo}", brandBlock)
-                .Replace("{Supplier Name}", token.Supplier.SupplierName)
+                .Replace("{Supplier Name}", System.Net.WebUtility.HtmlEncode(token.Supplier.SupplierName))
                 .Replace("{OTP Code}", code)
                 .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
             var (ok, error) = await emailDispatcher.SendHtmlAsync(

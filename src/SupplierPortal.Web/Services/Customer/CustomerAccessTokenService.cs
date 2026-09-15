@@ -94,7 +94,7 @@ public class CustomerAccessTokenService(
         }
         var body = await File.ReadAllTextAsync(templatePath);
 
-        var code = RandomNumberGenerator.GetInt32(0, 10000).ToString("D4");
+        var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
         token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
         token.OtpGeneratedAt = DateTime.UtcNow;
         token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
@@ -111,7 +111,7 @@ public class CustomerAccessTokenService(
             : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block\" />";
         body = body
             .Replace("{CompanyLogo}", brandBlock)
-            .Replace("{Customer Name}", token.Customer.LegalName ?? "Customer")
+            .Replace("{Customer Name}", System.Net.WebUtility.HtmlEncode(token.Customer.LegalName ?? "Customer"))
             .Replace("{OTP Code}", code)
             .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
 
