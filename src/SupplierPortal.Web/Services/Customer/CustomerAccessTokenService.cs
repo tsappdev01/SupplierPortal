@@ -126,6 +126,12 @@ public class CustomerAccessTokenService(
 
     public async Task<(bool Success, string? Error, string? SessionToken)> VerifyOtpAsync(int tokenId, string enteredCode)
     {
+        // Guard against a null/blank code (e.g. a raw API body with code:null) before Trim() below.
+        if (string.IsNullOrWhiteSpace(enteredCode))
+        {
+            return (false, "Please enter the code from your email.", null);
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
         var token = await db.CustomerAccessTokens.FirstOrDefaultAsync(t => t.Id == tokenId);
         if (token is null)
