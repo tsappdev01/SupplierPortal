@@ -52,6 +52,63 @@ window.ssDoc = {
         a.click();
         document.body.removeChild(a);
         setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { } }, 1500);
+    },
+
+    // Stream a same-origin file to the browser while reporting download progress back to Blazor.
+    // Used by "Download all (zip)" so the user sees a progress bar while the archive is fetched.
+    // The server-provided Content-Disposition filename is preferred; falls back to fallbackName.
+    downloadWithProgress: async function (url, fallbackName, dotNetRef) {
+        function report() {
+            if (!dotNetRef) { return Promise.resolve(); }
+            var args = Array.prototype.slice.call(arguments);
+            return dotNetRef.invokeMethodAsync.apply(dotNetRef, args).catch(function () { });
+        }
+        try {
+            var resp = await fetch(url, { headers: { 'Accept': 'application/octet-stream' } });
+            if (!resp.ok) {
+                await report('OnDownloadError', resp.status === 404
+                    ? 'This supplier has no attachments.'
+                    : ('Download failed (' + resp.status + ').'));
+                return;
+            }
+
+            var name = fallbackName || 'download';
+            var cd = resp.headers.get('Content-Disposition') || '';
+            var m = /filename\*?=(?:UTF-8''|")?([^;"']+)/i.exec(cd);
+            if (m && m[1]) { try { name = decodeURIComponent(m[1].trim()); } catch (e) { name = m[1].trim(); } }
+
+            var total = parseInt(resp.headers.get('Content-Length') || '0', 10);
+            var blob;
+            var reader = (resp.body && resp.body.getReader) ? resp.body.getReader() : null;
+            if (reader) {
+                var chunks = [], received = 0, lastPct = -1;
+                while (true) {
+                    var r = await reader.read();
+                    if (r.done) { break; }
+                    chunks.push(r.value);
+                    received += r.value.length;
+                    var pct = total > 0 ? Math.min(100, Math.floor(received * 100 / total)) : -1;
+                    if (pct !== lastPct) { lastPct = pct; await report('OnDownloadProgress', pct, received, total); }
+                }
+                blob = new Blob(chunks, { type: resp.headers.get('Content-Type') || 'application/zip' });
+            } else {
+                // Streaming unsupported by this browser: fall back to an indeterminate whole-body fetch.
+                await report('OnDownloadProgress', -1, 0, 0);
+                blob = await resp.blob();
+            }
+
+            var objUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = objUrl;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { try { URL.revokeObjectURL(objUrl); } catch (e) { } }, 1500);
+            await report('OnDownloadComplete', name);
+        } catch (err) {
+            await report('OnDownloadError', (err && err.message) || 'Download failed.');
+        }
     }
 };
 

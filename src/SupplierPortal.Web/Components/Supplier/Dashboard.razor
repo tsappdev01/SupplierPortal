@@ -17,6 +17,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Manage Supplier - Supplier Portal</PageTitle>
 
@@ -577,9 +578,38 @@ else if (TotalPages > 1)
                     <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
                     <div class="di-docsall-toolbar-actions">
                         <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@docsSupplierId/documents.pdf" target="_blank">All images as PDF</a>
-                        <a class="btn btn-sm btn-dark" href="/suppliers/@docsSupplierId/documents.zip">⬇ Download all (zip)</a>
+                        <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@zipDownloading">
+                            @if (zipDownloading)
+                            {
+                                <span class="di-dl-spinner" aria-hidden="true"></span>
+                                <span>@(zipPercent < 0 ? "Downloading…" : $"Downloading… {zipPercent}%")</span>
+                            }
+                            else
+                            {
+                                <span>⬇ Download all (zip)</span>
+                            }
+                        </button>
                     </div>
                 </div>
+                @if (zipDownloading)
+                {
+                    <div class="di-dl-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(zipPercent < 0 ? 0 : zipPercent)">
+                        <div class="di-dl-progress-track">
+                            <div class="di-dl-progress-fill @(zipPercent < 0 ? "di-dl-indeterminate" : "")"
+                                 style="@(zipPercent < 0 ? "" : $"width:{zipPercent}%")"></div>
+                        </div>
+                        <span class="di-dl-progress-label">
+                            @if (zipPercent < 0)
+                            {
+                                <text>Preparing your download…</text>
+                            }
+                            else
+                            {
+                                <text>@zipPercent%@(string.IsNullOrEmpty(zipTotalText) ? "" : $" — {zipReceivedText} of {zipTotalText}")</text>
+                            }
+                        </span>
+                    </div>
+                }
                 <div class="di-docsall-grid">
                     @foreach (var doc in modalDocuments)
                     {
@@ -693,6 +723,18 @@ else if (TotalPages > 1)
     .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .di-docsall-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .di-docsall-count { font-size: 13px; font-weight: 600; color: #46506b; }
+
+    /* "Download all (zip)" progress bar + button spinner. */
+    .di-dl-progress { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .di-dl-progress-track { flex: 1; height: 8px; background: #e7ebf2; border-radius: 999px; overflow: hidden; }
+    .di-dl-progress-fill { height: 100%; background: linear-gradient(90deg, #1a2233, #2f4a7a); border-radius: 999px; transition: width .15s ease; }
+    .di-dl-progress-fill.di-dl-indeterminate { width: 40%; animation: di-dl-slide 1.1s ease-in-out infinite; }
+    @@keyframes di-dl-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .di-dl-progress-label { font-size: 12.5px; font-weight: 600; color: #46506b; white-space: nowrap; min-width: 140px; text-align: right; }
+    .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px;
+        border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
+    @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
+
     .di-docsall-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -871,6 +913,13 @@ else if (TotalPages > 1)
     private bool modalDocsLoading;
     private ElementReference docsViewerRef;
     private bool focusDocsPending;
+
+    // "Download all (zip)" progress: the archive is streamed via JS so the user sees a live progress bar.
+    private bool zipDownloading;
+    private int zipPercent;
+    private string zipReceivedText = "";
+    private string zipTotalText = "";
+    private DotNetObjectReference<Dashboard>? zipDotNetRef;
 
     private string SelectedBuLabel => filterBusinessUnitId == 0
         ? (SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")
@@ -1110,6 +1159,70 @@ else if (TotalPages > 1)
     private void CloseDocsModal() => showDocsModal = false;
     private void ModalPrevDoc() { if (modalDocIndex > 0) { modalDocIndex--; } }
     private void ModalNextDoc() { if (modalDocIndex < modalDocuments.Count - 1) { modalDocIndex++; } }
+
+    /// <summary>Streams the "download all" zip via JS so the user sees a live progress bar. The JS calls
+    /// back into the <see cref="OnDownloadProgress"/>/<see cref="OnDownloadComplete"/>/<see cref="OnDownloadError"/>
+    /// methods below.</summary>
+    private async Task DownloadAllZipAsync()
+    {
+        if (zipDownloading) { return; }
+        zipDownloading = true;
+        zipPercent = -1; // "Preparing…" until the first bytes arrive (server builds the archive first).
+        zipReceivedText = "";
+        zipTotalText = "";
+        zipDotNetRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/suppliers/{docsSupplierId}/documents.zip",
+                $"supplier-{docsSupplierId}.zip",
+                zipDotNetRef);
+        }
+        catch
+        {
+            zipDownloading = false;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    [JSInvokable]
+    public Task OnDownloadProgress(int percent, long received, long total)
+    {
+        zipPercent = percent;
+        zipReceivedText = FormatBytes(received);
+        zipTotalText = total > 0 ? FormatBytes(total) : "";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadComplete(string fileName)
+    {
+        zipDownloading = false;
+        zipPercent = 100;
+        ToastService.ShowSuccess($"Downloaded {fileName}");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadError(string message)
+    {
+        zipDownloading = false;
+        ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Human-readable size for the download progress label (KB up to 1 MB, then MB).</summary>
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) { return "0 KB"; }
+        double kb = bytes / 1024d;
+        return kb < 1024 ? $"{kb:0} KB" : $"{kb / 1024:0.0} MB";
+    }
+
+    public void Dispose() => zipDotNetRef?.Dispose();
 
     private async Task ModalPrintAsync(int documentId) =>
         await JS.InvokeVoidAsync("printImageUrl", $"/suppliers/documents/{documentId}");
