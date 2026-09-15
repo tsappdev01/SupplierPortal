@@ -1194,6 +1194,20 @@ else
 
     private bool ViaGateway => SsGateway is not null;
 
+    // Capture the self-service token/session the first time they arrive non-empty and keep them. Guards
+    // against a later parameter re-supply handing us nulls mid-flow (which surfaced as a "link-not-found"
+    // session error on document upload even though the form had loaded on a valid link).
+    private string? ssTokenActive;
+    private string? ssSessionActive;
+    private string SsTokenValue => ssTokenActive ?? SsToken ?? "";
+    private string SsSessionValue => ssSessionActive ?? SsSession ?? "";
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(SsToken)) { ssTokenActive = SsToken; }
+        if (!string.IsNullOrEmpty(SsSession)) { ssSessionActive = SsSession; }
+    }
+
     // Admin-configured tab titles + visibility (one row per field-section step 1-5).
     private List<SupplierTabSetting> tabSettings = [];
 
@@ -1866,7 +1880,7 @@ else
                 await rs.CopyToAsync(ms);
             }
             var up = await SsGateway!.UploadDocumentAsync(
-                SsToken ?? "", SsSession ?? "", (int)documentType, e.File.Name, e.File.ContentType, ms.ToArray());
+                SsTokenValue, SsSessionValue, (int)documentType, e.File.Name, e.File.ContentType, ms.ToArray());
             (success, error, extractedNumber, dunsNumber) = (up.Success, up.Error, up.ExtractedNumber, up.DunsNumber);
         }
         else
@@ -1930,7 +1944,7 @@ else
             byte[] bytes; string contentType; string fileName;
             if (ViaGateway)
             {
-                var f = await SsGateway!.GetDocumentFileAsync(SsToken ?? "", SsSession ?? "", documentId);
+                var f = await SsGateway!.GetDocumentFileAsync(SsTokenValue, SsSessionValue, documentId);
                 if (f is null)
                 {
                     ToastService.ShowError("Could not open the document. Please try again.");
@@ -1973,7 +1987,7 @@ else
         bool success; string? error;
         if (ViaGateway)
         {
-            var r = await SsGateway!.DeleteDocumentAsync(SsToken ?? "", SsSession ?? "", documentId);
+            var r = await SsGateway!.DeleteDocumentAsync(SsTokenValue, SsSessionValue, documentId);
             (success, error) = (r.Success, r.Error);
         }
         else
@@ -1994,7 +2008,7 @@ else
     /// <summary>Reloads the document list via the gateway (self-service) or the database (internal).</summary>
     private async Task<List<SupplierDocument>> LoadDocumentsAsync()
         => ViaGateway
-            ? await SsGateway!.ListDocumentsAsync(SsToken ?? "", SsSession ?? "")
+            ? await SsGateway!.ListDocumentsAsync(SsTokenValue, SsSessionValue)
             : await SupplierDocumentService.GetDocumentsAsync(Supplier.Id);
 
     private RenderFragment Req(string fieldKey) => builder =>
@@ -2306,7 +2320,7 @@ else
             // handles the update, completion, notifications and token expiry on the internal side.
             if (ViaGateway)
             {
-                var result = await SsGateway!.SaveAsync(SsToken ?? "", SsSession ?? "", Supplier, complete: submitting);
+                var result = await SsGateway!.SaveAsync(SsTokenValue, SsSessionValue, Supplier, complete: submitting);
                 if (!result.Success)
                 {
                     throw new InvalidOperationException(result.Error ?? "Save failed.");

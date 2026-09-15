@@ -216,7 +216,8 @@ public class SupplierAccessTokenService(
         string? reason = null;
         if (token is null)
         {
-            reason = "link-not-found";
+            var total = await db.SupplierAccessTokens.CountAsync();
+            reason = $"link-not-found (tokenLen={rawToken?.Length ?? 0}, sessionLen={rawSession?.Length ?? 0}, tokensInDb={total})";
         }
         else if (token.ExpiresAt < DateTime.UtcNow)
         {
