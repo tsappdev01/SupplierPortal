@@ -28,6 +28,17 @@
     </div>
 }
 
+<div class="d-flex align-items-center gap-2 mb-3">
+    <label class="form-label mb-0 fw-semibold">Status</label>
+    <select class="form-select form-select-sm" style="max-width: 200px;" @bind="statusFilter">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+        <option value="Pending">Pending</option>
+        <option value="All">All Statuses</option>
+    </select>
+    <span class="text-muted small">@FilteredUsers.Count() of @users.Count user(s)</span>
+</div>
+
 <div style="overflow-x: auto;">
 <table class="table table-striped align-middle">
     <thead>
@@ -44,7 +55,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var user in users)
+        @foreach (var user in FilteredUsers)
         {
             <tr>
                 <td style="width: 44px;">
@@ -207,6 +218,17 @@
     private List<User> users = [];
     private List<User> pendingRegistrations = [];
     private string currentUser = "unknown";
+
+    // Status filter — defaults to Active so the list opens on active users only.
+    private string statusFilter = "Active";
+
+    private IEnumerable<User> FilteredUsers => statusFilter switch
+    {
+        "Active" => users.Where(u => u.IsActive && !u.IsPendingRegistration),
+        "Inactive" => users.Where(u => !u.IsActive && !u.IsPendingRegistration),
+        "Pending" => users.Where(u => u.IsPendingRegistration),
+        _ => users,
+    };
 
     protected override async Task OnInitializedAsync()
     {
