@@ -77,7 +77,7 @@
                     <div class="di-section-body" style="grid-template-columns: 1fr;">
                         <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser"
                                            Types="docTypes"
-                                           SsGateway="DataGateway" SsToken="activeToken" SsSession="activeSession" OnChanged="OnDocsChanged" />
+                                           SsGateway="DataGateway" SsToken="@activeToken" SsSession="@activeSession" OnChanged="OnDocsChanged" />
                     </div>
                 </div>
             }

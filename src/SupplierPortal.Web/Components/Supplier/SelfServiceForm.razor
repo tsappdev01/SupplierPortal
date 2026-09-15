@@ -44,7 +44,7 @@
             </p>
             <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="@actorLabel"
                           SupplierFacing="true"
-                          SsGateway="DataGateway" Preloaded="bundle" SsToken="activeToken" SsSession="activeSession"
+                          SsGateway="DataGateway" Preloaded="bundle" SsToken="@activeToken" SsSession="@activeSession"
                           OnComplete="HandleCompleteAsync" />
         </div>
     }
