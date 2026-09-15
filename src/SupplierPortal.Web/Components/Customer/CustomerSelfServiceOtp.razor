@@ -28,7 +28,7 @@
     {
         <h1>Verify Your Identity</h1>
         <p class="text-muted">
-            We've sent a 4-digit verification code to the email address on file for
+            We've sent a 6-digit verification code to the email address on file for
             <strong>@link.CustomerName</strong>. Enter it below to continue.
         </p>
 
@@ -39,11 +39,11 @@
 
         <div class="mb-3">
             <label class="form-label">Verification Code</label>
-            <input class="form-control di-otp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*"
-                   @bind="enteredCode" @bind:event="oninput" placeholder="0000" />
+            <input class="form-control di-otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+                   @bind="enteredCode" @bind:event="oninput" placeholder="000000" />
         </div>
 
-        <button class="btn btn-primary w-100 mb-2" disabled="@(verifying || enteredCode.Length != 4)" @onclick="VerifyAsync">
+        <button class="btn btn-primary w-100 mb-2" disabled="@(verifying || enteredCode.Length != 6)" @onclick="VerifyAsync">
             @(verifying ? "Verifying..." : "Verify Code")
         </button>
         <button class="btn btn-link w-100" disabled="@resending" @onclick="ResendAsync">

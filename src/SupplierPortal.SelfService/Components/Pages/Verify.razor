@@ -20,7 +20,7 @@
     else
     {
         <p class="ss-muted">
-            We sent a 4-digit verification code to <strong>@maskedEmail</strong>.
+            We sent a 6-digit verification code to <strong>@maskedEmail</strong>.
             Enter it below to continue. The code expires in @expiresInMinutes minutes.
         </p>
 
@@ -31,8 +31,8 @@
 
         <div class="ss-field">
             <label>Verification code</label>
-            <input type="text" inputmode="numeric" maxlength="4" @bind="code" @bind:event="oninput"
-                   class="ss-input ss-code" placeholder="0000" autocomplete="one-time-code" />
+            <input type="text" inputmode="numeric" maxlength="6" @bind="code" @bind:event="oninput"
+                   class="ss-input ss-code" placeholder="000000" autocomplete="one-time-code" />
         </div>
 
         @if (error is not null)
@@ -40,7 +40,7 @@
             <div class="ss-alert ss-alert-error">@error</div>
         }
 
-        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || code.Length < 4)">
+        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || code.Length < 6)">
             @(verifying ? "Verifying…" : "Verify and continue")
         </button>
         <button class="ss-btn ss-btn-link" @onclick="ResendAsync" disabled="@verifying">Resend code</button>
