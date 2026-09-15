@@ -214,8 +214,8 @@ public class SupplierEmailService(
         var safeName = System.Net.WebUtility.HtmlEncode(supplierName);
         var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
   <div style=""max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
-    <div style=""background:#1a2233;padding:18px 24px"">{BrandBlock(logo, brand)}
-      <div style=""color:#cfd6e6;font-size:13px"">Supplier Data Gathering Portal</div>
+    <div style=""background:#ffffff;padding:18px 24px;border-bottom:1px solid #e2e5ea"">{BrandBlock(logo, brand)}
+      <div style=""color:#1a2233;font-size:13px"">Supplier Data Gathering Portal</div>
     </div>
     <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
       <h2 style=""margin:0 0 12px;color:#1a2233;font-size:19px"">Thank you, {safeName}</h2>
