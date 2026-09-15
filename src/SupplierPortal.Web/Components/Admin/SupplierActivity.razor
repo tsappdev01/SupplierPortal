@@ -1,5 +1,5 @@
 @page "/admin/supplier-activity"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Administrator")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization

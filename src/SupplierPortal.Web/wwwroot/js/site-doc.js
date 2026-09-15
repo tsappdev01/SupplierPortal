@@ -74,8 +74,15 @@ window.ssDoc = {
 
             var name = fallbackName || 'download';
             var cd = resp.headers.get('Content-Disposition') || '';
-            var m = /filename\*?=(?:UTF-8''|")?([^;"']+)/i.exec(cd);
-            if (m && m[1]) { try { name = decodeURIComponent(m[1].trim()); } catch (e) { name = m[1].trim(); } }
+            // RFC 5987 filename*=UTF-8''<pct-encoded> takes priority; else quoted or bare filename=.
+            // The quoted form must allow apostrophes (e.g. "123_O'Brien.zip") so names aren't truncated.
+            var star = /filename\*=(?:UTF-8'')?([^;\r\n]+)/i.exec(cd);
+            var plain = /filename=\s*"([^"]*)"|filename=\s*([^;\r\n]+)/i.exec(cd);
+            if (star && star[1]) {
+                try { name = decodeURIComponent(star[1].trim()); } catch (e) { name = star[1].trim(); }
+            } else if (plain) {
+                name = (plain[1] !== undefined ? plain[1] : plain[2]).trim();
+            }
 
             var total = parseInt(resp.headers.get('Content-Length') || '0', 10);
             var blob;

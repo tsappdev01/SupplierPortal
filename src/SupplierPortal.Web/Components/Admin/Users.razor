@@ -59,7 +59,7 @@
         {
             <tr>
                 <td style="width: 44px;">
-                    @if (user.ProfilePhoto is not null)
+                    @if (user.ProfilePhoto is not null || user.ProfilePhotoBlobKey is not null)
                     {
                         <img src="/users/@user.Id/photo" alt="" class="di-avatar-sm" />
                     }

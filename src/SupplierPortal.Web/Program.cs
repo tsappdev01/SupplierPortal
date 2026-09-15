@@ -747,13 +747,15 @@ app.MapGet("/customers/{id:int}/documents.zip", async (int id, CustomerDocumentS
         var used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var (bytes, fileName) in files)
         {
-            var name = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
-            if (used.TryGetValue(name, out var n))
+            var baseName = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
+            var name = baseName;
+            var n = 0;
+            while (used.ContainsKey(name))
             {
-                used[name] = ++n;
-                name = $"{Path.GetFileNameWithoutExtension(name)} ({n}){Path.GetExtension(name)}";
+                n++;
+                name = $"{Path.GetFileNameWithoutExtension(baseName)} ({n}){Path.GetExtension(baseName)}";
             }
-            else { used[name] = 0; }
+            used[name] = 0;
 
             var entry = archive.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
             await using var entryStream = entry.Open();
@@ -866,14 +868,18 @@ app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentS
         var used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var (bytes, fileName) in files)
         {
-            // De-duplicate names (several docs can share a file name) by appending " (n)" before the extension.
-            var name = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
-            if (used.TryGetValue(name, out var n))
+            // De-duplicate names (several docs can share a file name) by appending " (n)" before the
+            // extension, and keep probing until the generated name is itself free so a real "a (1).pdf"
+            // can't collide with a renamed duplicate of "a.pdf".
+            var baseName = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
+            var name = baseName;
+            var n = 0;
+            while (used.ContainsKey(name))
             {
-                used[name] = ++n;
-                name = $"{Path.GetFileNameWithoutExtension(name)} ({n}){Path.GetExtension(name)}";
+                n++;
+                name = $"{Path.GetFileNameWithoutExtension(baseName)} ({n}){Path.GetExtension(baseName)}";
             }
-            else { used[name] = 0; }
+            used[name] = 0;
 
             var entry = archive.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
             await using var entryStream = entry.Open();
