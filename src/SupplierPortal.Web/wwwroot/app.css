@@ -177,12 +177,22 @@ table thead th {
     overflow: hidden;
 }
 
+/* Manage Supplier: keep the action toolbar (Generate Template / Print / Notify / Register / Upload)
+   pinned to the top while scrolling. */
+.di-toolbar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--di-page-bg);
+    padding: 8px 0;
+}
+
 /* Manage Supplier list: scroll the table area and keep the navy header row pinned to the top so
    column names stay visible while scrolling the list. The header already has a solid navy
    background so it fully covers the rows scrolling underneath it. */
 .di-supplier-scroll {
     overflow: auto;
-    max-height: calc(100vh - 300px);
+    max-height: calc(100vh - 320px);
 }
 .di-supplier-scroll table thead th {
     position: sticky;
