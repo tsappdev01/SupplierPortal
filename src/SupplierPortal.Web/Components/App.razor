@@ -24,6 +24,17 @@
                 document.documentElement.setAttribute('data-sidebar', s === 'collapsed' ? 'collapsed' : 'expanded');
             } catch (e) { /* ignore */ }
         })();
+        // Sidebar hide/show toggle. Defined inline (like the pre-paint block) so it is always
+        // available to the top-bar button's onclick, independent of any external script file.
+        window.diSidebar = {
+            KEY: 'di-sidebar',
+            get: function () { return document.documentElement.getAttribute('data-sidebar') === 'collapsed'; },
+            set: function (collapsed) {
+                document.documentElement.setAttribute('data-sidebar', collapsed ? 'collapsed' : 'expanded');
+                try { localStorage.setItem(this.KEY, collapsed ? 'collapsed' : 'expanded'); } catch (e) { /* storage blocked */ }
+            },
+            toggle: function () { this.set(!this.get()); }
+        };
     </script>
     <HeadOutlet />
 </head>
@@ -33,7 +44,6 @@
     <script src="_framework/blazor.web.js"></script>
     <script src="js/site-doc.js?v=20260918b"></script>
     <script src="js/theme.js"></script>
-    <script src="js/sidebar.js"></script>
 </body>
 
 </html>
