@@ -2,6 +2,54 @@
 // Kept in a static file (not inline in App.razor) so Blazor enhanced navigation
 // never re-inserts the script body as visible text on the page.
 
+// Idle auto-logout ("screen lock"): after `timeoutMs` with no user activity, POST the logout form so the
+// server clears the auth cookie and returns the user to the login screen. Started only from the authenticated
+// app layout (see IdleGuard.razor), so public self-service pages are never affected.
+window.idleGuard = {
+    _timer: null, _bound: false, _ms: 900000, _fired: false,
+    start: function (timeoutMs) {
+        this._ms = timeoutMs && timeoutMs > 0 ? timeoutMs : 900000;
+        if (!this._bound) {
+            var reset = this.reset.bind(this);
+            ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel', 'click'].forEach(function (ev) {
+                window.addEventListener(ev, reset, { passive: true });
+            });
+            // Activity in another tab of the same app should also keep this one alive.
+            window.addEventListener('storage', function (e) { if (e.key === 'idleGuardPing') { reset(); } });
+            this._bound = true;
+        }
+        this.reset();
+    },
+    reset: function () {
+        if (this._fired) { return; }
+        if (this._timer) { clearTimeout(this._timer); }
+        try { localStorage.setItem('idleGuardPing', String(Date.now())); } catch (e) { }
+        var self = this;
+        this._timer = setTimeout(function () { self.logout(); }, this._ms);
+    },
+    logout: function () {
+        if (this._fired) { return; }
+        this._fired = true;
+        try { sessionStorage.setItem('idleLogout', '1'); } catch (e) { }
+        var f = document.createElement('form');
+        f.method = 'post';
+        f.action = '/account/logout';
+        document.body.appendChild(f);
+        f.submit();
+    }
+};
+
+// On the login page after an idle auto-logout, reveal the inactivity notice (element exists only there).
+(function () {
+    try {
+        if (sessionStorage.getItem('idleLogout') === '1') {
+            sessionStorage.removeItem('idleLogout');
+            var n = document.getElementById('idle-logout-note');
+            if (n) { n.style.display = ''; }
+        }
+    } catch (e) { }
+})();
+
 // Print a single image by URL in an isolated window (used by the supplier Documents viewer).
 window.printImageUrl = function (url) {
     var w = window.open('', '_blank');

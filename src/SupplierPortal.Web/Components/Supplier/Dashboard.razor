@@ -577,7 +577,7 @@ else if (TotalPages > 1)
                 <div class="di-docsall-toolbar">
                     <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
                     <div class="di-docsall-toolbar-actions">
-                        <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@docsSupplierId/documents.pdf" target="_blank">All images as PDF</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OpenImagesPdfAsync">All images as PDF</button>
                         <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@(zipDownloading || downloadingDocId is not null)">
                             @if (zipDownloading)
                             {
@@ -1179,6 +1179,19 @@ else if (TotalPages > 1)
         modalDocuments = await SupplierDocumentService.GetDocumentsAsync(supplier.Id);
         modalDocsLoading = false;
         focusDocsPending = true;
+    }
+
+    /// <summary>Opens the "combine images into one PDF" view — but only when the supplier actually has image
+    /// attachments. Otherwise it shows a friendly toast instead of navigating to the endpoint, which would
+    /// render a raw "no image attachments" message in a blank browser tab.</summary>
+    private async Task OpenImagesPdfAsync()
+    {
+        if (!modalDocuments.Any(IsImage))
+        {
+            ToastService.ShowInfo("This supplier has no image attachments (e.g. scans/photos) to combine into a PDF.");
+            return;
+        }
+        await JS.InvokeVoidAsync("open", $"/suppliers/{docsSupplierId}/documents.pdf", "_blank");
     }
 
     private void CloseDocsModal() => showDocsModal = false;

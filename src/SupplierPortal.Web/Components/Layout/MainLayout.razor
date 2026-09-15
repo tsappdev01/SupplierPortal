@@ -22,6 +22,8 @@
 
 <LoadingBar @rendermode="InteractiveServer" />
 <ToastContainer @rendermode="InteractiveServer" />
+@* Locks the screen (auto-logout) after 15 minutes of inactivity for signed-in app users. *@
+<IdleGuard @rendermode="InteractiveServer" TimeoutMinutes="15" />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

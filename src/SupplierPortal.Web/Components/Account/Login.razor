@@ -15,6 +15,11 @@
 
 <h1>Login</h1>
 
+@* Shown by site-doc.js when the user was auto-logged-out after 15 minutes of inactivity. *@
+<div id="idle-logout-note" class="alert alert-warning" style="display:none" role="alert">
+    You were signed out because your session was idle for 15 minutes. Please sign in again.
+</div>
+
 @if (Auth.Value.UseSso)
 {
     <p class="text-muted">Sign in with your organisation account.</p>
