@@ -32,10 +32,6 @@
     max-width: 190px;
     width: auto;
     object-fit: contain;
-    /* White chip so a transparent or dark-inked company logo stays visible on the dark sidebar. */
-    background: #ffffff;
-    padding: 5px 10px;
-    border-radius: 6px;
 }
 
 .di-profile-card {
