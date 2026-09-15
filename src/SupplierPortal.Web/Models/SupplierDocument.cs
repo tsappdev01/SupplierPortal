@@ -23,8 +23,12 @@ public class SupplierDocument
     [Required, MaxLength(255)]
     public string StoredFileName { get; set; } = string.Empty;
 
-    /// <summary>Blob storage key when the file lives in Azure Blob Storage. Null for older files still on
-    /// local disk (addressed by <see cref="StoredFileName"/>).</summary>
+    /// <summary>The file bytes when stored in the database (blob storage disabled). Null when the file lives
+    /// in Azure Blob Storage (see <see cref="BlobKey"/>) or, for legacy records, on local disk.</summary>
+    public byte[]? Content { get; set; }
+
+    /// <summary>Blob storage key when the file lives in Azure Blob Storage. Null when the bytes are in
+    /// <see cref="Content"/> (database) or, for legacy records, on local disk (via <see cref="StoredFileName"/>).</summary>
     [MaxLength(400)]
     public string? BlobKey { get; set; }
 

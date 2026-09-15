@@ -1710,6 +1710,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(400)
                         .HasColumnType("nvarchar(400)");
 
+                    b.Property<byte[]>("Content")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(100)
