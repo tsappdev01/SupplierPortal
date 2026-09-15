@@ -43,26 +43,7 @@
 </div>
 
 <div class="d-flex gap-2 mb-3 no-print align-items-center">
-    <a class="di-export-btn" href="@ExportUrl("xlsx")" title="Export to Excel (Supplier Data Template)" aria-label="Export to Excel">
-        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#2e7d32" stroke-width="2.5" />
-            <path d="M30 3h9v9z" fill="#a5d6a7" stroke="#2e7d32" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M12 15h16M12 21h16M12 27h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round" />
-            <rect x="5" y="33" width="34" height="15" rx="3" fill="#2e7d32" />
-            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">XLS</text>
-        </svg>
-        <span>Excel</span>
-    </a>
-    <a class="di-export-btn" href="@ExportUrl("xlsx-full")" title="Export to Excel — all supplier fields" aria-label="Export all fields to Excel">
-        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#1b5e20" stroke-width="2.5" />
-            <path d="M30 3h9v9z" fill="#a5d6a7" stroke="#1b5e20" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M12 15h16M12 21h16M12 27h16M12 33h9" stroke="#a5d6a7" stroke-width="2" stroke-linecap="round" />
-            <rect x="5" y="37" width="34" height="12" rx="3" fill="#1b5e20" />
-            <text x="22" y="46.5" font-family="Arial, sans-serif" font-size="8.5" font-weight="800" fill="#ffffff" text-anchor="middle">ALL</text>
-        </svg>
-        <span>Excel (All Fields)</span>
-    </a>
+    @* Excel, Excel (All Fields) and PDF export buttons hidden per request; use Print for a report. *@
     <button type="button" class="di-export-btn" @onclick="OpenTemplateDialog" title="Generate a supplier upload template" aria-label="Generate supplier template">
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#1565c0" stroke-width="2.5" />
@@ -71,17 +52,7 @@
         </svg>
         <span>Generate Template</span>
     </button>
-    <a class="di-export-btn" href="@ExportUrl("pdf")" title="Export to PDF" aria-label="Export to PDF">
-        <svg width="26" height="30" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="5" y="3" width="34" height="46" rx="4" fill="#ffffff" stroke="#c62828" stroke-width="2.5" />
-            <path d="M30 3h9v9z" fill="#ef9a9a" stroke="#c62828" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M12 15h16M12 21h16M12 27h9" stroke="#ef9a9a" stroke-width="2" stroke-linecap="round" />
-            <rect x="5" y="33" width="34" height="15" rx="3" fill="#c62828" />
-            <text x="22" y="44.5" font-family="Arial, sans-serif" font-size="10.5" font-weight="800" fill="#ffffff" text-anchor="middle">PDF</text>
-        </svg>
-        <span>PDF</span>
-    </a>
-    <button type="button" class="di-export-btn" @onclick="PrintAsync" title="Print" aria-label="Print">
+    <button type="button" class="di-export-btn" @onclick="OpenPrintDialog" title="Print" aria-label="Print">
         <svg width="28" height="30" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 6h20v11H14z" fill="#ffffff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round" />
             <rect x="7" y="16" width="34" height="17" rx="3.5" fill="#607d8b" />
@@ -666,6 +637,56 @@ else if (TotalPages > 1)
     </div>
 }
 
+@* ---- Advanced Print dialog: pick columns, print every row in the active tab (not just this page) ---- *@
+@if (showPrintDialog)
+{
+    <div class="di-print-backdrop no-print" @onclick="ClosePrintDialog"></div>
+    <div class="di-print-dialog no-print" role="dialog" aria-modal="true" aria-label="Print options">
+        <div class="di-print-head">
+            <div class="di-print-head-icon">
+                <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><path d="M14 6h20v11H14z" fill="#fff" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="16" width="34" height="17" rx="3.5" fill="#fff" opacity=".55"/><rect x="14" y="29" width="20" height="13" rx="1.5" fill="#fff" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+                <h3 class="di-print-title">Print Suppliers</h3>
+                <p class="di-print-sub">Choose the columns to include. All <strong>@TabFilteredSuppliers.Count()</strong> supplier(s) in the “@ActiveTabLabel” tab will be printed — not just this page.</p>
+            </div>
+            <button type="button" class="di-print-x" aria-label="Close" @onclick="ClosePrintDialog">✕</button>
+        </div>
+
+        <div class="di-print-body">
+            <div class="di-print-toolbar">
+                <span class="di-print-count">@printColumns.Count(c => c.Selected) of @printColumns.Count columns</span>
+                <div class="di-print-toolbar-actions">
+                    <button type="button" class="di-chip-btn" @onclick="SelectAllPrintColumns">Select all</button>
+                    <button type="button" class="di-chip-btn" @onclick="SelectDefaultPrintColumns">Default</button>
+                    <button type="button" class="di-chip-btn" @onclick="ClearPrintColumns">Clear</button>
+                </div>
+            </div>
+            <div class="di-print-cols">
+                @foreach (var col in printColumns)
+                {
+                    <label class="di-print-col @(col.Selected ? "is-on" : "")">
+                        <input type="checkbox" checked="@col.Selected" @onchange="e => { col.Selected = e.Value is true; }" />
+                        <span>@col.Label</span>
+                    </label>
+                }
+            </div>
+            <div class="di-print-hint">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+                <span>Layout adapts automatically: <strong>@(printColumns.Count(c => c.Selected) > 5 ? "landscape" : "portrait")</strong> orientation for @printColumns.Count(c => c.Selected) selected column(s).</span>
+            </div>
+        </div>
+
+        <div class="di-print-actions">
+            <button type="button" class="di-btn2 di-btn2-ghost" @onclick="ClosePrintDialog">Cancel</button>
+            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DoPrintAsync" disabled="@(!printColumns.Any(c => c.Selected))">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a1 1 0 0 0-1 1v3h8v-3a1 1 0 0 0-1-1H5z"/></svg>
+                Print @TabFilteredSuppliers.Count() row(s)
+            </button>
+        </div>
+    </div>
+}
+
 <style>
     @@media print {
         .no-print { display: none !important; }
@@ -753,6 +774,49 @@ else if (TotalPages > 1)
     /* Thin in-card variant shown under a single document's Download button (no side label). */
     .di-dl-progress-card { margin: 0 12px 12px; }
     .di-dl-progress-card .di-dl-progress-track { height: 5px; }
+
+    /* ---- Advanced Print dialog ---- */
+    .di-print-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .55); backdrop-filter: blur(2px); z-index: 1090; }
+    .di-print-dialog {
+        position: fixed; z-index: 1091; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+        background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(2, 10, 40, .38);
+        border: 1px solid #e6e9f0;
+    }
+    .di-print-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 22px;
+        background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff; border-radius: 16px 16px 0 0; }
+    .di-print-head-icon { flex: none; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+        background: rgba(255, 255, 255, .16); }
+    .di-print-title { margin: 0; font-size: 18px; font-weight: 700; }
+    .di-print-sub { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; line-height: 1.5; }
+    .di-print-sub strong { color: #fff; }
+    .di-print-x { margin-left: auto; flex: none; background: rgba(255, 255, 255, .14); border: 0; color: #fff; width: 30px; height: 30px;
+        border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .di-print-x:hover { background: rgba(255, 255, 255, .28); }
+    .di-print-body { padding: 18px 22px; }
+    .di-print-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-print-count { font-size: 12.5px; font-weight: 600; color: #46506b; }
+    .di-print-toolbar-actions { display: flex; gap: 6px; }
+    .di-chip-btn { border: 1px solid #d3dae6; background: #f7f9fc; color: #34507e; font-size: 12px; font-weight: 600;
+        border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+    .di-chip-btn:hover { background: #eaf0f9; }
+    .di-print-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .di-print-col { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border: 1.5px solid #e4e8f0; border-radius: 10px;
+        font-size: 13.5px; color: #2f3a4c; cursor: pointer; transition: border-color .12s, background .12s; user-select: none; }
+    .di-print-col:hover { border-color: #b9c6df; }
+    .di-print-col.is-on { border-color: #2f6fed; background: #eef4ff; color: #12315f; font-weight: 600; }
+    .di-print-col input { width: 16px; height: 16px; accent-color: #2f6fed; }
+    .di-print-hint { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 10px 12px; border-radius: 10px;
+        background: #f4f7fb; color: #5b6675; font-size: 12.5px; }
+    .di-print-hint svg { flex: none; color: #7488a6; }
+    .di-print-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px 20px; border-top: 1px solid #eef1f6; }
+    .di-btn2 { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 600;
+        cursor: pointer; border: 1px solid transparent; }
+    .di-btn2-ghost { background: #fff; border-color: #d3dae6; color: #46506b; }
+    .di-btn2-ghost:hover { background: #f4f6fa; }
+    .di-btn2-primary { background: linear-gradient(135deg, #2f6fed, #1e50c8); color: #fff; box-shadow: 0 6px 16px rgba(47, 111, 237, .32); }
+    .di-btn2-primary:hover { filter: brightness(1.05); }
+    .di-btn2-primary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
     .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px;
         border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
     @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
@@ -1529,9 +1593,102 @@ else if (TotalPages > 1)
         _ => "bg-light text-dark"
     };
 
-    private async Task PrintAsync()
+    // ---- Print (choose columns, print every row in the active tab) ----
+
+    private sealed class PrintColumn
     {
-        await JS.InvokeVoidAsync("print");
+        public string Label = "";
+        public Func<SupplierListItem, string> Value = _ => "";
+        public bool Default;
+        public bool Selected;
+    }
+
+    private bool showPrintDialog;
+    private List<PrintColumn> printColumns = [];
+
+    private string ActiveTabLabel => activeTab switch
+    {
+        SupplierTab.RecentlyUpdated => "Recently Updated",
+        SupplierTab.UpdatedLastWeek => "Updated Last Week",
+        _ => "Everything Else"
+    };
+
+    private void EnsurePrintColumns()
+    {
+        if (printColumns.Count > 0) { return; }
+        printColumns =
+        [
+            new() { Label = "Supplier Number", Value = s => s.SupplierNumber, Default = true },
+            new() { Label = "Priority", Value = s => s.Priority ?? "", Default = true },
+            new() { Label = "Supplier Name", Value = s => s.SupplierName, Default = true },
+            new() { Label = "First Name", Value = s => s.FirstName ?? "", Default = true },
+            new() { Label = "Contact Email", Value = s => s.ContactEmail ?? "", Default = true },
+            new() { Label = "Status", Value = s => s.StatusName ?? "", Default = true },
+            new() { Label = "Assigned To", Value = s => s.AssignedToUserName ?? "", Default = true },
+            new() { Label = "Department", Value = s => s.DepartmentName ?? "", Default = true },
+            new() { Label = "Tax Organization Type", Value = s => s.TaxOrganizationTypeName ?? "" },
+            new() { Label = "Supplier Type", Value = s => s.SupplierTypeName ?? "" },
+            new() { Label = "Tax Registration Number", Value = s => s.TaxRegistrationNumber ?? "" },
+            new() { Label = "Trade License Number", Value = s => s.TradeLicenseNumber ?? "" },
+            new() { Label = "Last Updated", Value = s => (s.UpdatedAt ?? s.CreatedAt).ToString("dd MMM yyyy") },
+        ];
+        SelectDefaultPrintColumns();
+    }
+
+    private void OpenPrintDialog() { EnsurePrintColumns(); showPrintDialog = true; }
+    private void ClosePrintDialog() => showPrintDialog = false;
+    private void SelectAllPrintColumns() { foreach (var c in printColumns) { c.Selected = true; } }
+    private void ClearPrintColumns() { foreach (var c in printColumns) { c.Selected = false; } }
+    private void SelectDefaultPrintColumns() { foreach (var c in printColumns) { c.Selected = c.Default; } }
+
+    private async Task DoPrintAsync()
+    {
+        var cols = printColumns.Where(c => c.Selected).ToList();
+        if (cols.Count == 0)
+        {
+            ToastService.ShowInfo("Please select at least one column to print.");
+            return;
+        }
+        var rows = SortedSuppliers.ToList();
+        var html = BuildPrintHtml(cols, rows);
+        showPrintDialog = false;
+        await JS.InvokeVoidAsync("printHtml", html);
+    }
+
+    /// <summary>Builds a standalone, print-ready HTML report (chosen columns × every row in the active tab).
+    /// Orientation and font size adapt to the number of columns so wide selections stay legible.</summary>
+    private string BuildPrintHtml(List<PrintColumn> cols, List<SupplierListItem> rows)
+    {
+        static string Esc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+        var landscape = cols.Count > 5;
+        var fontSize = cols.Count <= 6 ? "11px" : cols.Count <= 9 ? "9.5px" : "8.5px";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Manage Supplier</title><style>");
+        sb.Append($"@page{{size:A4 {(landscape ? "landscape" : "portrait")};margin:12mm;}}");
+        sb.Append($"*{{box-sizing:border-box;}}body{{font-family:'Segoe UI',Arial,sans-serif;color:#1a2233;font-size:{fontSize};margin:0;}}");
+        sb.Append(".hd{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #caa04d;padding-bottom:8px;margin-bottom:12px;}");
+        sb.Append(".hd h1{font-size:20px;color:#0b2545;margin:0;}");
+        sb.Append(".hd .meta{font-size:10px;color:#6b7280;text-align:right;}");
+        sb.Append("table{width:100%;border-collapse:collapse;}");
+        sb.Append("th,td{border:1px solid #d3dae6;padding:4px 6px;text-align:left;vertical-align:top;word-break:break-word;}");
+        sb.Append("th{background:#0b2545;color:#fff;font-weight:600;}");
+        sb.Append("tr:nth-child(even) td{background:#f6f8fb;}");
+        sb.Append("</style></head><body>");
+        sb.Append("<div class=\"hd\"><h1>Manage Supplier</h1><div class=\"meta\">");
+        sb.Append($"{Esc(ActiveTabLabel)} &middot; {rows.Count} supplier(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
+        sb.Append("</div></div>");
+        sb.Append("<table><thead><tr>");
+        foreach (var c in cols) { sb.Append($"<th>{Esc(c.Label)}</th>"); }
+        sb.Append("</tr></thead><tbody>");
+        foreach (var s in rows)
+        {
+            sb.Append("<tr>");
+            foreach (var c in cols) { sb.Append($"<td>{Esc(c.Value(s))}</td>"); }
+            sb.Append("</tr>");
+        }
+        sb.Append("</tbody></table></body></html>");
+        return sb.ToString();
     }
 
     private string ExportUrl(string format)

@@ -39,6 +39,22 @@ window.idleGuard = {
     }
 };
 
+// Opens a fully-formed HTML document in a new window and prints it. Used to print a report (all rows,
+// chosen columns) independent of the on-screen page/pagination and app chrome.
+window.printHtml = function (html) {
+    var w = window.open('', '_blank');
+    if (!w) { return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    // Let the new document lay out before invoking print; onload is most reliable, with a fallback timer.
+    var printed = false;
+    var go = function () { if (printed) { return; } printed = true; try { w.print(); } catch (e) { } };
+    w.onload = go;
+    setTimeout(go, 400);
+};
+
 // On the login page after an idle auto-logout, reveal the inactivity notice (element exists only there).
 (function () {
     try {
