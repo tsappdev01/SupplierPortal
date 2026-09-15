@@ -642,6 +642,18 @@ static string SafeFileName(string? raw, string fallback)
     return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned;
 }
 
+// The document endpoints take ?download as a string (not bool) because links pass "?download=1", which
+// ASP.NET Core cannot bind to a Nullable<bool> (it accepts only "true"/"false"). Any present, truthy value
+// means "serve as an attachment"; absent or an explicit "0"/"false"/"no" means inline preview.
+static bool WantsAttachment(string? download)
+{
+    if (string.IsNullOrWhiteSpace(download)) return false;
+    var v = download.Trim();
+    return !v.Equals("0", StringComparison.OrdinalIgnoreCase)
+        && !v.Equals("false", StringComparison.OrdinalIgnoreCase)
+        && !v.Equals("no", StringComparison.OrdinalIgnoreCase);
+}
+
 // Non-administrators may export only the suppliers assigned to them (mirrors the dashboard list);
 // administrators export the whole in-scope set. Returns null (no assignee filter) for administrators.
 static int? ResolveAssigneeScope(HttpContext ctx)
@@ -703,22 +715,22 @@ app.MapGet("/business-units/{id:int}/thumbnail", async (int id, BusinessUnitServ
 
 // Without ?download=1 the file is served inline so it previews in an <img>/<iframe>; with it, as an
 // attachment (Content-Disposition: attachment) so the browser saves it.
-app.MapGet("/suppliers/documents/{id:int}", async (int id, bool? download, SupplierDocumentService documentService) =>
+app.MapGet("/suppliers/documents/{id:int}", async (int id, string? download, SupplierDocumentService documentService) =>
 {
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return download == true
+    return WantsAttachment(download)
         ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization();
 
 // Customer KYC document preview/download (admin reviewers). Without ?download=1 the file is served
 // inline (preview); with it, as an attachment.
-app.MapGet("/customers/documents/{id:int}", async (int id, bool? download, CustomerDocumentService documentService) =>
+app.MapGet("/customers/documents/{id:int}", async (int id, string? download, CustomerDocumentService documentService) =>
 {
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return download == true
+    return WantsAttachment(download)
         ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization("Portal.Customer");
@@ -753,11 +765,11 @@ app.MapGet("/customers/{id:int}/documents.zip", async (int id, CustomerDocumentS
 
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
 // Without ?download=1 the file is served inline (preview); with it, as an attachment.
-app.MapGet("/landlord-documents/{id:int}", async (int id, bool? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
+app.MapGet("/landlord-documents/{id:int}", async (int id, string? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
 {
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
-    return download == true
+    return WantsAttachment(download)
         ? Results.File(file.Value.Bytes, file.Value.ContentType, file.Value.FileName)
         : Results.File(file.Value.Bytes, file.Value.ContentType);
 }).RequireAuthorization("Portal.Landlord");
