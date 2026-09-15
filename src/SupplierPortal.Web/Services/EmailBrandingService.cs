@@ -7,7 +7,9 @@ namespace SupplierPortal.Web.Services;
 /// (a Business Unit), so email headers show that company's logo, embedded as a base64 data URI (emails
 /// are sent via SQL Server Database Mail, which has no place to host a linked image). Falls back to the
 /// record's Business Unit, then to no logo (the caller then shows the default text brand).</summary>
-public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFactory)
+public class EmailBrandingService(
+    IDbContextFactory<ApplicationDbContext> dbFactory,
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     /// <summary>The acting user's company logo as a data URI, or null if the user has no company / logo.</summary>
     public async Task<string?> GetCompanyLogoDataUriAsync(string? actorUsername)
@@ -59,7 +61,7 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
             return null;
         }
 
-        return !string.IsNullOrWhiteSpace(bu.LogoUrl) ? bu.LogoUrl : DataUri(bu);
+        return !string.IsNullOrWhiteSpace(bu.LogoUrl) ? bu.LogoUrl : await DataUriAsync(bu);
     }
 
     /// <summary>The acting user's company logo <c>src</c> (hosted URL preferred, then embedded data URI).</summary>
@@ -121,19 +123,31 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
            ?? await GetBusinessUnitNameAsync(fallbackBusinessUnitId)
            ?? DefaultBrandName;
 
-    private static async Task<string?> LogoDataUriAsync(ApplicationDbContext db, int businessUnitId)
+    private async Task<string?> LogoDataUriAsync(ApplicationDbContext db, int businessUnitId)
     {
         var bu = await db.BusinessUnits.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessUnitId);
-        return bu is null ? null : DataUri(bu);
+        return bu is null ? null : await DataUriAsync(bu);
     }
 
-    /// <summary>The unit's uploaded logo as a data URI (full-size logo preferred over the thumbnail), or null.</summary>
-    private static string? DataUri(Models.BusinessUnit bu)
+    /// <summary>The unit's uploaded logo as a data URI (full-size logo preferred over the thumbnail), or null.
+    /// Reads the bytes from Azure Blob Storage when the image lives there, else from the entity's byte columns.</summary>
+    private async Task<string?> DataUriAsync(Models.BusinessUnit bu)
     {
         // Prefer the full-size uploaded logo for communications (it reads as the brand banner, not a
         // cropped square); fall back to the normalised 640×640 thumbnail only when no full logo exists.
-        var bytes = bu.Logo ?? bu.Thumbnail;
-        var contentType = bu.Logo is not null ? bu.LogoContentType : bu.ThumbnailContentType;
+        byte[]? bytes;
+        string? contentType;
+        if (!string.IsNullOrWhiteSpace(bu.LogoBlobKey) || bu.Logo is { Length: > 0 })
+        {
+            bytes = !string.IsNullOrWhiteSpace(bu.LogoBlobKey) ? await fileStore.ReadAsync(bu.LogoBlobKey) : bu.Logo;
+            contentType = bu.LogoContentType;
+        }
+        else
+        {
+            bytes = !string.IsNullOrWhiteSpace(bu.ThumbnailBlobKey) ? await fileStore.ReadAsync(bu.ThumbnailBlobKey) : bu.Thumbnail;
+            contentType = bu.ThumbnailContentType;
+        }
+
         if (bytes is not { Length: > 0 } || string.IsNullOrWhiteSpace(contentType))
         {
             return null;

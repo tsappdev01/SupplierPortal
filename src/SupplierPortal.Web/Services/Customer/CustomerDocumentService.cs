@@ -172,7 +172,7 @@ public class CustomerDocumentService(
             DocumentType = documentType,
             FileName = fileName,
             ContentType = resolvedContentType,
-            Content = blobKey is null ? bytes : [],
+            Content = blobKey is null ? bytes : Array.Empty<byte>(),
             BlobKey = blobKey,
             UploadedBy = uploadedBy,
             UploadedAt = DateTime.UtcNow

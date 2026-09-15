@@ -5,8 +5,41 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, AuditService auditService)
+public class UserService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, AuditService auditService,
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
+    /// <summary>Stores a newly-supplied profile photo in blob storage (when enabled) or inline in the
+    /// database (existing behaviour). No-op when <paramref name="photo"/> is null (no new photo supplied).</summary>
+    private async Task ApplyPhotoAsync(User user, byte[]? photo, string? contentType)
+    {
+        if (photo is null)
+        {
+            return;
+        }
+
+        if (fileStore.Enabled)
+        {
+            var ext = contentType is "image/jpeg" or "image/jpg" ? ".jpg" : contentType == "image/gif" ? ".gif" : ".png";
+            var key = await fileStore.SaveAsync("user", $"photo{ext}", photo, contentType ?? "image/png");
+            if (key is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(user.ProfilePhotoBlobKey))
+                {
+                    await fileStore.DeleteAsync(user.ProfilePhotoBlobKey);
+                }
+                user.ProfilePhotoBlobKey = key;
+                user.ProfilePhoto = null;
+                user.ProfilePhotoContentType = contentType;
+                return;
+            }
+        }
+
+        user.ProfilePhoto = photo;
+        user.ProfilePhotoContentType = contentType;
+        user.ProfilePhotoBlobKey = null;
+    }
+
     public async Task<List<User>> GetAllAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -54,12 +87,18 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user?.ProfilePhoto is null || user.ProfilePhotoContentType is null)
+        if (user is null || user.ProfilePhotoContentType is null)
         {
             return null;
         }
 
-        return (user.ProfilePhoto, user.ProfilePhotoContentType);
+        if (!string.IsNullOrWhiteSpace(user.ProfilePhotoBlobKey))
+        {
+            var blobBytes = await fileStore.ReadAsync(user.ProfilePhotoBlobKey);
+            return blobBytes is null ? null : (blobBytes, user.ProfilePhotoContentType);
+        }
+
+        return user.ProfilePhoto is null ? null : (user.ProfilePhoto, user.ProfilePhotoContentType);
     }
 
     /// <summary>
@@ -123,11 +162,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
             {
                 existing.PasswordHash = hasher.HashPassword(existing, password);
             }
-            if (photo is not null)
-            {
-                existing.ProfilePhoto = photo;
-                existing.ProfilePhotoContentType = photoContentType;
-            }
+            await ApplyPhotoAsync(existing, photo, photoContentType);
 
             user = existing;
         }
@@ -151,11 +186,10 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
                 DepartmentId = departmentId,
                 IsActive = isActive,
                 IsPendingRegistration = false,
-                ProfilePhoto = photo,
-                ProfilePhotoContentType = photoContentType,
                 AuthSource = authSource,
                 AdLogin = isAd ? adLogin : null
             };
+            await ApplyPhotoAsync(user, photo, photoContentType);
             user.PasswordHash = isAd ? "" : hasher.HashPassword(user, password!);
             db.Users.Add(user);
         }
@@ -219,11 +253,7 @@ public class UserService(IDbContextFactory<ApplicationDbContext> dbFactory, IPas
         user.CompanyBusinessUnitId = companyBusinessUnitId;
         user.DepartmentId = departmentId;
         user.IsActive = isActive;
-        if (photo is not null)
-        {
-            user.ProfilePhoto = photo;
-            user.ProfilePhotoContentType = photoContentType;
-        }
+        await ApplyPhotoAsync(user, photo, photoContentType);
         if (!string.IsNullOrWhiteSpace(newPassword))
         {
             user.PasswordHash = hasher.HashPassword(user, newPassword);

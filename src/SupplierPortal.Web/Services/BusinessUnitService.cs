@@ -8,9 +8,36 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache)
+public class BusinessUnitService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache,
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     private const string AllCacheKey = "ref:businessunits";
+
+    /// <summary>Stores a logo/thumbnail image in blob storage (when enabled) or returns it for inline
+    /// database storage. Returns (blobKey, bytesToStore): exactly one is non-null. A no-op returns (null, null).</summary>
+    private async Task<(string? BlobKey, byte[]? Bytes)> StoreImageAsync(
+        string kind, byte[]? bytes, string? contentType, string? oldBlobKey)
+    {
+        if (bytes is not { Length: > 0 })
+        {
+            return (null, null);
+        }
+        if (fileStore.Enabled)
+        {
+            var ext = contentType is "image/jpeg" or "image/jpg" ? ".jpg" : contentType == "image/svg+xml" ? ".svg" : ".png";
+            var key = await fileStore.SaveAsync($"business-unit/{kind}", $"{kind}{ext}", bytes, contentType ?? "image/png");
+            if (key is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(oldBlobKey))
+                {
+                    await fileStore.DeleteAsync(oldBlobKey);
+                }
+                return (key, null);
+            }
+        }
+        return (null, bytes);
+    }
 
     public async Task<List<BusinessUnit>> GetAllAsync()
     {
@@ -42,16 +69,20 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         var (thumb, thumbType) = thumbnail is { Length: > 0 }
             ? (thumbnail, thumbnailContentType)
             : MakeThumbnail(logo, logoContentType);
+        var (logoKey, logoBytes) = await StoreImageAsync("logo", logo, logoContentType, null);
+        var (thumbKey, thumbBytes) = await StoreImageAsync("thumbnail", thumb, thumbType, null);
         var businessUnit = new BusinessUnit
         {
             Name = name,
             Code = finalCode,
             Domain = NormalizeDomain(domain),
             LogoUrl = NormalizeUrl(logoUrl),
-            Logo = logo,
+            Logo = logoBytes,
             LogoContentType = logoContentType,
-            Thumbnail = thumb,
-            ThumbnailContentType = thumbType
+            LogoBlobKey = logoKey,
+            Thumbnail = thumbBytes,
+            ThumbnailContentType = thumbType,
+            ThumbnailBlobKey = thumbKey
         };
         db.BusinessUnits.Add(businessUnit);
         await db.SaveChangesAsync();
@@ -99,13 +130,17 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
         // Logo and thumbnail are independent uploads: each is replaced only when a new file is supplied.
         if (logo is not null)
         {
-            businessUnit.Logo = logo;
+            var (logoKey, logoBytes) = await StoreImageAsync("logo", logo, logoContentType, businessUnit.LogoBlobKey);
+            businessUnit.Logo = logoBytes;
             businessUnit.LogoContentType = logoContentType;
+            businessUnit.LogoBlobKey = logoKey;
         }
         if (thumbnail is { Length: > 0 })
         {
-            businessUnit.Thumbnail = thumbnail;
+            var (thumbKey, thumbBytes) = await StoreImageAsync("thumbnail", thumbnail, thumbnailContentType, businessUnit.ThumbnailBlobKey);
+            businessUnit.Thumbnail = thumbBytes;
             businessUnit.ThumbnailContentType = thumbnailContentType;
+            businessUnit.ThumbnailBlobKey = thumbKey;
         }
 
         await db.SaveChangesAsync();
@@ -119,12 +154,17 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var businessUnit = await db.BusinessUnits.FirstOrDefaultAsync(b => b.Id == businessUnitId);
-        if (businessUnit?.Logo is null || businessUnit.LogoContentType is null)
+        if (businessUnit is null || businessUnit.LogoContentType is null)
         {
             return null;
         }
 
-        return (businessUnit.Logo, businessUnit.LogoContentType);
+        if (!string.IsNullOrWhiteSpace(businessUnit.LogoBlobKey))
+        {
+            var blob = await fileStore.ReadAsync(businessUnit.LogoBlobKey);
+            return blob is null ? null : (blob, businessUnit.LogoContentType);
+        }
+        return businessUnit.Logo is null ? null : (businessUnit.Logo, businessUnit.LogoContentType);
     }
 
     /// <summary>The 640×640 thumbnail; falls back to the original logo for units uploaded before thumbnails
@@ -138,14 +178,26 @@ public class BusinessUnitService(IDbContextFactory<ApplicationDbContext> dbFacto
             return null;
         }
 
-        if (businessUnit.Thumbnail is not null && businessUnit.ThumbnailContentType is not null)
+        if (businessUnit.ThumbnailContentType is not null
+            && (businessUnit.Thumbnail is not null || !string.IsNullOrWhiteSpace(businessUnit.ThumbnailBlobKey)))
         {
-            return (businessUnit.Thumbnail, businessUnit.ThumbnailContentType);
+            var thumb = !string.IsNullOrWhiteSpace(businessUnit.ThumbnailBlobKey)
+                ? await fileStore.ReadAsync(businessUnit.ThumbnailBlobKey)
+                : businessUnit.Thumbnail;
+            if (thumb is not null)
+            {
+                return (thumb, businessUnit.ThumbnailContentType);
+            }
         }
 
-        return businessUnit.Logo is not null && businessUnit.LogoContentType is not null
-            ? (businessUnit.Logo, businessUnit.LogoContentType)
-            : null;
+        if (businessUnit.LogoContentType is null)
+        {
+            return null;
+        }
+        var logo = !string.IsNullOrWhiteSpace(businessUnit.LogoBlobKey)
+            ? await fileStore.ReadAsync(businessUnit.LogoBlobKey)
+            : businessUnit.Logo;
+        return logo is null ? null : (logo, businessUnit.LogoContentType);
     }
 
     /// <summary>Signature thumbnail size for business unit logos.</summary>
