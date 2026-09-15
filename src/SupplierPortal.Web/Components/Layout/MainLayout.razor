@@ -7,6 +7,11 @@
 
     <main>
         <div class="di-topbar no-print">
+            <button type="button" class="di-theme-toggle di-sidebar-toggle" onclick="diSidebar.toggle()"
+                    title="Hide / show navigation" aria-label="Hide or show the navigation sidebar">
+                <svg class="di-ico-navhide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>
+                <svg class="di-ico-navshow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>
+            </button>
             <button type="button" class="di-theme-toggle" onclick="diTheme.toggle()"
                     title="Toggle light / dark theme" aria-label="Toggle light or dark theme">
                 <svg class="di-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>

@@ -395,6 +395,25 @@ table thead th {
 [data-theme="dark"] .di-theme-toggle .di-ico-sun { display: block; }
 [data-theme="dark"] .di-theme-toggle .di-ico-moon { display: none; }
 
+/* Collapsible left navigation (hide/show the sidebar so content goes full width).
+   Driven by data-sidebar on the document root; the flex layout reflows <main> to fill
+   the freed space automatically (the sidebar has no content margin tied to it). */
+.sidebar { transition: width .18s ease; }
+/* Only collapse on desktop; below 641px the sidebar row carries the mobile hamburger, so it must stay. */
+@media (min-width: 641px) {
+    :root[data-sidebar="collapsed"] .sidebar {
+        width: 0 !important;
+        min-width: 0;
+        border-right: 0;
+        overflow: hidden;
+    }
+}
+/* Toggle icon: show the "hide" (close-panel) icon when expanded, the "show" (open-panel) icon when collapsed */
+.di-sidebar-toggle .di-ico-navshow { display: none; }
+.di-sidebar-toggle .di-ico-navhide { display: block; }
+:root[data-sidebar="collapsed"] .di-sidebar-toggle .di-ico-navshow { display: block; }
+:root[data-sidebar="collapsed"] .di-sidebar-toggle .di-ico-navhide { display: none; }
+
 /* A couple of custom surfaces that hardcode white so they follow the theme */
 [data-theme="dark"] .di-stat-tile,
 [data-theme="dark"] .di-form-page,

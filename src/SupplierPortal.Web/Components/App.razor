@@ -18,6 +18,11 @@
                 document.documentElement.setAttribute('data-theme', t);
                 document.documentElement.setAttribute('data-bs-theme', t);
             } catch (e) { /* ignore */ }
+            // Apply the saved sidebar state (collapsed/expanded) before first paint to avoid a flash.
+            try {
+                var s = localStorage.getItem('di-sidebar');
+                document.documentElement.setAttribute('data-sidebar', s === 'collapsed' ? 'collapsed' : 'expanded');
+            } catch (e) { /* ignore */ }
         })();
     </script>
     <HeadOutlet />
@@ -28,6 +33,7 @@
     <script src="_framework/blazor.web.js"></script>
     <script src="js/site-doc.js?v=20260918b"></script>
     <script src="js/theme.js"></script>
+    <script src="js/sidebar.js"></script>
 </body>
 
 </html>
