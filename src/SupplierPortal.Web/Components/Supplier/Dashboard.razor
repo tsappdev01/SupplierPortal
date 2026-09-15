@@ -185,6 +185,26 @@
     </div>
 }
 
+@if (confirmNotifySupplier is not null)
+{
+    <div class="di-tmpl-backdrop" @onclick="CancelNotify">
+        <div class="di-tmpl-modal" @onclick:stopPropagation>
+            <h5 class="di-tmpl-title">Send notification email?</h5>
+            <p class="di-tmpl-text">
+                Send the information-update email to <strong>@confirmNotifySupplier.SupplierName</strong>
+                @if (!string.IsNullOrWhiteSpace(confirmNotifySupplier.ContactEmail))
+                {
+                    <text> at <strong>@confirmNotifySupplier.ContactEmail</strong></text>
+                }?
+            </p>
+            <div class="di-tmpl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CancelNotify">Cancel</button>
+                <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmNotifyAsync">Send Email</button>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
     .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
     .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
@@ -425,7 +445,7 @@ else
                     @if (!supplier.IsDraft)
                     {
                         <button class="btn btn-sm btn-outline-secondary" title="Notify supplier via email"
-                                disabled="@(notifyingSupplierId == supplier.Id)" @onclick="() => NotifyAsync(supplier)">
+                                disabled="@(notifyingSupplierId == supplier.Id)" @onclick="() => RequestNotify(supplier)">
                             @if (notifyingSupplierId == supplier.Id)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -736,6 +756,20 @@ else if (TotalPages > 1)
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
+    private SupplierListItem? confirmNotifySupplier;
+
+    private void RequestNotify(SupplierListItem supplier) => confirmNotifySupplier = supplier;
+    private void CancelNotify() => confirmNotifySupplier = null;
+
+    private async Task ConfirmNotifyAsync()
+    {
+        var supplier = confirmNotifySupplier;
+        confirmNotifySupplier = null;
+        if (supplier is not null)
+        {
+            await NotifyAsync(supplier);
+        }
+    }
     private int currentPage = 1;
     private HashSet<int> selectedIds = [];
     private bool bulkSending;
