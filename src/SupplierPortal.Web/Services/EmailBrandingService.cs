@@ -64,6 +64,18 @@ public class EmailBrandingService(
         return !string.IsNullOrWhiteSpace(bu.LogoUrl) ? bu.LogoUrl : await DataUriAsync(bu);
     }
 
+    /// <summary>The contact / reply-to e-mail configured for a Business Unit, or null.</summary>
+    public async Task<string?> GetBusinessUnitEmailAsync(int? businessUnitId)
+    {
+        if (businessUnitId is not int id)
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.BusinessUnits.AsNoTracking().Where(b => b.Id == id).Select(b => b.Email).FirstOrDefaultAsync();
+    }
+
     /// <summary>The logo <c>src</c> for the PUBLIC self-service pages. Here the uploaded Business Unit logo
     /// (the "Logo (full-size)" shown on Edit Business Unit) takes precedence, so the self-service header shows
     /// the same logo as the business unit; the hosted <see cref="Models.BusinessUnit.LogoUrl"/> is used only

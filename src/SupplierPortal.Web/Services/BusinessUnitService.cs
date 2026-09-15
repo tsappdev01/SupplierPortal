@@ -50,7 +50,7 @@ public class BusinessUnitService(
     }
 
     public async Task<(bool Success, string? Error)> AddAsync(
-        string name, string? code, string? domain, string? logoUrl, byte[]? logo, string? logoContentType,
+        string name, string? code, string? domain, string? email, string? logoUrl, byte[]? logo, string? logoContentType,
         byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
@@ -76,6 +76,7 @@ public class BusinessUnitService(
             Name = name,
             Code = finalCode,
             Domain = NormalizeDomain(domain),
+            Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
             LogoUrl = NormalizeUrl(logoUrl),
             Logo = logoBytes,
             LogoContentType = logoContentType,
@@ -100,7 +101,7 @@ public class BusinessUnitService(
     }
 
     public async Task<(bool Success, string? Error)> UpdateAsync(
-        int id, string name, string code, string? domain, string? logoUrl, byte[]? logo, string? logoContentType,
+        int id, string name, string code, string? domain, string? email, string? logoUrl, byte[]? logo, string? logoContentType,
         byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
     {
         name = name.Trim();
@@ -126,6 +127,7 @@ public class BusinessUnitService(
         businessUnit.Name = name;
         businessUnit.Code = code;
         businessUnit.Domain = NormalizeDomain(domain);
+        businessUnit.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         businessUnit.LogoUrl = NormalizeUrl(logoUrl);
         // Logo and thumbnail are independent uploads: each is replaced only when a new file is supplied.
         if (logo is not null)

@@ -63,6 +63,17 @@ public class SupplierAccessTokenService(
         return token is null || token.ExpiresAt < DateTime.UtcNow ? null : token;
     }
 
+    /// <summary>Looks up a link token for DISPLAY only (e.g. to brand the "link expired" page with the
+    /// business unit's logo and contact e-mail), returning the token with its Supplier even when the link has
+    /// expired; null only when the token was never issued. Never use this to authorize an action — use
+    /// <see cref="GetValidTokenAsync"/> (which enforces expiry) for that.</summary>
+    public async Task<SupplierAccessToken?> GetTokenForDisplayAsync(string rawToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hash = Hash(rawToken);
+        return await db.SupplierAccessTokens.Include(t => t.Supplier).FirstOrDefaultAsync(t => t.TokenHash == hash);
+    }
+
     /// <summary>Blazor internal-app entry point: generate, persist and email a fresh OTP.</summary>
     public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId)
     {

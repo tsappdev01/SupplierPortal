@@ -66,6 +66,17 @@ public class CustomerAccessTokenService(
         return token is null || token.ExpiresAt < DateTime.UtcNow ? null : token;
     }
 
+    /// <summary>Looks up a link token for DISPLAY only (e.g. to brand the "link expired" page), returning the
+    /// token with its Customer even when expired; null only when the token was never issued.</summary>
+    public async Task<CustomerAccessToken?> GetTokenForDisplayAsync(string rawToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hash = Hash(rawToken);
+        return await db.CustomerAccessTokens
+            .Include(t => t.Customer).ThenInclude(c => c!.Contact)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash);
+    }
+
     /// <summary>Generate, persist and email a fresh OTP for a link.</summary>
     public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId)
     {

@@ -119,6 +119,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<byte[]>("Logo")
                         .HasColumnType("varbinary(max)");
 

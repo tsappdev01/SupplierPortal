@@ -10,15 +10,18 @@ public class LocalCustomerSelfServiceAccessGateway(
 {
     public async Task<SsCustomerLinkInfo> ResolveAsync(string token)
     {
-        var t = await accessTokenService.GetValidTokenAsync(token);
+        // Resolve even if expired so the "link not available" page can show the business unit's logo + e-mail.
+        var t = await accessTokenService.GetTokenForDisplayAsync(token);
         if (t is null)
         {
             return new SsCustomerLinkInfo(false, null, null, null, false);
         }
         var buId = t.Customer?.BusinessUnitId;
         var logo = await branding.GetBusinessUnitUploadedLogoSrcAsync(buId);
-        var needsFresh = t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
-        return new SsCustomerLinkInfo(true, t.Customer?.LegalName, buId, logo, needsFresh);
+        var email = await branding.GetBusinessUnitEmailAsync(buId);
+        var valid = t.ExpiresAt >= DateTime.UtcNow;
+        var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
+        return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email);
     }
 
     public async Task<(bool Success, string? Error)> SendOtpAsync(string token)

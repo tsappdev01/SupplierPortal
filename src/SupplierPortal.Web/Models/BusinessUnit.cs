@@ -19,6 +19,11 @@ public class BusinessUnit
     [MaxLength(200)]
     public string? Domain { get; set; }
 
+    /// <summary>Contact / sender e-mail address for this business unit (e.g. the reply-to shown on
+    /// communications for the unit). Optional.</summary>
+    [MaxLength(256), EmailAddress]
+    public string? Email { get; set; }
+
     /// <summary>Absolute URL of the unit's logo hosted on a public server, e.g.
     /// "https://cdn.dipark.com/logo.png". When set it is used as the brand image in emails and other
     /// external links (a hosted URL renders more reliably in mail clients than an embedded image), taking
