@@ -425,6 +425,11 @@ public class SupplierService(
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, $"Marked supplier '{supplier.SupplierName}' Complete");
     }
 
+    // Internal classification / payment-routing flags a supplier must never set via self-service, regardless
+    // of the field-settings table. Captured before the copy and restored after on any token-based save.
+    private static readonly string[] AlwaysSupplierLockedKeys =
+        ["Priority", "IsOrdering", "IsSourcingOnly", "IsPurchasing", "IsPay", "IsPrimaryPay"];
+
     public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null, bool markComplete = false)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -447,6 +452,19 @@ public class SupplierService(
                 .ToListAsync();
             foreach (var key in hiddenKeys)
             {
+                var prop = typeof(Supplier).GetProperty(key);
+                if (prop is not null && prop.CanWrite)
+                {
+                    protectedOriginals[key] = prop.GetValue(supplier);
+                }
+            }
+
+            // Always protect internal classification / payment-routing flags on a self-service save, even
+            // when they have no field-settings row: they are set by staff and must never be supplier-editable
+            // (a crafted submit could otherwise flip a supplier's payment or purchasing routing).
+            foreach (var key in AlwaysSupplierLockedKeys)
+            {
+                if (protectedOriginals.ContainsKey(key)) { continue; }
                 var prop = typeof(Supplier).GetProperty(key);
                 if (prop is not null && prop.CanWrite)
                 {
