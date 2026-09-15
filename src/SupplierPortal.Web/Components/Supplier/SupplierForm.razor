@@ -27,7 +27,7 @@ else
         <InputText @bind-Value="formModel.SupplierName" />
     </div>;
     fieldFragments["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")">
-        <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
+        <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))@Help("TaxOrganizationTypeId")</label>
         @* Editable for internal admins/staff, but frozen (read-only) on the supplier self-service
            portal so suppliers cannot change a value set by the business. *@
         <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="@SupplierFacing" class="@(SupplierFacing ? "di-frozen" : null)">
@@ -100,7 +100,7 @@ else
         }
     </text>;
     fieldFragments["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")">
-        <label>VAT Registered?@(Req("VatRegistered"))</label>
+        <label>VAT Registered?@(Req("VatRegistered"))@Help("VatRegistered")</label>
         <InputSelect @bind-Value="vatRegisteredYesNo">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -113,7 +113,7 @@ else
         @if (IsVatRegistered)
         {
             <div class="di-field @FieldClass("TaxRegistrationNumber")">
-                <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label>
+                <label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))@Help("TaxRegistrationNumber")</label>
                 <InputText @bind-Value="formModel.TaxRegistrationNumber" maxlength="15"
                            inputmode="numeric" pattern="[0-9]*" title="15 digits" />
             </div>
@@ -123,7 +123,7 @@ else
         @if (IsVatRegistered)
         {
             <div class="di-field @FieldClass("VatRegistrationTypeId")">
-                <label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label>
+                <label>VAT Registration Type@(Req("VatRegistrationTypeId"))@Help("VatRegistrationTypeId")</label>
                 <InputSelect @bind-Value="formModel.VatRegistrationTypeId">
                     <option value="">— Select —</option>
                     @foreach (var lov in vatRegistrationTypes)
@@ -135,12 +135,12 @@ else
         }
     </text>;
     fieldFragments["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")">
-        <label>Supplier TIN@(Req("SupplierTin"))</label>
+        <label>Supplier TIN@(Req("SupplierTin"))@Help("SupplierTin")</label>
         <InputText @bind-Value="formModel.SupplierTin" maxlength="10"
                    inputmode="numeric" pattern="[0-9]*" title="10 digits" />
     </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
-        <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>
+        <label>Business Partner Type@(Req("BusinessPartnerTypeId"))@Help("BusinessPartnerTypeId")</label>
         <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
             <option value="">— Select —</option>
             @foreach (var lov in businessPartnerTypes)
@@ -160,7 +160,7 @@ else
         </InputSelect>
     </div>;
     fieldFragments["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")">
-        <label>eINvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label>
+        <label>eINvoicing Wave Applicability@(Req("EInvoicingWaveId"))@Help("EInvoicingWaveId")</label>
         <InputSelect @bind-Value="formModel.EInvoicingWaveId">
             <option value="">— Select —</option>
             @foreach (var lov in eInvoicingWaves)
@@ -1144,9 +1144,30 @@ else
             </div>
         </div>
     }
+
+    @if (helpKey is not null && fieldHelp.TryGetValue(helpKey, out var help))
+    {
+        <div class="di-help-backdrop" @onclick="CloseHelp">
+            <div class="di-help-pop" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+                <div class="di-help-head">
+                    <h3 class="di-help-title">@help.Title</h3>
+                    <button type="button" class="di-help-close" title="Close" @onclick="CloseHelp">&times;</button>
+                </div>
+                <p class="di-help-body">@help.Body</p>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
+    .di-help-btn { border: none; background: transparent; color: #3b5bdb; cursor: pointer; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; display: inline-flex; }
+    .di-help-btn:hover { color: #1e40af; }
+    .di-help-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.5); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 24px; }
+    .di-help-pop { background: #fff; border-radius: 10px; width: min(420px, 100%); padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+    .di-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .di-help-title { margin: 0; font-size: 16px; font-weight: 700; color: #0b2545; }
+    .di-help-close { border: none; background: transparent; font-size: 22px; line-height: 1; color: #6b7280; cursor: pointer; }
+    .di-help-body { margin: 0; font-size: 14px; color: #2f3a4c; line-height: 1.6; }
     .di-decl-section { font-weight: 700; color: #0b2545; margin: 14px 0 4px; }
     .di-decl-section:first-child { margin-top: 0; }
     .di-hidden-field { display: none !important; }
@@ -2023,6 +2044,60 @@ else
             builder.CloseElement();
         }
     };
+
+    // ---- Field help ("What's this?" info popups) ----
+    private string? helpKey;
+
+    /// <summary>Short explanations shown in the info popup for selected fields (title, body).</summary>
+    private static readonly Dictionary<string, (string Title, string Body)> fieldHelp = new()
+    {
+        ["TaxOrganizationTypeId"] = ("Tax Organization Type",
+            "The legal/tax classification of your organization (e.g. Corporation, Partnership, Sole Establishment). " +
+            "It determines how your entity is treated for tax and e-invoicing. Select the type shown on your trade licence."),
+        ["VatRegistered"] = ("VAT Registered?",
+            "Choose Yes if your business is registered for VAT with the UAE Federal Tax Authority (FTA) and has a Tax " +
+            "Registration Number (TRN). Choose No if you are not VAT-registered — you will then confirm a non-registration " +
+            "declaration before submitting."),
+        ["TaxRegistrationNumber"] = ("TRN / VAT Registration Number",
+            "Your 15-digit Tax Registration Number (TRN) issued by the FTA when you registered for VAT. It appears on your " +
+            "VAT Certificate and on your tax invoices. Required only if you are VAT-registered."),
+        ["VatRegistrationTypeId"] = ("VAT Registration Type",
+            "Whether you are registered as a standalone entity or as part of a VAT Group. Select VAT Group only if your TRN " +
+            "is shared across multiple entities under one group registration."),
+        ["SupplierTin"] = ("Supplier TIN",
+            "Taxpayer Identification Number — a 10-digit identifier for your business. Enter it exactly as issued (10 digits)."),
+        ["BusinessPartnerTypeId"] = ("Business Partner Type",
+            "How you transact with us for e-invoicing — e.g. B2B (Business to Business), B2G (Business to Government) or " +
+            "B2C (Business to Consumer). Required under the UAE e-invoicing (PINT-AE / Peppol) standard."),
+        ["EInvoicingWaveId"] = ("e-Invoicing Wave Applicability",
+            "The phased roll-out group (wave) under which your organization becomes subject to mandatory UAE e-invoicing. " +
+            "If you are unsure, check with your finance team or leave the default."),
+    };
+
+    /// <summary>Renders a small "info" button next to a label when help text exists for that field.</summary>
+    private RenderFragment Help(string fieldKey) => builder =>
+    {
+        if (!fieldHelp.ContainsKey(fieldKey))
+        {
+            return;
+        }
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "type", "button");
+        builder.AddAttribute(2, "class", "di-help-btn");
+        builder.AddAttribute(3, "title", "What's this?");
+        builder.AddAttribute(4, "aria-label", "What's this?");
+        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create(this, () => ShowHelp(fieldKey)));
+        builder.AddEventStopPropagationAttribute(6, "onclick", true);
+        builder.AddEventPreventDefaultAttribute(7, "onclick", true);
+        builder.AddMarkupContent(8,
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\">" +
+            "<path d=\"M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z\"/>" +
+            "<path d=\"M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z\"/></svg>");
+        builder.CloseElement();
+    };
+
+    private void ShowHelp(string fieldKey) => helpKey = fieldKey;
+    private void CloseHelp() => helpKey = null;
 
     private void OnBankChanged()
     {
