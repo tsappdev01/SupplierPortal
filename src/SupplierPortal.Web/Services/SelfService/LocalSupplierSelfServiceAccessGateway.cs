@@ -16,7 +16,7 @@ public class LocalSupplierSelfServiceAccessGateway(
         }
 
         var buId = t.Supplier?.BusinessUnitId;
-        var logo = buId is null ? null : await branding.GetBusinessUnitLogoSrcAsync(buId);
+        var logo = buId is null ? null : await branding.GetBusinessUnitUploadedLogoSrcAsync(buId);
         var needsFresh = t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
         return new SsLinkInfo(true, t.Supplier?.SupplierName, buId, logo, needsFresh);
     }

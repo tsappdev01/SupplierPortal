@@ -42,7 +42,7 @@ public class LocalSupplierSelfServiceDataGateway(
         var data = new SsFormData
         {
             Supplier = supplier,
-            LogoSrc = await branding.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId),
+            LogoSrc = await branding.GetBusinessUnitUploadedLogoSrcAsync(supplier.BusinessUnitId),
             TaxOrgTypes = await supplierService.GetLookupsAsync(LookupCategory.TaxOrganizationType),
             SupplierTypes = await supplierService.GetLookupsAsync(LookupCategory.SupplierType),
             Countries = await supplierService.GetLookupsAsync(LookupCategory.Country),

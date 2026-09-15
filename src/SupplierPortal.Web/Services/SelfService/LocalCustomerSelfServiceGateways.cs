@@ -16,7 +16,7 @@ public class LocalCustomerSelfServiceAccessGateway(
             return new SsCustomerLinkInfo(false, null, null, null, false);
         }
         var buId = t.Customer?.BusinessUnitId;
-        var logo = await branding.GetBusinessUnitLogoSrcAsync(buId);
+        var logo = await branding.GetBusinessUnitUploadedLogoSrcAsync(buId);
         var needsFresh = t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow;
         return new SsCustomerLinkInfo(true, t.Customer?.LegalName, buId, logo, needsFresh);
     }
@@ -69,7 +69,7 @@ public class LocalCustomerSelfServiceDataGateway(
         return new SsCustomerFormData
         {
             Customer = customer,
-            LogoSrc = await branding.GetBusinessUnitLogoSrcAsync(customer.BusinessUnitId),
+            LogoSrc = await branding.GetBusinessUnitUploadedLogoSrcAsync(customer.BusinessUnitId),
             Config = await fieldConfigService.GetAllAsync(),
             Documents = await documentService.GetDocumentsAsync(access.CustomerId),
             DocTypes = await documentService.GetTypesAsync(),
