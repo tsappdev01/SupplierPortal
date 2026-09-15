@@ -546,10 +546,16 @@ else if (TotalPages > 1)
 @if (showDocsModal)
 {
     <div class="di-modal-backdrop no-print" @onclick="CloseDocsModal"></div>
-    <div class="di-modal no-print" role="dialog" aria-modal="true">
+    <div class="di-modal di-modal-adv no-print" role="dialog" aria-modal="true">
         <div class="di-modal-head">
-            <h2 class="h6 mb-0 text-truncate">Attached Documents &mdash; @docsSupplierName</h2>
-            <button type="button" class="btn-close" aria-label="Close" @onclick="CloseDocsModal"></button>
+            <div class="di-modal-head-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5z" fill="#fff" opacity=".92"/><path d="M14 2.5v4h4" fill="#cbd8ee"/><path d="M8.5 12h7M8.5 15h7M8.5 18h4.5" stroke="#274a7d" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div class="di-modal-head-text">
+                <h2 class="di-modal-title text-truncate">Attached Documents</h2>
+                <p class="di-modal-subtitle text-truncate">@docsSupplierName@(modalDocuments.Count > 0 ? $" · {modalDocuments.Count} file(s)" : "")</p>
+            </div>
+            <button type="button" class="di-modal-x" aria-label="Close" @onclick="CloseDocsModal">✕</button>
         </div>
         <div class="di-modal-body" tabindex="0" @ref="docsViewerRef" @onkeydown="OnDocsKeyDown">
             @if (modalDocsLoading)
@@ -776,6 +782,20 @@ else if (TotalPages > 1)
     }
     .di-modal-body { padding: 12px 16px; overflow: auto; outline: none; }
 
+    /* Advanced modal: gradient header with icon + subtitle, softer frame. */
+    .di-modal-adv { border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(2, 10, 40, .4); }
+    .di-modal-adv .di-modal-head {
+        align-items: flex-start; gap: 14px; padding: 18px 20px; border-bottom: 0;
+        background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff;
+    }
+    .di-modal-head-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.16); }
+    .di-modal-head-text { min-width: 0; flex: 1; }
+    .di-modal-title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
+    .di-modal-subtitle { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; }
+    .di-modal-x { flex: none; background: rgba(255,255,255,.14); border: 0; color: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .di-modal-x:hover { background: rgba(255,255,255,.28); }
+    .di-modal-adv .di-modal-body { padding: 16px 20px; }
+
     /* All-documents grid (preview + open + download on one screen) */
     .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .di-docsall-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -863,10 +883,10 @@ else if (TotalPages > 1)
         box-shadow: 0 1px 3px rgba(20, 30, 50, 0.05);
         transition: box-shadow 0.15s ease, transform 0.05s ease;
     }
-    .di-docsall-card:hover { box-shadow: 0 6px 20px rgba(20, 30, 50, 0.1); }
+    .di-docsall-card:hover { box-shadow: 0 10px 26px rgba(20, 30, 50, 0.14); transform: translateY(-2px); border-color: #cfd8ea; }
     .di-docsall-preview {
-        height: 220px; background: #f6f7f9; border-bottom: 1px solid #eceff3;
-        display: flex; align-items: center; justify-content: center; overflow: hidden;
+        height: 220px; background: linear-gradient(180deg, #fbfcfe, #f1f4f9); border-bottom: 1px solid #eceff3;
+        display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
     }
     .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
