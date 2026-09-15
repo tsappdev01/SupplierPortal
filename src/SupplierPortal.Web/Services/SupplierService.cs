@@ -190,6 +190,7 @@ public class SupplierService(
                 SupplierName = s.SupplierName,
                 TaxOrganizationTypeName = s.TaxOrganizationType != null ? s.TaxOrganizationType.DisplayName : null,
                 FirstName = s.FirstName,
+                LastName = s.LastName,
                 SupplierTypeName = s.SupplierType != null ? s.SupplierType.DisplayName : null,
                 TaxRegistrationNumber = s.TaxRegistrationNumber,
                 TradeLicenseNumber = s.TradeLicenseNumber,

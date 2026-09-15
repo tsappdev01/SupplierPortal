@@ -12,6 +12,12 @@ public class SupplierListItem
     public string SupplierName { get; set; } = string.Empty;
     public string? TaxOrganizationTypeName { get; set; }
     public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+
+    /// <summary>Contact full name (first + last) for the dashboard "Full Name" column, print and export.</summary>
+    public string FullName =>
+        string.Join(" ", new[] { FirstName, LastName }.Where(n => !string.IsNullOrWhiteSpace(n)));
+
     public string? SupplierTypeName { get; set; }
     public string? TaxRegistrationNumber { get; set; }
     public string? TradeLicenseNumber { get; set; }

@@ -1,6 +1,9 @@
 @page "/supplier/dashboard"
 @attribute [Authorize(Policy = "Portal.Supplier")]
-@rendermode InteractiveServer
+@* prerender:false so a click navigates instantly to the interactive shell (which shows the
+   loading indicator immediately) instead of the server holding the response until the whole
+   supplier query finishes. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using SupplierPortal.Web.Models
@@ -431,7 +434,7 @@ else
             <th>Supplier Number</th>
             <th>Priority</th>
             <th>Supplier Name</th>
-            <th>First Name</th>
+            <th>Full Name</th>
             <th>Contact Email</th>
             <th>Status</th>
             <th class="no-print">Assigned To</th>
@@ -464,7 +467,7 @@ else
                         </a>
                     }
                 </td>
-                <td>@supplier.FirstName</td>
+                <td>@supplier.FullName</td>
                 <td>@supplier.ContactEmail</td>
                 <td>
                     @if (!string.IsNullOrEmpty(supplier.StatusName))
@@ -1693,7 +1696,7 @@ else if (TotalPages > 1)
             new() { Label = "Supplier Number", Value = s => s.SupplierNumber, Default = true },
             new() { Label = "Priority", Value = s => s.Priority ?? "", Default = true },
             new() { Label = "Supplier Name", Value = s => s.SupplierName, Default = true },
-            new() { Label = "First Name", Value = s => s.FirstName ?? "", Default = true },
+            new() { Label = "Full Name", Value = s => s.FullName, Default = true },
             new() { Label = "Contact Email", Value = s => s.ContactEmail ?? "", Default = true },
             new() { Label = "Status", Value = s => s.StatusName ?? "", Default = true },
             new() { Label = "Assigned To", Value = s => s.AssignedToUserName ?? "", Default = true },
