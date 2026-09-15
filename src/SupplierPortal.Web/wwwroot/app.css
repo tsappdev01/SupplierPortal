@@ -188,6 +188,15 @@ table thead th {
     border-bottom: 2px solid var(--di-gold);
 }
 
+/* Dark-mode contrast fixes: outline buttons and tab labels use the fixed navy/grey which are
+   near-invisible on the dark surface. Re-map them to light theme tokens in dark mode. */
+[data-theme="dark"] .btn-outline-primary { color: var(--di-link); border-color: var(--di-link); }
+[data-theme="dark"] .btn-outline-primary:hover { background-color: var(--di-link); border-color: var(--di-link); color: #0e1626; }
+[data-theme="dark"] .btn-outline-secondary { color: var(--di-text); border-color: var(--di-border); }
+[data-theme="dark"] .btn-outline-secondary:hover { background-color: var(--di-surface-2); border-color: var(--di-text-soft); color: var(--di-text); }
+[data-theme="dark"] .nav-tabs .nav-link { color: var(--di-text-soft); }
+[data-theme="dark"] .nav-tabs .nav-link.active { color: var(--di-heading); }
+
 /* Cards / panels pick up a soft shadow so they lift off the grey page */
 .di-stat-tile,
 .di-field-settings-section,

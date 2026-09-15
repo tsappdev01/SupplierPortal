@@ -308,6 +308,39 @@
     color: #97a1b3;
 }
 
+/* ---- Dark-mode readability -------------------------------------------------
+   The base field rules above hardcode black text on a white box, which is
+   unreadable on the dark theme (and the "Edited by supplier" green box turned
+   dark-on-dark). Re-map form fields to the theme surface/text tokens in dark. */
+[data-theme="dark"] .di-field ::deep input[type=text],
+[data-theme="dark"] .di-field ::deep input[type=email],
+[data-theme="dark"] .di-field ::deep input[type=date],
+[data-theme="dark"] .di-field ::deep input[type=number],
+[data-theme="dark"] .di-field ::deep textarea,
+[data-theme="dark"] .di-field ::deep select {
+    background: var(--di-surface);
+    color: var(--di-text);
+    border-color: var(--di-border);
+}
+[data-theme="dark"] .di-field ::deep input[type=text]:disabled,
+[data-theme="dark"] .di-field ::deep input[type=email]:disabled,
+[data-theme="dark"] .di-field ::deep input[type=date]:disabled,
+[data-theme="dark"] .di-field ::deep input[type=number]:disabled,
+[data-theme="dark"] .di-field ::deep select:disabled {
+    background: var(--di-surface-2);
+    color: var(--di-text-soft);
+}
+[data-theme="dark"] .di-field-changed ::deep input[type=text],
+[data-theme="dark"] .di-field-changed ::deep input[type=email],
+[data-theme="dark"] .di-field-changed ::deep input[type=date],
+[data-theme="dark"] .di-field-changed ::deep select {
+    background: #14301f;
+    color: var(--di-text);
+    border-color: #2f9e44;
+}
+[data-theme="dark"] .di-field-changed label,
+[data-theme="dark"] .di-field-changed label::after { color: #4ade80; }
+
 .di-checkbox-row {
     display: flex;
     flex-wrap: wrap;
