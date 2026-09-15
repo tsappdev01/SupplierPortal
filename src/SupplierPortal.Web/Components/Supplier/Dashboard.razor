@@ -609,13 +609,22 @@ else if (TotalPages > 1)
                     {
                         <div class="di-docsall-card">
                             <div class="di-docsall-preview">
+                                @if (!previewLoaded.Contains(doc.Id))
+                                {
+                                    <div class="di-preview-loading">
+                                        <span class="di-preview-spinner" aria-hidden="true"></span>
+                                        <span>Loading preview…</span>
+                                    </div>
+                                }
                                 @if (IsImage(doc))
                                 {
-                                    <img src="/suppliers/documents/@doc.Id" alt="@doc.FileName" loading="lazy" />
+                                    <img src="/suppliers/documents/@doc.Id" alt="@doc.FileName" loading="lazy"
+                                         @onload="() => MarkPreviewLoaded(doc.Id)" @onerror="() => MarkPreviewLoaded(doc.Id)" />
                                 }
                                 else
                                 {
-                                    <iframe src="/suppliers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"></iframe>
+                                    <iframe src="/suppliers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"
+                                            @onload="() => MarkPreviewLoaded(doc.Id)"></iframe>
                                 }
                             </div>
                             <div class="di-docsall-info">
@@ -890,6 +899,11 @@ else if (TotalPages > 1)
     }
     .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
+    .di-preview-loading { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 9px; color: #7488a6; font-size: 12.5px; font-weight: 600;
+        background: linear-gradient(180deg, #fbfcfe, #f1f4f9); }
+    .di-preview-spinner { width: 24px; height: 24px; border: 3px solid #d9e0ec; border-top-color: #2f6fed;
+        border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
     .di-docsall-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
     .di-docsall-type { background: #eef1ff; color: #3b5bdb; font-weight: 600; flex: none; }
     .di-docsall-name {
@@ -1048,6 +1062,10 @@ else if (TotalPages > 1)
     private List<SupplierDocument> modalDocuments = [];
     private int modalDocIndex;
     private bool modalDocsLoading;
+    // Tracks which document previews (img/iframe) have finished loading, so each card shows a "Loading
+    // preview…" spinner until its own preview is ready.
+    private readonly HashSet<int> previewLoaded = [];
+    private void MarkPreviewLoaded(int docId) { previewLoaded.Add(docId); }
     private ElementReference docsViewerRef;
     private bool focusDocsPending;
 
@@ -1288,6 +1306,7 @@ else if (TotalPages > 1)
         docsSupplierName = supplier.SupplierName;
         modalDocIndex = 0;
         modalDocuments = [];
+        previewLoaded.Clear();
         modalDocsLoading = true;
         StateHasChanged();
 
