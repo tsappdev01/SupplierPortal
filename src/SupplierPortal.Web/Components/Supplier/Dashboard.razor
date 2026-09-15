@@ -578,11 +578,11 @@ else if (TotalPages > 1)
                     <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
                     <div class="di-docsall-toolbar-actions">
                         <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@docsSupplierId/documents.pdf" target="_blank">All images as PDF</a>
-                        <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@zipDownloading">
+                        <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@(zipDownloading || downloadingDocId is not null)">
                             @if (zipDownloading)
                             {
                                 <span class="di-dl-spinner" aria-hidden="true"></span>
-                                <span>@(zipPercent < 0 ? "Downloading…" : $"Downloading… {zipPercent}%")</span>
+                                <span>@(dlPercent < 0 ? "Downloading…" : $"Downloading… {dlPercent}%")</span>
                             }
                             else
                             {
@@ -593,19 +593,19 @@ else if (TotalPages > 1)
                 </div>
                 @if (zipDownloading)
                 {
-                    <div class="di-dl-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(zipPercent < 0 ? 0 : zipPercent)">
+                    <div class="di-dl-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
                         <div class="di-dl-progress-track">
-                            <div class="di-dl-progress-fill @(zipPercent < 0 ? "di-dl-indeterminate" : "")"
-                                 style="@(zipPercent < 0 ? "" : $"width:{zipPercent}%")"></div>
+                            <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                 style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
                         </div>
                         <span class="di-dl-progress-label">
-                            @if (zipPercent < 0)
+                            @if (dlPercent < 0)
                             {
                                 <text>Preparing your download…</text>
                             }
                             else
                             {
-                                <text>@zipPercent%@(string.IsNullOrEmpty(zipTotalText) ? "" : $" — {zipReceivedText} of {zipTotalText}")</text>
+                                <text>@dlPercent%@(string.IsNullOrEmpty(dlTotalText) ? "" : $" — {dlReceivedText} of {dlTotalText}")</text>
                             }
                         </span>
                     </div>
@@ -633,11 +633,30 @@ else if (TotalPages > 1)
                                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
                                     Open
                                 </a>
-                                <a class="btn btn-sm btn-primary" href="/suppliers/documents/@doc.Id?download=1" title="Download the original file">
-                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" /></svg>
-                                    Download
-                                </a>
+                                <button type="button" class="btn btn-sm btn-primary" title="Download the original file"
+                                        @onclick="() => DownloadDocAsync(doc)"
+                                        disabled="@(zipDownloading || downloadingDocId is not null)">
+                                    @if (downloadingDocId == doc.Id)
+                                    {
+                                        <span class="di-dl-spinner" aria-hidden="true"></span>
+                                        <span>@(dlPercent < 0 ? "Downloading…" : $"{dlPercent}%")</span>
+                                    }
+                                    else
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" /></svg>
+                                        <span>Download</span>
+                                    }
+                                </button>
                             </div>
+                            @if (downloadingDocId == doc.Id)
+                            {
+                                <div class="di-dl-progress di-dl-progress-card" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
+                                    <div class="di-dl-progress-track">
+                                        <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                             style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
@@ -731,6 +750,9 @@ else if (TotalPages > 1)
     .di-dl-progress-fill.di-dl-indeterminate { width: 40%; animation: di-dl-slide 1.1s ease-in-out infinite; }
     @@keyframes di-dl-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
     .di-dl-progress-label { font-size: 12.5px; font-weight: 600; color: #46506b; white-space: nowrap; min-width: 140px; text-align: right; }
+    /* Thin in-card variant shown under a single document's Download button (no side label). */
+    .di-dl-progress-card { margin: 0 12px 12px; }
+    .di-dl-progress-card .di-dl-progress-track { height: 5px; }
     .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px;
         border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
     @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
@@ -914,12 +936,15 @@ else if (TotalPages > 1)
     private ElementReference docsViewerRef;
     private bool focusDocsPending;
 
-    // "Download all (zip)" progress: the archive is streamed via JS so the user sees a live progress bar.
+    // Download progress: files are streamed via JS so the user sees a live progress bar, both for the
+    // "Download all (zip)" button and each single-document Download. Only one download runs at a time, so a
+    // single set of progress fields is shared; zipDownloading vs downloadingDocId says which UI to light up.
     private bool zipDownloading;
-    private int zipPercent;
-    private string zipReceivedText = "";
-    private string zipTotalText = "";
-    private DotNetObjectReference<Dashboard>? zipDotNetRef;
+    private int? downloadingDocId;
+    private int dlPercent;
+    private string dlReceivedText = "";
+    private string dlTotalText = "";
+    private DotNetObjectReference<Dashboard>? dlDotNetRef;
 
     private string SelectedBuLabel => filterBusinessUnitId == 0
         ? (SeesAllBusinessUnits ? "All Business Units" : "All My Business Units")
@@ -1165,18 +1190,15 @@ else if (TotalPages > 1)
     /// methods below.</summary>
     private async Task DownloadAllZipAsync()
     {
-        if (zipDownloading) { return; }
+        if (zipDownloading || downloadingDocId is not null) { return; }
         zipDownloading = true;
-        zipPercent = -1; // "Preparing…" until the first bytes arrive (server builds the archive first).
-        zipReceivedText = "";
-        zipTotalText = "";
-        zipDotNetRef ??= DotNetObjectReference.Create(this);
+        BeginDownloadState(preparing: true); // "Preparing…" until the first bytes (server builds the archive).
         try
         {
             await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
                 $"/suppliers/{docsSupplierId}/documents.zip",
                 $"supplier-{docsSupplierId}.zip",
-                zipDotNetRef);
+                dlDotNetRef);
         }
         catch
         {
@@ -1185,12 +1207,40 @@ else if (TotalPages > 1)
         }
     }
 
+    /// <summary>Streams a single document via JS so its Download button shows the same live progress.</summary>
+    private async Task DownloadDocAsync(SupplierDocument doc)
+    {
+        if (zipDownloading || downloadingDocId is not null) { return; }
+        downloadingDocId = doc.Id;
+        BeginDownloadState(preparing: false); // a single file streams immediately, so start at 0%.
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/suppliers/documents/{doc.Id}?download=1",
+                string.IsNullOrWhiteSpace(doc.FileName) ? $"document-{doc.Id}" : doc.FileName,
+                dlDotNetRef);
+        }
+        catch
+        {
+            downloadingDocId = null;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    private void BeginDownloadState(bool preparing)
+    {
+        dlPercent = preparing ? -1 : 0;
+        dlReceivedText = "";
+        dlTotalText = "";
+        dlDotNetRef ??= DotNetObjectReference.Create(this);
+    }
+
     [JSInvokable]
     public Task OnDownloadProgress(int percent, long received, long total)
     {
-        zipPercent = percent;
-        zipReceivedText = FormatBytes(received);
-        zipTotalText = total > 0 ? FormatBytes(total) : "";
+        dlPercent = percent;
+        dlReceivedText = FormatBytes(received);
+        dlTotalText = total > 0 ? FormatBytes(total) : "";
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -1199,7 +1249,8 @@ else if (TotalPages > 1)
     public Task OnDownloadComplete(string fileName)
     {
         zipDownloading = false;
-        zipPercent = 100;
+        downloadingDocId = null;
+        dlPercent = 100;
         ToastService.ShowSuccess($"Downloaded {fileName}");
         StateHasChanged();
         return Task.CompletedTask;
@@ -1209,6 +1260,7 @@ else if (TotalPages > 1)
     public Task OnDownloadError(string message)
     {
         zipDownloading = false;
+        downloadingDocId = null;
         ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
         StateHasChanged();
         return Task.CompletedTask;
@@ -1222,7 +1274,7 @@ else if (TotalPages > 1)
         return kb < 1024 ? $"{kb:0} KB" : $"{kb / 1024:0.0} MB";
     }
 
-    public void Dispose() => zipDotNetRef?.Dispose();
+    public void Dispose() => dlDotNetRef?.Dispose();
 
     private async Task ModalPrintAsync(int documentId) =>
         await JS.InvokeVoidAsync("printImageUrl", $"/suppliers/documents/{documentId}");
