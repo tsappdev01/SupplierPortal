@@ -23,6 +23,10 @@ public class LocalSupplierSelfServiceDataGateway(
     private async Task<SupplierAccessToken?> ResolveAsync(string token, string session)
         => await accessTokenService.ValidateSessionAsync(token, session);
 
+    /// <summary>Validates the session and returns the reason it failed (for a clearer on-screen message).</summary>
+    private async Task<(SupplierAccessToken? Access, string? Reason)> ResolveDetailedAsync(string token, string session)
+        => await accessTokenService.ValidateSessionDetailedAsync(token, session);
+
     public async Task<SsFormData?> LoadFormAsync(string token, string session)
     {
         var access = await ResolveAsync(token, session);
@@ -70,10 +74,10 @@ public class LocalSupplierSelfServiceDataGateway(
 
     public async Task<SsSaveResult> SaveAsync(string token, string session, Supplier updated, bool complete)
     {
-        var access = await ResolveAsync(token, session);
+        var (access, reason) = await ResolveDetailedAsync(token, session);
         if (access is null)
         {
-            return new SsSaveResult(false, "Your session has expired. Please use the link from your email again.", null);
+            return new SsSaveResult(false, $"Your session has expired. Please use the link from your email again. ({reason})", null);
         }
         // Security: the record being saved must be the one this session is scoped to.
         if (updated.Id != access.SupplierId)
@@ -113,10 +117,10 @@ public class LocalSupplierSelfServiceDataGateway(
     public async Task<SsUploadResult> UploadDocumentAsync(
         string token, string session, int documentType, string fileName, string contentType, byte[] bytes)
     {
-        var access = await ResolveAsync(token, session);
+        var (access, reason) = await ResolveDetailedAsync(token, session);
         if (access is null)
         {
-            return new SsUploadResult(false, "Your session has expired.", null, null);
+            return new SsUploadResult(false, $"Your session has expired. ({reason})", null, null);
         }
 
         await using var stream = new MemoryStream(bytes);
