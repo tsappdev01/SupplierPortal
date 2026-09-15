@@ -100,6 +100,20 @@ public class SupplierService(
              (visibleToDepartmentId != null && s.DepartmentId == visibleToDepartmentId)));
     }
 
+    /// <summary>True when the supplier with <paramref name="supplierId"/> is visible to a caller holding the
+    /// given scope — the same visibility rule as the dashboard list (<see cref="ApplyScope"/>). Used by the
+    /// document/download endpoints to enforce per-record business-unit/assignment scope, so a user cannot pull
+    /// another business unit's supplier documents by guessing ids.</summary>
+    public async Task<bool> IsSupplierAccessibleAsync(
+        int supplierId, IReadOnlyCollection<int>? businessUnitIds, int? assignedToUserId, int? visibleToDepartmentId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var query = ApplyScope(
+            db.Suppliers.AsNoTracking().Where(s => s.Id == supplierId),
+            businessUnitIds, assignedToUserId, visibleToDepartmentId);
+        return await query.AnyAsync();
+    }
+
     /// <summary>Pass null/empty businessUnitIds (Administrator, no filter) to see all business units' suppliers.</summary>
     public async Task<List<Supplier>> GetSuppliersAsync(
         IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, string? statusName = null,

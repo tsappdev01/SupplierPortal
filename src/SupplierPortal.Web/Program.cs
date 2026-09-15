@@ -695,6 +695,18 @@ static List<int>? ResolveExportScope(HttpContext ctx, int? businessUnitId)
         : userBuIds;
 }
 
+// True when the caller may access the given supplier's data (documents/exports). Reuses the same
+// business-unit + assignment/department visibility rule as the dashboard list, so a user cannot pull
+// another business unit's supplier documents by guessing document/supplier ids. Administrators are
+// unrestricted (or scoped to their own units) exactly as on the dashboard.
+static async Task<bool> CanAccessSupplierAsync(HttpContext ctx, UserService userService, SupplierService supplierService, int supplierId)
+{
+    var buIds = ResolveExportScope(ctx, null);
+    var assignee = ResolveAssigneeScope(ctx);
+    var dept = await ResolveDepartmentScopeAsync(ctx, userService);
+    return await supplierService.IsSupplierAccessibleAsync(supplierId, buIds, assignee, dept);
+}
+
 app.MapGet("/users/{id:int}/photo", async (int id, UserService userService) =>
 {
     var photo = await userService.GetPhotoAsync(id);
@@ -715,8 +727,14 @@ app.MapGet("/business-units/{id:int}/thumbnail", async (int id, BusinessUnitServ
 
 // Without ?download=1 the file is served inline so it previews in an <img>/<iframe>; with it, as an
 // attachment (Content-Disposition: attachment) so the browser saves it.
-app.MapGet("/suppliers/documents/{id:int}", async (int id, string? download, SupplierDocumentService documentService) =>
+app.MapGet("/suppliers/documents/{id:int}", async (int id, string? download, HttpContext ctx,
+    UserService userService, SupplierService supplierService, SupplierDocumentService documentService) =>
 {
+    // Enforce per-supplier access scope (not just "authenticated") so ids can't be enumerated across units.
+    var supplierId = await documentService.GetSupplierIdForDocumentAsync(id);
+    if (supplierId is null) return Results.NotFound();
+    if (!await CanAccessSupplierAsync(ctx, userService, supplierService, supplierId.Value)) return Results.NotFound();
+
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
     return WantsAttachment(download)
@@ -851,8 +869,10 @@ app.MapPost("/api/leasing/circularo/webhook", async (
 }).AllowAnonymous();
 
 // Download all of a supplier's attachments (originals, any type) as a single zip archive.
-app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentService documentService, SupplierService supplierService) =>
+app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, HttpContext ctx, UserService userService,
+    SupplierDocumentService documentService, SupplierService supplierService) =>
 {
+    if (!await CanAccessSupplierAsync(ctx, userService, supplierService, id)) return Results.NotFound();
     var files = await documentService.GetAllFilesAsync(id);
     if (files.Count == 0) return Results.NotFound("This supplier has no attachments.");
 
@@ -890,16 +910,20 @@ app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, SupplierDocumentS
 }).RequireAuthorization();
 
 // Combine a supplier's attached images into a single PDF / Excel workbook.
-app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
+app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, HttpContext ctx, UserService userService,
+    SupplierService supplierService, SupplierDocumentService documentService, ExportService exportService) =>
 {
+    if (!await CanAccessSupplierAsync(ctx, userService, supplierService, id)) return Results.NotFound();
     var images = await documentService.GetImageFilesAsync(id);
     return images.Count == 0
         ? Results.NotFound("This supplier has no image attachments.")
         : Results.File(exportService.ImagesToPdf(images), "application/pdf", $"supplier-{id}-documents.pdf");
 }).RequireAuthorization();
 
-app.MapGet("/suppliers/{id:int}/documents.xlsx", async (int id, SupplierDocumentService documentService, ExportService exportService) =>
+app.MapGet("/suppliers/{id:int}/documents.xlsx", async (int id, HttpContext ctx, UserService userService,
+    SupplierService supplierService, SupplierDocumentService documentService, ExportService exportService) =>
 {
+    if (!await CanAccessSupplierAsync(ctx, userService, supplierService, id)) return Results.NotFound();
     var images = await documentService.GetImageFilesAsync(id);
     return images.Count == 0
         ? Results.NotFound("This supplier has no image attachments.")

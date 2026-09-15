@@ -411,6 +411,15 @@ public class SupplierDocumentService(
         return result;
     }
 
+    /// <summary>The owning supplier id for a document, or null when the document does not exist. Lets the
+    /// download endpoint enforce per-supplier access scope before serving the file.</summary>
+    public async Task<int?> GetSupplierIdForDocumentAsync(int documentId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.SupplierDocuments.Where(d => d.Id == documentId)
+            .Select(d => (int?)d.SupplierId).FirstOrDefaultAsync();
+    }
+
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

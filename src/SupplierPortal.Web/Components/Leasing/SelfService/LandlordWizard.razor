@@ -12,6 +12,7 @@
 @inject LandlordDocumentService DocumentService
 @inject ToastService ToastService
 @inject LoadingService Loading
+@inject IJSRuntime JS
 @inject IDocumentOcrService Ocr
 @inject IWebHostEnvironment Env
 @inject IUaePassService UaePass
@@ -761,7 +762,7 @@
                     @if (doc is not null)
                     {
                         <span class="sig-doc-file">@CheckIcon @DocTypeShort(doc.DocumentType) · @doc.FileName@(doc.ExpiryDate is { } de ? $" · exp {de:dd MMM yyyy}" : "")</span>
-                        <a class="link" href="/landlord-documents/@doc.Id" target="_blank">View</a>
+                        <button type="button" class="link" @onclick="() => ViewDocumentAsync(doc.Id)">View</button>
                     }
                     else if (!busy)
                     {
@@ -814,6 +815,27 @@
         var emailById = landlord.Signatories.ToDictionary(s => s.Id, s => (s.Email ?? "").Trim().ToLowerInvariant());
         sigDocByEmail = byId.Where(kv => emailById.ContainsKey(kv.Key))
             .ToDictionary(kv => emailById[kv.Key], kv => kv.Value);
+    }
+
+    /// <summary>Opens an uploaded signatory document in a new tab. This is a public (anonymous) page, so it
+    /// cannot use the auth-gated /landlord-documents endpoint; the bytes are read server-side and handed to the
+    /// browser via the ssDoc blob helper (same approach as the customer self-service form).</summary>
+    private async Task ViewDocumentAsync(int documentId)
+    {
+        try
+        {
+            var file = await DocumentService.GetFileAsync(documentId);
+            if (file is null)
+            {
+                ToastService.ShowError("Could not open the document. Please try again.");
+                return;
+            }
+            await JS.InvokeVoidAsync("ssDoc.open", file.Value.ContentType, Convert.ToBase64String(file.Value.Bytes));
+        }
+        catch
+        {
+            ToastService.ShowError("Could not open the document. Please try again.");
+        }
     }
 
     private async Task UploadSignatoryDocAsync(string emailKey, InputFileChangeEventArgs e)
