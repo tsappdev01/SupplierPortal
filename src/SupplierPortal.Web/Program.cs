@@ -295,12 +295,22 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Portal.Customer", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Customer)));
 
 builder.Services.AddRateLimiter(options =>
-    options.AddFixedWindowLimiter("credential", limiter =>
-    {
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.PermitLimit = 5;
-        limiter.QueueLimit = 0;
-    }));
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Partition the credential/OTP limiter by client IP so one abusive client can only exhaust its own
+    // bucket, not lock the OTP subsystem for every supplier/customer (a shared global bucket did). NOTE:
+    // behind the DMZ reverse proxy this needs forwarded-headers so RemoteIpAddress is the real client IP;
+    // otherwise all traffic shares the proxy's bucket (no worse than before).
+    options.AddPolicy("credential", httpContext =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 5,
+                QueueLimit = 0
+            }));
+});
 
 var app = builder.Build();
 
