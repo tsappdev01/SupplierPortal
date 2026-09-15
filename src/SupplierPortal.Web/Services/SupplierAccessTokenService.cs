@@ -207,8 +207,11 @@ public class SupplierAccessTokenService(
     public async Task<(SupplierAccessToken? Token, string? Reason)> ValidateSessionDetailedAsync(string rawToken, string rawSession)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        // Pre-compute the hash into a local so EF binds it as a parameter (never tries to translate the
+        // custom Hash() into SQL), matching GetValidTokenAsync.
+        var tokenHash = Hash(rawToken);
         var token = await db.SupplierAccessTokens.Include(t => t.Supplier)
-            .FirstOrDefaultAsync(t => t.TokenHash == Hash(rawToken));
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
 
         string? reason = null;
         if (token is null)
