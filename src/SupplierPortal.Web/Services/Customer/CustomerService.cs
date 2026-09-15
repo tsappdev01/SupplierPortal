@@ -9,6 +9,19 @@ namespace SupplierPortal.Web.Services;
 /// scoped to the user's business units (like suppliers), and move Draft → For Review → Completed (or Returned).</summary>
 public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService audit)
 {
+    /// <summary>True when the customer with <paramref name="customerId"/> is visible to a caller scoped to
+    /// <paramref name="scopeBusinessUnitIds"/> — the same rule as the dashboard list (empty scope = admin,
+    /// sees all; otherwise the customer's BU must be null or in scope). Used by the document/download
+    /// endpoints so a user cannot pull another business unit's customer KYC files by guessing ids.</summary>
+    public async Task<bool> IsCustomerAccessibleAsync(int customerId, List<int> scopeBusinessUnitIds)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var q = db.Customers.AsNoTracking().Where(c => c.Id == customerId);
+        if (scopeBusinessUnitIds.Count > 0)
+            q = q.Where(c => c.BusinessUnitId == null || scopeBusinessUnitIds.Contains(c.BusinessUnitId.Value));
+        return await q.AnyAsync();
+    }
+
     /// <summary>One page of customers, filtered by search / status / business unit and scoped to the user's BUs.</summary>
     public async Task<(List<Customer> Items, int Total)> GetListAsync(
         string? search, string? status, int? businessUnitId, List<int> scopeBusinessUnitIds, int page, int pageSize)

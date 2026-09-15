@@ -716,6 +716,21 @@ static async Task<bool> CanAccessSupplierAsync(HttpContext ctx, UserService user
     return await supplierService.IsSupplierAccessibleAsync(supplierId, buIds, assignee, dept);
 }
 
+// Business-unit scope for customer records, mirroring the customer dashboard: only an administrator with no
+// assigned units sees all customers; everyone else is scoped to their assigned units (records with no unit
+// are visible to all). Returns an empty list for the see-all case.
+static List<int> ResolveCustomerScope(HttpContext ctx)
+{
+    var ids = ctx.User.GetBusinessUnitIds();
+    var seesAll = ctx.User.IsAdministrator() && ids.Count == 0;
+    return seesAll ? new List<int>() : ids;
+}
+
+// True when the caller may access the given customer's data. Same rule as the customer dashboard, so a user
+// cannot pull another business unit's customer KYC documents by guessing ids.
+static async Task<bool> CanAccessCustomerAsync(HttpContext ctx, CustomerService customerService, int customerId) =>
+    await customerService.IsCustomerAccessibleAsync(customerId, ResolveCustomerScope(ctx));
+
 app.MapGet("/users/{id:int}/photo", async (int id, UserService userService) =>
 {
     var photo = await userService.GetPhotoAsync(id);
@@ -753,8 +768,14 @@ app.MapGet("/suppliers/documents/{id:int}", async (int id, string? download, Htt
 
 // Customer KYC document preview/download (admin reviewers). Without ?download=1 the file is served
 // inline (preview); with it, as an attachment.
-app.MapGet("/customers/documents/{id:int}", async (int id, string? download, CustomerDocumentService documentService) =>
+app.MapGet("/customers/documents/{id:int}", async (int id, string? download, HttpContext ctx,
+    CustomerService customerService, CustomerDocumentService documentService) =>
 {
+    // Enforce per-customer access scope so ids can't be enumerated across business units.
+    var customerId = await documentService.GetCustomerIdForDocumentAsync(id);
+    if (customerId is null) return Results.NotFound();
+    if (!await CanAccessCustomerAsync(ctx, customerService, customerId.Value)) return Results.NotFound();
+
     var file = await documentService.GetFileAsync(id);
     if (file is null) return Results.NotFound();
     return WantsAttachment(download)
@@ -763,8 +784,10 @@ app.MapGet("/customers/documents/{id:int}", async (int id, string? download, Cus
 }).RequireAuthorization("Portal.Customer");
 
 // Download all of a customer's KYC attachments as a single zip archive.
-app.MapGet("/customers/{id:int}/documents.zip", async (int id, CustomerDocumentService documentService) =>
+app.MapGet("/customers/{id:int}/documents.zip", async (int id, HttpContext ctx,
+    CustomerService customerService, CustomerDocumentService documentService) =>
 {
+    if (!await CanAccessCustomerAsync(ctx, customerService, id)) return Results.NotFound();
     var files = await documentService.GetAllFilesAsync(id);
     if (files.Count == 0) return Results.NotFound("This customer has no attachments.");
 

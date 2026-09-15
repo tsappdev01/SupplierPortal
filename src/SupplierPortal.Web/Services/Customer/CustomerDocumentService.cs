@@ -204,6 +204,15 @@ public class CustomerDocumentService(
         return result;
     }
 
+    /// <summary>The owning customer id for a document, or null when it does not exist. Lets the download
+    /// endpoint enforce per-customer access scope before serving the file.</summary>
+    public async Task<int?> GetCustomerIdForDocumentAsync(int documentId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerDocuments.Where(d => d.Id == documentId)
+            .Select(d => (int?)d.CustomerId).FirstOrDefaultAsync();
+    }
+
     public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetFileAsync(int documentId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
