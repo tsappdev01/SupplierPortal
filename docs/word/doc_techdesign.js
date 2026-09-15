@@ -12,7 +12,7 @@ kids.push(...titlePage("Supplier Portal", "Technical Design & Architecture", [
 kids.push(...tocPage());
 
 kids.push(h1("1. Introduction"));
-kids.push(para("The Supplier Portal is a .NET 8 Blazor Server application that digitises supplier onboarding and master-data maintenance for Dubai Investments, alongside two sibling portals — Customer (KYC) and Leasing/Landlord. It supports an internal deployment and a hardened DMZ deployment in which a public self-service front-end talks to the internal tier through a controlled API seam. This document describes the solution structure, runtime architecture, security model and integrations."));
+kids.push(para("The Supplier Portal is a .NET 8 Blazor Server application that digitises supplier onboarding and master-data maintenance for Dubai Investments. It supports an internal deployment and a hardened DMZ deployment in which a public self-service front-end talks to the internal tier through a controlled API seam. This document describes the solution structure, runtime architecture, security model and integrations."));
 
 kids.push(h1("2. Solution Structure"));
 kids.push(para("All projects target net8.0 with nullable reference types and implicit usings enabled. Solution file: BPPortal.sln."));
@@ -30,7 +30,7 @@ kids.push(bullet("ZXing.Net 0.16.9 (QR), SixLabors.ImageSharp 2.1.9, UglyToad.Pd
 
 kids.push(h1("3. Runtime Architecture"));
 kids.push(h2("3.1 Presentation"));
-kids.push(para("Blazor Server with the Interactive Server render mode. The root App/Routes components host areas: Supplier, Customer, Leasing, Admin, Account, plus Layout and Shared components. Cascading authentication state flows to all components; server-side [Authorize] policies enforce access (the UI only hides what the server also denies)."));
+kids.push(para("Blazor Server with the Interactive Server render mode. The root App/Routes components host areas: Supplier, Admin, Account, plus Layout and Shared components. Cascading authentication state flows to all components; server-side [Authorize] policies enforce access (the UI only hides what the server also denies)."));
 kids.push(h2("3.2 Service layer"));
 kids.push(para("Domain logic lives in scoped services (Services/). Representative services:"));
 kids.push(table(["Service", "Responsibility"],
@@ -40,26 +40,24 @@ kids.push(table(["Service", "Responsibility"],
   ["SupplierFieldSettingService / SupplierActivityService","Per-field visibility/mandatory/tab settings; self-service change review."],
   ["EmailDispatcher / SupplierEmailService / EmailBrandingService","Central email send (SMTP or Database Mail); notifications; per-BU logo branding."],
   ["SupplierDeclarationPdfService / ExportService","Signed declaration PDF; Excel/CSV/PDF export and re-import."],
-  ["Customer* services","Customer (KYC) counterparts (service, import/export, documents, field config, tokens, email)."],
   ["UserService / BusinessUnitService","User and business-unit administration."],
   ["AuthService / RoleClaimsTransformation / ActiveDirectoryService / BreakGlassService","Authentication, claims resolution, LDAP, emergency access."],
-  ["AuditService","Writes AuditLog rows for every workflow transition."],
-  ["Leasing/* services","Landlord/Leasing bounded-context services."]],
+  ["AuditService","Writes AuditLog rows for every workflow transition."]],
  [3000, 6500]));
 kids.push(h2("3.3 Data access"));
-kids.push(para("The DbContextFactory pattern (AddDbContextFactory) is used instead of a scoped DbContext: every service opens a short-lived context per unit of work. Two contexts over the same server — ApplicationDbContext (suppliers/customers/users/audit) and LeasingDbContext (a separate bounded context with its own migration history). In Internal mode, startup seeds ApplicationDbContext and migrates LeasingDbContext."));
+kids.push(para("The DbContextFactory pattern (AddDbContextFactory) is used instead of a scoped DbContext: every service opens a short-lived context per unit of work. The supplier, user and master-data schema lives in ApplicationDbContext (default dbo schema). In Internal mode, startup seeds ApplicationDbContext master data."));
 kids.push(h2("3.4 Minimal-API endpoints"));
-kids.push(para("Hosted in Web Program.cs: supplier/customer exports and templates, document serving (single, zip, images-as-pdf/xlsx bundles), landlord documents, user photo / BU logo, /account/logout, /account/sso-login, /account/dev-login, /api/breakglass, the Circularo webhook, and the self-service API group /api/ss/*."));
+kids.push(para("Hosted in Web Program.cs: supplier exports and templates, document serving (single, zip, images-as-pdf/xlsx bundles), user photo / BU logo, /account/logout, /account/sso-login, /account/dev-login, /api/breakglass, and the self-service API group /api/ss/*."));
 
-kids.push(h1("4. The Three Portals & Deployment Modes"));
-kids.push(para("Portals are expressed as PortalAccess flags (Supplier, Customer, Landlord, Broker) granted per user and enforced by policies. The three primary business portals are Supplier onboarding, Customer/KYC, and Leasing/Landlord (a separate bounded context reading the read-only dbo.Property view)."));
+kids.push(h1("4. Deployment Modes"));
+kids.push(para("Portal access is expressed as a PortalAccess flag (Supplier) granted per user and enforced by policies. The Supplier Portal runs in one of two deployment modes — an internal (trusted-zone) deployment and a hardened DMZ deployment — described below."));
 kids.push(h2("4.1 Internal vs DMZ"));
 kids.push(table(["Mode", "Behaviour"],
  [["Internal","Full app in the trusted zone: portal UI + database + self-service API. Self-service uses the database directly (Local gateways)."],
   ["DMZ","Public front-end serving only self-service pages, with no database, file share or directory access. It reaches the trusted zone only through the internal self-service API (Http gateways). Startup skips migration/seeding and never opens a real DbContext."]],
  [1600, 7900]));
 kids.push(h2("4.2 The gateway seam"));
-kids.push(para("Four gateway interfaces (supplier + customer, access + data) are bound by mode: Internal → Local* gateways calling the DB-backed services directly; DMZ → Http* gateways calling the internal API over a named HttpClient carrying the base URL and shared key. The /api/ss/* endpoints are what the DMZ front-end consumes so it needs no database. Two-factor protection guards them: (a) a shared X-SelfService-Key header validated in constant time (closed if unset), and (b) the opaque link/session token in each request body, scoping every call to one supplier."));
+kids.push(para("Two gateway interfaces (supplier access + data) are bound by mode: Internal → Local* gateways calling the DB-backed services directly; DMZ → Http* gateways calling the internal API over a named HttpClient carrying the base URL and shared key. The /api/ss/* endpoints are what the DMZ front-end consumes so it needs no database. Two-factor protection guards them: (a) a shared X-SelfService-Key header validated in constant time (closed if unset), and (b) the opaque link/session token in each request body, scoping every call to one supplier."));
 kids.push(h2("4.3 Secondary OAuth self-service stack"));
 kids.push(para("A second, independent stack exists for the standalone DMZ portal: SupplierPortal.SelfService (Blazor UI) → SupplierPortal.Api (internal REST) using a full OAuth2 client-credentials flow. The API issues a short-lived portal JWT (scope selfservice.portal); data endpoints additionally require a per-supplier X-Supplier-Session token minted after OTP verify, and the session resolver re-checks the embedded link/session secrets against live DB state so admin completion or expiry revokes access instantly."));
 
@@ -68,7 +66,7 @@ kids.push(bullet("Cookie auth is the default scheme: __Host-SupplierPortalAuth, 
 kids.push(bullet("Optional Entra/OpenIdConnect SSO (authorization-code + PKCE), active only when Auth:Mode=Sso and Entra is configured; otherwise local sign-in is used so nobody is locked out."));
 kids.push(bullet("Local/AD sign-in via AuthService: matched by e-mail or AD login; AD users validated over LDAP, others via the ASP.NET Identity password hasher."));
 kids.push(bullet("RoleClaimsTransformation maps the authenticated identity to a Users row each request, resolving role + business units; unknown/inactive users get only a resolved marker so deny-by-default blocks them."));
-kids.push(bullet("Deny-by-default authorization; portal policies (Portal.Supplier/Customer/Landlord/Broker) and role attributes ([Authorize(Roles=\"Administrator\")]) are applied on the Razor components server-side."));
+kids.push(bullet("Deny-by-default authorization; the portal policy (Portal.Supplier) and role attributes ([Authorize(Roles=\"Administrator\")]) are applied on the Razor components server-side."));
 kids.push(bullet("Login lockout: 5 failed attempts → 15-minute lock (in-memory). Active-session revocation: OnValidatePrincipal re-checks IsActive (throttled to every 2 min) and signs out deactivated users. Idle lockout: a client-side 15-minute auto-logout."));
 kids.push(bullet("Break-glass: time-boxed emergency admin, disabled unless a SHA-256 secret is configured; anonymous, rate-limited, constant-time compared and fully audited."));
 
@@ -89,9 +87,7 @@ kids.push(table(["Integration", "Purpose & behaviour"],
   ["Azure AI Document Intelligence (OCR)","Prebuilt-read text extraction for TRN/Trade-Licence/DUNS and Emirates-ID; best-effort (never blocks an upload)."],
   ["License QR / DED fetch","ZXing + ImageSharp + PdfPig read the trade-licence QR to get the DED verification URL, fetched under the SSRF/DoS guards."],
   ["Email (EmailDispatcher)","SMTP when Email:Smtp:Host is set (works on Azure SQL), otherwise SQL Server Database Mail; logos embedded as base64 data URIs."],
-  ["UAE Pass","Landlord identity verification via OIDC authorization-code; simulation mode when live credentials are absent."],
-  ["Circularo e-signature","Routes the landlord summary PDF for signature; a background poller plus an HMAC-validated webhook capture completion."],
-  ["QuestPDF","Signed declaration, landlord summary, and images→PDF generation."]],
+  ["QuestPDF","Signed declaration and images→PDF generation."]],
  [2500, 7000]));
 
 kids.push(h1("8. Cross-Cutting Concerns"));

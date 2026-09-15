@@ -69,11 +69,10 @@ kids.push(table(["App Setting", "Value"],
 kids.push(para("Data-Protection keys: on App Service, persist keys to Azure Blob + protect with Key Vault (or use a mounted share) so auth cookies survive restarts and scale-out. Enable 'Always On' and HTTPS-only.", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("6. Database Migration"));
-kids.push(para("Apply EF Core migrations for both contexts before first use (run from CI with the app user granted db_ddladmin, or generate an idempotent SQL script and run it against Azure SQL):"));
+kids.push(para("Apply EF Core migrations before first use (run from CI with the app user granted db_ddladmin, or generate an idempotent SQL script and run it against Azure SQL):"));
 kids.push(code("dotnet ef database update --project src/SupplierPortal.Web --context ApplicationDbContext"));
-kids.push(code("dotnet ef database update --project src/SupplierPortal.Web --context LeasingDbContext"));
 kids.push(code("# or: dotnet ef migrations script --idempotent -o migrate.sql   (then run in Azure SQL)"));
-kids.push(para("In Internal mode the app seeds master data and migrates the leasing context at startup; ensure the runtime user has the needed rights, or pre-apply the scripts and grant only datareader/datawriter at runtime.", { size: 18, color: g.colors.GREY }));
+kids.push(para("In Internal mode the app seeds master data at startup; ensure the runtime user has the needed rights, or pre-apply the scripts and grant only datareader/datawriter at runtime.", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("7. DMZ Topology on Azure"));
 kids.push(bullet("Internal tier (SupplierPortal.Web/Api): VNet-integrated, private endpoint or IP-restricted so only the DMZ front-end (and internal users) can reach it. Expose only /api/ss/* (shared-key seam) or /connect/token + /api/selfservice/* (OAuth seam)."));

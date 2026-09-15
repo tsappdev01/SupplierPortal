@@ -19,7 +19,7 @@ kids.push(para("This report documents acceptance and security testing of the Sup
 kids.push(table(["Category", "Identified", "Fixed", "Residual"],
   [["Security — Critical","1","1","0"],["Security — High","2","2","0"],["Security — Medium","5","4","1*"],["Security — Low","3","3","0"],["Functional — High","2","2","0"],["Functional — Medium/Low","4","3","1**"]],
   [3800, 1900, 1900, 1900]));
-kids.push(para("* Session token carried in the self-service URL — mitigated with Referrer-Policy; full cookie migration recorded as residual.  ** Supplier/Customer number uniqueness — requires a data de-duplication + unique-index migration.", { size: 17, color: g.colors.GREY, italics: true }));
+kids.push(para("* Session token carried in the self-service URL — mitigated with Referrer-Policy; full cookie migration recorded as residual.  ** Supplier number uniqueness — requires a data de-duplication + unique-index migration.", { size: 17, color: g.colors.GREY, italics: true }));
 
 kids.push(h1("2. Test Environment & Method"));
 kids.push(para("The application was restored, compiled and unit-tested on a clean Ubuntu 24.04 host with .NET SDK 8.0.131. Full runtime end-to-end execution requires a SQL Server / Azure SQL database and was therefore assessed at the build, unit-test and source-verification level. Each test case below is marked with its method:"));
@@ -33,7 +33,7 @@ kids.push(table(["#", "Check", "Command", "Result"],
    ["B3","Compile full solution","dotnet build BPPortal.sln","PASS · 0 errors"],
    ["B4","Unit test suite","dotnet test","PASS · 23/23"]],
   W5));
-kids.push(para("Unit tests cover portal-access claim logic, supplier field mapping/round-trip, customer field accessors, Emirates-ID extraction, and PDF generation (23 tests, 0 failures, 0 skipped).", { size: 17, color: g.colors.GREY }));
+kids.push(para("Unit tests cover portal-access claim logic, supplier field mapping/round-trip, Emirates-ID extraction, and PDF generation (23 tests, 0 failures, 0 skipped).", { size: 17, color: g.colors.GREY }));
 
 kids.push(h1("4. Functional Acceptance Test Cases"));
 const fn = [
@@ -42,7 +42,7 @@ const fn = [
   ["F3","Signed declaration + drawn signature","Supplier signs (typed + mouse-drawn); a signed PDF with details+signature generated once and stored.","Verified","PASS"],
   ["F4","Signed PDF preserved on admin save","Admin 'Save Changes' on a signed supplier does NOT overwrite the genuine signature with a blank one.","Verified","PASS"],
   ["F5","Attached documents modal","Per-preview loading spinner; single download with progress; download-all zip with progress.","Verified","PASS"],
-  ["F6","Download original file","'?download=1' works for supplier/customer/landlord (previous crash fixed).","Automated/Verified","PASS"],
+  ["F6","Download original file","'?download=1' works for supplier documents (previous crash fixed).","Automated/Verified","PASS"],
   ["F7","Zip file naming","Zip named 'Supplier No_Name.zip'; each entry prefixed by document type (Trade License _, VAT _, Other _).","Verified","PASS"],
   ["F8","Print — all rows, chosen columns","Print selects columns, prints every row in the active tab; layout adapts to column count.","Verified","PASS"],
   ["F9","Excel import / re-import","Re-import no longer wipes Priority, assignment, department, VAT-address or declaration audit.","Verified","PASS"],
@@ -61,13 +61,13 @@ kids.push(para("The public-facing supplier self-service (DMZ) surface was review
 const sec = [
   ["S1","Critical","Stored XSS — an uploaded document with a crafted content-type (text/html, svg) executed as script in the reviewer's authenticated session (auto-rendered in an iframe).","Inline serving restricted to a safe allowlist (pdf/images/plain); all else forced to download. Added nosniff / X-Frame-Options / Referrer-Policy headers.","FIXED"],
   ["S2","High","SSRF — the trade-license QR-code URL was fetched by the internal server with only a scheme check (e.g. cloud metadata 169.254.169.254).","Blocks loopback/link-local/private/reserved hosts, caps the response at 25 MB, disables redirects.","FIXED"],
-  ["S3","High","IDOR — internal document endpoints served any supplier's documents by guessing id (no per-record scope).","Endpoints enforce the dashboard business-unit + assignment/department scope; out-of-scope ids return 404 (supplier and customer).","FIXED"],
+  ["S3","High","IDOR — internal document endpoints served any supplier's documents by guessing id (no per-record scope).","Endpoints enforce the dashboard business-unit + assignment/department scope; out-of-scope ids return 404.","FIXED"],
   ["S4","Medium","Self-service submit could tamper internal payment-routing / classification flags (IsPay, IsPurchasing, Priority).","Those flags are always captured and restored server-side on token-based saves.","FIXED"],
-  ["S5","Medium","HTML/content injection into internal notification & OTP emails via supplier/customer name.","All supplier/customer names HTML-encoded in email bodies.","FIXED"],
+  ["S5","Medium","HTML/content injection into internal notification & OTP emails via supplier name.","All supplier names HTML-encoded in email bodies.","FIXED"],
   ["S6","Medium","Weak 4-digit OTP and a single global rate-limit bucket (one attacker could 429 the whole OTP subsystem).","OTP widened to 6 digits; rate limiter partitioned per client IP.","FIXED"],
-  ["S7","Medium","Completed self-service record stayed editable / re-submittable for the 14-day link window (replay, duplicate emails).","Final submit now expires the link and session (supplier and customer).","FIXED"],
+  ["S7","Medium","Completed self-service record stayed editable / re-submittable for the 14-day link window (replay, duplicate emails).","Final submit now expires the link and session.","FIXED"],
   ["S8","Medium","Session token carried in the self-service URL query string (leaks via Referer / history / logs).","Referrer-Policy: no-referrer added. Full move to an HttpOnly cookie recorded as residual risk.","PARTIAL"],
-  ["S9","Low","Public self-service upload / OTP could return HTTP 500 on malformed base64 or null code.","Guarded to return clean 400 / validation messages (supplier and customer).","FIXED"],
+  ["S9","Low","Public self-service upload / OTP could return HTTP 500 on malformed base64 or null code.","Guarded to return clean 400 / validation messages.","FIXED"],
   ["S10","Low","Deactivated user kept an active session up to 8h; login had no lockout.","Cookie re-validates the user's active state (~2 min); 5 failed logins trigger a 15-minute lockout.","FIXED"],
   ["S11","Low","Admin activity page reachable by non-admin; blob-stored profile photos shown as 'no photo'.","Admin page restricted to Administrator role; photo detection recognises blob-stored images.","FIXED"],
 ];
@@ -79,7 +79,7 @@ kids.push(para("Verified secure (no defect): self-service document file/delete e
 kids.push(h1("6. Residual Risks & Recommendations"));
 kids.push(table(["#","Item","Recommendation","Status"],
   [["R1","Session token in self-service URL","Move the post-OTP session token to an HttpOnly, SameSite cookie to remove it from URLs, history and logs.","Accepted"],
-   ["R2","Supplier/Customer number uniqueness","De-duplicate existing data, then add a unique index via migration (must be run with data cleanup, not blind).","Accepted"],
+   ["R2","Supplier number uniqueness","De-duplicate existing data, then add a unique index via migration (must be run with data cleanup, not blind).","Accepted"],
    ["R3","Rate-limit client attribution","Per-IP OTP limiting is effective only if the DMZ proxy forwards the real client IP (forwarded-headers).","Config"],
    ["R4","Email on Azure SQL","Database Mail is unavailable on Azure SQL; set Email:Smtp:Host before an Azure SQL go-live.","Config"]],
   [560, 2600, 5100, 1240]));

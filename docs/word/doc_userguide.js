@@ -5,9 +5,10 @@ const kids = [];
 const step = (t) => para([g.t(t)], { after: 60 });
 
 kids.push(...titlePage("Supplier Portal", "User Guide (Internal Staff)", [
-  ["Document", "User Guide — Internal Staff"],
+  ["Document", "User Guide — Internal Staff (Supplier Portal)"],
+  ["Scope", "Supplier Portal only"],
   ["Audience", "Business users / reviewers (Normal User, Administrator)"],
-  ["Version", "1.0"],
+  ["Version", "2.0"],
   ["Date", today],
 ]));
 kids.push(...tocPage());
@@ -18,7 +19,7 @@ kids.push(bullet("Open the portal URL. Depending on configuration you either sig
 kids.push(bullet("After 15 minutes of inactivity you are signed out automatically; sign in again to continue."));
 kids.push(bullet("If you enter the wrong password five times, sign-in is locked for 15 minutes."));
 kids.push(h2("1.2 What you can see"));
-kids.push(para("Access is scoped by role and business unit. Administrators see everything; a Normal User sees the suppliers/customers assigned to them or owned by their department within their business units. Use the theme toggle (top bar) for light/dark mode."));
+kids.push(para("Access is scoped by role and business unit. Administrators see everything; a Normal User sees the suppliers assigned to them or owned by their department within their business units. Use the theme toggle (top bar) for light/dark mode."));
 
 kids.push(h1("2. Manage Supplier Dashboard"));
 kids.push(para("The dashboard lists suppliers with KPI tiles (Total, Not Submitted, Awaiting Supplier Response, Completed) and tabs for Recently Updated / Updated Last Week / Everything Else."));
@@ -55,10 +56,7 @@ kids.push(h2("4.2 Generate template / import"));
 kids.push(bullet("Generate Template downloads a blank or pre-populated Excel template for the business to fill in and re-upload."));
 kids.push(bullet("Upload Supplier Data imports the completed template; duplicates are detected by supplier number, and app-managed fields (priority, assignment, department, the VAT-address block and the declaration audit) are preserved on re-import."));
 
-kids.push(h1("5. Manage Customer"));
-kids.push(para("The Customer module mirrors the supplier flow for KYC records: a dashboard scoped to your business units, register/edit, self-service with OTP, a configurable KYC document checklist, and a Draft → For Review → Completed workflow."));
-
-kids.push(h1("6. Tips"));
+kids.push(h1("5. Tips"));
 kids.push(bullet("A red asterisk marks a mandatory field; the field-help popups explain purpose and expected values."));
 kids.push(bullet("Long operations (template generation, downloads) show progress; wait for completion."));
 kids.push(bullet("If you are unexpectedly signed out, it is due to the 15-minute inactivity lock — simply sign in again."));

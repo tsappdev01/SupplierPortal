@@ -88,24 +88,14 @@ kids.push(cfg([
   ["Ocr:ApiVersion","2024-11-30","Service API version."],
 ]));
 
-kids.push(h1("8. Leasing (UAE Pass & Circularo)"));
-kids.push(cfg([
-  ["Leasing:Zones","[\"597\",\"598\"]","Property zones in scope for the leasing module."],
-  ["Leasing:MailProfile","BP","Database Mail profile for landlord e-mails."],
-  ["Leasing:UaePass:Enabled","false","Enable live UAE Pass; when false, runs in simulation mode."],
-  ["Leasing:UaePass:BaseUrl / ClientId / ClientSecret","(env/secret)","UAE Pass OIDC endpoint and credentials."],
-  ["Leasing:UaePass:Scope / AcrValues / Endpoints","(as shipped)","OIDC scope, assurance level and sub-endpoint paths."],
-  ["Leasing:Circularo:* (Enabled, BaseUrl, ApiKey, WebhookSecret)","(secret)","Circularo e-signature endpoint, key and webhook HMAC secret."],
-]));
-
-kids.push(h1("9. Internal API (SupplierPortal.Api)"));
+kids.push(h1("8. Internal API (SupplierPortal.Api)"));
 kids.push(cfg([
   ["ApiSecurity:Clients","(secret)","Registered OAuth clients (client_id + SHA-256 secret hash) allowed at /connect/token."],
   ["ApiSecurity:SigningKey","(secret)","JWT signing key for portal/session tokens."],
   ["SelfService:ApiKey","(secret)","Shared X-SelfService-Key accepted on /api/ss/* (must match the DMZ front-end)."],
 ]));
 
-kids.push(h1("10. General"));
+kids.push(h1("9. General"));
 kids.push(cfg([
   ["Logging:LogLevel:Default","Information","Default log level."],
   ["AllowedHosts","*","Host filtering."],
