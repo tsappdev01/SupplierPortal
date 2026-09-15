@@ -14,7 +14,7 @@ namespace SupplierPortal.Web.Services;
 /// <c>AuthService</c> does for login passwords.</summary>
 public class SupplierAccessTokenService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
-    EmailBrandingService branding)
+    EmailBrandingService branding, ILogger<SupplierAccessTokenService> logger)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(14);
     private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
@@ -201,16 +201,47 @@ public class SupplierAccessTokenService(
 
     public async Task<SupplierAccessToken?> ValidateSessionAsync(string rawToken, string rawSession)
     {
-        var token = await GetValidTokenAsync(rawToken);
-        if (token is null || token.OtpVerifiedAt is null)
+        // Diagnostic logging: pinpoint which check rejects a session (helps triage a "session expired"
+        // reported by a supplier whose form clearly loaded). Logs no secrets — only lengths and timestamps.
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.SupplierAccessTokens.Include(t => t.Supplier)
+            .FirstOrDefaultAsync(t => t.TokenHash == Hash(rawToken));
+
+        if (token is null)
         {
+            logger.LogWarning("SS session reject: token not found (tokenLen={TokenLen}).", rawToken?.Length ?? 0);
             return null;
         }
-        if (token.SessionTokenHash is null || token.SessionExpiresAt is null || token.SessionExpiresAt < DateTime.UtcNow)
+        if (token.ExpiresAt < DateTime.UtcNow)
         {
+            logger.LogWarning("SS session reject: link expired (supplier {SupplierId}, expiresAt {ExpiresAt:o}, nowUtc {Now:o}).",
+                token.SupplierId, token.ExpiresAt, DateTime.UtcNow);
             return null;
         }
-        return token.SessionTokenHash == Hash(rawSession) ? token : null;
+        if (token.OtpVerifiedAt is null)
+        {
+            logger.LogWarning("SS session reject: OTP not verified (supplier {SupplierId}).", token.SupplierId);
+            return null;
+        }
+        if (token.SessionTokenHash is null)
+        {
+            logger.LogWarning("SS session reject: no session hash on token (supplier {SupplierId}).", token.SupplierId);
+            return null;
+        }
+        if (token.SessionExpiresAt is null || token.SessionExpiresAt < DateTime.UtcNow)
+        {
+            logger.LogWarning("SS session reject: session expired (supplier {SupplierId}, sessionExpiresAt {Exp:o}, nowUtc {Now:o}).",
+                token.SupplierId, token.SessionExpiresAt, DateTime.UtcNow);
+            return null;
+        }
+        if (token.SessionTokenHash != Hash(rawSession))
+        {
+            logger.LogWarning("SS session reject: session hash MISMATCH (supplier {SupplierId}, sessionLen={SessionLen}). " +
+                "The session in the URL is not the latest one issued for this link (e.g. the link/OTP was re-verified in another tab).",
+                token.SupplierId, rawSession?.Length ?? 0);
+            return null;
+        }
+        return token;
     }
 
     public async Task MarkUsedAsync(int tokenId)
