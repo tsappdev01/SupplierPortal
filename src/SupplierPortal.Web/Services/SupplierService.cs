@@ -673,7 +673,10 @@ public class SupplierService(
         // On a completed submission with a signed declaration, generate the signed-declaration PDF (full
         // supplier details + acknowledgment + drawn signature) and store it with the supplier's documents so
         // it appears in the documents list and the "download all" zip. Best-effort — never fail the submit.
-        if (markComplete && updated.DisclaimerAcknowledged)
+        // Guarded on a freshly-drawn signature image being present so the PDF is (re)generated only at the
+        // actual signing moment: an internal admin "Save Changes" on an already-signed supplier carries no
+        // image, so it must NOT overwrite the genuine signed PDF (single-slot) with a signature-less copy.
+        if (markComplete && updated.DisclaimerAcknowledged && updated.DisclaimerSignatureImage is { Length: > 0 })
         {
             try
             {

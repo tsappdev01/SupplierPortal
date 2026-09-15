@@ -257,6 +257,12 @@ public class SupplierAccessTokenService(
             return;
         }
         token.UsedAt = DateTime.UtcNow;
+        // Final submit invalidates the link and session (validation rejects on ExpiresAt/SessionExpiresAt),
+        // so a Completed record can't be reopened, re-edited and re-submitted — which would re-send the
+        // requestor/supplier emails and regenerate the declaration — within the remaining link window.
+        // MarkUsedAsync is only called on the completing submit, so expiring here is correct.
+        token.ExpiresAt = DateTime.UtcNow;
+        token.SessionExpiresAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
     }
 

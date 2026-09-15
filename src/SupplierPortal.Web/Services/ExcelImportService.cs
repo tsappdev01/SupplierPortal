@@ -408,7 +408,13 @@ public class ExcelImportService(
     private static readonly HashSet<string> UpsertSkipFields =
     [
         "Id", "SupplierNumber", "BusinessUnitId", "StatusId", "IsDraft", "IsActive",
-        "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "ReviewRemarks"
+        "CreatedAt", "CreatedBy", "UpdatedAt", "UpdatedBy", "ReviewRemarks",
+        // Ownership/workflow fields that are set inside the app, never carried in the upload template.
+        // Without these, re-importing the (populated) template would null a supplier's assignment and
+        // department and wipe the signed-declaration acknowledgment audit on every matched row.
+        "AssignedToUserId", "DepartmentId",
+        "DisclaimerAcknowledged", "DisclaimerAcknowledgedAt", "DisclaimerAcknowledgedBy",
+        "DisclaimerText", "DisclaimerSignature"
     ];
 
     /// <summary>Copies the imported scalar/lookup fields from a freshly parsed supplier onto an

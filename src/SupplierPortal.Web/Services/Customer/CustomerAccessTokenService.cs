@@ -210,6 +210,11 @@ public class CustomerAccessTokenService(
             return;
         }
         token.UsedAt = DateTime.UtcNow;
+        // Final submit invalidates the link and session so a completed record can't be reopened and
+        // re-submitted (re-sending notifications) within the remaining link window. MarkUsedAsync is only
+        // called on the completing submit, so expiring here is correct.
+        token.ExpiresAt = DateTime.UtcNow;
+        token.SessionExpiresAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
     }
 
