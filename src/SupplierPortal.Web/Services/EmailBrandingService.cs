@@ -127,12 +127,13 @@ public class EmailBrandingService(IDbContextFactory<ApplicationDbContext> dbFact
         return bu is null ? null : DataUri(bu);
     }
 
-    /// <summary>The unit's uploaded logo as a data URI (thumbnail preferred over the original), or null.</summary>
+    /// <summary>The unit's uploaded logo as a data URI (full-size logo preferred over the thumbnail), or null.</summary>
     private static string? DataUri(Models.BusinessUnit bu)
     {
-        // Prefer the normalised 640×640 thumbnail; fall back to the original logo.
-        var bytes = bu.Thumbnail ?? bu.Logo;
-        var contentType = bu.Thumbnail is not null ? bu.ThumbnailContentType : bu.LogoContentType;
+        // Prefer the full-size uploaded logo for communications (it reads as the brand banner, not a
+        // cropped square); fall back to the normalised 640×640 thumbnail only when no full logo exists.
+        var bytes = bu.Logo ?? bu.Thumbnail;
+        var contentType = bu.Logo is not null ? bu.LogoContentType : bu.ThumbnailContentType;
         if (bytes is not { Length: > 0 } || string.IsNullOrWhiteSpace(contentType))
         {
             return null;
