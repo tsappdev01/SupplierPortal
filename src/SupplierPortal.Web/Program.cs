@@ -728,24 +728,21 @@ static bool WantsAttachment(string? download)
         && !v.Equals("no", StringComparison.OrdinalIgnoreCase);
 }
 
-// Content types that are safe to serve INLINE (rendered in the reviewer's browser). Anything else — notably
-// text/html and image/svg+xml, which can execute script in the app origin — is forced to download instead,
-// so a supplier-uploaded document with a crafted content type cannot run as script when a reviewer opens it.
-static readonly HashSet<string> InlineSafeContentTypes = new(StringComparer.OrdinalIgnoreCase)
-{
-    "application/pdf", "image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/bmp", "text/plain"
-};
-
 // Serves a stored document. Attachment downloads keep their content type; inline requests are served with the
-// stored type only when it is on the safe-inline allowlist, otherwise forced to download as an octet-stream.
+// stored type only when it is on the safe-inline allowlist (pdf/images/plain) — anything else, notably
+// text/html and image/svg+xml which can execute script in the app origin, is forced to download instead, so a
+// supplier-uploaded document with a crafted content type cannot run as script when a reviewer opens it.
 static IResult ServeDocument(byte[] bytes, string contentType, string fileName, bool asAttachment)
 {
     if (asAttachment)
     {
         return Results.File(bytes, contentType, fileName);
     }
-    return InlineSafeContentTypes.Contains(contentType)
-        ? Results.File(bytes, contentType)
+    var ct = contentType?.Trim().ToLowerInvariant();
+    var safeInline = ct is "application/pdf" or "image/png" or "image/jpeg" or "image/jpg"
+        or "image/gif" or "image/webp" or "image/bmp" or "text/plain";
+    return safeInline
+        ? Results.File(bytes, contentType!)
         : Results.File(bytes, "application/octet-stream", fileName);
 }
 
