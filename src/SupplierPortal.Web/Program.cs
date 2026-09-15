@@ -33,7 +33,15 @@ builder.Services.AddCascadingAuthenticationState();
 // DbContext factories are still registered so DI can satisfy components that inject the domain services
 // (which the self-service path never actually calls). A placeholder connection is used when none is
 // configured; it is never opened because the DMZ skips startup migration and uses the HTTP gateways.
-var dbConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+// Choose the database by the Database:Provider flag: "Azure" uses ConnectionStrings:AzureConnection
+// (Azure SQL Database); anything else (default "Local") uses ConnectionStrings:DefaultConnection
+// (on-prem SQL Server). Falls back to DefaultConnection if the selected one is blank.
+var useAzureSql = string.Equals(builder.Configuration["Database:Provider"], "Azure", StringComparison.OrdinalIgnoreCase);
+var dbConnection = builder.Configuration.GetConnectionString(useAzureSql ? "AzureConnection" : "DefaultConnection");
+if (string.IsNullOrWhiteSpace(dbConnection))
+{
+    dbConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+}
 if (string.IsNullOrWhiteSpace(dbConnection))
 {
     dbConnection = "Server=(placeholder);Database=none;Trusted_Connection=False;";
