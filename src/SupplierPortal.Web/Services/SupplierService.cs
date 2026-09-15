@@ -6,7 +6,9 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache)
+public class SupplierService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache,
+    SupplierDeclarationPdfService declarationPdf, SupplierDocumentService documentService)
 {
     // Reference data (lookups, banks) is shared across users and changes rarely, so it is cached to avoid
     // re-querying on every form open. TTL keeps admin changes appearing within a few minutes.
@@ -668,7 +670,36 @@ public class SupplierService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         var reloaded = await IncludeLookups(db.Suppliers).AsNoTracking().FirstAsync(s => s.Id == supplier.Id);
         await UpsertFieldChangesAsync(db, supplier.Id, before, reloaded, updatedBy, accessTokenId);
 
+        // On a completed submission with a signed declaration, generate the signed-declaration PDF (full
+        // supplier details + acknowledgment + drawn signature) and store it with the supplier's documents so
+        // it appears in the documents list and the "download all" zip. Best-effort — never fail the submit.
+        if (markComplete && updated.DisclaimerAcknowledged)
+        {
+            try
+            {
+                var full = await GetByIdAsync(supplier.Id);
+                if (full is not null)
+                {
+                    var pdf = declarationPdf.Build(full, updated.DisclaimerSignatureImage);
+                    var fileName = $"Supplier Declaration - {SanitizeName(full.SupplierName)}.pdf";
+                    await using var ms = new MemoryStream(pdf);
+                    await documentService.UploadFromStreamAsync(
+                        supplier.Id, SupplierDocumentType.SignedDeclaration, ms, fileName, "application/pdf", pdf.Length, updatedBy);
+                }
+            }
+            catch { /* generating/storing the declaration PDF must never block the submission */ }
+        }
+
         await auditService.LogAsync(updatedBy, AuditAction.Update, "Supplier", supplier.Id, $"Updated supplier '{supplier.SupplierName}'");
+    }
+
+    /// <summary>Filesystem-safe supplier name for the generated PDF's display name.</summary>
+    private static string SanitizeName(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "Supplier";
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var cleaned = new string(raw.Select(c => invalid.Contains(c) ? ' ' : c).ToArray()).Trim();
+        return cleaned.Length == 0 ? "Supplier" : (cleaned.Length > 80 ? cleaned[..80].Trim() : cleaned);
     }
 
     /// <summary>Human-readable field label for change-tracking: strips the "Id" suffix from FK-id

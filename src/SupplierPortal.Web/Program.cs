@@ -66,6 +66,7 @@ builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordEmailServ
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordDocumentService>();
 builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordSummaryPdfService>();
+builder.Services.AddScoped<SupplierDeclarationPdfService>();
 builder.Services.Configure<SupplierPortal.Web.Services.Leasing.UaePassOptions>(
     builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.UaePassOptions.SectionName));
 builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.IUaePassService,

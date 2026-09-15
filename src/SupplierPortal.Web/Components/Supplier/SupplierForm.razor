@@ -1132,7 +1132,14 @@ else
 
                     <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
                     <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
-                           placeholder="Type your full name here (this will be considered as your digital signature)" />
+                           placeholder="Type your full name here" />
+
+                    <label class="di-decl-siglabel" style="margin-top:14px;">Sign here <span class="di-req">*</span></label>
+                    <div class="di-sigpad-wrap">
+                        <canvas id="di-sigpad" @ref="sigCanvas" class="di-sigpad"></canvas>
+                        <button type="button" class="di-sigpad-clear" @onclick="ClearSignatureAsync" title="Clear signature">Clear</button>
+                    </div>
+                    <div class="di-sigpad-hint">Draw your signature in the box using your mouse (or finger on a touch screen).</div>
                 </div>
                 <div class="di-decl-actions">
                     <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@isSaving">Cancel</button>
@@ -1170,6 +1177,11 @@ else
     .di-help-body { margin: 0; font-size: 14px; color: #2f3a4c; line-height: 1.6; white-space: pre-line; }
     .di-decl-section { font-weight: 700; color: #0b2545; margin: 14px 0 4px; }
     .di-decl-section:first-child { margin-top: 0; }
+    .di-sigpad-wrap { position: relative; margin-top: 6px; }
+    .di-sigpad { display: block; width: 100%; height: 150px; border: 1.5px dashed #b7c2d6; border-radius: 10px; background: #fbfcfe; cursor: crosshair; touch-action: none; }
+    .di-sigpad-clear { position: absolute; top: 8px; right: 8px; border: 1px solid #d3dae6; background: #fff; color: #46618f; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+    .di-sigpad-clear:hover { background: #f1f4f9; }
+    .di-sigpad-hint { font-size: 12px; color: #7b8697; margin-top: 6px; }
     .di-hidden-field { display: none !important; }
     .di-subsection-header {
         grid-column: 1 / -1;
@@ -1304,6 +1316,10 @@ else
 
     /// <summary>The full name the supplier types as their digital signature in the declaration pop-up.</summary>
     private string declarationSignature = "";
+
+    /// <summary>The mouse/touch-drawn signature canvas and its one-time JS initialisation flag.</summary>
+    private ElementReference sigCanvas;
+    private bool sigInitialized;
 
     /// <summary>True when the supplier is VAT registered (drives which declaration is shown).</summary>
     private bool IsVatRegistered => formModel.VatRegistered == true;
@@ -1661,6 +1677,13 @@ else
     // progress instead of a blank panel while the (cached) reference data is fetched.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Initialise the drawn-signature canvas once the declaration pop-up is on screen.
+        if (showDeclaration && !sigInitialized)
+        {
+            sigInitialized = true;
+            try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { /* pad init is best-effort */ }
+        }
+
         if (!firstRender || dataLoaded)
         {
             return;
@@ -2565,15 +2588,35 @@ else
     private void CancelDeclaration()
     {
         showDeclaration = false;
+        sigInitialized = false;
     }
 
-    /// <summary>Records the signed declaration and completes the submission.</summary>
+    private async Task ClearSignatureAsync()
+    {
+        try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { /* best-effort */ }
+    }
+
+    /// <summary>Records the signed declaration (typed name + drawn signature) and completes the submission.
+    /// The drawn signature travels on the (NotMapped) Supplier.DisclaimerSignatureImage so the server can
+    /// render it into the generated declaration PDF.</summary>
     private async Task ConfirmDeclarationAsync()
     {
         if (string.IsNullOrWhiteSpace(declarationSignature))
         {
+            ToastService.ShowError("Please type your full name as your signature.");
             return;
         }
+
+        // Capture the hand-drawn signature; it is required.
+        string dataUrl = "";
+        try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
+        if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
+        {
+            ToastService.ShowError("Please draw your signature in the box before submitting.");
+            return;
+        }
+        var comma = dataUrl.IndexOf(',');
+        Supplier.DisclaimerSignatureImage = comma >= 0 ? Convert.FromBase64String(dataUrl[(comma + 1)..]) : null;
 
         Supplier.DisclaimerAcknowledged = true;
         Supplier.DisclaimerAcknowledgedAt = DateTime.UtcNow;
@@ -2582,6 +2625,7 @@ else
         Supplier.DisclaimerSignature = declarationSignature.Trim();
 
         showDeclaration = false;
+        sigInitialized = false;
         Supplier.IsDraft = false;
         await FinishAsync(submitting: true);
     }

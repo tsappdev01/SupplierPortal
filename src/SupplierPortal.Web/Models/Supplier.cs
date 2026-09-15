@@ -360,6 +360,12 @@ public class Supplier
     [MaxLength(200)]
     public string? DisclaimerSignature { get; set; }
 
+    /// <summary>The hand-drawn signature (PNG bytes) captured on the declaration. Not persisted as a column —
+    /// it is carried on submit (including over the self-service API) so the server can render it into the
+    /// generated declaration PDF, which is the durable signed artifact stored with the supplier's documents.</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public byte[]? DisclaimerSignatureImage { get; set; }
+
     /// <summary>True while the registration wizard is still in progress (not yet Submitted for Approval).</summary>
     public bool IsDraft { get; set; } = true;
 
