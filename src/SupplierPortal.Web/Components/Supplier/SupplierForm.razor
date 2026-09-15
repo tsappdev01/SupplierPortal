@@ -23,11 +23,11 @@ else
     fieldFragments = new Dictionary<string, RenderFragment>();
 
     fieldFragments["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")">
-        <label>Supplier Name@(Req("SupplierName"))</label>
+        <label>Supplier Name@(Req("SupplierName"))@Help("SupplierName")</label>
         <InputText @bind-Value="formModel.SupplierName" />
     </div>;
     fieldFragments["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")">
-        <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))@Help("TaxOrganizationTypeId")</label>
+        <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
         @* Editable for internal admins/staff, but frozen (read-only) on the supplier self-service
            portal so suppliers cannot change a value set by the business. *@
         <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="@SupplierFacing" class="@(SupplierFacing ? "di-frozen" : null)">
@@ -81,7 +81,7 @@ else
         <InputDate @bind-Value="formModel.TradeLicenseExpiryDate" />
     </div>;
     fieldFragments["TradeLicenseIssuingBodyId"] = @<div class="di-field @FieldClass("TradeLicenseIssuingBodyId")">
-        <label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label>
+        <label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))@Help("TradeLicenseIssuingBodyId")</label>
         <InputSelect @bind-Value="formModel.TradeLicenseIssuingBodyId">
             <option value="">— Select —</option>
             @foreach (var lov in licensingAuthorities)
@@ -100,7 +100,7 @@ else
         }
     </text>;
     fieldFragments["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")">
-        <label>VAT Registered?@(Req("VatRegistered"))@Help("VatRegistered")</label>
+        <label>VAT Registered?@(Req("VatRegistered"))</label>
         <InputSelect @bind-Value="vatRegisteredYesNo">
             <option value="">— Select —</option>
             <option value="Yes">Yes</option>
@@ -140,7 +140,7 @@ else
                    inputmode="numeric" pattern="[0-9]*" title="10 digits" />
     </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
-        <label>Business Partner Type@(Req("BusinessPartnerTypeId"))@Help("BusinessPartnerTypeId")</label>
+        <label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label>
         <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
             <option value="">— Select —</option>
             @foreach (var lov in businessPartnerTypes)
@@ -195,15 +195,15 @@ else
         <InputText @bind-Value="formModel.AddressName" />
     </div>;
     fieldFragments["AddressLine1"] = @<div class="di-field di-full @FieldClass("AddressLine1")">
-        <label>Address Line 1@(Req("AddressLine1"))</label>
+        <label>Address Line 1@(Req("AddressLine1"))@Help("AddressLine1")</label>
         <InputText @bind-Value="formModel.AddressLine1" />
     </div>;
     fieldFragments["AddressLine2"] = @<div class="di-field di-full @FieldClass("AddressLine2")">
-        <label>Address Line 2@(Req("AddressLine2"))</label>
+        <label>Address Line 2@(Req("AddressLine2"))@Help("AddressLine2")</label>
         <InputText @bind-Value="formModel.AddressLine2" />
     </div>;
     fieldFragments["CountryId"] = @<div class="di-field @FieldClass("CountryId")">
-        <label>Country@(Req("CountryId"))</label>
+        <label>Country@(Req("CountryId"))@Help("CountryId")</label>
         <InputSelect @bind-Value="formModel.CountryId">
             <option value="">— Select —</option>
             @foreach (var lov in countries)
@@ -213,7 +213,7 @@ else
         </InputSelect>
     </div>;
     fieldFragments["CityId"] = @<div class="di-field @FieldClass("CityId")">
-        <label>City / Emirate<span class="di-req">*</span></label>
+        <label>City / Emirate<span class="di-req">*</span>@Help("CityId")</label>
         @if (IsUaeCountry)
         {
             <InputSelect @bind-Value="formModel.CityId">
@@ -511,7 +511,7 @@ else
                 {
                     <div class="di-field di-full di-vatgroup">
                         <div class="di-vatgroup-head">
-                            <span class="di-vatgroup-title">VAT Group</span>
+                            <span class="di-vatgroup-title">VAT Group</span>@Help("VatGroup")
                             <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
                                 <span>Add Row</span>
@@ -1167,7 +1167,7 @@ else
     .di-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
     .di-help-title { margin: 0; font-size: 16px; font-weight: 700; color: #0b2545; }
     .di-help-close { border: none; background: transparent; font-size: 22px; line-height: 1; color: #6b7280; cursor: pointer; }
-    .di-help-body { margin: 0; font-size: 14px; color: #2f3a4c; line-height: 1.6; }
+    .di-help-body { margin: 0; font-size: 14px; color: #2f3a4c; line-height: 1.6; white-space: pre-line; }
     .di-decl-section { font-weight: 700; color: #0b2545; margin: 14px 0 4px; }
     .di-decl-section:first-child { margin-top: 0; }
     .di-hidden-field { display: none !important; }
@@ -2051,27 +2051,36 @@ else
     /// <summary>Short explanations shown in the info popup for selected fields (title, body).</summary>
     private static readonly Dictionary<string, (string Title, string Body)> fieldHelp = new()
     {
-        ["TaxOrganizationTypeId"] = ("Tax Organization Type",
-            "The legal/tax classification of your organization (e.g. Corporation, Partnership, Sole Establishment). " +
-            "It determines how your entity is treated for tax and e-invoicing. Select the type shown on your trade licence."),
-        ["VatRegistered"] = ("VAT Registered?",
-            "Choose Yes if your business is registered for VAT with the UAE Federal Tax Authority (FTA) and has a Tax " +
-            "Registration Number (TRN). Choose No if you are not VAT-registered — you will then confirm a non-registration " +
-            "declaration before submitting."),
-        ["TaxRegistrationNumber"] = ("TRN / VAT Registration Number",
-            "Your 15-digit Tax Registration Number (TRN) issued by the FTA when you registered for VAT. It appears on your " +
-            "VAT Certificate and on your tax invoices. Required only if you are VAT-registered."),
+        ["SupplierName"] = ("Supplier Name (Legal Name)",
+            "Enter name as per valid Trade License"),
+        ["TaxRegistrationNumber"] = ("Tax Registration Number",
+            "Tax Registration Number mentioned in the VAT Registration certificate"),
         ["VatRegistrationTypeId"] = ("VAT Registration Type",
-            "Whether you are registered as a standalone entity or as part of a VAT Group. Select VAT Group only if your TRN " +
-            "is shared across multiple entities under one group registration."),
+            "Please select whether the supplier is part of a VAT Tax group or not"),
+        ["VatGroup"] = ("VAT Group",
+            "Number of Entities if VAT Group: Please mention number of entities part of the VAT tax group dealing with DI PJSC.\n\n" +
+            "Legal Names of all Entities under the VAT Group: Please enter details of entities part of the VAT Tax Group as per " +
+            "VAT Tax Group certificate dealing with DI PJSC."),
         ["SupplierTin"] = ("Supplier TIN",
-            "Taxpayer Identification Number — a 10-digit identifier for your business. Enter it exactly as issued (10 digits)."),
-        ["BusinessPartnerTypeId"] = ("Business Partner Type",
-            "How you transact with us for e-invoicing — e.g. B2B (Business to Business), B2G (Business to Government) or " +
-            "B2C (Business to Consumer). Required under the UAE e-invoicing (PINT-AE / Peppol) standard."),
-        ["EInvoicingWaveId"] = ("e-Invoicing Wave Applicability",
-            "The phased roll-out group (wave) under which your organization becomes subject to mandatory UAE e-invoicing. " +
-            "If you are unsure, check with your finance team or leave the default."),
+            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+            "How to obtain TIN from Emaratax Portal\n\n" +
+            "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
+            "2. View the profile of your entity.\n" +
+            "3. From the left-side menu, click on E-Invoicing.\n" +
+            "4. Your TIN (Tax Identification Number) will be displayed there for reference. 10 Digit number"),
+        ["EInvoicingWaveId"] = ("eINvoicing Wave Applicability",
+            "Revenue greater than or equal to AED 50million - Wave 1\n" +
+            "Revenue less than AED 50million - Wave 2"),
+        ["TradeLicenseIssuingBodyId"] = ("Trade License Issuing Body",
+            "As per valid Trade License"),
+        ["AddressLine1"] = ("Address Line 1",
+            "Address as per valid Trade License"),
+        ["AddressLine2"] = ("Address Line 2",
+            "Address as per valid Trade License"),
+        ["CityId"] = ("City",
+            "As per valid Trade License"),
+        ["CountryId"] = ("Country",
+            "As per valid Trade License"),
     };
 
     /// <summary>Renders a small "info" button next to a label when help text exists for that field.</summary>
