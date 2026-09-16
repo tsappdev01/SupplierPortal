@@ -102,10 +102,13 @@ kids.push(cfg([
   ["Ocr:ApiVersion","2024-11-30","Service API version."],
 ]));
 
-kids.push(h1("8. Internal API (SupplierPortal.Api)"));
+kids.push(h1("8. Self-Service OAuth API (hosted in SupplierPortal.Web)"));
+kids.push(para("The self-service OAuth API (/connect/token + /api/selfservice/*) is hosted in-process by the main portal (SupplierPortal.Web); there is no separate SupplierPortal.Api app to deploy. Partner Connect points Api:BaseUrl at the main portal URL. The whole API is disabled until ApiSecurity:SigningKey is set — when it is blank the endpoints are not mapped and the portal is unchanged."));
 kids.push(cfg([
-  ["ApiSecurity:Clients","(secret)","Registered OAuth clients (client_id + SHA-256 secret hash) allowed at /connect/token."],
-  ["ApiSecurity:SigningKey","(secret)","JWT signing key for portal/session tokens."],
+  ["ApiSecurity:SigningKey","(secret)","JWT signing key for portal/session tokens (>= 32 chars). Blank = the API is off. Supply via env var ApiSecurity__SigningKey / Key Vault."],
+  ["ApiSecurity:Clients[].ClientId","selfservice-portal","OAuth client_id allowed at /connect/token."],
+  ["ApiSecurity:Clients[].ClientSecret","(secret)","PLAINTEXT shared client secret (constant-time compared, NOT a hash). Env var ApiSecurity__Clients__0__ClientSecret / Key Vault; must match Partner Connect's Api:ClientSecret."],
+  ["Notifications:AdminBaseUrl","https://supplierportal…","Reviewer portal URL used in the 'supplier submitted' email from /api/selfservice/submit."],
   ["SelfService:ApiKey","(secret)","Shared X-SelfService-Key accepted on /api/ss/* (must match the DMZ front-end)."],
 ]));
 

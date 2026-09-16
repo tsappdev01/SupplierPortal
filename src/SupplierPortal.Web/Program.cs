@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -190,6 +193,27 @@ var authOptions = builder.Configuration.GetSection(AuthOptions.SectionName).Get<
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 builder.Services.Configure<BreakGlassOptions>(builder.Configuration.GetSection(BreakGlassOptions.SectionName));
 
+// ---------------------------------------------------------------------------------------------------
+// Self-service OAuth API (/connect/token + /api/selfservice/*), hosted IN-PROCESS so the DMZ front-end
+// (Partner Connect) can call the main portal directly instead of a separate API app. The entire feature
+// is gated on ApiSecurity:SigningKey being configured: when it is blank (the default), none of the JWT
+// scheme, the PortalClient policy, or the endpoints are registered/mapped, so the portal's sign-in, SSO
+// and existing /api/ss/* gateway behave byte-for-byte as before. Secrets come from env / Key Vault.
+// ---------------------------------------------------------------------------------------------------
+var apiSecurity = builder.Configuration
+    .GetSection(SupplierPortal.Web.SelfServiceApi.ApiSecurityOptions.SectionName)
+    .Get<SupplierPortal.Web.SelfServiceApi.ApiSecurityOptions>()
+    ?? new SupplierPortal.Web.SelfServiceApi.ApiSecurityOptions();
+var selfServiceApiEnabled = !string.IsNullOrWhiteSpace(apiSecurity.SigningKey);
+if (selfServiceApiEnabled)
+{
+    builder.Services.Configure<SupplierPortal.Web.SelfServiceApi.ApiSecurityOptions>(
+        builder.Configuration.GetSection(SupplierPortal.Web.SelfServiceApi.ApiSecurityOptions.SectionName));
+    builder.Services.AddSingleton<SupplierPortal.Web.SelfServiceApi.TokenService>();
+    builder.Services.AddScoped<SupplierPortal.Web.SelfServiceApi.SupplierSessionResolver>();
+    builder.Services.AddScoped<SupplierPortal.Web.SelfServiceApi.SelfServiceApiService>();
+}
+
 // SSO is active only when it is BOTH selected (Auth:Mode = Sso) and actually configured. If Sso is
 // selected without Entra credentials, fall back to local sign-in so no one is locked out.
 var useEntra = authOptions.UseSso;
@@ -278,6 +302,27 @@ if (useEntra)
     });
 }
 
+if (selfServiceApiEnabled)
+{
+    // Additive JWT scheme for the self-service API. It is NOT the default scheme — the cookie remains the
+    // default and OIDC remains the SSO challenge — so it only applies where a policy names it explicitly.
+    authenticationBuilder.AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = apiSecurity.Issuer,
+            ValidateAudience = true,
+            ValidAudience = apiSecurity.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(apiSecurity.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+}
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IClaimsTransformation, RoleClaimsTransformation>();
 builder.Services.AddScoped<BreakGlassService>();
@@ -297,6 +342,20 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("Portal.Broker", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Broker)))
     .AddPolicy("Portal.Customer", p => p.RequireClaim(AppClaims.AppUser, "true").RequireClaim(AppClaims.Portal, nameof(SupplierPortal.Web.Models.PortalAccess.Customer)));
 
+if (selfServiceApiEnabled)
+{
+    // Portal client-credentials policy for the self-service API, bound EXPLICITLY to the JWT scheme so it
+    // authenticates the bearer token and never the app's sign-in cookie. Endpoints opt in via
+    // RequireAuthorization(PortalPolicy); nothing else in the app references it.
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy(SupplierPortal.Web.SelfServiceApi.SelfServiceEndpoints.PortalPolicy, policy =>
+        {
+            policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("scope", SupplierPortal.Web.SelfServiceApi.ApiScopes.Portal);
+        });
+}
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -313,6 +372,12 @@ builder.Services.AddRateLimiter(options =>
                 PermitLimit = 5,
                 QueueLimit = 0
             }));
+
+    // Named limiters for the in-process self-service OAuth API (harmless when the API is disabled, since
+    // only its gated endpoints reference them): the token endpoint, the OTP request/verify pair, and uploads.
+    options.AddFixedWindowLimiter("token", o => { o.Window = TimeSpan.FromMinutes(1); o.PermitLimit = 20; });
+    options.AddFixedWindowLimiter("otp", o => { o.Window = TimeSpan.FromMinutes(1); o.PermitLimit = 10; });
+    options.AddFixedWindowLimiter("upload", o => { o.Window = TimeSpan.FromMinutes(1); o.PermitLimit = 30; });
 });
 
 var app = builder.Build();
@@ -376,6 +441,13 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+// Self-service OAuth API (/connect/token + /api/selfservice/*). Mapped only when ApiSecurity:SigningKey is
+// configured; otherwise these routes do not exist (a request to /connect/token returns 404), confirming the gate.
+if (selfServiceApiEnabled)
+{
+    SupplierPortal.Web.SelfServiceApi.SelfServiceEndpoints.MapSelfServiceApi(app);
+}
 
 app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService) =>
 {
