@@ -154,7 +154,17 @@ public class SelfServiceApiService(
 
         await supplierService.UpdateAsync(supplier, actor, session.Id, markComplete: true);
 
-        await emailService.NotifyRequestorOfSubmissionAsync(supplier, session.CreatedBy, baseUrl);
+        // Best-effort notifications (must not fail the submission): notify the internal requestor, and send
+        // the supplier their "Supplier Registration Completed" confirmation — same emails the internal
+        // self-service path sends on completion.
+        try { await emailService.NotifyRequestorOfSubmissionAsync(supplier, session.CreatedBy, baseUrl); } catch { }
+        try
+        {
+            await emailService.NotifySupplierCompletedAsync(
+                supplier.Id, supplier.SupplierName, supplier.ContactEmail, actor, supplier.BusinessUnitId);
+        }
+        catch { }
+
         return new SubmitResponse { Success = true };
     }
 
