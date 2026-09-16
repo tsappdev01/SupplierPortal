@@ -174,12 +174,39 @@ public class SupplierDocumentService(
         // Either way the local temp copy is then removed, so new uploads never linger on disk.
         var fileBytes = await File.ReadAllBytesAsync(fullPath);
         var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+
+        // Trade License / VAT / Bank / Signed Declaration are single-slot: a new upload replaces the
+        // previous one. "Other" documents accumulate. Load the ones being replaced so their old blobs
+        // can be removed after the new file is saved (never before, so a save failure can't lose data).
+        var replaced = documentType != SupplierDocumentType.Other
+            ? await db.SupplierDocuments
+                .Where(d => d.SupplierId == supplierId && d.DocumentType == documentType)
+                .ToListAsync()
+            : new List<SupplierDocument>();
+
+        // Lay blob files out like the "download all" zip: a folder per supplier, each file prefixed by
+        // its document-type label — e.g. "10001_Al Nisr Publishing LLC/Trade License _ <original>.pdf".
+        var meta = await db.Suppliers.Where(s => s.Id == supplierId)
+            .Select(s => new { s.SupplierNumber, s.SupplierName })
+            .FirstOrDefaultAsync();
+
         string? blobKey;
         try
         {
-            blobKey = fileStore.Enabled
-                ? await fileStore.SaveAsync($"supplier/{supplierId}", fileName, fileBytes, resolvedContentType)
-                : null;
+            if (fileStore.Enabled)
+            {
+                var folder = SanitizeSegment($"{meta?.SupplierNumber}_{meta?.SupplierName}");
+                var name = SanitizeSegment($"{DocumentTypeLabel(documentType)} _ {fileName}");
+                // Single-slot overwrites its own key; "Other" disambiguates duplicate names with " (n)".
+                blobKey = await fileStore.SaveAtKeyAsync($"{folder}/{name}", fileBytes, resolvedContentType,
+                    overwrite: documentType != SupplierDocumentType.Other);
+            }
+            else
+            {
+                blobKey = null;
+            }
         }
         finally
         {
@@ -189,20 +216,15 @@ public class SupplierDocumentService(
         }
         byte[]? contentBytes = blobKey is null ? fileBytes : null;
 
-        await using var db = await dbFactory.CreateDbContextAsync();
-
-        // Trade License / VAT Certification are single-slot fields: a new upload replaces the
-        // previous one. "Other" documents accumulate as a list instead.
-        if (documentType != SupplierDocumentType.Other)
+        // Now retire the superseded single-slot files — but never delete the blob we just wrote (which
+        // happens when a same-named file is re-uploaded and overwrites its own key).
+        foreach (var old in replaced)
         {
-            var existing = await db.SupplierDocuments
-                .Where(d => d.SupplierId == supplierId && d.DocumentType == documentType)
-                .ToListAsync();
-            foreach (var old in existing)
+            if (!string.Equals(old.BlobKey, blobKey, StringComparison.Ordinal))
             {
                 await DeleteStoredFileAsync(old);
-                db.SupplierDocuments.Remove(old);
             }
+            db.SupplierDocuments.Remove(old);
         }
 
         db.SupplierDocuments.Add(new SupplierDocument
@@ -482,6 +504,32 @@ public class SupplierDocumentService(
         SupplierDocumentType.SignedDeclaration => "Signed Declaration",
         _ => "Other"
     };
+
+    /// <summary>Makes a string safe as a single blob path segment: no slashes/control characters,
+    /// collapsed whitespace, trimmed, and length-capped. Falls back to "unknown" when empty.</summary>
+    private static string SanitizeSegment(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) { return "unknown"; }
+        var sb = new System.Text.StringBuilder(value.Length);
+        var lastWasSpace = false;
+        foreach (var ch in value)
+        {
+            var c = (char.IsControl(ch) || ch == '\\' || ch == '/') ? ' ' : ch;
+            if (c == ' ')
+            {
+                if (lastWasSpace) { continue; }
+                lastWasSpace = true;
+            }
+            else
+            {
+                lastWasSpace = false;
+            }
+            sb.Append(c);
+        }
+        var cleaned = sb.ToString().Trim().TrimEnd('.', ' ').Trim();
+        if (cleaned.Length == 0) { return "unknown"; }
+        return cleaned.Length > 200 ? cleaned[..200].TrimEnd('.', ' ') : cleaned;
+    }
 
     /// <summary>The owning supplier id for a document, or null when the document does not exist. Lets the
     /// download endpoint enforce per-supplier access scope before serving the file.</summary>

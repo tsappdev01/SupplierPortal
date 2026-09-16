@@ -64,6 +64,39 @@ public class AzureBlobStorageService : IFileStorageService
         return key;
     }
 
+    public async Task<string?> SaveAtKeyAsync(string desiredKey, byte[] bytes, string contentType, bool overwrite)
+    {
+        if (_container is null)
+        {
+            return null;
+        }
+
+        var key = desiredKey.Replace('\\', '/').Trim('/');
+        if (!overwrite)
+        {
+            // Never clobber an existing blob: append " (2)", " (3)" … before the extension until free.
+            var ext = Path.GetExtension(key);
+            var stem = key[..^ext.Length];
+            var n = 1;
+            while (await _container.GetBlobClient(key).ExistsAsync())
+            {
+                n++;
+                key = $"{stem} ({n}){ext}";
+            }
+        }
+
+        var blob = _container.GetBlobClient(key);
+        using var ms = new MemoryStream(bytes, writable: false);
+        await blob.UploadAsync(ms, new BlobUploadOptions
+        {
+            HttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
+            },
+        });
+        return key;
+    }
+
     public async Task<byte[]?> ReadAsync(string? blobKey)
     {
         if (_container is null || string.IsNullOrWhiteSpace(blobKey))
