@@ -480,15 +480,10 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// Cache static assets (CSS/JS/images/fonts) for a week so repeat visits and navigations don't re-download
-// them. The framework files under _framework carry their own fingerprinted long-cache headers.
-app.UseStaticFiles(new StaticFileOptions
-{
-    OnPrepareResponse = ctx =>
-    {
-        ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
-    }
-});
+// Default static-file handling: sends ETag/Last-Modified so browsers revalidate and get fresh assets
+// right after a deploy (no stale CSS/JS), while still serving 304s for unchanged files. Response
+// compression above is what shrinks the first load.
+app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -25,47 +25,86 @@ window.ssSubmitForm = function (id) {
     if (form) { form.submit(); }
 };
 
-// Signature pad for the supplier declaration (draw with mouse/touch). Mirrors the internal portal.
+// Smooth signature pad for the supplier declaration. Uses Pointer Events so mouse, touch and stylus /
+// signature-pad devices all work the same way, and quadratic-curve smoothing (drawing through the
+// midpoints of successive points) so strokes are smooth rather than jagged straight segments.
 window.sigpad = {
     _pads: {},
     init: function (canvas) {
         if (!canvas) { return; }
         var ctx = canvas.getContext('2d');
-        var rect = canvas.getBoundingClientRect();
-        var dpr = window.devicePixelRatio || 1;
-        canvas.width = Math.max(1, Math.round(rect.width * dpr));
-        canvas.height = Math.max(1, Math.round(rect.height * dpr));
-        ctx.scale(dpr, dpr);
-        ctx.lineWidth = 2.4;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#0b2545';
 
-        var drawing = false, dirty = false, lastX = 0, lastY = 0;
+        function resize() {
+            var rect = canvas.getBoundingClientRect();
+            var dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.round(rect.width * dpr));
+            canvas.height = Math.max(1, Math.round(rect.height * dpr));
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.lineWidth = 2.4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#0b2545';
+        }
+        resize();
+
+        var drawing = false, dirty = false, pts = [];
         function pos(e) {
             var r = canvas.getBoundingClientRect();
-            var p = (e.touches && e.touches[0]) ? e.touches[0] : e;
-            return { x: p.clientX - r.left, y: p.clientY - r.top };
+            return { x: e.clientX - r.left, y: e.clientY - r.top };
         }
-        function start(e) { drawing = true; var pt = pos(e); lastX = pt.x; lastY = pt.y; if (e.cancelable) { e.preventDefault(); } }
-        function move(e) {
-            if (!drawing) { return; }
-            var pt = pos(e);
-            ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pt.x, pt.y); ctx.stroke();
-            lastX = pt.x; lastY = pt.y; dirty = true;
+        function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+        function start(e) {
+            drawing = true;
+            pts = [pos(e)];
+            // A dot for a single tap so a quick signature mark still shows.
+            ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, 1.2, 0, Math.PI * 2); ctx.fillStyle = '#0b2545'; ctx.fill();
+            dirty = true;
+            try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
             if (e.cancelable) { e.preventDefault(); }
         }
-        function end() { drawing = false; }
+        function move(e) {
+            if (!drawing) { return; }
+            // Use coalesced events (high-frequency samples) when available for extra smoothness.
+            var evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [e];
+            for (var i = 0; i < evs.length; i++) {
+                pts.push(pos(evs[i]));
+                var n = pts.length;
+                if (n < 3) { continue; }
+                var m1 = mid(pts[n - 3], pts[n - 2]);
+                var m2 = mid(pts[n - 2], pts[n - 1]);
+                ctx.beginPath();
+                ctx.moveTo(m1.x, m1.y);
+                ctx.quadraticCurveTo(pts[n - 2].x, pts[n - 2].y, m2.x, m2.y);
+                ctx.stroke();
+            }
+            dirty = true;
+            if (e.cancelable) { e.preventDefault(); }
+        }
+        function end() {
+            if (!drawing) { return; }
+            // Finish the trailing segment so the very end of the stroke is drawn.
+            var n = pts.length;
+            if (n >= 2) {
+                var m1 = mid(pts[n - 2], pts[n - 1]);
+                ctx.beginPath();
+                ctx.moveTo(m1.x, m1.y);
+                ctx.lineTo(pts[n - 1].x, pts[n - 1].y);
+                ctx.stroke();
+            }
+            drawing = false;
+            pts = [];
+        }
 
-        canvas.addEventListener('mousedown', start);
-        canvas.addEventListener('mousemove', move);
-        window.addEventListener('mouseup', end);
-        canvas.addEventListener('touchstart', start, { passive: false });
-        canvas.addEventListener('touchmove', move, { passive: false });
-        canvas.addEventListener('touchend', end);
+        canvas.style.touchAction = 'none';
+        canvas.addEventListener('pointerdown', start);
+        canvas.addEventListener('pointermove', move);
+        canvas.addEventListener('pointerup', end);
+        canvas.addEventListener('pointercancel', end);
+        canvas.addEventListener('pointerleave', end);
 
         this._pads[canvas.id] = {
-            clear: function () { ctx.clearRect(0, 0, canvas.width, canvas.height); dirty = false; },
+            clear: function () { ctx.clearRect(0, 0, canvas.width, canvas.height); dirty = false; pts = []; },
             isEmpty: function () { return !dirty; },
             dataUrl: function () { return dirty ? canvas.toDataURL('image/png') : ''; }
         };
