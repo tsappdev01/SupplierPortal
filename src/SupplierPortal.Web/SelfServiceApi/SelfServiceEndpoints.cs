@@ -55,7 +55,7 @@ public static class SelfServiceEndpoints
             // In Development there is no Database Mail profile, so skip the send and surface the code for
             // automated testing. In every other environment the OTP is emailed and never returned.
             var devMode = env.IsDevelopment();
-            var (success, error, code) = await accessTokens.IssueOtpAsync(token.Id, sendEmail: !devMode);
+            var (success, error, code) = await accessTokens.IssueOtpAsync(token.Id, sendEmail: !devMode, forceResend: req.Resend);
 
             return Results.Ok(new OtpRequestResponse
             {

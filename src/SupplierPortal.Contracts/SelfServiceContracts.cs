@@ -81,6 +81,11 @@ public class SupplierFormBootstrapDto
 public class OtpRequestRequest
 {
     public string LinkToken { get; set; } = "";
+
+    /// <summary>When false (the default, an automatic send on page load), a still-valid unexpired code is
+    /// reused instead of emailing a new one — so a reload does not generate another OTP. When true (the
+    /// user clicked "Resend code"), a fresh code is always issued.</summary>
+    public bool Resend { get; set; }
 }
 
 public class OtpRequestResponse

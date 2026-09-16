@@ -28,12 +28,12 @@ public class SupplierApiClient(
         return http;
     }
 
-    public async Task<OtpRequestResponse> RequestOtpAsync(string linkToken)
+    public async Task<OtpRequestResponse> RequestOtpAsync(string linkToken, bool resend = false)
     {
         try
         {
             var http = await AuthedClientAsync();
-            var res = await http.PostAsJsonAsync("/api/selfservice/otp/request", new OtpRequestRequest { LinkToken = linkToken });
+            var res = await http.PostAsJsonAsync("/api/selfservice/otp/request", new OtpRequestRequest { LinkToken = linkToken, Resend = resend });
             if (!res.IsSuccessStatusCode)
             {
                 return new OtpRequestResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };

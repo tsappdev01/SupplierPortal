@@ -74,10 +74,12 @@ public class SupplierAccessTokenService(
         return await db.SupplierAccessTokens.Include(t => t.Supplier).FirstOrDefaultAsync(t => t.TokenHash == hash);
     }
 
-    /// <summary>Blazor internal-app entry point: generate, persist and email a fresh OTP.</summary>
+    /// <summary>Blazor internal-app entry point: generate, persist and email a fresh OTP. This is called
+    /// only when the caller has already decided a code should go out (initial send gated by NeedsFreshOtp,
+    /// or an explicit "Resend"), so it forces a new code rather than reusing an existing one.</summary>
     public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId)
     {
-        var (success, error, _) = await IssueOtpAsync(tokenId, sendEmail: true);
+        var (success, error, _) = await IssueOtpAsync(tokenId, sendEmail: true, forceResend: true);
         return (success, error);
     }
 
@@ -87,7 +89,7 @@ public class SupplierAccessTokenService(
     /// testing when no Database Mail profile exists. Production callers must send the email
     /// (<paramref name="sendEmail"/> = true) and must never expose the returned code.
     /// </summary>
-    public async Task<(bool Success, string? Error, string? Code)> IssueOtpAsync(int tokenId, bool sendEmail = true)
+    public async Task<(bool Success, string? Error, string? Code)> IssueOtpAsync(int tokenId, bool sendEmail = true, bool forceResend = false)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var token = await db.SupplierAccessTokens.Include(t => t.Supplier).FirstOrDefaultAsync(t => t.Id == tokenId);
@@ -99,6 +101,20 @@ public class SupplierAccessTokenService(
         {
             return (false, "This supplier has no Contact Email on file.", null);
         }
+
+        // Idempotent auto-send: when a still-valid, unexpired code already exists and the caller is not
+        // explicitly resending, reuse it — do NOT email a second code or increment the send cap. This makes
+        // a page reload, a double component render, or a scanner hit harmless; only an explicit "Resend"
+        // (forceResend = true) issues a fresh code. The plaintext code is not recoverable here, so reuse
+        // returns Code = null (dev-mode surfacing only applies to a freshly generated code).
+        if (!forceResend
+            && token.OtpCodeHash is not null
+            && token.OtpExpiresAt is not null
+            && token.OtpExpiresAt > DateTime.UtcNow)
+        {
+            return (true, null, null);
+        }
+
         if (token.OtpSendCount >= MaxOtpSends)
         {
             return (false, "Too many verification code requests for this link. Please contact us for assistance.", null);
