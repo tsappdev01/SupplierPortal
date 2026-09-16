@@ -58,9 +58,10 @@ public static class SelfServiceEndpoints
             var devMode = env.IsDevelopment();
             var (success, error, code) = await accessTokens.IssueOtpAsync(token.Id, sendEmail: !devMode, forceResend: req.Resend);
 
-            // The supplier's business-unit logo (hosted URL or embedded data URI) so the public front-end
-            // can brand its header with the correct entity.
-            var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Supplier?.BusinessUnitId);
+            // The supplier's business-unit logo, using the SAME source as the internal self-service header
+            // (uploaded logo as a self-contained data URI, falling back to the hosted URL) so the public
+            // front-end brands identically to the portal.
+            var logo = await branding.GetBusinessUnitUploadedLogoSrcAsync(token.Supplier?.BusinessUnitId);
 
             return Results.Ok(new OtpRequestResponse
             {
