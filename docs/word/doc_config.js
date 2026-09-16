@@ -66,6 +66,7 @@ kids.push(cfg([
 kids.push(h1("5. File Storage (Azure Blob)"));
 kids.push(para("The app authenticates to Azure Blob with a connection string only (no managed identity). The container is created automatically as private (no anonymous access), so it need not be pre-created. If the connection string is blank or unreachable, blob is disabled and files fall back to the database / local disk — the app does not fail."));
 kids.push(cfg([
+  ["BlobStorage:Enabled","true","Master on/off switch. false = always store files in the database even if a ConnectionString is set; true (default) = use blob when a ConnectionString is configured. Read at startup (restart to apply)."],
   ["BlobStorage:ConnectionString","(secret)","Storage-account connection string: DefaultEndpointsProtocol=https;AccountName=…;AccountKey=…;EndpointSuffix=core.windows.net. Supply via env var BlobStorage__ConnectionString / Key Vault, never committed. Blank = store files in the database / on disk."],
   ["BlobStorage:ContainerName","userfiles","Blob container name; auto-created as private (PublicAccessType.None)."],
 ]));

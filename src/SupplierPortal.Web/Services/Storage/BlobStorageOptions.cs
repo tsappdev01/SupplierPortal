@@ -7,6 +7,11 @@ public class BlobStorageOptions
 {
     public const string SectionName = "BlobStorage";
 
+    /// <summary>Master on/off switch. When false, files are always stored in the database even if a
+    /// <see cref="ConnectionString"/> is set. When true (default), blob is used provided a connection
+    /// string is configured and it initialises.</summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Azure Storage account connection string. Blank = blob storage disabled.</summary>
     public string ConnectionString { get; set; } = "";
 

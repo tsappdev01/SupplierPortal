@@ -16,6 +16,11 @@ public class AzureBlobStorageService : IFileStorageService
     {
         _logger = logger;
         var opts = options.Value;
+        if (!opts.Enabled)
+        {
+            _logger.LogInformation("Blob storage disabled by configuration (BlobStorage:Enabled=false); using database/local storage.");
+            return; // explicit off switch — container stays null so uploads go to the DB Content column
+        }
         if (string.IsNullOrWhiteSpace(opts.ConnectionString))
         {
             return; // disabled — no connection string configured
