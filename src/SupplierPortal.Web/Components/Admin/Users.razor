@@ -26,7 +26,17 @@
         <div class="d-flex justify-content-between align-items-start gap-3">
             <div>
                 <strong>Pending registrations awaiting linking:</strong>
-                @string.Join(", ", pendingRegistrations.Select(p => p.Email))
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    @foreach (var p in pendingRegistrations)
+                    {
+                        <span class="badge bg-white text-dark border d-inline-flex align-items-center gap-2 py-1" style="font-weight:500;">
+                            @p.Email
+                            <button type="button" class="btn-close" style="font-size:.55rem;"
+                                    title="Reject this registration" aria-label="Reject"
+                                    @onclick="() => RejectPendingAsync(p)" disabled="@cleaning"></button>
+                        </span>
+                    }
+                </div>
             </div>
             @if (InvalidPendingCount > 0)
             {
@@ -276,6 +286,24 @@
     {
         await UserService.SetActiveAsync(user.Id, isActive, currentUser);
         users = await UserService.GetAllAsync();
+    }
+
+    // Rejects a single pending registration (e.g. a valid-format test entry the bulk "invalid" cleanup
+    // leaves behind). Guarded server-side to only ever delete a still-pending row.
+    private async Task RejectPendingAsync(User pending)
+    {
+        cleaning = true;
+        try
+        {
+            var removed = await UserService.DeletePendingRegistrationAsync(pending.Id, currentUser);
+            pendingRegistrations = await UserService.GetPendingRegistrationsAsync();
+            users = await UserService.GetAllAsync();
+            cleanupResult = removed ? $"Rejected '{pending.Email}'." : null;
+        }
+        finally
+        {
+            cleaning = false;
+        }
     }
 
     // Removes only pending (unlinked, inactive) registrations whose email is invalid — the scanner/injection

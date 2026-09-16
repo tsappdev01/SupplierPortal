@@ -83,6 +83,25 @@ public class UserService(
         return await db.Users.Where(u => u.IsPendingRegistration).OrderBy(u => u.Email).ToListAsync();
     }
 
+    /// <summary>Rejects (deletes) a single pending self-registration by id. Guarded: only removes the row
+    /// when it is still <see cref="User.IsPendingRegistration"/> == true, so it can never delete a linked or
+    /// active user even if the id is stale. Returns true when a row was removed.</summary>
+    public async Task<bool> DeletePendingRegistrationAsync(int userId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.IsPendingRegistration);
+        if (user is null)
+        {
+            return false;
+        }
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Delete, "User", user.Id,
+            $"Rejected pending registration '{user.Email}'.");
+        return true;
+    }
+
     /// <summary>Deletes pending (unlinked, inactive) self-registrations whose e-mail is not a valid address
     /// — i.e. the vulnerability-scanner / injection junk that predates intake validation. Only ever touches
     /// rows with <see cref="User.IsPendingRegistration"/> == true; never linked or active users. The email
