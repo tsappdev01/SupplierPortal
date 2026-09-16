@@ -58,11 +58,24 @@
         {
             <div class="ss-alert ss-alert-error">@error</div>
         }
+        @if (resendNotice is not null)
+        {
+            <div class="ss-alert ss-alert-info">@resendNotice</div>
+        }
 
-        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || code.Length < 6)">
+        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || resending || code.Length < 6)">
             @(verifying ? "Verifying…" : "Verify and continue")
         </button>
-        <button class="ss-btn ss-btn-link" @onclick="ResendAsync" disabled="@verifying">Resend code</button>
+        <button class="ss-btn ss-btn-link" @onclick="ResendAsync" disabled="@(verifying || resending)">
+            @if (resending)
+            {
+                <span class="ss-spin" aria-hidden="true"></span><span>Sending…</span>
+            }
+            else
+            {
+                <span>Resend code</span>
+            }
+        </button>
     }
 </div>
 
@@ -78,6 +91,9 @@
     .ss-btn-primary { background: #3b5bdb; color: #fff; }
     .ss-btn-primary:disabled { opacity: 0.6; cursor: default; }
     .ss-btn-link { background: none; color: #46618f; text-decoration: underline; padding: 10px 4px; }
+    .ss-btn-link:disabled { opacity: 0.7; cursor: default; }
+    .ss-spin { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; border: 2px solid #c3ccdd; border-top-color: #46618f; border-radius: 50%; animation: ss-spin 0.6s linear infinite; }
+    @@keyframes ss-spin { to { transform: rotate(360deg); } }
     .ss-alert { padding: 0.7rem 0.9rem; border-radius: 6px; margin: 0.75rem 0; font-size: 14px; }
     .ss-alert-error { background: #fdecea; color: #c0392b; }
     .ss-alert-info { background: #eef1ff; color: #1a2233; }
@@ -158,17 +174,35 @@
         }
     }
 
+    private bool resending;
+    private string? resendNotice;
+
     private async Task ResendAsync()
     {
         error = null;
+        resendNotice = null;
         code = "";
-        // Explicit user action: force a fresh code.
-        var result = await Api.RequestOtpAsync(Token, resend: true);
-        maskedEmail = result.MaskedEmail;
-        devOtp = result.DevOtp;
-        if (!result.Success)
+        // Show the in-progress state immediately (before the network round-trip).
+        resending = true;
+        StateHasChanged();
+        try
         {
-            error = result.Error;
+            // Explicit user action: force a fresh code.
+            var result = await Api.RequestOtpAsync(Token, resend: true);
+            maskedEmail = result.MaskedEmail;
+            devOtp = result.DevOtp;
+            if (!result.Success)
+            {
+                error = result.Error;
+            }
+            else
+            {
+                resendNotice = "A new verification code has been sent.";
+            }
+        }
+        finally
+        {
+            resending = false;
         }
     }
 }
