@@ -3,6 +3,8 @@
 @inject ToastService Toast
 
 <div class="di-form-page">
+    @if (!submitted)
+    {
     <div class="di-form-topbar">
         <div class="di-form-headings">
             <div class="di-form-title">Supplier Registration</div>
@@ -41,13 +43,23 @@
             }
         }
     </div>
+    }
 
     @if (submitted)
     {
-        <div class="di-section">
-            <div class="di-section-header">Thank you</div>
-            <div class="di-section-body" style="display:block;">
-                <p>Your details have been submitted for review. You may now close this window.</p>
+        <div class="di-thankyou-wrap">
+            <div class="di-thankyou-card">
+                <div class="di-thankyou-check" aria-hidden="true">
+                    <svg width="34" height="34" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13.5 4.5 6.5 11.5 3 8" />
+                    </svg>
+                </div>
+                <h1 class="di-thankyou-title">Thank You</h1>
+                <p class="di-thankyou-text">
+                    Your supplier information has been submitted successfully. Our team will review the
+                    changes shortly.
+                </p>
+                <p class="di-thankyou-note">You may now close this window.</p>
             </div>
         </div>
     }
@@ -209,7 +221,7 @@
                 }
                 else
                 {
-                    <button class="di-btn di-btn-primary" type="button" @onclick="SubmitAsync" disabled="@isSaving">Submit for Review</button>
+                    <button class="di-btn di-btn-primary" type="button" @onclick="SubmitAsync" disabled="@isSaving">Proceed</button>
                 }
             </div>
         </EditForm>
@@ -941,12 +953,12 @@
         f["LastName"] = @<div class="di-field @FieldClass("LastName")"><label>Last Name@(Req("LastName"))</label><InputText @bind-Value="model.LastName" /></div>;
         f["AdministrativeContact"] = @<div class="di-field @FieldClass("AdministrativeContact")"><label>Administrative Contact@(Req("AdministrativeContact"))</label><InputText @bind-Value="model.AdministrativeContact" placeholder="Defaults to First Name if left blank" /></div>;
         f["ContactEmail"] = @<div class="di-field @FieldClass("ContactEmail")"><label>Contacts E-Mail@(Req("ContactEmail"))</label><InputText @bind-Value="model.ContactEmail" /></div>;
-        f["PhoneCountryCodeId"] = @<div class="di-field @FieldClass("PhoneCountryCodeId")"><label>Phone Country Code@(Req("PhoneCountryCodeId"))</label><InputSelect @bind-Value="model.PhoneCountryCodeId"><option value="">— Select —</option>@foreach (var l in countriesWithPhoneCode){<option value="@l.Id">+@l.PhoneCode @l.DisplayName</option>}</InputSelect></div>;
-        f["PhoneAreaCode"] = @<div class="di-field @FieldClass("PhoneAreaCode")"><label>Phone Area Code@(Req("PhoneAreaCode"))</label><InputText @bind-Value="model.PhoneAreaCode" /></div>;
-        f["Phone"] = @<div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><InputText @bind-Value="model.Phone" /></div>;
-        f["MobileCountryCodeId"] = @<div class="di-field @FieldClass("MobileCountryCodeId")"><label>Mobile Country Code@(Req("MobileCountryCodeId"))</label><InputSelect @bind-Value="model.MobileCountryCodeId"><option value="">— Select —</option>@foreach (var l in countriesWithPhoneCode){<option value="@l.Id">+@l.PhoneCode @l.DisplayName</option>}</InputSelect></div>;
-        f["MobileAreaCode"] = @<div class="di-field @FieldClass("MobileAreaCode")"><label>Mobile Area Code@(Req("MobileAreaCode"))</label><InputText @bind-Value="model.MobileAreaCode" /></div>;
-        f["Mobile"] = @<div class="di-field @FieldClass("Mobile")"><label>Mobile@(Req("Mobile"))</label><InputText @bind-Value="model.Mobile" /></div>;
+        // Phone and Mobile are compound controls (country dial code + area code + number in one bordered
+        // group), matching the internal SupplierForm. The separate PhoneCountryCode/PhoneAreaCode /
+        // MobileCountryCode/MobileAreaCode fields are absorbed here, so they have no standalone fragment
+        // (that also removes them from KeysForStep rendering and the mandatory loop, which gate on the map).
+        f["Phone"] = @<div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><PhoneField Countries="countriesWithPhoneCode" @bind-CountryCodeId="model.PhoneCountryCodeId" @bind-AreaCode="model.PhoneAreaCode" @bind-Number="model.Phone" ShowAreaCode="true" Placeholder="888 6998" /></div>;
+        f["Mobile"] = @<div class="di-field @FieldClass("Mobile")"><label>Mobile@(Req("Mobile"))</label><PhoneField Countries="countriesWithPhoneCode" @bind-CountryCodeId="model.MobileCountryCodeId" @bind-AreaCode="model.MobileAreaCode" @bind-Number="model.Mobile" ShowAreaCode="true" Placeholder="50 123 4567" /></div>;
 
         // Step 4 — Site / Business Unit
         f["ProcurementBuId"] = @<div class="di-field @FieldClass("ProcurementBuId")"><label>Procurement BU@(Req("ProcurementBuId"))</label><InputSelect @bind-Value="model.ProcurementBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
