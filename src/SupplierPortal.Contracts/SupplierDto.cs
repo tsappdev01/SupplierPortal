@@ -58,6 +58,16 @@ public class SupplierDto
     public bool AddressPurposeRemitTo { get; set; }
     public bool AddressPurposeRfqBidding { get; set; }
 
+    // Alternate "Address as per VAT Certificate" — captured only when the main address is NOT the same as
+    // the Trade License / VAT Certificate. Names/types mirror SupplierFormModel so DtoMapper maps them.
+    public bool? AddressSameAsTradeLicense { get; set; }
+    public string? VatAddressLine1 { get; set; }
+    public string? VatAddressLine2 { get; set; }
+    public int? VatCityId { get; set; }
+    public string? VatCityText { get; set; }
+    public int? VatCountryId { get; set; }
+    public string? VatPostalCode { get; set; }
+
     // -- Step 3: Contact person --
     public string? MiddleName { get; set; }
     public string? LastName { get; set; }

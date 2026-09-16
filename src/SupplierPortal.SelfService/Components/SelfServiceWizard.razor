@@ -88,6 +88,66 @@
                             @fieldFragments[key]
                         }
 
+                        @if (tab.Step == 2)
+                        {
+                            <!-- Is the address above the same as on the Trade License and VAT Certificate?
+                                 When "No", the supplier must give the alternate address per their VAT Certificate. -->
+                            <div class="di-field di-full">
+                                <label>Is your address the same as your Trade License and VAT Certificate?</label>
+                                <div class="di-switch-wrap">
+                                    <button type="button" role="switch"
+                                            aria-checked="@(model.AddressSameAsTradeLicense == true ? "true" : "false")"
+                                            class="di-switch @(model.AddressSameAsTradeLicense == true ? "on" : "") @(model.AddressSameAsTradeLicense == false ? "off" : "")"
+                                            @onclick="ToggleAddressSameAsTradeLicense">
+                                        <span class="di-switch-knob"></span>
+                                    </button>
+                                    <span class="di-switch-text">@(model.AddressSameAsTradeLicense == true ? "Yes" : model.AddressSameAsTradeLicense == false ? "No" : "—")</span>
+                                </div>
+                            </div>
+                            @if (model.AddressSameAsTradeLicense == false)
+                            {
+                                <div class="di-field di-full">
+                                    <div class="di-subsection-header">
+                                        <svg class="di-subsection-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
+                                        Address (As per VAT Certificate)
+                                    </div>
+                                </div>
+                                <div class="di-field di-full">
+                                    <label>Address Line 1<span class="di-req">*</span></label>
+                                    <InputText @bind-Value="model.VatAddressLine1" />
+                                </div>
+                                <div class="di-field di-full">
+                                    <label>Address Line 2</label>
+                                    <InputText @bind-Value="model.VatAddressLine2" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Country<span class="di-req">*</span></label>
+                                    <InputSelect @bind-Value="model.VatCountryId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>City / Emirate<span class="di-req">*</span></label>
+                                    @if (IsVatUaeCountry)
+                                    {
+                                        <InputSelect @bind-Value="model.VatCityId">
+                                            <option value="">— Select Emirate —</option>
+                                            @foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}
+                                        </InputSelect>
+                                    }
+                                    else
+                                    {
+                                        <InputText @bind-Value="model.VatCityText" placeholder="Enter city" />
+                                    }
+                                </div>
+                                <div class="di-field">
+                                    <label>PO Box / Postal Code</label>
+                                    <InputText @bind-Value="model.VatPostalCode" />
+                                </div>
+                            }
+                        }
+
                         @if (tab.Step == 1)
                         {
                             <div class="di-documents-grid">
@@ -362,6 +422,44 @@
     private void Back() => currentIndex = Math.Max(0, currentIndex - 1);
     private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, visibleTabs.Count - 1);
 
+    // Fields only meaningful / required when the supplier is VAT registered (same rule as the internal form).
+    private static readonly HashSet<string> VatDependentKeys =
+        ["TaxRegistrationNumber", "VatRegistrationTypeId", "NumberOfVatGroupEntities", "VatGroupEntityNames", "SupplierTin"];
+
+    private int? UaeCountryId =>
+        countries.FirstOrDefault(c => c.DisplayName.Contains("United Arab Emirates", StringComparison.OrdinalIgnoreCase))?.Id;
+
+    // UAE test for the alternate VAT-certificate address (drives its Emirate-LOV vs free-text city).
+    private bool IsVatUaeCountry => model.VatCountryId is null || model.VatCountryId == UaeCountryId;
+
+    // Cycles the "address same as Trade License / VAT Certificate" toggle: unset (—) → Yes → No → Yes …
+    // Clears the alternate VAT-certificate address whenever the answer is not "No".
+    private void ToggleAddressSameAsTradeLicense()
+    {
+        model.AddressSameAsTradeLicense = model.AddressSameAsTradeLicense switch
+        {
+            true => false,
+            false => true,
+            null => true,
+        };
+        if (model.AddressSameAsTradeLicense != false)
+        {
+            model.VatAddressLine1 = null;
+            model.VatAddressLine2 = null;
+            model.VatCityId = null;
+            model.VatCityText = null;
+            model.VatCountryId = null;
+            model.VatPostalCode = null;
+        }
+    }
+
+    // True when the value is exactly <length> digits (spaces/dashes ignored) — matches the internal form.
+    private static bool IsDigits(string value, int length)
+    {
+        var d = value.Replace(" ", "").Replace("-", "");
+        return d.Length == length && d.All(char.IsDigit);
+    }
+
     // Circular progress: position within the visible tabs (matches the internal supplier form).
     private int ProgressPct =>
         visibleTabs.Count == 0 ? 0
@@ -393,6 +491,8 @@
         var errors = new List<string>();
         foreach (var f in Bootstrap.FieldSettings.Where(f => f.Step == step && f.IsMandatory && f.IsVisibleToSupplier))
         {
+            // VAT-dependent fields (TRN, VAT type, TIN, VAT-group) are never required when not VAT registered.
+            if (VatDependentKeys.Contains(f.FieldKey) && model.VatRegistered != true) { continue; }
             // Only enforce fields this form can actually collect (a property on SupplierDto with a fragment).
             var prop = typeof(SupplierDto).GetProperty(f.FieldKey);
             if (prop is null || !fieldFragments.ContainsKey(f.FieldKey)) { continue; }
@@ -414,8 +514,44 @@
                 }
             }
         }
+
+        // Format checks (data-quality) — same rules as the internal form. Supplier TIN exactly 10 digits;
+        // TRN/VAT Registration Number exactly 15 digits (only when VAT registered). Fire only when a value
+        // is present and the field belongs to this step.
+        if (IsFieldOnStep("SupplierTin", step) && !IsHidden("SupplierTin")
+            && !string.IsNullOrWhiteSpace(model.SupplierTin) && !IsDigits(model.SupplierTin, 10))
+        {
+            errors.Add("Supplier TIN must be exactly 10 digits.");
+        }
+        if (IsFieldOnStep("TaxRegistrationNumber", step) && IsVatRegistered
+            && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
+        {
+            errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
+        }
+
+        // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
+        // address is mandatory (matches the internal form's step-2 rule).
+        if (step == 2 && model.AddressSameAsTradeLicense == false)
+        {
+            if (string.IsNullOrWhiteSpace(model.VatAddressLine1))
+            {
+                errors.Add("Address (As per VAT Certificate): Address Line 1 is required.");
+            }
+            if (model.VatCountryId is null)
+            {
+                errors.Add("Address (As per VAT Certificate): Country is required.");
+            }
+            var vatIsUae = model.VatCountryId is null || model.VatCountryId == UaeCountryId;
+            if (vatIsUae ? model.VatCityId is null : string.IsNullOrWhiteSpace(model.VatCityText))
+            {
+                errors.Add("Address (As per VAT Certificate): City / Emirate is required.");
+            }
+        }
         return errors;
     }
+
+    private bool IsFieldOnStep(string key, int step) =>
+        Bootstrap.FieldSettings.Any(f => f.FieldKey == key && f.Step == step && f.IsVisibleToSupplier);
 
     private async Task<bool> PersistAsync()
     {
@@ -764,12 +900,12 @@
         f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["SupplierTypeId"] = @<div class="di-field @FieldClass("SupplierTypeId")"><label>Supplier Type@(Req("SupplierTypeId"))</label><InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["TaxpayerCountryId"] = @<div class="di-field @FieldClass("TaxpayerCountryId")"><label>Taxpayer Country@(Req("TaxpayerCountryId"))</label><InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
-        f["TaxRegistrationNumber"] = @<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label><InputText @bind-Value="model.TaxRegistrationNumber" /></div>;
+        f["TaxRegistrationNumber"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label><InputText @bind-Value="model.TaxRegistrationNumber" maxlength="15" inputmode="numeric" pattern="[0-9]*" title="15 digits" /></div>}</text>;
         f["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")"><label>VAT Registered?@(Req("VatRegistered"))</label><select class="form-select" @bind="VatRegisteredStr"><option value="">— Select —</option><option value="true">Yes</option><option value="false">No</option></select></div>;
-        f["VatRegistrationTypeId"] = @<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["VatRegistrationTypeId"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>}</text>;
         f["NumberOfVatGroupEntities"] = @<div class="di-field @FieldClass("NumberOfVatGroupEntities")"><label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label><InputNumber @bind-Value="model.NumberOfVatGroupEntities" /></div>;
         f["VatGroupEntityNames"] = @<div class="di-field di-full @FieldClass("VatGroupEntityNames")"><label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label><InputTextArea @bind-Value="model.VatGroupEntityNames" /></div>;
-        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))</label><InputText @bind-Value="model.SupplierTin" /></div>;
+        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))</label><InputText @bind-Value="model.SupplierTin" maxlength="10" inputmode="numeric" pattern="[0-9]*" title="10 digits" /></div>;
         f["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")"><label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label><InputSelect @bind-Value="model.BusinessPartnerTypeId"><option value="">— Select —</option>@foreach (var l in businessPartnerTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["BusinessLocationTypeId"] = @<div class="di-field @FieldClass("BusinessLocationTypeId")"><label>Business Location Type@(Req("BusinessLocationTypeId"))</label><InputSelect @bind-Value="model.BusinessLocationTypeId"><option value="">— Select —</option>@foreach (var l in businessLocationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")"><label>eInvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label><InputSelect @bind-Value="model.EInvoicingWaveId"><option value="">— Select —</option>@foreach (var l in eInvoicingWaves){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
