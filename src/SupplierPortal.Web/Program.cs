@@ -24,6 +24,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Real UAT credentials live only in this gitignored, optional local override file.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+// Don't advertise the server implementation ("Server: Kestrel") — an easy information-disclosure win.
+builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
@@ -430,6 +433,20 @@ app.Use(async (context, next) =>
     headers["X-Content-Type-Options"] = "nosniff";
     headers["X-Frame-Options"] = "SAMEORIGIN";
     headers["Referrer-Policy"] = "no-referrer";
+    // A conservative CSP that hardens without a default-src (Blazor Server renders inline component
+    // <style> blocks and a pre-paint inline <script>, which a strict default-src would break): block
+    // plugin/object embeds, lock the document base URI, and restrict framing to this origin.
+    headers["Content-Security-Policy"] = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
+    // Deny powerful browser features the admin app never uses (scanner sees an explicit deny).
+    headers["Permissions-Policy"] =
+        "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), " +
+        "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), " +
+        "usb=(), interest-cohort=()";
+    // Cross-origin isolation (SSO uses full redirects, not popups, so same-origin COOP is safe).
+    headers["Cross-Origin-Opener-Policy"] = "same-origin";
+    headers["Cross-Origin-Resource-Policy"] = "same-origin";
+    headers["X-Permitted-Cross-Domain-Policies"] = "none";
+    headers.Remove("X-Powered-By");
     await next();
 });
 
