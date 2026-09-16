@@ -24,7 +24,8 @@ public class SelfServiceApiService(
         LookupCategory.TaxOrganizationType, LookupCategory.SupplierType, LookupCategory.Country,
         LookupCategory.Province, LookupCategory.VatCode, LookupCategory.PaymentMethod,
         LookupCategory.PaymentTerms, LookupCategory.Prefix, LookupCategory.Currency,
-        LookupCategory.BusinessRelationship, LookupCategory.CommunicationMethod
+        LookupCategory.BusinessRelationship, LookupCategory.CommunicationMethod,
+        LookupCategory.LicensingAuthority
     ];
 
     // Email fields and their labels (server-side format validation — the DMZ boundary never trusts the client).

@@ -21,6 +21,12 @@ public class SupplierDto
     public int? TaxpayerCountryId { get; set; }
     public string TaxRegistrationNumber { get; set; } = "";
     public string TradeLicenseNumber { get; set; } = "";
+    // Trade-license detail fields (configurable / mandatory via field settings). Names match
+    // SupplierFormModel so DtoMapper's by-name copy carries them through the API automatically.
+    public DateTime? TradeLicenseIssueDate { get; set; }
+    public DateTime? TradeLicenseExpiryDate { get; set; }
+    public int? TradeLicenseIssuingBodyId { get; set; }
+    public string? IssuingBodyIfOthers { get; set; }
     public int? VatCodeId { get; set; }
     public int? BusinessRelationshipId { get; set; }
     public bool IsOneTimeSupplier { get; set; }

@@ -92,6 +92,25 @@
                         <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
                         <InputText @bind-Value="model.TradeLicenseNumber" />
                     </div>
+                    <div class="di-field @FieldClass("TradeLicenseIssueDate")">
+                        <label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label>
+                        <InputDate @bind-Value="model.TradeLicenseIssueDate" />
+                    </div>
+                    <div class="di-field @FieldClass("TradeLicenseExpiryDate")">
+                        <label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label>
+                        <InputDate @bind-Value="model.TradeLicenseExpiryDate" />
+                    </div>
+                    <div class="di-field @FieldClass("TradeLicenseIssuingBodyId")">
+                        <label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label>
+                        <InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
+                    </div>
+                    @if (IsOthersIssuingBody())
+                    {
+                        <div class="di-field @FieldClass("IssuingBodyIfOthers")">
+                            <label>Issuing Body (if Others)@(Req("IssuingBodyIfOthers"))</label>
+                            <InputText @bind-Value="model.IssuingBodyIfOthers" />
+                        </div>
+                    }
                     <div class="di-field @FieldClass("VatCodeId")">
                         <label>VAT Code@(Req("VatCodeId"))</label>
                         <InputSelect @bind-Value="model.VatCodeId"><option value="">— Select —</option>@foreach (var l in vatCodes){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect>
@@ -275,7 +294,7 @@
 
     private List<LookupItemDto> taxOrgTypes = [], supplierTypes = [], countries = [], countriesWithPhoneCode = [],
         businessRelationships = [], provinces = [], vatCodes = [], paymentMethods = [], paymentTerms = [],
-        prefixes = [], communicationMethods = [], currencies = [];
+        prefixes = [], communicationMethods = [], currencies = [], licensingAuthorities = [];
     private List<BankDto> banks = [];
     private List<BusinessUnitDto> businessUnits = [];
     private List<SupplierDocumentDto> documents = [];
@@ -301,6 +320,7 @@
         provinces = L("Province"); vatCodes = L("VatCode"); paymentMethods = L("PaymentMethod");
         paymentTerms = L("PaymentTerms"); prefixes = L("Prefix"); currencies = L("Currency");
         businessRelationships = L("BusinessRelationship"); communicationMethods = L("CommunicationMethod");
+        licensingAuthorities = L("LicensingAuthority");
         countriesWithPhoneCode = countries.Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode)).ToList();
 
         banks = Bootstrap.Banks;
@@ -325,6 +345,11 @@
     }
 
     private bool IsHidden(string key) => hiddenKeys.Contains(key);
+
+    // Show the free-text "Issuing Body (if Others)" only when the selected licensing authority is "Others".
+    private bool IsOthersIssuingBody() =>
+        licensingAuthorities.FirstOrDefault(l => l.Id == model.TradeLicenseIssuingBodyId)?.DisplayName?
+            .Contains("Other", StringComparison.OrdinalIgnoreCase) == true;
 
     private RenderFragment Req(string key) => builder =>
     {
@@ -354,7 +379,12 @@
         var errors = new List<string>();
         foreach (var f in Bootstrap.FieldSettings.Where(f => f.Step == step && f.IsMandatory && f.IsVisibleToSupplier))
         {
-            var value = typeof(SupplierDto).GetProperty(f.FieldKey)?.GetValue(model);
+            // Only enforce fields the self-service form can actually collect (a property on SupplierDto).
+            // A mandatory field with no matching DTO property isn't rendered here, so requiring it would
+            // permanently block submission — skip it rather than soft-lock the supplier.
+            var prop = typeof(SupplierDto).GetProperty(f.FieldKey);
+            if (prop is null) { continue; }
+            var value = prop.GetValue(model);
             if (value is null || (value is string s && string.IsNullOrWhiteSpace(s)))
             {
                 errors.Add($"{f.DisplayLabel} is required.");
