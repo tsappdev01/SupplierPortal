@@ -27,6 +27,21 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 // Don't advertise the server implementation ("Server: Kestrel") — an easy information-disclosure win.
 builder.WebHost.ConfigureKestrel(o => o.AddServerHeader = false);
 
+// Compress responses (Brotli + Gzip) so the first load transfers the framework JS and CSS
+// (bootstrap.min.css, the scoped-CSS bundle, blazor.web.js) far smaller. Fastest level keeps CPU low.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    o.MimeTypes = Microsoft.AspNetCore.ResponseCompression.ResponseCompressionDefaults.MimeTypes
+        .Concat(["application/octet-stream", "image/svg+xml"]);
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(
+    o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(
+    o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
@@ -424,6 +439,9 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseHttpsRedirection();
 
+// Compress before static files / components are served, so the first load's JS + CSS transfer smaller.
+app.UseResponseCompression();
+
 // Baseline security response headers. nosniff stops content-type sniffing (so an uploaded document can't be
 // re-interpreted as HTML/script), SAMEORIGIN blocks framing by other sites, and no-referrer keeps the
 // self-service session URL out of the Referer header sent to externally-hosted logos/links.
@@ -450,7 +468,15 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStaticFiles();
+// Cache static assets (CSS/JS/images/fonts) for a week so repeat visits and navigations don't re-download
+// them. The framework files under _framework carry their own fingerprinted long-cache headers.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

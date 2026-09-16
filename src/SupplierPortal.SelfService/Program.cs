@@ -18,6 +18,20 @@ builder.WebHost.ConfigureKestrel(o =>
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+// Compress responses (Brotli + Gzip) so the first load transfers blazor.web.js + CSS far smaller.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    o.MimeTypes = Microsoft.AspNetCore.ResponseCompression.ResponseCompressionDefaults.MimeTypes
+        .Concat(["application/octet-stream", "image/svg+xml"]);
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(
+    o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(
+    o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
 // The single outbound channel: an HttpClient pointed at the internal API. No database, no EF.
 builder.Services.AddHttpClient("Api", client =>
 {
@@ -67,6 +81,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+// Compress before static files / components are served.
+app.UseResponseCompression();
+
 // Security headers for a public-facing surface, including a content-security policy. Hardened for
 // vulnerability / penetration scanning: legacy clickjacking + sniffing guards, a strict CSP, a
 // deny-by-default Permissions-Policy for powerful browser features, and cross-origin isolation.
@@ -90,14 +107,27 @@ app.Use(async (ctx, next) =>
     h["Cross-Origin-Opener-Policy"] = "same-origin";
     h["Cross-Origin-Resource-Policy"] = "same-origin";
     h["X-Permitted-Cross-Domain-Policies"] = "none";
-    // Sensitive, per-supplier pages must never be cached by shared proxies / the browser.
-    h["Cache-Control"] = "no-store, no-cache, must-revalidate";
-    h["Pragma"] = "no-cache";
     h.Remove("X-Powered-By");
+    // Only the sensitive per-supplier pages are marked no-store; static assets (CSS/JS/framework) stay
+    // cacheable so repeat loads and navigations are fast.
+    var path = ctx.Request.Path.Value ?? "";
+    if (path.StartsWith("/supplier/self-service", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/account/", StringComparison.OrdinalIgnoreCase))
+    {
+        h["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        h["Pragma"] = "no-cache";
+    }
     await next();
 });
 
-app.UseStaticFiles();
+// Cache static assets for a week so repeat visits don't re-download the CSS/JS.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
