@@ -7,7 +7,7 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-/// <summary>Issues and validates the opaque link tokens and 4-digit OTP codes that protect the
+/// <summary>Issues and validates the opaque link tokens and 6-digit OTP codes that protect the
 /// supplier self-service flow. The link token is looked up by value, so it's hashed
 /// deterministically (SHA-256); the OTP code is always verified against one already-known row,
 /// so it reuses the app's existing salted <see cref="IPasswordHasher{TUser}"/> exactly as

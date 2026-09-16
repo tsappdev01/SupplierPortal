@@ -76,7 +76,7 @@
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAdministrator = state.User.IsAdministrator();
         businessUnitIds = state.User.GetBusinessUnitIds();
-        currentUser = state.User.Identity?.Name ?? "";
+        currentUser = state.User.Identity?.Name ?? "unknown";
         await ReloadAsync();
 
         // Poll every 60s so a new supplier submission surfaces without a manual refresh.

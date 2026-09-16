@@ -1,6 +1,8 @@
 @page "/supplier/self-service/{Token}"
 @layout Layout.PublicLayout
-@rendermode InteractiveServer
+@* prerender:false so OnInitializedAsync (which auto-sends the OTP) runs once on the interactive
+   render, not twice — prerendering issued two OTP emails and burned the send cap. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @using SupplierPortal.Web.Services.SelfService

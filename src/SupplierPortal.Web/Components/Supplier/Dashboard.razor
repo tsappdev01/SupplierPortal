@@ -1566,6 +1566,8 @@ else if (TotalPages > 1)
         if (success)
         {
             ToastService.ShowSuccess($"1 email sent to {supplier.ContactEmail}.");
+            // Refresh so the row's status badge reflects the move to "Awaiting Supplier Response".
+            await ReloadAsync();
         }
         else
         {

@@ -120,9 +120,20 @@ public class LocalSupplierSelfServiceDataGateway(
             return new SsUploadResult(false, "Your session has expired.", null, null);
         }
 
+        // Suppliers may only upload their own supporting documents. The Signed Declaration is
+        // generated server-side from the drawn signature and must never be supplied by the client,
+        // otherwise a crafted upload could overwrite the genuine declaration (non-Other types are
+        // single-slot / replace).
+        var type = (SupplierDocumentType)documentType;
+        if (type is not (SupplierDocumentType.TradeLicense or SupplierDocumentType.VatCertification
+            or SupplierDocumentType.BankConfirmationLetter or SupplierDocumentType.Other))
+        {
+            return new SsUploadResult(false, "That document type cannot be uploaded.", null, null);
+        }
+
         await using var stream = new MemoryStream(bytes);
         var result = await documentService.UploadFromStreamAsync(
-            access.SupplierId, (SupplierDocumentType)documentType, stream, fileName, contentType, bytes.Length, Actor);
+            access.SupplierId, type, stream, fileName, contentType, bytes.Length, Actor);
         return new SsUploadResult(result.Success, result.Error, result.ExtractedNumber, result.DunsNumber);
     }
 

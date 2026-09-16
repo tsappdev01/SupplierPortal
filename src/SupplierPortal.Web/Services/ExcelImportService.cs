@@ -418,7 +418,7 @@ public class ExcelImportService(
         // from wiping the Priority and the "Address as per VAT Certificate" block set via the edit form.
         "Priority", "SupplierSiteBuId",
         "AddressSameAsTradeLicense", "VatAddressLine1", "VatAddressLine2",
-        "VatCityId", "VatCityText", "VatCountryId"
+        "VatCityId", "VatCityText", "VatCountryId", "VatPostalCode"
     ];
 
     /// <summary>Copies the imported scalar/lookup fields from a freshly parsed supplier onto an

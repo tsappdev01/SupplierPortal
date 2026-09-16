@@ -190,6 +190,7 @@ public class SupplierService(
                 SupplierName = s.SupplierName,
                 TaxOrganizationTypeName = s.TaxOrganizationType != null ? s.TaxOrganizationType.DisplayName : null,
                 FirstName = s.FirstName,
+                MiddleName = s.MiddleName,
                 LastName = s.LastName,
                 SupplierTypeName = s.SupplierType != null ? s.SupplierType.DisplayName : null,
                 TaxRegistrationNumber = s.TaxRegistrationNumber,
@@ -372,8 +373,28 @@ public class SupplierService(
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var businessUnit = await db.BusinessUnits.FirstAsync(b => b.Id == businessUnitId);
-        var count = await db.Suppliers.CountAsync(s => s.BusinessUnitId == businessUnitId);
-        return $"{businessUnit.Code}-{(count + 1):D6}";
+
+        // Base the next sequence on the highest existing number for this BU, not a live COUNT — a
+        // COUNT collides after a supplier is deleted (e.g. deleting -000003 of 5 makes COUNT+1 = -000005,
+        // colliding with an existing record). Parse the trailing numeric part of each number.
+        var numbers = await db.Suppliers
+            .Where(s => s.BusinessUnitId == businessUnitId)
+            .Select(s => s.SupplierNumber)
+            .ToListAsync();
+
+        var maxSequence = 0;
+        foreach (var number in numbers)
+        {
+            if (string.IsNullOrEmpty(number)) { continue; }
+            var dash = number.LastIndexOf('-');
+            var tail = dash >= 0 ? number[(dash + 1)..] : number;
+            if (int.TryParse(tail, out var sequence) && sequence > maxSequence)
+            {
+                maxSequence = sequence;
+            }
+        }
+
+        return $"{businessUnit.Code}-{(maxSequence + 1):D6}";
     }
 
     /// <summary>Resolves a workflow status LookupValue id by its well-known name (see
@@ -487,7 +508,12 @@ public class SupplierService(
             }
         }
 
-        supplier.SupplierNumber = updated.SupplierNumber;
+        // Identity key: only an admin (non-token) save may set it; a tampered self-service payload
+        // must never change the supplier number.
+        if (accessTokenId is null)
+        {
+            supplier.SupplierNumber = updated.SupplierNumber;
+        }
         supplier.Priority = updated.Priority;
         supplier.SupplierName = updated.SupplierName;
         supplier.Email = updated.Email;
@@ -586,6 +612,16 @@ public class SupplierService(
         supplier.IntermediaryIban = updated.IntermediaryIban;
         supplier.IntermediaryBicSwiftCode = updated.IntermediaryBicSwiftCode;
 
+        // Address (as per VAT Certificate) block — previously omitted here, so it was silently
+        // dropped on every save. ApplyTo already nulls these when "same as trade licence" = yes.
+        supplier.AddressSameAsTradeLicense = updated.AddressSameAsTradeLicense;
+        supplier.VatAddressLine1 = updated.VatAddressLine1;
+        supplier.VatAddressLine2 = updated.VatAddressLine2;
+        supplier.VatCountryId = updated.VatCountryId;
+        supplier.VatCityId = updated.VatCityId;
+        supplier.VatCityText = updated.VatCityText;
+        supplier.VatPostalCode = updated.VatPostalCode;
+
         // Self-service disclaimer acknowledgement recorded with the submission.
         supplier.DisclaimerAcknowledged = updated.DisclaimerAcknowledged;
         supplier.DisclaimerAcknowledgedAt = updated.DisclaimerAcknowledgedAt;
@@ -593,7 +629,11 @@ public class SupplierService(
         supplier.DisclaimerText = updated.DisclaimerText;
         supplier.DisclaimerSignature = updated.DisclaimerSignature;
 
-        supplier.IsDraft = updated.IsDraft;
+        // Draft flag is a workflow field: only an admin save may change it, never a token-based one.
+        if (accessTokenId is null)
+        {
+            supplier.IsDraft = updated.IsDraft;
+        }
 
         // Restore any fields hidden from suppliers so a self-service save can never change a locked
         // field (the client only hides them; the server is the real guard).

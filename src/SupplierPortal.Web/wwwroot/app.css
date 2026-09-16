@@ -193,6 +193,16 @@ table thead th {
 .di-supplier-scroll {
     overflow: auto;
     max-height: calc(100vh - 320px);
+    border: 1px solid var(--di-border);
+    border-radius: 8px;
+}
+/* The base .table rule sets overflow:hidden (to clip its rounded corners), which makes the table
+   its own scroll container and prevents the sticky header from pinning to .di-supplier-scroll.
+   Let the scroll wrapper own the border/rounding and clear the table's overflow so sticky works. */
+.di-supplier-scroll > table.table {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
 }
 .di-supplier-scroll table thead th {
     position: sticky;
