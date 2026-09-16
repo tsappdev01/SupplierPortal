@@ -122,13 +122,37 @@ public class SelfServiceApiService(
         };
     }
 
-    public async Task<SubmitResponse> SubmitAsync(SupplierAccessToken session, string baseUrl)
+    public async Task<SubmitResponse> SubmitAsync(SupplierAccessToken session, string baseUrl, SubmitRequest declaration, string actor)
     {
+        if (string.IsNullOrWhiteSpace(declaration.SignatureName))
+        {
+            return new SubmitResponse { Success = false, Error = "Please type your full name as your signature." };
+        }
+        if (string.IsNullOrWhiteSpace(declaration.SignatureImageBase64))
+        {
+            return new SubmitResponse { Success = false, Error = "Please draw your signature before submitting." };
+        }
+
         var supplier = await supplierService.GetByIdAsync(session.SupplierId);
         if (supplier is null)
         {
             return new SubmitResponse { Success = false, Error = "Supplier not found." };
         }
+
+        byte[]? signatureImage;
+        try { signatureImage = Convert.FromBase64String(declaration.SignatureImageBase64); }
+        catch (FormatException) { return new SubmitResponse { Success = false, Error = "The signature image was invalid." }; }
+
+        // Record the signed declaration on the supplier, then complete the submission the same way the
+        // internal supplier form does (markComplete = true → status Completed + signed-declaration PDF).
+        supplier.DisclaimerAcknowledged = true;
+        supplier.DisclaimerAcknowledgedAt = DateTime.UtcNow;
+        supplier.DisclaimerAcknowledgedBy = actor;
+        supplier.DisclaimerText = declaration.DeclarationText;
+        supplier.DisclaimerSignature = declaration.SignatureName.Trim();
+        supplier.DisclaimerSignatureImage = signatureImage;
+
+        await supplierService.UpdateAsync(supplier, actor, session.Id, markComplete: true);
 
         await emailService.NotifyRequestorOfSubmissionAsync(supplier, session.CreatedBy, baseUrl);
         return new SubmitResponse { Success = true };

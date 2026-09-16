@@ -144,6 +144,15 @@ public class SaveSupplierResponse
     public List<string> PendingEditedFieldKeys { get; set; } = [];
 }
 
+/// <summary>The signed declaration a supplier accepts when submitting: the typed full-name signature, the
+/// hand-drawn signature (PNG, base64, no data-URI prefix) and the full declaration wording shown.</summary>
+public class SubmitRequest
+{
+    public string SignatureName { get; set; } = "";
+    public string? SignatureImageBase64 { get; set; }
+    public string DeclarationText { get; set; } = "";
+}
+
 public class SubmitResponse
 {
     public bool Success { get; set; }

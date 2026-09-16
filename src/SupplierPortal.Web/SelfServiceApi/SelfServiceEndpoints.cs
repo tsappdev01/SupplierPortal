@@ -131,17 +131,20 @@ public static class SelfServiceEndpoints
         });
 
         group.MapPost("/submit", async (
-            HttpContext ctx, SupplierSessionResolver resolver, SupplierAccessTokenService accessTokens,
-            SelfServiceApiService svc, IConfiguration config) =>
+            HttpContext ctx, SubmitRequest declaration, SupplierSessionResolver resolver,
+            SupplierAccessTokenService accessTokens, SelfServiceApiService svc, IConfiguration config) =>
         {
             var session = await resolver.ResolveAsync(ctx);
             if (session is null)
             {
                 return Results.Unauthorized();
             }
-            await accessTokens.MarkUsedAsync(session.Id);
             var adminBaseUrl = config["Notifications:AdminBaseUrl"] ?? "";
-            var result = await svc.SubmitAsync(session, adminBaseUrl);
+            var result = await svc.SubmitAsync(session, adminBaseUrl, declaration, ActorLabel(session));
+            if (result.Success)
+            {
+                await accessTokens.MarkUsedAsync(session.Id);
+            }
             return Results.Ok(result);
         });
 

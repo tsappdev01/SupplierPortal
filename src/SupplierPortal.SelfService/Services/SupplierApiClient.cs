@@ -147,10 +147,10 @@ public class SupplierApiClient(
                ?? new DocumentUploadResponse { Success = false, Error = "Unexpected response." };
     }
 
-    public async Task<SubmitResponse> SubmitAsync(string sessionToken)
+    public async Task<SubmitResponse> SubmitAsync(string sessionToken, SubmitRequest declaration)
     {
         var http = await AuthedClientAsync(sessionToken);
-        var res = await http.PostAsync("/api/selfservice/submit", null);
+        var res = await http.PostAsJsonAsync("/api/selfservice/submit", declaration);
         if (!res.IsSuccessStatusCode)
         {
             return new SubmitResponse { Success = false, Error = "Could not submit. Please try again." };
