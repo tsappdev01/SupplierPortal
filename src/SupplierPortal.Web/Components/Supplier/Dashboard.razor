@@ -1742,14 +1742,17 @@ else if (TotalPages > 1)
         var sb = new System.Text.StringBuilder();
         sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Manage Supplier</title><style>");
         sb.Append($"@page{{size:A4 {(landscape ? "landscape" : "portrait")};margin:12mm;}}");
-        sb.Append($"*{{box-sizing:border-box;}}body{{font-family:'Segoe UI',Arial,sans-serif;color:#1a2233;font-size:{fontSize};margin:0;}}");
+        // Force backgrounds/colors to print (browsers drop them by default) AND keep dark text on the
+        // header so it stays legible even when a printer/PDF ignores color-adjust.
+        sb.Append($"*{{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}body{{font-family:'Segoe UI',Arial,sans-serif;color:#111827;font-size:{fontSize};margin:0;}}");
         sb.Append(".hd{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #caa04d;padding-bottom:8px;margin-bottom:12px;}");
         sb.Append(".hd h1{font-size:20px;color:#0b2545;margin:0;}");
-        sb.Append(".hd .meta{font-size:10px;color:#6b7280;text-align:right;}");
+        sb.Append(".hd .meta{font-size:10px;color:#374151;text-align:right;}");
         sb.Append("table{width:100%;border-collapse:collapse;}");
-        sb.Append("th,td{border:1px solid #d3dae6;padding:4px 6px;text-align:left;vertical-align:top;word-break:break-word;}");
-        sb.Append("th{background:#0b2545;color:#fff;font-weight:600;}");
-        sb.Append("tr:nth-child(even) td{background:#f6f8fb;}");
+        sb.Append("th,td{border:1px solid #b7c2d6;padding:5px 7px;text-align:left;vertical-align:top;word-break:break-word;}");
+        sb.Append("th{background:#e7ecf3;color:#0b2545;font-weight:700;border-bottom:2px solid #0b2545;}");
+        sb.Append("td{color:#111827;}");
+        sb.Append("tr:nth-child(even) td{background:#f4f6fb;}");
         sb.Append("</style></head><body>");
         sb.Append("<div class=\"hd\"><h1>Manage Supplier</h1><div class=\"meta\">");
         sb.Append($"{Esc(ActiveTabLabel)} &middot; {rows.Count} supplier(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
