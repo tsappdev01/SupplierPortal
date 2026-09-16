@@ -5,6 +5,8 @@ const kids = [];
 const W = [3300, 1500, 4700]; // Key, Default/Example, Description
 
 function cfg(rows){ return table(["Setting", "Value / example", "Description"], rows, W); }
+function kv(rows){ return table(["Item", "Value / maps to"], rows, [3300, 6200]); }
+function code(t){ return para([g.t(t, { font: "Consolas", size: 17, color: "1F3350" })], { after: 100 }); }
 
 kids.push(...titlePage("Supplier Portal", "Configuration Document", [
   ["Document", "Configuration Reference (appsettings)"],
@@ -62,15 +64,26 @@ kids.push(cfg([
 ]));
 
 kids.push(h1("5. File Storage (Azure Blob)"));
+kids.push(para("The app authenticates to Azure Blob with a connection string only (no managed identity). The container is created automatically as private (no anonymous access), so it need not be pre-created. If the connection string is blank or unreachable, blob is disabled and files fall back to the database / local disk — the app does not fail."));
 kids.push(cfg([
-  ["BlobStorage:ConnectionString","(blank)","Leave blank to store files on local disk / in the database. When set, new uploads go to Azure Blob; existing files keep working from their current location."],
-  ["BlobStorage:ContainerName","userfiles","Blob container (auto-created, private)."],
+  ["BlobStorage:ConnectionString","(secret)","Storage-account connection string: DefaultEndpointsProtocol=https;AccountName=…;AccountKey=…;EndpointSuffix=core.windows.net. Supply via env var BlobStorage__ConnectionString / Key Vault, never committed. Blank = store files in the database / on disk."],
+  ["BlobStorage:ContainerName","userfiles","Blob container name; auto-created as private (PublicAccessType.None)."],
 ]));
+kids.push(para("To configure blob you need: the storage account name; a connection string (account key) for BlobStorage:ConnectionString; the container name (default 'userfiles'); and network reachability — with a private endpoint and public access restricted, the web app must reach <account>.blob.core.windows.net over the private endpoint (VNet integration + private DNS).", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("6. Email"));
-kids.push(para("Emails route through EmailDispatcher, which chooses the mechanism from configuration: SMTP when Email:Smtp:Host is set (required on Azure SQL, which has no Database Mail), otherwise SQL Server Database Mail."));
+kids.push(para("Emails route through EmailDispatcher, which chooses the delivery mechanism from configuration in this order of precedence: (1) Microsoft Graph (app-only) when Email:Graph is fully configured; otherwise (2) SMTP when Email:Smtp:Host is set (required on Azure SQL, which has no Database Mail); otherwise (3) SQL Server Database Mail."));
+kids.push(h2("6.1 Microsoft Graph (app-only, client-credentials)"));
+kids.push(para("Sends from one fixed mailbox (SenderUpn) via Microsoft Graph with no signed-in user. Which mailbox the app may send as is enforced Exchange-side by an Application Access Policy (see the provisioning steps), not in code. Preferred sender once all four values are set."));
 kids.push(cfg([
-  ["Email:MailProfileName","BP","SQL Server Database Mail profile (used when Smtp:Host is blank)."],
+  ["Email:Graph:TenantId","(guid)","Entra directory (tenant) id of the mailing app registration."],
+  ["Email:Graph:ClientId","(guid)","Application (client) id of the mailing app registration."],
+  ["Email:Graph:ClientSecret","(secret)","Client secret — env var Email__Graph__ClientSecret / Key Vault only, never committed. Prefer a certificate in production."],
+  ["Email:Graph:SenderUpn","(mailbox)","Fixed sender mailbox (UPN). A 403 ErrorAccessDenied means the Application Access Policy excludes this mailbox."],
+]));
+kids.push(h2("6.2 SMTP / SQL Server Database Mail (fallback)"));
+kids.push(cfg([
+  ["Email:MailProfileName","BP","SQL Server Database Mail profile (used when Graph and Smtp:Host are blank)."],
   ["Email:Smtp:Host","(blank)","SMTP server host. Blank = use Database Mail."],
   ["Email:Smtp:Port","587","SMTP port."],
   ["Email:Smtp:EnableSsl","true","Use STARTTLS/implicit TLS."],
@@ -103,5 +116,52 @@ kids.push(cfg([
   ["DefaultAdmin:Username / Email","admin / admin@…","Seeded default administrator (local mode). Change the seeded password immediately after first deployment."],
 ]));
 kids.push(para("Note: a valid production appsettings must not contain any secret values or stray keys; store all secrets in appsettings.Local.json, environment variables, or Azure Key Vault, and rotate any credential that has ever been committed.", { size: 18, color: g.colors.AMBER, bold: true }));
+
+kids.push(h1("10. Environment Provisioning Steps"));
+kids.push(para("The production environment (Dubai Investments) is provisioned as below. Identifiers (app/client, object and tenant ids, endpoints, host names) are recorded for reference; all secret values — passwords and client secrets — are stored only in Azure Key Vault / environment variables and are shown here as '(secret)'.", { size: 18 }));
+kids.push(para("Never commit the secret values; supply them at deploy time via the environment-variable names given below or a Key Vault reference, and rotate any credential that has ever been shared or committed.", { size: 18, color: g.colors.AMBER, bold: true }));
+
+kids.push(h2("Step 1 — Azure SQL Database"));
+kids.push(kv([
+  ["Server", "ts-db.database.windows.net"],
+  ["Administrator login", "sqladmin"],
+  ["Administrator password", "(secret — Key Vault)"],
+  ["Maps to", "Database:Provider = Azure; ConnectionStrings:AzureConnection (secret — ConnectionStrings__AzureConnection)"],
+]));
+
+kids.push(h2("Step 2 — Email app registration (Microsoft Graph mailing)"));
+kids.push(kv([
+  ["Display name", "disupplierportalemail"],
+  ["Application (client) ID", "8c515592-9f04-4d45-97de-98fe9e2e4e18"],
+  ["Object ID", "674cdfcf-e2d6-4ece-b779-792538d3e96f"],
+  ["Directory (tenant) ID", "ba42ffd1-f322-49fa-81b7-74dcbd5f52a7"],
+  ["Client secret (Value)", "(secret — Email__Graph__ClientSecret / Key Vault)"],
+  ["Sends as (SenderUpn)", "purchase@dubaiinvestments.com"],
+  ["Maps to", "Email:Graph:TenantId / ClientId / ClientSecret / SenderUpn"],
+]));
+
+kids.push(h2("Step 3 — Exchange Online sender restriction (System team)"));
+kids.push(para("Restrict the mailing app so it can send only as the allowed sender mailbox. Run in Exchange Online PowerShell (allow up to ~30 minutes for the policy to propagate):"));
+kids.push(code('New-DistributionGroup -Name "partnerconnectallowedsenders" -Type Security -Members purchase@dubaiinvestments.com'));
+kids.push(code('New-ApplicationAccessPolicy -AppId 8c515592-9f04-4d45-97de-98fe9e2e4e18 -PolicyScopeGroupId partnerconnectallowedsenders@techsourcedxb.onmicrosoft.com -AccessRight RestrictAccess -Description "Restrict app to allowed sender mailbox only"'));
+kids.push(para("AppId is the mailing app (disupplierportalemail, 8c515592-…). A 403 ErrorAccessDenied at send time means the policy excludes the sender (or has not propagated yet), which is the policy working / mis-scoped — not a code bug.", { size: 18, color: g.colors.GREY }));
+
+kids.push(h2("Step 4 — SSO app registration (Entra ID)"));
+kids.push(kv([
+  ["Display name", "TS-AI-Supplierportal"],
+  ["Redirect URI", "https://supplierportal.dubaiinvestments.com/signin-oidc"],
+  ["Application (client) ID", "60e54f06-d73e-495d-8d07-b4c3f3f2a8ae"],
+  ["Object ID", "a0850a92-8208-4dc2-8079-7b164ea30aa6"],
+  ["Directory (tenant) ID", "ba42ffd1-f322-49fa-81b7-74dcbd5f52a7"],
+  ["Supported account types", "Single tenant (My organization only)"],
+  ["Client secret (Value)", "(secret — Auth__Entra__ClientSecret / Key Vault)"],
+  ["Maps to", "Auth:Mode = Sso; Auth:Entra:TenantId / ClientId / ClientSecret; Auth:Entra:CallbackPath = /signin-oidc"],
+]));
+
+kids.push(h2("Step 5 — Azure topology & storage"));
+kids.push(bullet("Two web apps, each behind a private endpoint: the DI Supplier Portal and Partner Connect (the public self-service front-end)."));
+kids.push(bullet("One Azure SQL server with a private endpoint; public network access restricted to three fixed broadband lines."));
+kids.push(bullet("Blob storage: one public storage account (network-restricted) and one with a private endpoint."));
+kids.push(bullet("Blob configuration: BlobStorage:ConnectionString (secret — BlobStorage__ConnectionString / Key Vault); BlobStorage:ContainerName = userfiles (auto-created, private)."));
 
 write(buildDoc({ title: "Supplier Portal — Configuration Document", children: kids }), "/home/user/SupplierPortal/docs/word/Supplier Portal - Configuration Document.docx");
