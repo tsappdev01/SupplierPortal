@@ -385,3 +385,51 @@
 .di-document-message {
     margin-top: 10px;
 }
+
+/* Upload progress banner (shown while a document streams to the server / API). */
+.ss-upload-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    background: #eef3fb;
+    border: 1px solid #cdddf3;
+    color: #274a7d;
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+}
+
+.ss-spinner {
+    width: 1.05rem;
+    height: 1.05rem;
+    border: 2px solid #a9c3e6;
+    border-top-color: #274a7d;
+    border-radius: 50%;
+    animation: ss-spin 0.7s linear infinite;
+    flex: 0 0 auto;
+}
+
+.ss-progress-track {
+    flex: 1;
+    height: 6px;
+    background: #d6e2f4;
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 80px;
+}
+
+.ss-progress-bar {
+    display: block;
+    height: 100%;
+    width: 40%;
+    background: #274a7d;
+    border-radius: 999px;
+    animation: ss-indeterminate 1.1s ease-in-out infinite;
+}
+
+@keyframes ss-spin { to { transform: rotate(360deg); } }
+@keyframes ss-indeterminate {
+    0% { margin-left: -40%; }
+    100% { margin-left: 100%; }
+}

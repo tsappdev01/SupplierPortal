@@ -97,6 +97,10 @@ public class OtpRequestResponse
     /// <summary>ONLY populated when the API runs in a non-production environment, to allow automated
     /// end-to-end testing without a live mail server. Always null in Production.</summary>
     public string? DevOtp { get; set; }
+
+    /// <summary>The supplier's business-unit logo image URL, so the public front-end can brand its
+    /// header with the correct entity's logo instead of a generic one. Null when the unit has none.</summary>
+    public string? LogoUrl { get; set; }
 }
 
 public class OtpVerifyRequest

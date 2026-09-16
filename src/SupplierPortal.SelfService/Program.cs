@@ -24,6 +24,8 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddSingleton<PortalTokenProvider>();
 builder.Services.AddScoped<SupplierApiClient>();
 builder.Services.AddScoped<SelfServiceSession>();
+builder.Services.AddScoped<SelfServiceBranding>();
+builder.Services.AddScoped<ToastService>();
 
 // Persist Data Protection keys (antiforgery) to a stable folder so they survive app-pool recycles.
 var keysDir = Path.Combine(builder.Environment.ContentRootPath, "keys");
@@ -52,7 +54,7 @@ app.Use(async (ctx, next) =>
     h["Referrer-Policy"] = "no-referrer";
     h["Content-Security-Policy"] =
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; " +
+        "img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; " +
         "frame-src blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     // Turn off browser features this app never uses, so a scanner sees an explicit deny.
     h["Permissions-Policy"] =

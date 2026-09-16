@@ -1,6 +1,7 @@
 @page "/supplier/self-service/{Token}"
 @inject SupplierApiClient Api
 @inject SelfServiceSession Session
+@inject SelfServiceBranding Branding
 @inject NavigationManager Nav
 
 <PageTitle>Verify — Supplier Self-Service</PageTitle>
@@ -80,6 +81,9 @@
         // Automatic send on load: reuse a still-valid code (resend: false) so a reload does not issue a new OTP.
         var result = await Api.RequestOtpAsync(Token, resend: false);
         loading = false;
+
+        // Brand the header with the supplier's business-unit logo when available.
+        Branding.SetLogo(result.LogoUrl);
         linkValid = result.Success;
         maskedEmail = result.MaskedEmail;
         devOtp = result.DevOtp;

@@ -40,7 +40,8 @@ public static class SelfServiceEndpoints
 
         // Request an OTP for a supplier link token.
         group.MapPost("/otp/request", async (
-            OtpRequestRequest req, SupplierAccessTokenService accessTokens, IWebHostEnvironment env) =>
+            OtpRequestRequest req, SupplierAccessTokenService accessTokens, EmailBrandingService branding,
+            IWebHostEnvironment env) =>
         {
             var token = await accessTokens.GetValidTokenAsync(req.LinkToken ?? "");
             if (token is null)
@@ -57,13 +58,18 @@ public static class SelfServiceEndpoints
             var devMode = env.IsDevelopment();
             var (success, error, code) = await accessTokens.IssueOtpAsync(token.Id, sendEmail: !devMode, forceResend: req.Resend);
 
+            // The supplier's business-unit logo (hosted URL or embedded data URI) so the public front-end
+            // can brand its header with the correct entity.
+            var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Supplier?.BusinessUnitId);
+
             return Results.Ok(new OtpRequestResponse
             {
                 Success = success,
                 Error = error,
                 MaskedEmail = SupplierAccessTokenService.MaskEmail(token.Supplier?.ContactEmail),
                 ExpiresInMinutes = 10,
-                DevOtp = devMode ? code : null
+                DevOtp = devMode ? code : null,
+                LogoUrl = logo
             });
         })
         .RequireRateLimiting("otp");

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="SupplierPortal.SelfService.styles.css" />
     <title>Supplier Self-Service — Dubai Investments</title>
@@ -15,17 +16,6 @@
        interactive render, not twice — prerendering fired two OTP requests per load. *@
     <Routes @rendermode="@(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode(prerender: false))" />
     <script src="_framework/blazor.web.js"></script>
-    <script>
-        // Turns raw document bytes (passed from the Blazor circuit) into a same-origin blob URL so an
-        // <iframe> can preview the PDF/image inline, without ever exposing the session token to the browser.
-        window.ssDoc = {
-            makeUrl: function (bytes, contentType) {
-                const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-                const blob = new Blob([view], { type: contentType || 'application/octet-stream' });
-                return URL.createObjectURL(blob);
-            },
-            revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } }
-        };
-    </script>
+    <script src="js/ss.js"></script>
 </body>
 </html>

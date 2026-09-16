@@ -1,5 +1,6 @@
 @inject SupplierApiClient Api
 @inject IJSRuntime JS
+@inject ToastService Toast
 
 <div class="di-form-page">
     <div class="di-form-title">Supplier Registration</div>
@@ -38,13 +39,13 @@
     else
     {
         <EditForm Model="model">
-            @if (errorMessage is not null)
+            @if (uploadingDocument)
             {
-                <div class="alert alert-danger">@errorMessage</div>
-            }
-            @if (statusMessage is not null)
-            {
-                <div class="alert alert-success">@statusMessage</div>
+                <div class="ss-upload-progress" role="status">
+                    <span class="ss-spinner" aria-hidden="true"></span>
+                    <span>Uploading@(string.IsNullOrEmpty(uploadingFileName) ? "" : $" '{uploadingFileName}'")… please wait.</span>
+                    <span class="ss-progress-track"><span class="ss-progress-bar"></span></span>
+                </div>
             }
 
             <!-- Step 1: Business / Organization -->
@@ -262,11 +263,15 @@
     private bool isSaving;
     private bool submitted;
     private bool uploadingDocument;
+    private string? uploadingFileName;
     private bool viewingDocument;
     private string? viewerUrl;
     private string? viewerName;
-    private string? errorMessage;
-    private string? statusMessage;
+
+    // Write-through to the toast queue: existing code that sets errorMessage/statusMessage now raises a
+    // toast instead of an inline alert. The getters return null so the old inline alert blocks never render.
+    private string? errorMessage { get => null; set => Toast.ShowError(value); }
+    private string? statusMessage { get => null; set => Toast.ShowSuccess(value); }
 
     private List<LookupItemDto> taxOrgTypes = [], supplierTypes = [], countries = [], countriesWithPhoneCode = [],
         businessRelationships = [], provinces = [], vatCodes = [], paymentMethods = [], paymentTerms = [],
@@ -442,8 +447,6 @@
 
     private async Task UploadDocumentAsync(InputFileChangeEventArgs e, SelfServiceDocumentType documentType)
     {
-        errorMessage = null;
-        statusMessage = null;
         uploadingDocument = true;
         try
         {
@@ -453,6 +456,11 @@
                 errorMessage = $"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the 10 MB limit. Please attach a smaller file.";
                 return;
             }
+
+            // Show a progress banner while the file streams to the server and on to the API.
+            uploadingFileName = e.File.Name;
+            Toast.ShowInfo($"Uploading '{e.File.Name}'…");
+            StateHasChanged();
 
             await using var stream = e.File.OpenReadStream(maxBytes);
             var result = await Api.UploadDocumentAsync(SessionToken, documentType, stream, e.File.Name, e.File.ContentType);
@@ -486,7 +494,7 @@
             // message instead of an unhandled circuit error that looks like "nothing happened".
             errorMessage = $"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.";
         }
-        finally { uploadingDocument = false; }
+        finally { uploadingDocument = false; uploadingFileName = null; }
     }
 
     private async Task ViewDocumentAsync(int documentId)

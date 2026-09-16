@@ -1,0 +1,54 @@
+@implements IDisposable
+@inject ToastService Toasts
+
+<div class="ss-toast-wrap" aria-live="polite" aria-atomic="true">
+    @foreach (var t in Toasts.Messages)
+    {
+        <div class="ss-toast ss-toast-@(t.Level.ToString().ToLowerInvariant())" role="alert" @key="t.Id">
+            <span class="ss-toast-text">@t.Text</span>
+            <button type="button" class="ss-toast-close" aria-label="Dismiss" @onclick="() => Toasts.Remove(t.Id)">&times;</button>
+        </div>
+    }
+</div>
+
+<style>
+    .ss-toast-wrap {
+        position: fixed; top: 1rem; right: 1rem; z-index: 1080;
+        display: flex; flex-direction: column; gap: 0.6rem; max-width: min(420px, 92vw);
+    }
+    .ss-toast {
+        display: flex; align-items: flex-start; gap: 0.75rem;
+        padding: 0.8rem 1rem; border-radius: 8px; color: #fff; font-size: 0.95rem; line-height: 1.4;
+        box-shadow: 0 10px 30px rgba(11, 37, 69, 0.22); animation: ss-toast-in 0.18s ease-out;
+    }
+    .ss-toast-success { background: #1e7d52; }
+    .ss-toast-error   { background: #b03b3b; }
+    .ss-toast-info    { background: #274a7d; }
+    .ss-toast-text { flex: 1; }
+    .ss-toast-close {
+        background: none; border: none; color: #fff; opacity: 0.85; font-size: 1.25rem;
+        line-height: 1; cursor: pointer; padding: 0;
+    }
+    .ss-toast-close:hover { opacity: 1; }
+    @@keyframes ss-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+</style>
+
+@code {
+    protected override void OnInitialized() => Toasts.OnChange += OnToastsChanged;
+
+    private async void OnToastsChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+
+        // Auto-dismiss the most recent toast after a few seconds (errors linger a little longer).
+        var latest = Toasts.Messages.LastOrDefault();
+        if (latest is not null)
+        {
+            var delay = latest.Level == ToastLevel.Error ? 8000 : 4500;
+            await Task.Delay(delay);
+            Toasts.Remove(latest.Id);
+        }
+    }
+
+    public void Dispose() => Toasts.OnChange -= OnToastsChanged;
+}
