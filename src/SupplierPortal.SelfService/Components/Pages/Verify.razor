@@ -1,4 +1,4 @@
-@page "/self-service/{Token}"
+@page "/supplier/self-service/{Token}"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject SupplierApiClient Api
 @inject SelfServiceSession Session
@@ -104,7 +104,7 @@
         Session.SupplierName = result.SupplierName;
         Session.ContactEmail = result.ContactEmail;
         Session.ExpiresAtUtc = result.ExpiresAtUtc;
-        Nav.NavigateTo($"/self-service/{Token}/form");
+        Nav.NavigateTo($"/supplier/self-service/{Token}/form");
     }
 
     private async Task ResendAsync()

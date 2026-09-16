@@ -1,4 +1,4 @@
-@page "/self-service/{Token}/form"
+@page "/supplier/self-service/{Token}/form"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject SupplierApiClient Api
 @inject SelfServiceSession Session
@@ -37,7 +37,7 @@ else
     {
         if (!Session.IsActive)
         {
-            Nav.NavigateTo($"/self-service/{Token}");
+            Nav.NavigateTo($"/supplier/self-service/{Token}");
             return;
         }
 
