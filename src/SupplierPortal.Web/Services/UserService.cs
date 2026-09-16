@@ -83,6 +83,29 @@ public class UserService(
         return await db.Users.Where(u => u.IsPendingRegistration).OrderBy(u => u.Email).ToListAsync();
     }
 
+    /// <summary>Deletes pending (unlinked, inactive) self-registrations whose e-mail is not a valid address
+    /// — i.e. the vulnerability-scanner / injection junk that predates intake validation. Only ever touches
+    /// rows with <see cref="User.IsPendingRegistration"/> == true; never linked or active users. The email
+    /// check runs in memory (the regex can't translate to SQL), over the small pending set. Returns the
+    /// number removed.</summary>
+    public async Task<int> RemoveInvalidPendingRegistrationsAsync(string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var pending = await db.Users.Where(u => u.IsPendingRegistration).ToListAsync();
+        var junk = pending.Where(u => !EmailValidation.IsValid(u.Email)).ToList();
+        if (junk.Count == 0)
+        {
+            return 0;
+        }
+
+        db.Users.RemoveRange(junk);
+        await db.SaveChangesAsync();
+
+        await auditService.LogAsync(actorUsername, AuditAction.Delete, "User", null,
+            $"Removed {junk.Count} invalid pending registration(s) (scanner/injection junk).");
+        return junk.Count;
+    }
+
     public async Task<(byte[] Bytes, string ContentType)?> GetPhotoAsync(int userId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

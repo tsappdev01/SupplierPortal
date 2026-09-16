@@ -23,8 +23,35 @@
 @if (pendingRegistrations.Count > 0)
 {
     <div class="alert alert-info">
-        <strong>Pending registrations awaiting linking:</strong>
-        @string.Join(", ", pendingRegistrations.Select(p => p.Email))
+        <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+                <strong>Pending registrations awaiting linking:</strong>
+                @string.Join(", ", pendingRegistrations.Select(p => p.Email))
+            </div>
+            @if (InvalidPendingCount > 0)
+            {
+                <div class="flex-shrink-0 text-nowrap">
+                    @if (!confirmingCleanup)
+                    {
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => confirmingCleanup = true">
+                            Remove @InvalidPendingCount invalid
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="me-2 small">Delete @InvalidPendingCount junk registration(s)?</span>
+                        <button class="btn btn-sm btn-danger" @onclick="RemoveInvalidAsync" disabled="@cleaning">
+                            @(cleaning ? "Removing…" : "Yes, remove")
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => confirmingCleanup = false" disabled="@cleaning">Cancel</button>
+                    }
+                </div>
+            }
+        </div>
+        @if (cleanupResult is not null)
+        {
+            <div class="mt-2 small fw-semibold text-success">@cleanupResult</div>
+        }
     </div>
 }
 
@@ -219,6 +246,12 @@
     private List<User> pendingRegistrations = [];
     private string currentUser = "unknown";
 
+    // Cleanup of invalid (scanner/injection) pending registrations.
+    private bool confirmingCleanup;
+    private bool cleaning;
+    private string? cleanupResult;
+    private int InvalidPendingCount => pendingRegistrations.Count(p => !EmailValidation.IsValid(p.Email));
+
     // Status filter — defaults to Active so the list opens on active users only.
     private string statusFilter = "Active";
 
@@ -243,6 +276,27 @@
     {
         await UserService.SetActiveAsync(user.Id, isActive, currentUser);
         users = await UserService.GetAllAsync();
+    }
+
+    // Removes only pending (unlinked, inactive) registrations whose email is invalid — the scanner/injection
+    // junk. Real self-registrations (valid email, awaiting admin linking) are preserved.
+    private async Task RemoveInvalidAsync()
+    {
+        cleaning = true;
+        try
+        {
+            var removed = await UserService.RemoveInvalidPendingRegistrationsAsync(currentUser);
+            pendingRegistrations = await UserService.GetPendingRegistrationsAsync();
+            users = await UserService.GetAllAsync();
+            cleanupResult = removed > 0
+                ? $"Removed {removed} invalid pending registration(s)."
+                : "No invalid pending registrations found.";
+        }
+        finally
+        {
+            cleaning = false;
+            confirmingCleanup = false;
+        }
     }
 
     private static string GetInitials(User user)
