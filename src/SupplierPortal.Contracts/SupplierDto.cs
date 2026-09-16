@@ -20,9 +20,17 @@ public class SupplierDto
     public int? SupplierTypeId { get; set; }
     public int? TaxpayerCountryId { get; set; }
     public string TaxRegistrationNumber { get; set; } = "";
-    public string TradeLicenseNumber { get; set; } = "";
-    // Trade-license detail fields (configurable / mandatory via field settings). Names match
+    // Configurable Business/Organization fields (shown/mandatory via field settings). Names match
     // SupplierFormModel so DtoMapper's by-name copy carries them through the API automatically.
+    public bool? VatRegistered { get; set; }
+    public int? VatRegistrationTypeId { get; set; }
+    public int? NumberOfVatGroupEntities { get; set; }
+    public string? VatGroupEntityNames { get; set; }
+    public string? SupplierTin { get; set; }
+    public int? BusinessPartnerTypeId { get; set; }
+    public int? BusinessLocationTypeId { get; set; }
+    public int? EInvoicingWaveId { get; set; }
+    public string TradeLicenseNumber { get; set; } = "";
     public DateTime? TradeLicenseIssueDate { get; set; }
     public DateTime? TradeLicenseExpiryDate { get; set; }
     public int? TradeLicenseIssuingBodyId { get; set; }
@@ -33,7 +41,7 @@ public class SupplierDto
     public string? DunsNumber { get; set; }
     public string? CorporateWebSite { get; set; }
 
-    // -- Step 2: Contact --
+    // -- Step 2: Address --
     public string? AddressLine1 { get; set; }
     public string? AddressLine2 { get; set; }
     public int? CityId { get; set; }
@@ -45,6 +53,17 @@ public class SupplierDto
     public int? PhoneCountryCodeId { get; set; }
     public string? PhoneAreaCode { get; set; }
     public string? State { get; set; }
+    public string? BusinessPhone { get; set; }
+    public bool AddressPurposeOrdering { get; set; }
+    public bool AddressPurposeRemitTo { get; set; }
+    public bool AddressPurposeRfqBidding { get; set; }
+
+    // -- Step 3: Contact person --
+    public string? MiddleName { get; set; }
+    public string? LastName { get; set; }
+    public int? MobileCountryCodeId { get; set; }
+    public string? MobileAreaCode { get; set; }
+    public string? Mobile { get; set; }
 
     // -- Step 3: Payment / Banking --
     public int? BankId { get; set; }

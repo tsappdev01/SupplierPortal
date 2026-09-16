@@ -50,6 +50,14 @@ public class FieldSettingDto
     public bool IsVisibleToSupplier { get; set; }
 }
 
+/// <summary>A wizard tab (step) as configured by the admin — its title and whether suppliers see it.</summary>
+public class TabSettingDto
+{
+    public int Step { get; set; }
+    public string Title { get; set; } = "";
+    public bool IsVisible { get; set; }
+}
+
 public class SupplierDocumentDto
 {
     public int Id { get; set; }
@@ -71,6 +79,8 @@ public class SupplierFormBootstrapDto
     public Dictionary<string, List<LookupItemDto>> Lookups { get; set; } = [];
     public List<BankDto> Banks { get; set; } = [];
     public List<FieldSettingDto> FieldSettings { get; set; } = [];
+    /// <summary>Wizard tabs (title + visibility), so the self-service form shows the same tabs as the portal.</summary>
+    public List<TabSettingDto> Tabs { get; set; } = [];
     public List<SupplierDocumentDto> Documents { get; set; } = [];
     /// <summary>Field keys the supplier has already edited but that are not yet acknowledged (drives highlight).</summary>
     public List<string> PendingEditedFieldKeys { get; set; } = [];

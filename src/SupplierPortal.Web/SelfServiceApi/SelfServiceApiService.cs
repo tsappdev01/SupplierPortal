@@ -25,7 +25,9 @@ public class SelfServiceApiService(
         LookupCategory.Province, LookupCategory.VatCode, LookupCategory.PaymentMethod,
         LookupCategory.PaymentTerms, LookupCategory.Prefix, LookupCategory.Currency,
         LookupCategory.BusinessRelationship, LookupCategory.CommunicationMethod,
-        LookupCategory.LicensingAuthority
+        LookupCategory.LicensingAuthority, LookupCategory.VatRegistrationType,
+        LookupCategory.BusinessPartnerType, LookupCategory.BusinessLocationType,
+        LookupCategory.EInvoicingWave
     ];
 
     // Email fields and their labels (server-side format validation — the DMZ boundary never trusts the client).
@@ -57,6 +59,7 @@ public class SelfServiceApiService(
 
         var banks = await supplierService.GetBanksAsync();
         var fieldSettings = await fieldSettingService.GetAllAsync();
+        var tabs = await fieldSettingService.GetTabsAsync();
         var documents = await documentService.GetDocumentsAsync(supplierId);
         var pending = await supplierService.GetPendingSupplierEditedFieldsAsync(supplierId);
         var businessUnits = await businessUnitService.GetAllAsync();
@@ -70,6 +73,7 @@ public class SelfServiceApiService(
             Lookups = lookups,
             Banks = banks.Select(DtoMapper.ToDto).ToList(),
             FieldSettings = fieldSettings.Select(DtoMapper.ToDto).ToList(),
+            Tabs = tabs.Select(DtoMapper.ToDto).ToList(),
             Documents = documents.Select(DtoMapper.ToDto).ToList(),
             PendingEditedFieldKeys = pending.ToList()
         };

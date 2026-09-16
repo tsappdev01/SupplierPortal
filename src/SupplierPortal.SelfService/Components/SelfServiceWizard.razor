@@ -10,15 +10,16 @@
     </div>
 
     <div class="di-stepper">
-        @for (var i = 1; i <= 4; i++)
+        @for (var i = 0; i < visibleTabs.Count; i++)
         {
-            var step = i;
-            <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") reached"
-                    @onclick="() => GoToStep(step)">
-                <span class="di-stepper-num">@step</span>
-                <span class="di-stepper-label">@StepLabels[step]</span>
+            var idx = i;
+            var tab = visibleTabs[idx];
+            <button type="button" class="di-stepper-item @(currentIndex == idx ? "active" : "") reached"
+                    @onclick="() => GoToIndex(idx)">
+                <span class="di-stepper-num">@(idx + 1)</span>
+                <span class="di-stepper-label">@tab.Title</span>
             </button>
-            @if (i < 4)
+            @if (i < visibleTabs.Count - 1)
             {
                 <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
@@ -48,191 +49,67 @@
                 </div>
             }
 
-            <!-- Step 1: Business / Organization -->
-            <div class="di-section" style="display:@(currentStep == 1 ? "block" : "none")">
-                <div class="di-section-header">Business / Organization Information</div>
-                <div class="di-section-body">
-                    <div class="di-field">
-                        <label>Supplier Number</label>
-                        <input type="text" value="@(string.IsNullOrWhiteSpace(model.SupplierNumber) ? "System generated" : model.SupplierNumber)" disabled />
-                    </div>
-                    <div class="di-field @FieldClass("SupplierName")">
-                        <label>Supplier Name@(Req("SupplierName"))</label>
-                        <InputText @bind-Value="model.SupplierName" />
-                    </div>
-                    <div class="di-field @FieldClass("PrefixId")">
-                        <label>Prefix@(Req("PrefixId"))</label>
-                        <InputSelect @bind-Value="model.PrefixId"><option value="">— Select —</option>@foreach (var l in prefixes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("TaxOrganizationTypeId")">
-                        <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
-                        <InputSelect @bind-Value="model.TaxOrganizationTypeId"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("FirstName")">
-                        <label>First Name@(Req("FirstName"))</label>
-                        <InputText @bind-Value="model.FirstName" />
-                    </div>
-                    <div class="di-field @FieldClass("Email")">
-                        <label>Business E-Mail@(Req("Email"))</label>
-                        <InputText @bind-Value="model.Email" />
-                    </div>
-                    <div class="di-field @FieldClass("SupplierTypeId")">
-                        <label>Supplier Type@(Req("SupplierTypeId"))</label>
-                        <InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("TaxpayerCountryId")">
-                        <label>Taxpayer Country@(Req("TaxpayerCountryId"))</label>
-                        <InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("TaxRegistrationNumber")">
-                        <label>Tax Registration Number@(Req("TaxRegistrationNumber"))</label>
-                        <InputText @bind-Value="model.TaxRegistrationNumber" />
-                    </div>
-                    <div class="di-field @FieldClass("TradeLicenseNumber")">
-                        <label>Trade License Number@(Req("TradeLicenseNumber"))</label>
-                        <InputText @bind-Value="model.TradeLicenseNumber" />
-                    </div>
-                    <div class="di-field @FieldClass("TradeLicenseIssueDate")">
-                        <label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label>
-                        <InputDate @bind-Value="model.TradeLicenseIssueDate" />
-                    </div>
-                    <div class="di-field @FieldClass("TradeLicenseExpiryDate")">
-                        <label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label>
-                        <InputDate @bind-Value="model.TradeLicenseExpiryDate" />
-                    </div>
-                    <div class="di-field @FieldClass("TradeLicenseIssuingBodyId")">
-                        <label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label>
-                        <InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    @if (IsOthersIssuingBody())
-                    {
-                        <div class="di-field @FieldClass("IssuingBodyIfOthers")">
-                            <label>Issuing Body (if Others)@(Req("IssuingBodyIfOthers"))</label>
-                            <InputText @bind-Value="model.IssuingBodyIfOthers" />
-                        </div>
-                    }
-                    <div class="di-field @FieldClass("VatCodeId")">
-                        <label>VAT Code@(Req("VatCodeId"))</label>
-                        <InputSelect @bind-Value="model.VatCodeId"><option value="">— Select —</option>@foreach (var l in vatCodes){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("BusinessRelationshipId")">
-                        <label>Business Relationship@(Req("BusinessRelationshipId"))</label>
-                        <InputSelect @bind-Value="model.BusinessRelationshipId"><option value="">— Select —</option>@foreach (var l in businessRelationships){<option value="@l.Id">@l.DisplayName</option>}</InputSelect>
-                    </div>
-                    <div class="di-field @FieldClass("DunsNumber")">
-                        <label>D-U-N-S Number@(Req("DunsNumber"))</label>
-                        <InputText @bind-Value="model.DunsNumber" />
-                    </div>
-                    <div class="di-field @FieldClass("CorporateWebSite")">
-                        <label>Corporate Web Site@(Req("CorporateWebSite"))</label>
-                        <InputText @bind-Value="model.CorporateWebSite" placeholder="https://" />
-                    </div>
-                    <div class="di-checkbox-row">
-                        <div class="di-checkbox-item @FieldClass("IsOneTimeSupplier")"><InputCheckbox @bind-Value="model.IsOneTimeSupplier" id="oneTime" /><label for="oneTime" style="margin:0;">One-time supplier</label></div>
-                    </div>
+            @for (var i = 0; i < visibleTabs.Count; i++)
+            {
+                var idx = i;
+                var tab = visibleTabs[idx];
+                <div class="di-section" style="display:@(currentIndex == idx ? "block" : "none")">
+                    <div class="di-section-header">@tab.Title</div>
+                    <div class="di-section-body">
+                        @if (tab.Step == 1)
+                        {
+                            <div class="di-field">
+                                <label>Supplier Number</label>
+                                <input type="text" value="@(string.IsNullOrWhiteSpace(model.SupplierNumber) ? "System generated" : model.SupplierNumber)" disabled />
+                            </div>
+                        }
+                        @foreach (var key in KeysForStep(tab.Step))
+                        {
+                            @fieldFragments[key]
+                        }
 
-                    <div class="di-documents-row">
-                        <div class="di-document-slot">
-                            <label>Trade License <span class="di-req">*</span></label>
-                            @if (GetDocument(SelfServiceDocumentType.TradeLicense) is { } tl){<div class="di-document-current">Uploaded: @tl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tl.Id)" disabled="@viewingDocument">View</button></div>}
-                            <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.TradeLicense)" disabled="@uploadingDocument" />
-                            @if (!HasTradeLicenseDocument()){<div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>}
-                        </div>
-                        <div class="di-document-slot">
-                            <label>VAT Certificate</label>
-                            @if (GetDocument(SelfServiceDocumentType.VatCertification) is { } vd){<div class="di-document-current">Uploaded: @vd.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vd.Id)" disabled="@viewingDocument">View</button></div>}
-                            <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.VatCertification)" disabled="@uploadingDocument" />
-                        </div>
-                        <div class="di-document-slot">
-                            <label>Other Documents</label>
-                            @foreach (var doc in OtherDocuments){<div class="di-document-current">@doc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button><button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button></div>}
-                            <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
-                        </div>
+                        @if (tab.Step == 1)
+                        {
+                            <div class="di-documents-row">
+                                <div class="di-document-slot">
+                                    <label>Trade License <span class="di-req">*</span></label>
+                                    @if (GetDocument(SelfServiceDocumentType.TradeLicense) is { } tl){<div class="di-document-current">Uploaded: @tl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tl.Id)" disabled="@viewingDocument">View</button></div>}
+                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.TradeLicense)" disabled="@uploadingDocument" />
+                                    @if (!HasTradeLicenseDocument()){<div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>}
+                                </div>
+                                <div class="di-document-slot">
+                                    <label>VAT Certificate</label>
+                                    @if (GetDocument(SelfServiceDocumentType.VatCertification) is { } vd){<div class="di-document-current">Uploaded: @vd.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vd.Id)" disabled="@viewingDocument">View</button></div>}
+                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.VatCertification)" disabled="@uploadingDocument" />
+                                </div>
+                                <div class="di-document-slot">
+                                    <label>Other Documents</label>
+                                    @foreach (var doc in OtherDocuments){<div class="di-document-current">@doc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button><button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button></div>}
+                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
+                                </div>
+                            </div>
+                        }
+                        @if (tab.Step == 5)
+                        {
+                            <div class="di-documents-row">
+                                <div class="di-document-slot">
+                                    <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
+                                    @if (GetDocument(SelfServiceDocumentType.BankConfirmationLetter) is { } bl){<div class="di-document-current">Uploaded: @bl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bl.Id)" disabled="@viewingDocument">View</button></div>}
+                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.BankConfirmationLetter)" disabled="@uploadingDocument" />
+                                    @if (RequiresBankConfirmationLetter()){<div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>}
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
-            </div>
-
-            <!-- Step 2: Contact Information -->
-            <div class="di-section" style="display:@(currentStep == 2 ? "block" : "none")">
-                <div class="di-section-header">Contact Information</div>
-                <div class="di-section-body">
-                    <div class="di-field @FieldClass("AddressName")"><label>Address Name@(Req("AddressName"))</label><InputText @bind-Value="model.AddressName" /></div>
-                    <div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))</label><InputText @bind-Value="model.AddressLine1" /></div>
-                    <div class="di-field di-full @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))</label><InputText @bind-Value="model.AddressLine2" /></div>
-                    <div class="di-field @FieldClass("CityId")"><label>City@(Req("CityId"))</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("State")"><label>State@(Req("State"))</label><InputText @bind-Value="model.State" /></div>
-                    <div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("PostalCode")"><label>Postal Code@(Req("PostalCode"))</label><InputText @bind-Value="model.PostalCode" /></div>
-                    <div class="di-field @FieldClass("AdministrativeContact")"><label>Administrative Contact@(Req("AdministrativeContact"))</label><InputText @bind-Value="model.AdministrativeContact" placeholder="Defaults to First Name if left blank" /></div>
-                    <div class="di-field @FieldClass("PhoneCountryCodeId")"><label>Phone Country Code@(Req("PhoneCountryCodeId"))</label><InputSelect @bind-Value="model.PhoneCountryCodeId"><option value="">— Select —</option>@foreach (var l in countriesWithPhoneCode){<option value="@l.Id">+@l.PhoneCode @l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("PhoneAreaCode")"><label>Phone Area Code@(Req("PhoneAreaCode"))</label><InputText @bind-Value="model.PhoneAreaCode" /></div>
-                </div>
-            </div>
-
-            <!-- Step 3: Payment / Banking -->
-            <div class="di-section" style="display:@(currentStep == 3 ? "block" : "none")">
-                <div class="di-section-header">Payment / Banking Information</div>
-                <div class="di-section-body">
-                    <div class="di-field @FieldClass("BankId")"><label>Bank Name@(Req("BankId"))</label><InputSelect @bind-Value="model.BankId" @bind-Value:after="OnBankChanged"><option value="">— Select —</option>@foreach (var b in banks){<option value="@b.Id">@b.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("BankBranchId")"><label>Branch Name@(Req("BankBranchId"))</label><InputSelect @bind-Value="model.BankBranchId" disabled="@(model.BankId is null)"><option value="">— Select —</option>@foreach (var br in SelectedBankBranches){<option value="@br.Id">@br.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("AccountCountryCodeId")"><label>Account Country Code@(Req("AccountCountryCodeId"))</label><InputSelect @bind-Value="model.AccountCountryCodeId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("AccountName")"><label>Account Name@(Req("AccountName"))</label><InputText @bind-Value="model.AccountName" /></div>
-                    <div class="di-field @FieldClass("AccountNumber")"><label>Account Number@(Req("AccountNumber"))</label><InputText @bind-Value="model.AccountNumber" /></div>
-                    <div class="di-field @FieldClass("AccountCurrencyCodeId")"><label>Account Currency Code@(Req("AccountCurrencyCodeId"))</label><InputSelect @bind-Value="model.AccountCurrencyCodeId"><option value="">— Select —</option>@foreach (var l in currencies){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("SwiftCode")"><label>Swift Code / BIC Code@(Req("SwiftCode"))</label><InputText @bind-Value="model.SwiftCode" /></div>
-                    <div class="di-field @FieldClass("Iban")"><label>IBAN@(Req("Iban"))</label><InputText @bind-Value="model.Iban" /></div>
-                    <div class="di-field @FieldClass("AccountStartDate")"><label>Account Start Date@(Req("AccountStartDate"))</label><InputDate @bind-Value="model.AccountStartDate" /></div>
-                    <div class="di-field @FieldClass("PaymentMethodCode")"><label>Payment Method Code@(Req("PaymentMethodCode"))</label><InputText @bind-Value="model.PaymentMethodCode" /></div>
-                    <div class="di-field @FieldClass("RemitAdviceEmail")"><label>Remit Advice Email@(Req("RemitAdviceEmail"))</label><InputText @bind-Value="model.RemitAdviceEmail" /></div>
-                    <div class="di-checkbox-row"><div class="di-checkbox-item @FieldClass("AllowInternationalPayments")"><InputCheckbox @bind-Value="model.AllowInternationalPayments" id="intlPay" /><label for="intlPay" style="margin:0;">Allow International Payments</label></div></div>
-
-                    <div class="di-documents-row">
-                        <div class="di-document-slot">
-                            <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
-                            @if (GetDocument(SelfServiceDocumentType.BankConfirmationLetter) is { } bl){<div class="di-document-current">Uploaded: @bl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bl.Id)" disabled="@viewingDocument">View</button></div>}
-                            <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.BankConfirmationLetter)" disabled="@uploadingDocument" />
-                            @if (RequiresBankConfirmationLetter()){<div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 4: Site / Business Unit -->
-            <div class="di-section" style="display:@(currentStep == 4 ? "block" : "none")">
-                <div class="di-section-header">Site / Business Unit</div>
-                <div class="di-section-body">
-                    <div class="di-field @FieldClass("SupplierSiteBuId")"><label>Supplier Site@(Req("SupplierSiteBuId"))</label><InputSelect @bind-Value="model.SupplierSiteBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("ProcurementBuId")"><label>Procurement BU@(Req("ProcurementBuId"))</label><InputSelect @bind-Value="model.ProcurementBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("ClientBuId")"><label>Client BU@(Req("ClientBuId"))</label><InputSelect @bind-Value="model.ClientBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("BillToBuId")"><label>Bill-to BU@(Req("BillToBuId"))</label><InputSelect @bind-Value="model.BillToBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("PaymentMethodId")"><label>Payment Method@(Req("PaymentMethodId"))</label><InputSelect @bind-Value="model.PaymentMethodId"><option value="">— Select —</option>@foreach (var l in paymentMethods){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("PaymentTermsId")"><label>Payment Terms@(Req("PaymentTermsId"))</label><InputSelect @bind-Value="model.PaymentTermsId"><option value="">— Select —</option>@foreach (var l in paymentTerms){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("CommunicationMethodId")"><label>Communication Method@(Req("CommunicationMethodId"))</label><InputSelect @bind-Value="model.CommunicationMethodId"><option value="">— Select —</option>@foreach (var l in communicationMethods){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>
-                    <div class="di-field @FieldClass("CommunicationEmail")"><label>Communication Email@(Req("CommunicationEmail"))</label><InputText @bind-Value="model.CommunicationEmail" /></div>
-                    <div class="di-field @FieldClass("ContactEmail")"><label>Contact Email@(Req("ContactEmail"))</label><InputText @bind-Value="model.ContactEmail" /></div>
-                    <div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><InputText @bind-Value="model.Phone" /></div>
-                    <div class="di-field di-full @FieldClass("RemittanceEmail")"><label>Remittance E-mail@(Req("RemittanceEmail"))</label><InputText @bind-Value="model.RemittanceEmail" /></div>
-                    @if (SiteUsageKeys.Any(k => !hiddenKeys.Contains(k)))
-                    {
-                        <div class="di-hint">Site usages — select all that apply:</div>
-                    }
-                    <div class="di-checkbox-row">
-                        <div class="di-checkbox-item @FieldClass("IsRfqOrBidding")"><InputCheckbox @bind-Value="model.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div>
-                        <div class="di-checkbox-item @FieldClass("IsOrdering")"><InputCheckbox @bind-Value="model.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div>
-                        <div class="di-checkbox-item @FieldClass("IsSourcingOnly")"><InputCheckbox @bind-Value="model.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div>
-                        <div class="di-checkbox-item @FieldClass("IsPurchasing")"><InputCheckbox @bind-Value="model.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div>
-                        <div class="di-checkbox-item @FieldClass("IsPay")"><InputCheckbox @bind-Value="model.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div>
-                        <div class="di-checkbox-item @FieldClass("IsPrimaryPay")"><InputCheckbox @bind-Value="model.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div>
-                    </div>
-                </div>
-            </div>
+            }
 
             <div class="di-actions">
-                @if (currentStep > 1)
+                @if (currentIndex > 0)
                 {
                     <button class="di-btn di-btn-secondary" type="button" @onclick="Back" disabled="@isSaving">Back</button>
                 }
-                @if (currentStep < 4)
+                @if (currentIndex < visibleTabs.Count - 1)
                 {
                     <button class="di-btn di-btn-primary" type="button" @onclick="NextAsync" disabled="@isSaving">Next</button>
                 }
@@ -262,23 +139,18 @@
     [Parameter, EditorRequired] public SupplierFormBootstrapDto Bootstrap { get; set; } = default!;
     [Parameter, EditorRequired] public string SessionToken { get; set; } = "";
 
-    private static readonly Dictionary<int, string> StepLabels = new()
-    {
-        [1] = "Business / Organization", [2] = "Contact Information",
-        [3] = "Payment / Banking", [4] = "Site / Business Unit"
-    };
-
     private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
 
+    // Email fields validated per SETTINGS step number.
     private static readonly Dictionary<int, (string Key, string Label)[]> EmailFieldsByStep = new()
     {
-        [1] = [("Email", "Business E-Mail")],
-        [3] = [("RemitAdviceEmail", "Remit Advice Email")],
-        [4] = [("ContactEmail", "Contact Email"), ("CommunicationEmail", "Communication Email"), ("RemittanceEmail", "Remittance E-mail")]
+        [2] = [("Email", "Business E-Mail")],
+        [3] = [("ContactEmail", "Contacts E-Mail")],
+        [5] = [("RemitAdviceEmail", "Remit Advice Email")]
     };
 
     private SupplierDto model = new();
-    private int currentStep = 1;
+    private int currentIndex;
     private bool isSaving;
     private bool submitted;
     private bool uploadingDocument;
@@ -287,23 +159,23 @@
     private string? viewerUrl;
     private string? viewerName;
 
-    // Write-through to the toast queue: existing code that sets errorMessage/statusMessage now raises a
-    // toast instead of an inline alert. The getters return null so the old inline alert blocks never render.
+    // Write-through to the toast queue: setting errorMessage/statusMessage raises a toast. Getters null.
     private string? errorMessage { get => null; set => Toast.ShowError(value); }
     private string? statusMessage { get => null; set => Toast.ShowSuccess(value); }
 
     private List<LookupItemDto> taxOrgTypes = [], supplierTypes = [], countries = [], countriesWithPhoneCode = [],
         businessRelationships = [], provinces = [], vatCodes = [], paymentMethods = [], paymentTerms = [],
-        prefixes = [], communicationMethods = [], currencies = [], licensingAuthorities = [];
+        prefixes = [], communicationMethods = [], currencies = [], licensingAuthorities = [],
+        vatRegistrationTypes = [], businessPartnerTypes = [], businessLocationTypes = [], eInvoicingWaves = [];
     private List<BankDto> banks = [];
     private List<BusinessUnitDto> businessUnits = [];
     private List<SupplierDocumentDto> documents = [];
 
+    private List<TabSettingDto> visibleTabs = [];
+    private Dictionary<string, RenderFragment> fieldFragments = new();
+
     private HashSet<string> mandatoryKeys = [];
     private HashSet<string> hiddenKeys = [];
-
-    private static readonly string[] SiteUsageKeys =
-        ["IsRfqOrBidding", "IsOrdering", "IsSourcingOnly", "IsPurchasing", "IsPay", "IsPrimaryPay"];
     private HashSet<string> changedKeys = [];
     private int? originalBankId;
     private string? originalAccountNumber;
@@ -311,6 +183,13 @@
     private List<BankBranchDto> SelectedBankBranches => banks.FirstOrDefault(b => b.Id == model.BankId)?.Branches ?? [];
     private List<SupplierDocumentDto> OtherDocuments => documents.Where(d => d.DocumentType == SelfServiceDocumentType.Other).ToList();
     private SupplierDocumentDto? GetDocument(SelfServiceDocumentType type) => documents.FirstOrDefault(d => d.DocumentType == type);
+
+    // VAT Registered is a nullable bool rendered as a Yes/No/— select.
+    private string VatRegisteredStr
+    {
+        get => model.VatRegistered switch { true => "true", false => "false", _ => "" };
+        set => model.VatRegistered = value switch { "true" => true, "false" => false, _ => (bool?)null };
+    }
 
     protected override void OnInitialized()
     {
@@ -320,7 +199,9 @@
         provinces = L("Province"); vatCodes = L("VatCode"); paymentMethods = L("PaymentMethod");
         paymentTerms = L("PaymentTerms"); prefixes = L("Prefix"); currencies = L("Currency");
         businessRelationships = L("BusinessRelationship"); communicationMethods = L("CommunicationMethod");
-        licensingAuthorities = L("LicensingAuthority");
+        licensingAuthorities = L("LicensingAuthority"); vatRegistrationTypes = L("VatRegistrationType");
+        businessPartnerTypes = L("BusinessPartnerType"); businessLocationTypes = L("BusinessLocationType");
+        eInvoicingWaves = L("EInvoicingWave");
         countriesWithPhoneCode = countries.Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode)).ToList();
 
         banks = Bootstrap.Banks;
@@ -330,9 +211,31 @@
         hiddenKeys = Bootstrap.FieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
         changedKeys = Bootstrap.PendingEditedFieldKeys.ToHashSet();
 
+        // Visible tabs, in configured order. Fall back to the steps that actually carry visible fields
+        // (with generic titles) if no tab settings were provided.
+        visibleTabs = Bootstrap.Tabs.Where(t => t.IsVisible).OrderBy(t => t.Step).ToList();
+        if (visibleTabs.Count == 0)
+        {
+            visibleTabs = Bootstrap.FieldSettings
+                .Where(f => f.IsVisibleToSupplier)
+                .Select(f => f.Step).Distinct().OrderBy(s => s)
+                .Select(s => new TabSettingDto { Step = s, Title = $"Section {s}", IsVisible = true })
+                .ToList();
+        }
+
+        BuildFragments();
+
         originalBankId = model.BankId;
         originalAccountNumber = model.AccountNumber;
     }
+
+    // Fields assigned to a step, in Sequence order, that are visible to the supplier and that this form
+    // knows how to render (has a fragment for). Drives the exact set + order the admin configured.
+    private IEnumerable<string> KeysForStep(int step) =>
+        Bootstrap.FieldSettings
+            .Where(f => f.Step == step && f.IsVisibleToSupplier && fieldFragments.ContainsKey(f.FieldKey))
+            .OrderBy(f => f.Sequence)
+            .Select(f => f.FieldKey);
 
     private string FieldClass(string key)
     {
@@ -346,7 +249,6 @@
 
     private bool IsHidden(string key) => hiddenKeys.Contains(key);
 
-    // Show the free-text "Issuing Body (if Others)" only when the selected licensing authority is "Others".
     private bool IsOthersIssuingBody() =>
         licensingAuthorities.FirstOrDefault(l => l.Id == model.TradeLicenseIssuingBodyId)?.DisplayName?
             .Contains("Other", StringComparison.OrdinalIgnoreCase) == true;
@@ -366,24 +268,23 @@
         model.BankId != originalBankId ||
         !string.Equals((model.AccountNumber ?? "").Trim(), (originalAccountNumber ?? "").Trim(), StringComparison.Ordinal);
 
-    private bool HasBankConfirmationLetter() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.BankConfirmationLetter);
     private bool HasTradeLicenseDocument() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.TradeLicense);
-    private bool RequiresBankConfirmationLetter() => BankAccountChanged() && !HasBankConfirmationLetter();
+    private bool HasBankFieldsVisible() => visibleTabs.Any(t => t.Step == 5);
+    private bool RequiresBankConfirmationLetter() =>
+        HasBankFieldsVisible() && BankAccountChanged() && !documents.Any(d => d.DocumentType == SelfServiceDocumentType.BankConfirmationLetter);
 
     private void OnBankChanged() => model.BankBranchId = null;
-    private void Back() => currentStep = Math.Max(1, currentStep - 1);
-    private void GoToStep(int step) => currentStep = step;
+    private void Back() => currentIndex = Math.Max(0, currentIndex - 1);
+    private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, visibleTabs.Count - 1);
 
     private List<string> ValidateStep(int step)
     {
         var errors = new List<string>();
         foreach (var f in Bootstrap.FieldSettings.Where(f => f.Step == step && f.IsMandatory && f.IsVisibleToSupplier))
         {
-            // Only enforce fields the self-service form can actually collect (a property on SupplierDto).
-            // A mandatory field with no matching DTO property isn't rendered here, so requiring it would
-            // permanently block submission — skip it rather than soft-lock the supplier.
+            // Only enforce fields this form can actually collect (a property on SupplierDto with a fragment).
             var prop = typeof(SupplierDto).GetProperty(f.FieldKey);
-            if (prop is null) { continue; }
+            if (prop is null || !fieldFragments.ContainsKey(f.FieldKey)) { continue; }
             var value = prop.GetValue(model);
             if (value is null || (value is string s && string.IsNullOrWhiteSpace(s)))
             {
@@ -420,50 +321,49 @@
 
     private async Task NextAsync()
     {
-        statusMessage = null;
-        var errors = ValidateStep(currentStep);
+        var step = visibleTabs[currentIndex].Step;
+        var errors = ValidateStep(step);
         if (errors.Count > 0) { errorMessage = string.Join(" ", errors); return; }
-        if (currentStep == 3 && RequiresBankConfirmationLetter())
+        if (step == 5 && RequiresBankConfirmationLetter())
         {
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
-        errorMessage = null;
         isSaving = true;
         try
         {
-            if (await PersistAsync()) { currentStep++; }
+            if (await PersistAsync()) { currentIndex = Math.Min(currentIndex + 1, visibleTabs.Count - 1); }
         }
         finally { isSaving = false; }
     }
 
     private async Task SubmitAsync()
     {
-        statusMessage = null;
-        var allErrors = Enumerable.Range(1, 4).SelectMany(ValidateStep).ToList();
+        var allErrors = visibleTabs.SelectMany(t => ValidateStep(t.Step)).ToList();
         if (allErrors.Count > 0)
         {
-            for (var step = 1; step <= 4; step++)
+            for (var i = 0; i < visibleTabs.Count; i++)
             {
-                if (ValidateStep(step).Count > 0) { currentStep = step; break; }
+                if (ValidateStep(visibleTabs[i].Step).Count > 0) { currentIndex = i; break; }
             }
             errorMessage = "Complete all required fields before submitting: " + string.Join(" ", allErrors);
             return;
         }
         if (!HasTradeLicenseDocument())
         {
-            currentStep = 1;
+            var i = visibleTabs.FindIndex(t => t.Step == 1);
+            if (i >= 0) { currentIndex = i; }
             errorMessage = "A Trade License document must be attached before submitting.";
             return;
         }
         if (RequiresBankConfirmationLetter())
         {
-            currentStep = 3;
+            var i = visibleTabs.FindIndex(t => t.Step == 5);
+            if (i >= 0) { currentIndex = i; }
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
         }
 
-        errorMessage = null;
         isSaving = true;
         try
         {
@@ -487,7 +387,6 @@
                 return;
             }
 
-            // Show a progress banner while the file streams to the server and on to the API.
             uploadingFileName = e.File.Name;
             Toast.ShowInfo($"Uploading '{e.File.Name}'…");
             StateHasChanged();
@@ -520,8 +419,6 @@
         }
         catch (Exception)
         {
-            // Any failure (oversized stream, transient network, bad response) surfaces as a friendly
-            // message instead of an unhandled circuit error that looks like "nothing happened".
             errorMessage = $"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.";
         }
         finally { uploadingDocument = false; uploadingFileName = null; }
@@ -529,8 +426,6 @@
 
     private async Task ViewDocumentAsync(int documentId)
     {
-        errorMessage = null;
-        statusMessage = null;
         viewingDocument = true;
         try
         {
@@ -566,5 +461,92 @@
         var result = await Api.DeleteDocumentAsync(SessionToken, documentId);
         if (result.Success) { documents = result.Documents; statusMessage = "Document removed."; }
         else { errorMessage = result.Error ?? "Could not remove the document."; }
+    }
+
+    // ----- Field fragments (one per field key; rendered per tab in the admin-configured order) -----
+    private void BuildFragments()
+    {
+        var f = new Dictionary<string, RenderFragment>();
+
+        // Step 1 — Business / Organization
+        f["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")"><label>Supplier Name@(Req("SupplierName"))</label><InputText @bind-Value="model.SupplierName" /></div>;
+        f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["SupplierTypeId"] = @<div class="di-field @FieldClass("SupplierTypeId")"><label>Supplier Type@(Req("SupplierTypeId"))</label><InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TaxpayerCountryId"] = @<div class="di-field @FieldClass("TaxpayerCountryId")"><label>Taxpayer Country@(Req("TaxpayerCountryId"))</label><InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TaxRegistrationNumber"] = @<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label><InputText @bind-Value="model.TaxRegistrationNumber" /></div>;
+        f["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")"><label>VAT Registered?@(Req("VatRegistered"))</label><select class="form-select" @bind="VatRegisteredStr"><option value="">— Select —</option><option value="true">Yes</option><option value="false">No</option></select></div>;
+        f["VatRegistrationTypeId"] = @<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["NumberOfVatGroupEntities"] = @<div class="di-field @FieldClass("NumberOfVatGroupEntities")"><label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label><InputNumber @bind-Value="model.NumberOfVatGroupEntities" /></div>;
+        f["VatGroupEntityNames"] = @<div class="di-field di-full @FieldClass("VatGroupEntityNames")"><label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label><InputTextArea @bind-Value="model.VatGroupEntityNames" /></div>;
+        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))</label><InputText @bind-Value="model.SupplierTin" /></div>;
+        f["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")"><label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label><InputSelect @bind-Value="model.BusinessPartnerTypeId"><option value="">— Select —</option>@foreach (var l in businessPartnerTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["BusinessLocationTypeId"] = @<div class="di-field @FieldClass("BusinessLocationTypeId")"><label>Business Location Type@(Req("BusinessLocationTypeId"))</label><InputSelect @bind-Value="model.BusinessLocationTypeId"><option value="">— Select —</option>@foreach (var l in businessLocationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")"><label>eInvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label><InputSelect @bind-Value="model.EInvoicingWaveId"><option value="">— Select —</option>@foreach (var l in eInvoicingWaves){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TradeLicenseNumber"] = @<div class="di-field @FieldClass("TradeLicenseNumber")"><label>Trade License Number@(Req("TradeLicenseNumber"))</label><InputText @bind-Value="model.TradeLicenseNumber" /></div>;
+        f["TradeLicenseIssueDate"] = @<div class="di-field @FieldClass("TradeLicenseIssueDate")"><label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label><InputDate @bind-Value="model.TradeLicenseIssueDate" /></div>;
+        f["TradeLicenseExpiryDate"] = @<div class="di-field @FieldClass("TradeLicenseExpiryDate")"><label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label><InputDate @bind-Value="model.TradeLicenseExpiryDate" /></div>;
+        f["TradeLicenseIssuingBodyId"] = @<div class="di-field @FieldClass("TradeLicenseIssuingBodyId")"><label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label><InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["IssuingBodyIfOthers"] = @<div class="di-field @FieldClass("IssuingBodyIfOthers")" style="display:@(IsOthersIssuingBody() ? "flex" : "none")"><label>Issuing Body (if Others)@(Req("IssuingBodyIfOthers"))</label><InputText @bind-Value="model.IssuingBodyIfOthers" /></div>;
+        f["VatCodeId"] = @<div class="di-field @FieldClass("VatCodeId")"><label>VAT Code@(Req("VatCodeId"))</label><InputSelect @bind-Value="model.VatCodeId"><option value="">— Select —</option>@foreach (var l in vatCodes){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>;
+        f["BusinessRelationshipId"] = @<div class="di-field @FieldClass("BusinessRelationshipId")"><label>Business Relationship@(Req("BusinessRelationshipId"))</label><InputSelect @bind-Value="model.BusinessRelationshipId"><option value="">— Select —</option>@foreach (var l in businessRelationships){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["DunsNumber"] = @<div class="di-field @FieldClass("DunsNumber")"><label>D-U-N-S Number@(Req("DunsNumber"))</label><InputText @bind-Value="model.DunsNumber" /></div>;
+        f["IsOneTimeSupplier"] = @<div class="di-field @FieldClass("IsOneTimeSupplier")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOneTimeSupplier" id="oneTime" /><label for="oneTime" style="margin:0;">One-time supplier</label></div></div>;
+
+        // Step 2 — Address
+        f["AddressName"] = @<div class="di-field @FieldClass("AddressName")"><label>Address Name@(Req("AddressName"))</label><InputText @bind-Value="model.AddressName" /></div>;
+        f["AddressLine1"] = @<div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))</label><InputText @bind-Value="model.AddressLine1" /></div>;
+        f["AddressLine2"] = @<div class="di-field di-full @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))</label><InputText @bind-Value="model.AddressLine2" /></div>;
+        f["CityId"] = @<div class="di-field @FieldClass("CityId")"><label>City / Emirate@(Req("CityId"))</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["CountryId"] = @<div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["PostalCode"] = @<div class="di-field @FieldClass("PostalCode")"><label>PO Box / Postal Code@(Req("PostalCode"))</label><InputText @bind-Value="model.PostalCode" /></div>;
+        f["State"] = @<div class="di-field @FieldClass("State")"><label>State@(Req("State"))</label><InputText @bind-Value="model.State" /></div>;
+        f["CorporateWebSite"] = @<div class="di-field @FieldClass("CorporateWebSite")"><label>Corporate Web Site@(Req("CorporateWebSite"))</label><InputText @bind-Value="model.CorporateWebSite" placeholder="https://" /></div>;
+        f["Email"] = @<div class="di-field @FieldClass("Email")"><label>Business E-Mail@(Req("Email"))</label><InputText @bind-Value="model.Email" /></div>;
+        f["BusinessPhone"] = @<div class="di-field @FieldClass("BusinessPhone")"><label>Business Contact Number@(Req("BusinessPhone"))</label><InputText @bind-Value="model.BusinessPhone" /></div>;
+        f["AddressPurposeOrdering"] = @<div class="di-field @FieldClass("AddressPurposeOrdering")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeOrdering" id="apOrd" /><label for="apOrd" style="margin:0;">Address Purpose — Ordering</label></div></div>;
+        f["AddressPurposeRemitTo"] = @<div class="di-field @FieldClass("AddressPurposeRemitTo")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeRemitTo" id="apRemit" /><label for="apRemit" style="margin:0;">Address Purpose — Remit to</label></div></div>;
+        f["AddressPurposeRfqBidding"] = @<div class="di-field @FieldClass("AddressPurposeRfqBidding")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeRfqBidding" id="apRfq" /><label for="apRfq" style="margin:0;">Address Purpose — RFQ or Bidding</label></div></div>;
+
+        // Step 3 — Contact Information
+        f["PrefixId"] = @<div class="di-field @FieldClass("PrefixId")"><label>Prefix@(Req("PrefixId"))</label><InputSelect @bind-Value="model.PrefixId"><option value="">— Select —</option>@foreach (var l in prefixes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["FirstName"] = @<div class="di-field @FieldClass("FirstName")"><label>First Name@(Req("FirstName"))</label><InputText @bind-Value="model.FirstName" /></div>;
+        f["MiddleName"] = @<div class="di-field @FieldClass("MiddleName")"><label>Middle Name@(Req("MiddleName"))</label><InputText @bind-Value="model.MiddleName" /></div>;
+        f["LastName"] = @<div class="di-field @FieldClass("LastName")"><label>Last Name@(Req("LastName"))</label><InputText @bind-Value="model.LastName" /></div>;
+        f["AdministrativeContact"] = @<div class="di-field @FieldClass("AdministrativeContact")"><label>Administrative Contact@(Req("AdministrativeContact"))</label><InputText @bind-Value="model.AdministrativeContact" placeholder="Defaults to First Name if left blank" /></div>;
+        f["ContactEmail"] = @<div class="di-field @FieldClass("ContactEmail")"><label>Contacts E-Mail@(Req("ContactEmail"))</label><InputText @bind-Value="model.ContactEmail" /></div>;
+        f["PhoneCountryCodeId"] = @<div class="di-field @FieldClass("PhoneCountryCodeId")"><label>Phone Country Code@(Req("PhoneCountryCodeId"))</label><InputSelect @bind-Value="model.PhoneCountryCodeId"><option value="">— Select —</option>@foreach (var l in countriesWithPhoneCode){<option value="@l.Id">+@l.PhoneCode @l.DisplayName</option>}</InputSelect></div>;
+        f["PhoneAreaCode"] = @<div class="di-field @FieldClass("PhoneAreaCode")"><label>Phone Area Code@(Req("PhoneAreaCode"))</label><InputText @bind-Value="model.PhoneAreaCode" /></div>;
+        f["Phone"] = @<div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><InputText @bind-Value="model.Phone" /></div>;
+        f["MobileCountryCodeId"] = @<div class="di-field @FieldClass("MobileCountryCodeId")"><label>Mobile Country Code@(Req("MobileCountryCodeId"))</label><InputSelect @bind-Value="model.MobileCountryCodeId"><option value="">— Select —</option>@foreach (var l in countriesWithPhoneCode){<option value="@l.Id">+@l.PhoneCode @l.DisplayName</option>}</InputSelect></div>;
+        f["MobileAreaCode"] = @<div class="di-field @FieldClass("MobileAreaCode")"><label>Mobile Area Code@(Req("MobileAreaCode"))</label><InputText @bind-Value="model.MobileAreaCode" /></div>;
+        f["Mobile"] = @<div class="di-field @FieldClass("Mobile")"><label>Mobile@(Req("Mobile"))</label><InputText @bind-Value="model.Mobile" /></div>;
+
+        // Step 4 — Site / Business Unit
+        f["ProcurementBuId"] = @<div class="di-field @FieldClass("ProcurementBuId")"><label>Procurement BU@(Req("ProcurementBuId"))</label><InputSelect @bind-Value="model.ProcurementBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["ClientBuId"] = @<div class="di-field @FieldClass("ClientBuId")"><label>Client BU@(Req("ClientBuId"))</label><InputSelect @bind-Value="model.ClientBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["BillToBuId"] = @<div class="di-field @FieldClass("BillToBuId")"><label>Bill-to BU@(Req("BillToBuId"))</label><InputSelect @bind-Value="model.BillToBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["PaymentMethodId"] = @<div class="di-field @FieldClass("PaymentMethodId")"><label>Payment Method@(Req("PaymentMethodId"))</label><InputSelect @bind-Value="model.PaymentMethodId"><option value="">— Select —</option>@foreach (var l in paymentMethods){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["PaymentTermsId"] = @<div class="di-field @FieldClass("PaymentTermsId")"><label>Payment Terms@(Req("PaymentTermsId"))</label><InputSelect @bind-Value="model.PaymentTermsId"><option value="">— Select —</option>@foreach (var l in paymentTerms){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["IsRfqOrBidding"] = @<div class="di-field @FieldClass("IsRfqOrBidding")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div></div>;
+        f["IsOrdering"] = @<div class="di-field @FieldClass("IsOrdering")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div></div>;
+        f["IsSourcingOnly"] = @<div class="di-field @FieldClass("IsSourcingOnly")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div></div>;
+        f["IsPurchasing"] = @<div class="di-field @FieldClass("IsPurchasing")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div></div>;
+        f["IsPay"] = @<div class="di-field @FieldClass("IsPay")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div></div>;
+        f["IsPrimaryPay"] = @<div class="di-field @FieldClass("IsPrimaryPay")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div></div>;
+
+        // Step 5 — Payment / Banking
+        f["BankId"] = @<div class="di-field @FieldClass("BankId")"><label>Bank Name@(Req("BankId"))</label><InputSelect @bind-Value="model.BankId" @bind-Value:after="OnBankChanged"><option value="">— Select —</option>@foreach (var b in banks){<option value="@b.Id">@b.Name</option>}</InputSelect></div>;
+        f["BankBranchId"] = @<div class="di-field @FieldClass("BankBranchId")"><label>Branch Name@(Req("BankBranchId"))</label><InputSelect @bind-Value="model.BankBranchId" disabled="@(model.BankId is null)"><option value="">— Select —</option>@foreach (var br in SelectedBankBranches){<option value="@br.Id">@br.Name</option>}</InputSelect></div>;
+        f["AccountCountryCodeId"] = @<div class="di-field @FieldClass("AccountCountryCodeId")"><label>Account Country Code@(Req("AccountCountryCodeId"))</label><InputSelect @bind-Value="model.AccountCountryCodeId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["AccountName"] = @<div class="di-field @FieldClass("AccountName")"><label>Account Name@(Req("AccountName"))</label><InputText @bind-Value="model.AccountName" /></div>;
+        f["AccountNumber"] = @<div class="di-field @FieldClass("AccountNumber")"><label>Account Number@(Req("AccountNumber"))</label><InputText @bind-Value="model.AccountNumber" /></div>;
+        f["AccountCurrencyCodeId"] = @<div class="di-field @FieldClass("AccountCurrencyCodeId")"><label>Account Currency Code@(Req("AccountCurrencyCodeId"))</label><InputSelect @bind-Value="model.AccountCurrencyCodeId"><option value="">— Select —</option>@foreach (var l in currencies){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>;
+        f["SwiftCode"] = @<div class="di-field @FieldClass("SwiftCode")"><label>Swift Code / BIC Code@(Req("SwiftCode"))</label><InputText @bind-Value="model.SwiftCode" /></div>;
+        f["Iban"] = @<div class="di-field @FieldClass("Iban")"><label>IBAN@(Req("Iban"))</label><InputText @bind-Value="model.Iban" /></div>;
+        f["AccountStartDate"] = @<div class="di-field @FieldClass("AccountStartDate")"><label>Account Start Date@(Req("AccountStartDate"))</label><InputDate @bind-Value="model.AccountStartDate" /></div>;
+        f["RemitAdviceEmail"] = @<div class="di-field @FieldClass("RemitAdviceEmail")"><label>Remit Advice Email@(Req("RemitAdviceEmail"))</label><InputText @bind-Value="model.RemitAdviceEmail" /></div>;
+        f["AllowInternationalPayments"] = @<div class="di-field @FieldClass("AllowInternationalPayments")"><label>&nbsp;</label><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AllowInternationalPayments" id="intlPay" /><label for="intlPay" style="margin:0;">Allow International Payments</label></div></div>;
+
+        fieldFragments = f;
     }
 }

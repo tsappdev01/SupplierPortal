@@ -66,6 +66,13 @@ public static class DtoMapper
 
     public static BusinessUnitDto ToDto(BusinessUnit b) => new() { Id = b.Id, Name = b.Name, Code = b.Code };
 
+    public static TabSettingDto ToDto(SupplierTabSetting t) => new()
+    {
+        Step = t.Step,
+        Title = t.Title,
+        IsVisible = t.IsVisible
+    };
+
     public static FieldSettingDto ToDto(SupplierFieldSetting f) => new()
     {
         FieldKey = f.FieldKey,
