@@ -49,6 +49,23 @@ public class SupplierApiClient(
         static OtpRequestResponse Fail() => new() { Success = false, Error = "Unexpected response from the service." };
     }
 
+    /// <summary>Branding + business-unit support email for a link, resolvable even when the session has
+    /// expired (used to brand the "session expired" screen). Never throws; returns null on any failure.</summary>
+    public async Task<LinkInfoResponse?> GetLinkInfoAsync(string linkToken)
+    {
+        try
+        {
+            var http = await AuthedClientAsync();
+            var res = await http.GetAsync($"/api/selfservice/link-info?token={Uri.EscapeDataString(linkToken)}");
+            return res.IsSuccessStatusCode ? await res.Content.ReadFromJsonAsync<LinkInfoResponse>() : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetLinkInfo failed");
+            return null;
+        }
+    }
+
     public async Task<OtpVerifyResponse> VerifyOtpAsync(string linkToken, string code)
     {
         try

@@ -117,6 +117,17 @@ public class OtpRequestResponse
     public string? LogoUrl { get; set; }
 }
 
+/// <summary>Non-sensitive branding for a link, resolvable even when the link/session has EXPIRED (so the
+/// public front-end can brand an error screen and show a business-unit support email). Carries no OTP and
+/// no supplier data beyond the branding contact.</summary>
+public class LinkInfoResponse
+{
+    public bool Success { get; set; }
+    public string? BusinessUnitName { get; set; }
+    public string? BusinessUnitEmail { get; set; }
+    public string? LogoUrl { get; set; }
+}
+
 public class OtpVerifyRequest
 {
     public string LinkToken { get; set; } = "";

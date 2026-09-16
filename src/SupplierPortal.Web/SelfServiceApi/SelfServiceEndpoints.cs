@@ -75,6 +75,28 @@ public static class SelfServiceEndpoints
         })
         .RequireRateLimiting("otp");
 
+        // Non-sensitive branding for a link, resolvable even when the link/session has expired — so the
+        // front-end can brand an error screen (logo) and show a business-unit support email. No OTP issued.
+        group.MapGet("/link-info", async (
+            string token, SupplierAccessTokenService accessTokens, EmailBrandingService branding,
+            BrandLogoInliner logoInliner) =>
+        {
+            var link = await accessTokens.GetTokenForDisplayAsync(token ?? "");
+            if (link is null)
+            {
+                return Results.Ok(new LinkInfoResponse { Success = false });
+            }
+            var buId = link.Supplier?.BusinessUnitId;
+            return Results.Ok(new LinkInfoResponse
+            {
+                Success = true,
+                BusinessUnitName = await branding.GetBusinessUnitNameAsync(buId),
+                BusinessUnitEmail = await branding.GetBusinessUnitEmailAsync(buId),
+                LogoUrl = await logoInliner.InlineIfUrlAsync(await branding.GetBusinessUnitLogoSrcAsync(buId))
+            });
+        })
+        .RequireRateLimiting("otp");
+
         // Verify an OTP and mint a supplier session token.
         group.MapPost("/otp/verify", async (
             OtpVerifyRequest req, SupplierAccessTokenService accessTokens, TokenService tokens) =>
