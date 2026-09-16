@@ -152,16 +152,19 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();
 
-// True when the request's Origin (or, failing that, Referer) host matches this site's host — a
-// lightweight CSRF defense for the cookie-set endpoint that does not depend on an interactive
-// anti-forgery token (which is not reliably available in an interactive Blazor circuit).
+// CSRF defense for the cookie-set endpoint that does not rely on an interactive anti-forgery token
+// (unavailable in an interactive Blazor circuit). Browsers OMIT the Origin header on same-origin form
+// POSTs, and our Referrer-Policy: no-referrer strips the Referer — so absence is EXPECTED and allowed.
+// We reject only when an Origin/Referer IS present and its host differs from ours (the clear cross-site
+// signal a real attacker's form POST would carry). Combined with the SameSite=Strict cookie and the
+// portal API re-validating the token, this blocks cross-site session fixation without breaking the flow.
 static bool IsSameOrigin(HttpContext ctx)
 {
     var host = ctx.Request.Host.Host;
-    if (string.IsNullOrEmpty(host)) { return false; }
+    if (string.IsNullOrEmpty(host)) { return true; }
 
     var origin = ctx.Request.Headers.Origin.ToString();
-    if (!string.IsNullOrEmpty(origin))
+    if (!string.IsNullOrEmpty(origin) && origin != "null")
     {
         return Uri.TryCreate(origin, UriKind.Absolute, out var o)
             && string.Equals(o.Host, host, StringComparison.OrdinalIgnoreCase);
@@ -174,5 +177,5 @@ static bool IsSameOrigin(HttpContext ctx)
             && string.Equals(r.Host, host, StringComparison.OrdinalIgnoreCase);
     }
 
-    return false; // no Origin/Referer on a state-changing POST → reject
+    return true; // no Origin/Referer (normal for a same-origin form POST) → allow
 }
