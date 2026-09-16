@@ -29,12 +29,20 @@ else
 @code {
     [Parameter] public string Token { get; set; } = "";
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     private bool loading = true;
     private SupplierFormBootstrapDto? bootstrap;
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.IsActive)
+        // Restore the verified session from the HttpOnly cookie (survives refresh). Require it to belong
+        // to THIS link so a stale cookie from another supplier's link can't load their data here.
+        if (AuthState is not null)
+        {
+            Session.PopulateFrom((await AuthState).User);
+        }
+        if (!Session.IsActiveFor(Token))
         {
             Nav.NavigateTo($"/supplier/self-service/{Token}");
             return;

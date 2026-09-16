@@ -17,3 +17,10 @@ window.ssDoc = {
     },
     revoke: function (url) { try { URL.revokeObjectURL(url); } catch (e) { } }
 };
+
+// Submit a form by id (used to hand the verified session to the server so it can set the HttpOnly
+// auth cookie). Kept here, not inline, so it is allowed under CSP script-src 'self'.
+window.ssSubmitForm = function (id) {
+    var form = document.getElementById(id);
+    if (form) { form.submit(); }
+};

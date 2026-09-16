@@ -3,13 +3,32 @@
 @inject SelfServiceSession Session
 @inject SelfServiceBranding Branding
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Verify — Supplier Self-Service</PageTitle>
+
+@* Hidden hand-off form: a same-origin POST that lets the server set the HttpOnly session cookie after
+   the OTP is verified, so a later refresh keeps the session without re-entering the code. *@
+@if (handoff)
+{
+    <form id="ss-signin-form" method="post" action="/account/ss-signin">
+        <input type="hidden" name="SessionToken" value="@Session.SessionToken" />
+        <input type="hidden" name="LinkToken" value="@Token" />
+        <input type="hidden" name="SupplierName" value="@Session.SupplierName" />
+        <input type="hidden" name="ContactEmail" value="@Session.ContactEmail" />
+        <input type="hidden" name="ExpiresAtUtc" value="@(Session.ExpiresAtUtc?.ToString("o"))" />
+        <input type="hidden" name="ReturnUrl" value="@($"/supplier/self-service/{Token}/form")" />
+    </form>
+}
 
 <div class="ss-card">
     <h1 class="ss-title">Verify it's you</h1>
 
-    @if (loading)
+    @if (handoff)
+    {
+        <p class="ss-muted">Verified — taking you to your details…</p>
+    }
+    else if (loading)
     {
         <p class="ss-muted">Sending a verification code…</p>
     }
@@ -67,9 +86,12 @@
 @code {
     [Parameter] public string Token { get; set; } = "";
 
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
     private bool loading = true;
     private bool linkValid;
     private bool verifying;
+    private bool handoff;
     private string code = "";
     private string? maskedEmail;
     private string? devOtp;
@@ -78,6 +100,18 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // If this browser already holds a valid session cookie FOR THIS LINK (a refresh after verifying),
+        // skip the OTP entirely and go straight to the form.
+        if (AuthState is not null)
+        {
+            Session.PopulateFrom((await AuthState).User);
+            if (Session.IsActiveFor(Token))
+            {
+                Nav.NavigateTo($"/supplier/self-service/{Token}/form");
+                return;
+            }
+        }
+
         // Automatic send on load: reuse a still-valid code (resend: false) so a reload does not issue a new OTP.
         var result = await Api.RequestOtpAsync(Token, resend: false);
         loading = false;
@@ -104,11 +138,24 @@
             return;
         }
 
+        // Stash the verified session, then post it to the server so it lands in the HttpOnly cookie.
         Session.SessionToken = result.SessionToken;
+        Session.LinkToken = Token;
         Session.SupplierName = result.SupplierName;
         Session.ContactEmail = result.ContactEmail;
         Session.ExpiresAtUtc = result.ExpiresAtUtc;
-        Nav.NavigateTo($"/supplier/self-service/{Token}/form");
+        handoff = true; // renders the hidden form; OnAfterRender submits it (browser POST -> Set-Cookie -> /form)
+    }
+
+    private bool submitted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (handoff && !submitted)
+        {
+            submitted = true;
+            await JS.InvokeVoidAsync("ssSubmitForm", "ss-signin-form");
+        }
     }
 
     private async Task ResendAsync()
