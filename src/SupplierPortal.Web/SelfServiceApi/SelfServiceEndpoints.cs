@@ -41,7 +41,7 @@ public static class SelfServiceEndpoints
         // Request an OTP for a supplier link token.
         group.MapPost("/otp/request", async (
             OtpRequestRequest req, SupplierAccessTokenService accessTokens, EmailBrandingService branding,
-            IWebHostEnvironment env) =>
+            BrandLogoInliner logoInliner, IWebHostEnvironment env) =>
         {
             var token = await accessTokens.GetValidTokenAsync(req.LinkToken ?? "");
             if (token is null)
@@ -60,7 +60,8 @@ public static class SelfServiceEndpoints
 
             // The supplier's business-unit logo. Prefer the BU's configured hosted LogoUrl (the image URL
             // set on the business unit), falling back to the uploaded logo as a data URI when no URL is set.
-            var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Supplier?.BusinessUnitId);
+            var logo = await logoInliner.InlineIfUrlAsync(
+                await branding.GetBusinessUnitLogoSrcAsync(token.Supplier?.BusinessUnitId));
 
             return Results.Ok(new OtpRequestResponse
             {

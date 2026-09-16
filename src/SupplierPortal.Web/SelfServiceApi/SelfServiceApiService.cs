@@ -17,7 +17,8 @@ public class SelfServiceApiService(
     SupplierDocumentService documentService,
     BusinessUnitService businessUnitService,
     SupplierEmailService emailService,
-    EmailBrandingService brandingService)
+    EmailBrandingService brandingService,
+    BrandLogoInliner logoInliner)
 {
     // Categories the self-service wizard renders (everything except the internal SupplierStatus list).
     private static readonly LookupCategory[] FormCategories =
@@ -68,8 +69,10 @@ public class SelfServiceApiService(
         var businessUnitDto = businessUnit is null ? null : DtoMapper.ToDto(businessUnit);
         if (businessUnitDto is not null)
         {
-            // Same logo source as the OTP response so the header brands identically on the form page.
-            businessUnitDto.LogoUrl = await brandingService.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId);
+            // Same logo source as the OTP response (fetched + inlined so it renders on the form page even
+            // when the storage account isn't publicly reachable from the supplier's browser).
+            businessUnitDto.LogoUrl = await logoInliner.InlineIfUrlAsync(
+                await brandingService.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId));
         }
 
         return new SupplierFormBootstrapDto

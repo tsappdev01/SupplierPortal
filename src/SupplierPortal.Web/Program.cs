@@ -230,6 +230,10 @@ if (selfServiceApiEnabled)
     builder.Services.AddSingleton<SupplierPortal.Web.SelfServiceApi.TokenService>();
     builder.Services.AddScoped<SupplierPortal.Web.SelfServiceApi.SupplierSessionResolver>();
     builder.Services.AddScoped<SupplierPortal.Web.SelfServiceApi.SelfServiceApiService>();
+    // Fetches a business-unit logo URL server-side and inlines it, so the self-service header shows the
+    // configured logo even when the storage account isn't publicly reachable from a supplier's browser.
+    builder.Services.AddSingleton<SupplierPortal.Web.SelfServiceApi.BrandLogoInliner>();
+    builder.Services.AddHttpClient("brandlogo", c => c.Timeout = TimeSpan.FromSeconds(10));
 }
 
 // SSO is active only when it is BOTH selected (Auth:Mode = Sso) and actually configured. If Sso is
