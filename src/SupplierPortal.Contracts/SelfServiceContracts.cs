@@ -36,6 +36,9 @@ public class BusinessUnitDto
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public string? Code { get; set; }
+    /// <summary>The BU's brand logo src (hosted LogoUrl, else uploaded data URI) so the self-service header
+    /// shows the correct entity logo even on the form page's own circuit.</summary>
+    public string? LogoUrl { get; set; }
 }
 
 /// <summary>Supplier-facing field rule (mandatory / visible / step) that drives the wizard's validation
@@ -65,6 +68,7 @@ public class SupplierDocumentDto
     public string FileName { get; set; } = "";
     public string? ContentType { get; set; }
     public DateTime UploadedAt { get; set; }
+    public long FileSizeBytes { get; set; }
 }
 
 /// <summary>One-shot payload the portal fetches after OTP verification: everything the wizard needs to

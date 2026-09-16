@@ -89,6 +89,7 @@ public static class DtoMapper
         DocumentType = (SelfServiceDocumentType)(int)d.DocumentType,
         FileName = d.FileName,
         ContentType = d.ContentType,
-        UploadedAt = d.UploadedAt
+        UploadedAt = d.UploadedAt,
+        FileSizeBytes = d.FileSizeBytes
     };
 }

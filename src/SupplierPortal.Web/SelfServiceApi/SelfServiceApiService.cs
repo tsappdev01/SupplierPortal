@@ -16,7 +16,8 @@ public class SelfServiceApiService(
     SupplierFieldSettingService fieldSettingService,
     SupplierDocumentService documentService,
     BusinessUnitService businessUnitService,
-    SupplierEmailService emailService)
+    SupplierEmailService emailService,
+    EmailBrandingService brandingService)
 {
     // Categories the self-service wizard renders (everything except the internal SupplierStatus list).
     private static readonly LookupCategory[] FormCategories =
@@ -64,6 +65,12 @@ public class SelfServiceApiService(
         var pending = await supplierService.GetPendingSupplierEditedFieldsAsync(supplierId);
         var businessUnits = await businessUnitService.GetAllAsync();
         var businessUnit = businessUnits.FirstOrDefault(b => b.Id == supplier.BusinessUnitId);
+        var businessUnitDto = businessUnit is null ? null : DtoMapper.ToDto(businessUnit);
+        if (businessUnitDto is not null)
+        {
+            // Same logo source as the OTP response so the header brands identically on the form page.
+            businessUnitDto.LogoUrl = await brandingService.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId);
+        }
 
         return new SupplierFormBootstrapDto
         {

@@ -70,34 +70,48 @@
 
                         @if (tab.Step == 1)
                         {
-                            <div class="di-documents-row">
-                                <div class="di-document-slot">
-                                    <label>Trade License <span class="di-req">*</span></label>
-                                    @if (GetDocument(SelfServiceDocumentType.TradeLicense) is { } tl){<div class="di-document-current">Uploaded: @tl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(tl.Id)" disabled="@viewingDocument">View</button></div>}
-                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.TradeLicense)" disabled="@uploadingDocument" />
-                                    @if (!HasTradeLicenseDocument()){<div class="text-danger" style="font-size:0.85em;">Required — attach the Trade License before submitting.</div>}
-                                </div>
-                                <div class="di-document-slot">
-                                    <label>VAT Certificate</label>
-                                    @if (GetDocument(SelfServiceDocumentType.VatCertification) is { } vd){<div class="di-document-current">Uploaded: @vd.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(vd.Id)" disabled="@viewingDocument">View</button></div>}
-                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.VatCertification)" disabled="@uploadingDocument" />
-                                </div>
-                                <div class="di-document-slot">
-                                    <label>Other Documents</label>
-                                    @foreach (var doc in OtherDocuments){<div class="di-document-current">@doc.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button><button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button></div>}
-                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
+                            <div class="di-documents-grid">
+                                @DocCard("Trade License", SelfServiceDocumentType.TradeLicense, "di-thumb-red", true, !HasTradeLicenseDocument(), "Required — attach the Trade License before submitting.")
+                                @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", false, false, "")
+                                <div class="di-doccard">
+                                    <div class="di-doccard-thumb di-thumb-amber">
+                                        <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+                                        <span class="di-doccard-ext">FILES</span>
+                                    </div>
+                                    <div class="di-doccard-main">
+                                        <div class="di-doccard-title">Other Documents</div>
+                                        @if (!OtherDocuments.Any())
+                                        {
+                                            <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var doc in OtherDocuments)
+                                            {
+                                                <div class="di-doccard-chip">
+                                                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                                                    <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                                    <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                    <div class="di-doccard-upload">
+                                        <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="docfile-Other">
+                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                            <span>Choose File</span>
+                                            <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+                                        </label>
+                                        <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
+                                        <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+                                    </div>
                                 </div>
                             </div>
                         }
                         @if (tab.Step == 5)
                         {
-                            <div class="di-documents-row">
-                                <div class="di-document-slot">
-                                    <label>Bank Confirmation Letter@(RequiresBankConfirmationLetter() ? " *" : "")</label>
-                                    @if (GetDocument(SelfServiceDocumentType.BankConfirmationLetter) is { } bl){<div class="di-document-current">Uploaded: @bl.FileName<button type="button" class="di-document-view" @onclick="() => ViewDocumentAsync(bl.Id)" disabled="@viewingDocument">View</button></div>}
-                                    <InputFile OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.BankConfirmationLetter)" disabled="@uploadingDocument" />
-                                    @if (RequiresBankConfirmationLetter()){<div class="text-danger" style="font-size:0.85em;">Required: you changed the bank account, so a Bank Confirmation Letter must be attached.</div>}
-                                </div>
+                            <div class="di-documents-grid">
+                                @DocCard("Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
                             </div>
                         }
                     </div>
@@ -461,6 +475,77 @@
         var result = await Api.DeleteDocumentAsync(SessionToken, documentId);
         if (result.Success) { documents = result.Documents; statusMessage = "Document removed."; }
         else { errorMessage = result.Error ?? "Could not remove the document."; }
+    }
+
+    private const int MaxUploadMb = 10;
+
+    private static string FileExtLabel(string fileName)
+    {
+        var ext = System.IO.Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant();
+        return string.IsNullOrEmpty(ext) ? "FILE" : ext;
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1048576 ? $"{bytes / 1048576.0:0.#} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:0} KB"
+        : $"{bytes} B";
+
+    // A rich upload card for a single-document slot (Trade License, VAT Certificate, Bank Confirmation
+    // Letter), matching the internal supplier form: coloured file thumbnail, uploaded file with date/size,
+    // a View action and a branded Choose File button with supported-format hints.
+    private RenderFragment DocCard(string title, SelfServiceDocumentType type, string thumbClass, bool showStar, bool showRequiredMsg, string requiredMsg)
+    {
+        return @<div class="di-doccard">
+        @{
+            var doc = GetDocument(type);
+            var inputId = $"docfile-{type}";
+        }
+        <div class="di-doccard-thumb @thumbClass">
+            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+            <span class="di-doccard-ext">@(doc is null ? "FILE" : FileExtLabel(doc.FileName))</span>
+        </div>
+        <div class="di-doccard-main">
+            <div class="di-doccard-title">@title @if (showStar){<span class="di-req">*</span>}</div>
+            @if (doc is not null)
+            {
+                <div class="di-doccard-chip">
+                    <span class="di-doccard-uplabel">Uploaded:</span>
+                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                </div>
+                <div class="di-doccard-meta">
+                    <span>Uploaded on: @doc.UploadedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    <span class="di-doccard-sep"></span>
+                    <span>Size: @FormatSize(doc.FileSizeBytes)</span>
+                </div>
+            }
+            else
+            {
+                <div class="di-doccard-meta di-doccard-empty">No file uploaded yet.</div>
+            }
+            @if (showRequiredMsg)
+            {
+                <div class="di-doccard-required">@requiredMsg</div>
+            }
+        </div>
+        @if (doc is not null)
+        {
+            <div class="di-doccard-actions">
+                <button type="button" class="di-doccard-viewbtn" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
+                    View
+                </button>
+            </div>
+        }
+        <div class="di-doccard-upload">
+            <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="@inputId">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                <span>Choose File</span>
+                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+            </label>
+            <InputFile id="@inputId" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, type)" disabled="@uploadingDocument" />
+            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+        </div>
+    </div>;
     }
 
     // ----- Field fragments (one per field key; rendered per tab in the admin-configured order) -----
