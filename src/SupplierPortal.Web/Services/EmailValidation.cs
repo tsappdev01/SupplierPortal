@@ -8,8 +8,11 @@ namespace SupplierPortal.Web.Services;
 /// </summary>
 public static class EmailValidation
 {
-    /// <summary>The canonical pattern (keep in sync with the client-side RegularExpression on Register.razor).</summary>
-    public const string Pattern = @"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$";
+    /// <summary>The canonical pattern (keep in sync with the client-side RegularExpression on Register.razor).
+    /// Allows an apostrophe in the local part (RFC-valid, e.g. mary.o'donnell@…) and an underscore in the
+    /// domain (used by some internal mail systems) so genuine addresses aren't misclassified as junk, while
+    /// still rejecting spaces and the metacharacters used by injection/scanner payloads.</summary>
+    public const string Pattern = @"^[A-Za-z0-9._%+'\-]+@[A-Za-z0-9._\-]+\.[A-Za-z]{2,}$";
 
     private static readonly System.Text.RegularExpressions.Regex Rx = new(
         Pattern,

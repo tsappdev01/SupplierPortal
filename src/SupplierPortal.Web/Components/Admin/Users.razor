@@ -58,11 +58,12 @@
                 </div>
             }
         </div>
-        @if (cleanupResult is not null)
-        {
-            <div class="mt-2 small fw-semibold text-success">@cleanupResult</div>
-        }
     </div>
+}
+@* Rendered outside the pending banner so the confirmation still shows after the last pending row is removed. *@
+@if (cleanupResult is not null)
+{
+    <div class="alert alert-success py-2">@cleanupResult</div>
 }
 
 <div class="d-flex align-items-center gap-2 mb-3">
