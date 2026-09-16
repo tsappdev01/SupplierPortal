@@ -96,6 +96,9 @@ builder.Services.AddScoped<CustomerFieldConfigService>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<CustomerImportService>();
 builder.Services.AddScoped<CustomerExportService>();
+// Microsoft Graph (app-only) email — preferred by EmailDispatcher when Email:Graph is configured.
+builder.Services.Configure<GraphMailOptions>(builder.Configuration.GetSection("Email:Graph"));
+builder.Services.AddSingleton<GraphMailSender>();
 builder.Services.AddScoped<EmailDispatcher>();
 builder.Services.AddScoped<CustomerAccessTokenService>();
 builder.Services.AddScoped<CustomerEmailService>();

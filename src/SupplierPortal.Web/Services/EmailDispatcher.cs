@@ -5,12 +5,14 @@ using SupplierPortal.Web.Data;
 
 namespace SupplierPortal.Web.Services;
 
-/// <summary>Central email sender. Uses SMTP when an <c>Email:Smtp:Host</c> is configured (works on Azure SQL,
-/// which has no Database Mail), otherwise falls back to SQL Server Database Mail (sp_send_dbmail) so local
-/// SQL Server deployments keep working unchanged. All supplier/customer notification and OTP emails route
-/// through here so the delivery mechanism is chosen in one place.</summary>
+/// <summary>Central email sender. Prefers Microsoft Graph when <c>Email:Graph</c> is configured, otherwise
+/// uses SMTP when an <c>Email:Smtp:Host</c> is configured (works on Azure SQL, which has no Database Mail),
+/// otherwise falls back to SQL Server Database Mail (sp_send_dbmail) so local SQL Server deployments keep
+/// working unchanged. All supplier/customer notification and OTP emails route through here so the delivery
+/// mechanism is chosen in one place.</summary>
 public class EmailDispatcher(
-    IConfiguration config, IDbContextFactory<ApplicationDbContext> dbFactory, ILogger<EmailDispatcher> logger)
+    IConfiguration config, IDbContextFactory<ApplicationDbContext> dbFactory, ILogger<EmailDispatcher> logger,
+    GraphMailSender graphMail)
 {
     private const string DefaultProfile = "BP";
 
@@ -20,6 +22,12 @@ public class EmailDispatcher(
         if (string.IsNullOrWhiteSpace(toEmail))
         {
             return (false, "No recipient email address.");
+        }
+
+        // Graph wins when fully configured; otherwise the existing SMTP / Database Mail choice is unchanged.
+        if (graphMail.IsConfigured)
+        {
+            return await graphMail.SendHtmlAsync(toEmail, subject, htmlBody);
         }
 
         var smtpHost = config["Email:Smtp:Host"];
