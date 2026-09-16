@@ -17,9 +17,29 @@ public class AuthService(
     private const int MaxFailedAttempts = 5;
     private static readonly TimeSpan LockoutWindow = TimeSpan.FromMinutes(15);
     private static string FailKey(string login) => $"login-fail:{login.ToLowerInvariant()}";
+    // A pragmatic e-mail shape check (local@domain.tld) that rejects spaces and the punctuation used by
+    // injection / vulnerability-scanner payloads, with an RFC-sane length cap and a ReDoS-safe timeout.
+    // The framework [EmailAddress] attribute only checks for a single '@', so it cannot be relied on here.
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex = new(
+        @"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromMilliseconds(250));
+
+    private static bool IsValidEmail(string email) =>
+        !string.IsNullOrWhiteSpace(email) && email.Length <= 254 && EmailRegex.IsMatch(email);
+
     public async Task<(bool Success, string? Error)> RegisterAsync(string email, string password)
     {
-        email = email.Trim();
+        email = (email ?? "").Trim();
+
+        // Authoritative server-side format check (a direct form POST bypasses the component's client
+        // validation). Blocks the scanner/injection payloads that the lax [EmailAddress] attribute admits,
+        // so they can never be stored as pending registrations.
+        if (!IsValidEmail(email))
+        {
+            return (false, "Please enter a valid email address.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
 
         if (await db.Users.AnyAsync(u => u.Email == email))

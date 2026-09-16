@@ -66,7 +66,11 @@ else
 
     private sealed class RegisterModel
     {
-        [Required, EmailAddress]
+        // [EmailAddress] alone only checks for a single '@'; the regex enforces a real local@domain.tld
+        // shape so scanner/injection payloads are rejected client-side too (the server re-checks regardless).
+        [Required, EmailAddress, StringLength(254)]
+        [RegularExpression(@"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$",
+            ErrorMessage = "Please enter a valid email address.")]
         public string Email { get; set; } = "";
 
         [Required, MinLength(6)]
