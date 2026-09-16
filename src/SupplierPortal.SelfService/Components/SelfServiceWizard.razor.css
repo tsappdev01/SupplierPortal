@@ -7,7 +7,8 @@
     --bg: #f4f6f9;
     --required: #c0392b;
     color: var(--text);
-    max-width: 1240px;
+    max-width: 100%;
+    width: 100%;
 }
 
 .di-form-topbar {
