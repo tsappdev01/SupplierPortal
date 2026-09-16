@@ -411,23 +411,31 @@ if (authOptions.Mode == AuthMode.Sso && !authOptions.Entra.Enabled)
 // API — so it must never migrate/seed or open a DbContext at startup.
 if (!deployment.IsDmz)
 {
+    // Timed so the startup log shows exactly which phase is slow (cold DB connect vs migrate vs seed).
+    var swAll = System.Diagnostics.Stopwatch.StartNew();
     using var scope = app.Services.CreateScope();
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
     await using var db = await dbFactory.CreateDbContextAsync();
+    app.Logger.LogInformation("Startup: DbContext created in {Ms} ms.", swAll.ElapsedMilliseconds);
+
+    var swSeed = System.Diagnostics.Stopwatch.StartNew();
     await DbSeeder.SeedAsync(db, app.Configuration);
+    app.Logger.LogInformation("Startup: migrate + seed completed in {Ms} ms.", swSeed.ElapsedMilliseconds);
 
     // Apply the Leasing bounded-context migrations (leasing.* tables) with their own history table, so a
     // deployment that already has the supplier schema also gets the Landlord module tables created.
+    var swLeasing = System.Diagnostics.Stopwatch.StartNew();
     var leasingFactory = scope.ServiceProvider
         .GetRequiredService<IDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>>();
     await using var leasingDb = await leasingFactory.CreateDbContextAsync();
     await leasingDb.Database.MigrateAsync();
+    app.Logger.LogInformation("Startup: leasing migrate completed in {Ms} ms.", swLeasing.ElapsedMilliseconds);
 
     // Make the effective SQL Server unambiguous in the logs. If appsettings.Local.json is present it
     // overrides appsettings.json — this line shows which server/database the app actually talks to.
     var conn = db.Database.GetDbConnection();
-    app.Logger.LogInformation("Database: connected to SQL Server '{Server}', database '{Database}'.",
-        conn.DataSource, conn.Database);
+    app.Logger.LogInformation("Database: connected to SQL Server '{Server}', database '{Database}'. Total startup DB work {Ms} ms.",
+        conn.DataSource, conn.Database, swAll.ElapsedMilliseconds);
 }
 
 // Configure the HTTP request pipeline.
