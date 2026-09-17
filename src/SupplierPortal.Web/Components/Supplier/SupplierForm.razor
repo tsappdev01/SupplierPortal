@@ -1168,8 +1168,11 @@ else
 </div>
 
 <style>
-    .di-help-btn { border: none; background: transparent; color: #3b5bdb; cursor: pointer; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; display: inline-flex; }
-    .di-help-btn:hover { color: #1e40af; }
+    .di-help-btn { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px;
+        margin: 0 0 0 6px; padding: 0; border: none; border-radius: 50%; background: #e8edf7; color: #5a6b9a;
+        cursor: pointer; vertical-align: -3px; transition: background-color .15s ease, color .15s ease; }
+    .di-help-btn:hover, .di-help-btn:focus-visible { background: #3b5bdb; color: #fff; outline: none; }
+    .di-help-btn svg { width: 11px; height: 11px; display: block; }
     .di-help-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.5); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 24px; }
     .di-help-pop { background: #fff; border-radius: 10px; width: min(420px, 100%); padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
     .di-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
@@ -2120,8 +2123,7 @@ else
         builder.AddEventStopPropagationAttribute(6, "onclick", true);
         builder.AddEventPreventDefaultAttribute(7, "onclick", true);
         builder.AddMarkupContent(8,
-            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\">" +
-            "<path d=\"M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z\"/>" +
+            "<svg viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\">" +
             "<path d=\"M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z\"/></svg>");
         builder.CloseElement();
     };
