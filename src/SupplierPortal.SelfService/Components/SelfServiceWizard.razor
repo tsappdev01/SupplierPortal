@@ -178,10 +178,10 @@
                                         <thead>
                                             <tr>
                                                 <th>Business Legal Name*</th>
-                                                <th>Address*</th>
+                                                <th>Address*@Help("VatGroupAddress")</th>
                                                 <th>E-Invoicing Wave<br />(Wave 1/Wave 2)*</th>
-                                                <th>TRN Number*</th>
-                                                <th>TIN Number*</th>
+                                                <th>TRN Number*@Help("VatGroupTrn")</th>
+                                                <th>TIN Number*@Help("VatGroupTin")</th>
                                                 <th>Bus. Location Type<br />(Mainland/Free Zone)*</th>
                                                 <th></th>
                                             </tr>
@@ -202,8 +202,8 @@
                                                             @foreach (var lov in eInvoicingWaves){<option value="@lov.Id">@lov.DisplayName</option>}
                                                         </select>
                                                     </td>
-                                                    <td><input type="text" @bind="entity.TrnNumber" /></td>
-                                                    <td><input type="text" @bind="entity.TinNumber" /></td>
+                                                    <td><input type="text" @bind="entity.TrnNumber" maxlength="15" inputmode="numeric" title="15 digits" /></td>
+                                                    <td><input type="text" @bind="entity.TinNumber" maxlength="10" inputmode="numeric" title="10 digits" /></td>
                                                     <td>
                                                         <select @bind="entity.BusinessLocationTypeId">
                                                             <option value="">Select</option>
@@ -587,6 +587,18 @@
             "Number of Entities if VAT Group: Please mention number of entities part of the VAT tax group dealing with DI PJSC.\n\n" +
             "Legal Names of all Entities under the VAT Group: Please enter details of entities part of the VAT Tax Group as per " +
             "VAT Tax Group certificate dealing with DI PJSC."),
+        ["VatGroupAddress"] = ("Address",
+            "As per Trade License of Group entity"),
+        ["VatGroupTrn"] = ("TRN Number",
+            "As per VAT Tax Group Certificate"),
+        ["VatGroupTin"] = ("TIN Number",
+            "Obtained from the Emaratax Portal of the respective Entity mentioned.\n\n" +
+            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+            "How to obtain TIN from Emaratax Portal\n\n" +
+            "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
+            "2. View the profile of your entity.\n" +
+            "3. From the left-side menu, click on E-Invoicing.\n" +
+            "4. Your TIN (Tax Identification Number) will be displayed there for reference. 10 Digit number"),
         ["SupplierTin"] = ("Supplier TIN",
             "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
             "How to obtain TIN from Emaratax Portal\n\n" +
@@ -790,6 +802,15 @@
             else if (rows.Any(e => !IsCompleteVatRow(e)))
             {
                 errors.Add("Complete every column (Business Legal Name, Address, E-Invoicing Wave, TRN Number, TIN Number, Bus. Location Type) for each VAT group entity.");
+            }
+            // Format checks per row: TRN exactly 15 digits, TIN exactly 10 digits (reported once each).
+            if (rows.Any(e => !string.IsNullOrWhiteSpace(e.TrnNumber) && !IsDigits(e.TrnNumber, 15)))
+            {
+                errors.Add("VAT Group: each TRN Number must be exactly 15 digits.");
+            }
+            if (rows.Any(e => !string.IsNullOrWhiteSpace(e.TinNumber) && !IsDigits(e.TinNumber, 10)))
+            {
+                errors.Add("VAT Group: each TIN Number must be exactly 10 digits.");
             }
         }
 
