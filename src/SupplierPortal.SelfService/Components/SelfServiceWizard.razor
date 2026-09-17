@@ -1216,7 +1216,7 @@
         // Step 2 — Address
         f["AddressName"] = @<div class="di-field @FieldClass("AddressName")"><label>Address Name@(Req("AddressName"))</label><InputText @bind-Value="model.AddressName" /></div>;
         f["AddressLine1"] = @<div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))@Help("AddressLine1")</label><InputText @bind-Value="model.AddressLine1" /></div>;
-        f["AddressLine2"] = @<div class="di-field di-full @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))@Help("AddressLine2")</label><InputText @bind-Value="model.AddressLine2" /></div>;
+        f["AddressLine2"] = @<div class="di-field @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))@Help("AddressLine2")</label><InputText @bind-Value="model.AddressLine2" /></div>;
         f["CityId"] = @<div class="di-field @FieldClass("CityId")"><label>City / Emirate@(Req("CityId"))@Help("CityId")</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["CountryId"] = @<div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))@Help("CountryId")</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["PostalCode"] = @<div class="di-field @FieldClass("PostalCode")"><label>PO Box / Postal Code@(Req("PostalCode"))</label><InputText @bind-Value="model.PostalCode" /></div>;
