@@ -50,6 +50,16 @@ builder.Services.AddRazorComponents()
     });
 builder.Services.AddCascadingAuthenticationState();
 
+// Mark the antiforgery cookie Secure (HTTPS-only) and strengthen HSTS (1-year max-age + includeSubDomains
+// + preload) — mirrors the self-service hardening from the security scan.
+builder.Services.AddAntiforgery(o => o.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always);
+builder.Services.AddHsts(o =>
+{
+    o.MaxAge = TimeSpan.FromDays(365);
+    o.IncludeSubDomains = true;
+    o.Preload = true;
+});
+
 // On the DMZ there is no database — all data flows through the internal Self-Service API — but the
 // DbContext factories are still registered so DI can satisfy components that inject the domain services
 // (which the self-service path never actually calls). A placeholder connection is used when none is

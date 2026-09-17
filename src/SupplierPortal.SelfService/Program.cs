@@ -65,6 +65,19 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 
+// Mark the antiforgery cookie Secure (HTTPS-only) — a security scan flagged the default .AspNetCore.Antiforgery
+// cookie as missing the Secure flag.
+builder.Services.AddAntiforgery(o => o.Cookie.SecurePolicy = CookieSecurePolicy.Always);
+
+// Strict Transport Security best practice: 1-year max-age + includeSubDomains + preload (the framework
+// default max-age is well under a year, which the scan flagged).
+builder.Services.AddHsts(o =>
+{
+    o.MaxAge = TimeSpan.FromDays(365);
+    o.IncludeSubDomains = true;
+    o.Preload = true;
+});
+
 // Persist Data Protection keys (antiforgery) to a stable folder so they survive app-pool recycles.
 var keysDir = Path.Combine(builder.Environment.ContentRootPath, "keys");
 Directory.CreateDirectory(keysDir);
