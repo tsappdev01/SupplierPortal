@@ -24,6 +24,18 @@ public class BankBranchDto
     public string Name { get; set; } = "";
 }
 
+/// <summary>One entity in a supplier's VAT Group (structured VAT-group table).</summary>
+public class VatGroupEntityDto
+{
+    public int Id { get; set; }
+    public string? BusinessLegalName { get; set; }
+    public string? Address { get; set; }
+    public int? EInvoicingWaveId { get; set; }
+    public string? TrnNumber { get; set; }
+    public string? TinNumber { get; set; }
+    public int? BusinessLocationTypeId { get; set; }
+}
+
 public class BankDto
 {
     public int Id { get; set; }

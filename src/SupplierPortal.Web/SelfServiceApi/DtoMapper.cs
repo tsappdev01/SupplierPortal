@@ -40,6 +40,17 @@ public static class DtoMapper
         {
             dtoProp.SetValue(dto, formProp.GetValue(form));
         }
+        // VAT-group entities: element types differ (VatGroupEntityDto vs VatGroupEntityModel), so map by hand.
+        dto.VatGroupEntities = form.VatGroupEntities.Select(e => new VatGroupEntityDto
+        {
+            Id = e.Id,
+            BusinessLegalName = e.BusinessLegalName,
+            Address = e.Address,
+            EInvoicingWaveId = e.EInvoicingWaveId,
+            TrnNumber = e.TrnNumber,
+            TinNumber = e.TinNumber,
+            BusinessLocationTypeId = e.BusinessLocationTypeId
+        }).ToList();
         return dto;
     }
 
@@ -51,6 +62,16 @@ public static class DtoMapper
         {
             formProp.SetValue(form, dtoProp.GetValue(dto));
         }
+        form.VatGroupEntities = (dto.VatGroupEntities ?? []).Select(e => new VatGroupEntityModel
+        {
+            Id = e.Id,
+            BusinessLegalName = e.BusinessLegalName,
+            Address = e.Address,
+            EInvoicingWaveId = e.EInvoicingWaveId,
+            TrnNumber = e.TrnNumber,
+            TinNumber = e.TinNumber,
+            BusinessLocationTypeId = e.BusinessLocationTypeId
+        }).ToList();
         form.ApplyTo(supplier);
     }
 

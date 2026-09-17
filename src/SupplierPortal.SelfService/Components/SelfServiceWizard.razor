@@ -160,6 +160,67 @@
                             }
                         }
 
+                        @if (tab.Step == 1 && IsVatGroupSelected)
+                        {
+                            <div class="di-field di-full di-vatgroup">
+                                <div class="di-vatgroup-head">
+                                    <span class="di-vatgroup-title">VAT Group</span>@Help("VatGroup")
+                                    <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
+                                        <span>Add Row</span>
+                                    </button>
+                                </div>
+                                <p class="di-vatgroup-note">Please list all entities registered under your VAT Group that are conducting business with our company.</p>
+                                <div class="di-vatgroup-scroll">
+                                    <table class="di-vatgroup-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Business Legal Name*</th>
+                                                <th>Address*</th>
+                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2)*</th>
+                                                <th>TRN Number*</th>
+                                                <th>TIN Number*</th>
+                                                <th>Bus. Location Type<br />(Mainland/Free Zone)*</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (model.VatGroupEntities.Count == 0)
+                                            {
+                                                <tr><td colspan="7" class="di-vatgroup-empty">No entities added yet. Click "Add Row" to list a VAT group entity.</td></tr>
+                                            }
+                                            @foreach (var entity in model.VatGroupEntities)
+                                            {
+                                                <tr>
+                                                    <td><input type="text" @bind="entity.BusinessLegalName" /></td>
+                                                    <td><input type="text" @bind="entity.Address" /></td>
+                                                    <td>
+                                                        <select @bind="entity.EInvoicingWaveId">
+                                                            <option value="">Select</option>
+                                                            @foreach (var lov in eInvoicingWaves){<option value="@lov.Id">@lov.DisplayName</option>}
+                                                        </select>
+                                                    </td>
+                                                    <td><input type="text" @bind="entity.TrnNumber" /></td>
+                                                    <td><input type="text" @bind="entity.TinNumber" /></td>
+                                                    <td>
+                                                        <select @bind="entity.BusinessLocationTypeId">
+                                                            <option value="">Select</option>
+                                                            @foreach (var lov in businessLocationTypes){<option value="@lov.Id">@lov.DisplayName</option>}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove entity" @onclick="() => RemoveVatGroupEntity(entity)">
+                                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+
                         @if (tab.Step == 1)
                         {
                             <div class="di-documents-grid">
@@ -423,6 +484,24 @@
         licensingAuthorities.FirstOrDefault(l => l.Id == model.TradeLicenseIssuingBodyId)?.DisplayName?
             .Contains("Other", StringComparison.OrdinalIgnoreCase) == true;
 
+    // ----- VAT Group table (structured entity list, shown when the VAT Registration Type is a VAT Group) -----
+    private bool IsVatGroupSelected =>
+        vatRegistrationTypes.FirstOrDefault(v => v.Id == model.VatRegistrationTypeId)?
+            .DisplayName.Contains("Group", StringComparison.OrdinalIgnoreCase) == true;
+
+    private void AddVatGroupEntity() => model.VatGroupEntities.Add(new VatGroupEntityDto());
+    private void RemoveVatGroupEntity(VatGroupEntityDto entity) => model.VatGroupEntities.Remove(entity);
+
+    private static bool IsBlankVatRow(VatGroupEntityDto e) =>
+        e.Id == 0 && string.IsNullOrWhiteSpace(e.BusinessLegalName) && string.IsNullOrWhiteSpace(e.Address)
+        && e.EInvoicingWaveId is null && string.IsNullOrWhiteSpace(e.TrnNumber) && string.IsNullOrWhiteSpace(e.TinNumber)
+        && e.BusinessLocationTypeId is null;
+
+    private static bool IsCompleteVatRow(VatGroupEntityDto e) =>
+        !string.IsNullOrWhiteSpace(e.BusinessLegalName) && !string.IsNullOrWhiteSpace(e.Address)
+        && e.EInvoicingWaveId is not null && !string.IsNullOrWhiteSpace(e.TrnNumber) && !string.IsNullOrWhiteSpace(e.TinNumber)
+        && e.BusinessLocationTypeId is not null;
+
     private RenderFragment Req(string key) => builder =>
     {
         if (mandatoryKeys.Contains(key))
@@ -610,6 +689,35 @@
             && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
         {
             errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
+        }
+
+        // Trade-license date sanity (same as the internal form): issue can't be in the future; expiry can't
+        // precede the issue date.
+        if (IsFieldOnStep("TradeLicenseIssueDate", step))
+        {
+            if (model.TradeLicenseIssueDate is DateTime iss && iss.Date > DateTime.Today)
+            {
+                errors.Add("Trade License Issue Date cannot be a future date.");
+            }
+            if (model.TradeLicenseIssueDate is DateTime i2 && model.TradeLicenseExpiryDate is DateTime exp && exp.Date < i2.Date)
+            {
+                errors.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+            }
+        }
+
+        // VAT Group: when the VAT Registration Type is a VAT Group, at least one fully-completed entity row
+        // is required (step 1).
+        if (step == 1 && IsVatGroupSelected)
+        {
+            var rows = model.VatGroupEntities.Where(e => !IsBlankVatRow(e)).ToList();
+            if (rows.Count == 0)
+            {
+                errors.Add("Please list at least one entity within your VAT group.");
+            }
+            else if (rows.Any(e => !IsCompleteVatRow(e)))
+            {
+                errors.Add("Complete every column (Business Legal Name, Address, E-Invoicing Wave, TRN Number, TIN Number, Bus. Location Type) for each VAT group entity.");
+            }
         }
 
         // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
@@ -985,7 +1093,8 @@
 
         // Step 1 — Business / Organization
         f["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")"><label>Supplier Name@(Req("SupplierName"))@Help("SupplierName")</label><InputText @bind-Value="model.SupplierName" /></div>;
-        f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        // Frozen for the supplier — the business sets the Tax Organization Type; suppliers see it read-only.
+        f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId" disabled="true" class="di-frozen"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["SupplierTypeId"] = @<div class="di-field @FieldClass("SupplierTypeId")"><label>Supplier Type@(Req("SupplierTypeId"))</label><InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["TaxpayerCountryId"] = @<div class="di-field @FieldClass("TaxpayerCountryId")"><label>Taxpayer Country@(Req("TaxpayerCountryId"))</label><InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["TaxRegistrationNumber"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))@Help("TaxRegistrationNumber")</label><InputText @bind-Value="model.TaxRegistrationNumber" maxlength="15" inputmode="numeric" pattern="[0-9]*" title="15 digits" /></div>}</text>;

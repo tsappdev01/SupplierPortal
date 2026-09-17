@@ -60,6 +60,10 @@ public class SupplierDto
 
     // Alternate "Address as per VAT Certificate" — captured only when the main address is NOT the same as
     // the Trade License / VAT Certificate. Names/types mirror SupplierFormModel so DtoMapper maps them.
+    // Structured VAT Group entities (when VAT Registration Type is a VAT Group). Mapped explicitly by
+    // DtoMapper (the reflection map skips it — the element type differs from SupplierFormModel's).
+    public List<VatGroupEntityDto> VatGroupEntities { get; set; } = [];
+
     public bool? AddressSameAsTradeLicense { get; set; }
     public string? VatAddressLine1 { get; set; }
     public string? VatAddressLine2 { get; set; }
