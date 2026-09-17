@@ -9,7 +9,7 @@ public class Supplier
     [Required, MaxLength(50)]
     public string SupplierNumber { get; set; } = string.Empty;
 
-    /// <summary>Internal triage priority: "P1", "P2" or "P3" (P1 = highest). Optional.</summary>
+    /// <summary>Internal triage priority: "P1", "P2", "P3" or "P4" (P1 = highest). Optional.</summary>
     [MaxLength(2)]
     public string? Priority { get; set; }
 

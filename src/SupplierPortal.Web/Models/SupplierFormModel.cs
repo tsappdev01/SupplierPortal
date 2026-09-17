@@ -12,7 +12,7 @@ public class SupplierFormModel
     // -- Step 1: Business / Organization Information --
     public string? SupplierNumber { get; set; }
 
-    /// <summary>Internal triage priority: P1 / P2 / P3.</summary>
+    /// <summary>Internal triage priority: P1 / P2 / P3 / P4.</summary>
     public string? Priority { get; set; }
 
     [Required(ErrorMessage = "Supplier Name is required.")]
