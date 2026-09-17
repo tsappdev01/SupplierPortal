@@ -427,20 +427,56 @@ else
     </div>
 }
 
+<div class="di-cols-bar no-print">
+    <div class="di-cols-wrap">
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => showColumnMenu = !showColumnMenu" title="Show or hide table columns">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm5 0v14h6V2H5ZM1 2v3h3V1H2a1 1 0 0 0-1 1Zm3 4H1v4h3V6Zm0 5H1v3a1 1 0 0 0 1 1h2v-4Zm8-10v4h3V2a1 1 0 0 0-1-1h-2Zm3 5h-3v4h3V6Zm0 5h-3v4h2a1 1 0 0 0 1-1v-3Z" />
+            </svg>
+            Columns
+        </button>
+        @if (showColumnMenu)
+        {
+            <div class="di-cols-menu" @onclick:stopPropagation>
+                <div class="di-cols-menu-head">
+                    <span>Show columns</span>
+                    <button type="button" class="di-chip-btn" @onclick="ResetColumnsAsync">Reset</button>
+                </div>
+                @foreach (var col in ChoosableCols)
+                {
+                    <label class="di-cols-item">
+                        <input type="checkbox" checked="@ColOn(col.Key)" @onchange="() => ToggleColumnAsync(col.Key)" />
+                        <span>@col.Label</span>
+                    </label>
+                }
+            </div>
+        }
+    </div>
+</div>
+@if (showColumnMenu)
+{
+    <div class="di-cols-backdrop no-print" @onclick="() => showColumnMenu = false"></div>
+}
+
 <div class="di-supplier-scroll">
 <table class="table table-striped table-sm">
     <thead>
         <tr>
             <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
-            <th>Supplier Number</th>
-            <th>Priority</th>
-            <th>Supplier Name</th>
-            <th>Full Name</th>
-            <th>Contact Email</th>
-            <th>Status</th>
-            <th class="no-print">Assigned To</th>
-            <th class="no-print">Department</th>
-            <th class="no-print">Actions</th>
+            @if (ColOn("number")) { <th>Supplier Number</th> }
+            @if (ColOn("priority")) { <th>Priority</th> }
+            @if (ColOn("name")) { <th>Supplier Name</th> }
+            @if (ColOn("fullname")) { <th>Full Name</th> }
+            @if (ColOn("email")) { <th>Contact Email</th> }
+            @if (ColOn("status")) { <th>Status</th> }
+            @if (ColOn("taxorg")) { <th>Tax Organization Type</th> }
+            @if (ColOn("suppliertype")) { <th>Supplier Type</th> }
+            @if (ColOn("trn")) { <th>TRN / VAT Reg. Number</th> }
+            @if (ColOn("tradelicense")) { <th>Trade License Number</th> }
+            @if (ColOn("updated")) { <th>Last Updated</th> }
+            @if (ColOn("assigned")) { <th class="no-print">Assigned To</th> }
+            @if (ColOn("department")) { <th class="no-print">Department</th> }
+            @if (ColOn("actions")) { <th class="no-print">Actions</th> }
         </tr>
     </thead>
     <tbody>
@@ -448,55 +484,77 @@ else
         {
             <tr>
                 <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(supplier.Id)" @onchange="() => ToggleSelected(supplier.Id)" /></td>
-                <td>@supplier.SupplierNumber</td>
-                <td>
-                    @if (!string.IsNullOrWhiteSpace(supplier.Priority))
-                    {
-                        <span class="di-priority di-priority-@supplier.Priority.ToLowerInvariant()">@supplier.Priority</span>
-                    }
-                </td>
-                <td>
-                    @supplier.SupplierName
-                    @if (supplier.PendingSupplierChangeCount > 0)
-                    {
-                        <a href="/supplier/edit/@supplier.Id" class="di-bell" title="@($"{supplier.PendingSupplierChangeCount} change(s) submitted by the supplier awaiting review")">
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2ZM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.375 3.632-.116.687-.257 1.382-.42 1.941-.169.588-.107 1.045.109 1.376.204.313.606.593 1.36.783C7.19 15.24 9.786 15.24 12.326 13.732c.754-.19 1.156-.47 1.36-.783.216-.331.278-.788.109-1.376a13.24 13.24 0 0 1-.42-1.94C13.134 8.196 13 6.628 13 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917Z" />
-                            </svg>
-                            @supplier.PendingSupplierChangeCount
-                        </a>
-                    }
-                </td>
-                <td>@supplier.FullName</td>
-                <td>@supplier.ContactEmail</td>
-                <td>
-                    @if (!string.IsNullOrEmpty(supplier.StatusName))
-                    {
-                        <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
-                    }
-                </td>
-                <td class="no-print">
-                    <select class="form-select form-select-sm di-assign-select"
-                            value="@supplier.AssignedToUserId"
-                            @onchange="e => AssignAsync(supplier, e.Value?.ToString())">
-                        <option value="">— Unassigned —</option>
-                        @foreach (var u in AssignableFor(supplier))
+                @if (ColOn("number")) { <td>@supplier.SupplierNumber</td> }
+                @if (ColOn("priority"))
+                {
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(supplier.Priority))
                         {
-                            <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                            <span class="di-priority di-priority-@supplier.Priority.ToLowerInvariant()">@supplier.Priority</span>
                         }
-                    </select>
-                </td>
-                <td class="no-print">
-                    <select class="form-select form-select-sm di-assign-select"
-                            value="@supplier.DepartmentId"
-                            @onchange="e => AssignDepartmentAsync(supplier, e.Value?.ToString())">
-                        <option value="">— None —</option>
-                        @foreach (var d in departments)
+                    </td>
+                }
+                @if (ColOn("name"))
+                {
+                    <td>
+                        @supplier.SupplierName
+                        @if (supplier.PendingSupplierChangeCount > 0)
                         {
-                            <option value="@d.Id">@d.Name</option>
+                            <a href="/supplier/edit/@supplier.Id" class="di-bell" title="@($"{supplier.PendingSupplierChangeCount} change(s) submitted by the supplier awaiting review")">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2ZM8 1.918l-.797.161A4.002 4.002 0 0 0 4 6c0 .628-.134 2.197-.375 3.632-.116.687-.257 1.382-.42 1.941-.169.588-.107 1.045.109 1.376.204.313.606.593 1.36.783C7.19 15.24 9.786 15.24 12.326 13.732c.754-.19 1.156-.47 1.36-.783.216-.331.278-.788.109-1.376a13.24 13.24 0 0 1-.42-1.94C13.134 8.196 13 6.628 13 6a4.002 4.002 0 0 0-3.203-3.92L8 1.917Z" />
+                                </svg>
+                                @supplier.PendingSupplierChangeCount
+                            </a>
                         }
-                    </select>
-                </td>
+                    </td>
+                }
+                @if (ColOn("fullname")) { <td>@supplier.FullName</td> }
+                @if (ColOn("email")) { <td>@supplier.ContactEmail</td> }
+                @if (ColOn("status"))
+                {
+                    <td>
+                        @if (!string.IsNullOrEmpty(supplier.StatusName))
+                        {
+                            <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
+                        }
+                    </td>
+                }
+                @if (ColOn("taxorg")) { <td>@supplier.TaxOrganizationTypeName</td> }
+                @if (ColOn("suppliertype")) { <td>@supplier.SupplierTypeName</td> }
+                @if (ColOn("trn")) { <td>@supplier.TaxRegistrationNumber</td> }
+                @if (ColOn("tradelicense")) { <td>@supplier.TradeLicenseNumber</td> }
+                @if (ColOn("updated")) { <td>@((supplier.UpdatedAt ?? supplier.CreatedAt).ToString("dd MMM yyyy"))</td> }
+                @if (ColOn("assigned"))
+                {
+                    <td class="no-print">
+                        <select class="form-select form-select-sm di-assign-select"
+                                value="@supplier.AssignedToUserId"
+                                @onchange="e => AssignAsync(supplier, e.Value?.ToString())">
+                            <option value="">— Unassigned —</option>
+                            @foreach (var u in AssignableFor(supplier))
+                            {
+                                <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                            }
+                        </select>
+                    </td>
+                }
+                @if (ColOn("department"))
+                {
+                    <td class="no-print">
+                        <select class="form-select form-select-sm di-assign-select"
+                                value="@supplier.DepartmentId"
+                                @onchange="e => AssignDepartmentAsync(supplier, e.Value?.ToString())">
+                            <option value="">— None —</option>
+                            @foreach (var d in departments)
+                            {
+                                <option value="@d.Id">@d.Name</option>
+                            }
+                        </select>
+                    </td>
+                }
+                @if (ColOn("actions"))
+                {
                 <td class="no-print">
                     <button class="btn btn-sm btn-outline-secondary" title="@(supplier.DocumentCount > 0 ? $"View {supplier.DocumentCount} attached document(s)" : "No documents attached")"
                             disabled="@(supplier.DocumentCount == 0)" @onclick="() => ShowDocumentsAsync(supplier)">
@@ -526,6 +584,7 @@ else
                         </button>
                     }
                 </td>
+                }
             </tr>
         }
     </tbody>
@@ -915,6 +974,23 @@ else if (TotalPages > 1)
     }
     .di-docsall-actions { display: flex; gap: 8px; padding: 8px 12px 12px; }
     .di-docsall-actions .btn { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 0; justify-content: center; }
+
+    /* Column chooser for the supplier table */
+    .di-cols-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+    .di-cols-wrap { position: relative; }
+    .di-cols-backdrop { position: fixed; inset: 0; z-index: 1080; }
+    .di-cols-menu {
+        position: absolute; top: calc(100% + 6px); right: 0; z-index: 1085; width: 250px; max-height: 60vh;
+        overflow-y: auto; background: #fff; border: 1px solid #e2e5ea; border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(20, 34, 70, 0.14); padding: 8px;
+    }
+    .di-cols-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 4px 8px 8px; margin-bottom: 4px; border-bottom: 1px solid #eef1f5; font-size: 12.5px;
+        font-weight: 700; color: #46506b; }
+    .di-cols-item { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px;
+        font-size: 13.5px; color: #1a2233; cursor: pointer; }
+    .di-cols-item:hover { background: #f4f6fb; }
+    .di-cols-item input { width: 15px; height: 15px; flex: none; cursor: pointer; }
 </style>
 
 @code {
@@ -1441,6 +1517,22 @@ else if (TotalPages > 1)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender && !colsLoaded)
+        {
+            colsLoaded = true;
+            try
+            {
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "di-supplier-cols");
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    var known = saved.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .Where(k => ChoosableCols.Any(c => c.Key == k)).ToHashSet();
+                    if (known.Count > 0) { visibleCols = known; StateHasChanged(); }
+                }
+            }
+            catch { /* storage unavailable — use defaults */ }
+        }
+
         if (focusDocsPending)
         {
             focusDocsPending = false;
@@ -1683,6 +1775,53 @@ else if (TotalPages > 1)
 
     private bool showPrintDialog;
     private List<PrintColumn> printColumns = [];
+
+    // ----- On-screen column chooser for the Manage Supplier table -----
+    // The bulk-select checkbox column is always shown; everything else is toggleable and persisted per
+    // browser in localStorage. Extra fields (tax org, supplier type, TRN, trade licence, last updated) are
+    // off by default and can be added from the "Columns" menu.
+    private static readonly (string Key, string Label)[] ChoosableCols =
+    [
+        ("number", "Supplier Number"),
+        ("priority", "Priority"),
+        ("name", "Supplier Name"),
+        ("fullname", "Full Name"),
+        ("email", "Contact Email"),
+        ("status", "Status"),
+        ("taxorg", "Tax Organization Type"),
+        ("suppliertype", "Supplier Type"),
+        ("trn", "TRN / VAT Reg. Number"),
+        ("tradelicense", "Trade License Number"),
+        ("updated", "Last Updated"),
+        ("assigned", "Assigned To"),
+        ("department", "Department"),
+        ("actions", "Actions"),
+    ];
+    private static readonly string[] DefaultCols =
+        ["number", "priority", "name", "fullname", "email", "status", "assigned", "department", "actions"];
+    private HashSet<string> visibleCols = new(DefaultCols);
+    private bool showColumnMenu;
+    private bool colsLoaded;
+
+    private bool ColOn(string key) => visibleCols.Contains(key);
+
+    private async Task ToggleColumnAsync(string key)
+    {
+        if (!visibleCols.Remove(key)) { visibleCols.Add(key); }
+        await SaveColumnsAsync();
+    }
+
+    private async Task ResetColumnsAsync()
+    {
+        visibleCols = new(DefaultCols);
+        await SaveColumnsAsync();
+    }
+
+    private async Task SaveColumnsAsync()
+    {
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "di-supplier-cols", string.Join(",", visibleCols)); }
+        catch { /* storage unavailable — keep the in-memory choice */ }
+    }
 
     private string ActiveTabLabel => activeTab switch
     {
