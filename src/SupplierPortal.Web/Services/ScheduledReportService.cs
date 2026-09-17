@@ -8,7 +8,7 @@ namespace SupplierPortal.Web.Services;
 /// local wall-clock date/time for the first (or next) run; it is converted to UTC on save.</summary>
 public record ScheduledReportInput(
     string Name, ReportFormat Format, ReportFrequency Frequency, DateTime StartLocal,
-    int? BusinessUnitId, int NotificationGroupId, bool IsActive);
+    int? BusinessUnitId, int NotificationGroupId, bool IsActive, int? ReportDefinitionId = null);
 
 /// <summary>CRUD and scheduling logic for administrator-defined scheduled supplier reports. The next-run
 /// time is stored in UTC and advanced by one interval after each run; a <see cref="ReportFrequency.Once"/>
@@ -53,6 +53,7 @@ public class ScheduledReportService(
             BusinessUnitId = input.BusinessUnitId,
             NotificationGroupId = input.NotificationGroupId,
             IsActive = input.IsActive,
+            ReportDefinitionId = input.ReportDefinitionId,
             NextRunUtc = ReportTimeZone.ToUtc(input.StartLocal),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actor,
@@ -90,6 +91,7 @@ public class ScheduledReportService(
         report.BusinessUnitId = input.BusinessUnitId;
         report.NotificationGroupId = input.NotificationGroupId;
         report.IsActive = input.IsActive;
+        report.ReportDefinitionId = input.ReportDefinitionId;
         report.NextRunUtc = ReportTimeZone.ToUtc(input.StartLocal);
 
         await db.SaveChangesAsync();
@@ -156,6 +158,7 @@ public class ScheduledReportService(
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.ScheduledReports
             .Include(r => r.NotificationGroup!).ThenInclude(g => g.Users)
+            .Include(r => r.ReportDefinition)
             .Where(r => r.IsActive && r.NextRunUtc <= nowUtc)
             .ToListAsync();
     }
@@ -200,6 +203,8 @@ public class ScheduledReportService(
                 ReportFrequency.Daily => next.AddDays(1),
                 ReportFrequency.Weekly => next.AddDays(7),
                 ReportFrequency.Monthly => next.AddMonths(1),
+                ReportFrequency.Quarterly => next.AddMonths(3),
+                ReportFrequency.Yearly => next.AddYears(1),
                 _ => afterUtc.AddYears(100),   // Once: push far out (it is also disabled)
             };
         }

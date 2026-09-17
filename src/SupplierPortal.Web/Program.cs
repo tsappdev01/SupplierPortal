@@ -117,6 +117,10 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<NotificationGroupService>();
 builder.Services.AddScoped<ScheduledReportService>();
+// Report Builder: metadata browser + safe query executor, dynamic renderer, and reusable definitions.
+builder.Services.AddScoped<SupplierPortal.Web.Services.Reporting.ReportSchemaService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Reporting.ReportRenderService>();
+builder.Services.AddScoped<SupplierPortal.Web.Services.Reporting.ReportDefinitionService>();
 // Configure the local time zone used to display/enter report schedules (default Gulf Standard Time).
 ReportTimeZone.Configure(builder.Configuration["Reports:TimeZone"]);
 // Background runner: fire due scheduled reports and email the PDF/Excel to the target group's active members.

@@ -40,28 +40,35 @@ public class EmailDispatcher(
     /// deliver the generated PDF/Excel. Graph is preferred when configured, then SMTP. SQL Server Database
     /// Mail cannot attach in-memory bytes, so when neither Graph nor SMTP is configured this returns a clear
     /// error rather than silently dropping the attachment.</summary>
-    public async Task<(bool Ok, string? Error)> SendHtmlWithAttachmentAsync(
-        string toEmail, string subject, string htmlBody, byte[] attachment, string fileName, string contentType)
+    public Task<(bool Ok, string? Error)> SendHtmlWithAttachmentAsync(
+        string toEmail, string subject, string htmlBody, byte[] attachment, string fileName, string contentType) =>
+        SendHtmlWithAttachmentsAsync(toEmail, subject, htmlBody, [(attachment, fileName, contentType)]);
+
+    /// <summary>Sends an HTML email with one or more file attachments (used by the scheduled report runner for
+    /// PDF and/or Excel). Graph is preferred when configured, then SMTP; SQL Server Database Mail cannot attach
+    /// in-memory files, so a clear error is returned rather than silently dropping the attachments.</summary>
+    public async Task<(bool Ok, string? Error)> SendHtmlWithAttachmentsAsync(
+        string toEmail, string subject, string htmlBody,
+        IReadOnlyList<(byte[] Bytes, string FileName, string ContentType)> attachments)
     {
         if (string.IsNullOrWhiteSpace(toEmail))
         {
             return (false, "No recipient email address.");
         }
-        if (attachment is null || attachment.Length == 0)
+        if (attachments is null || attachments.Count == 0 || attachments.All(a => a.Bytes is null || a.Bytes.Length == 0))
         {
             return (false, "No attachment content.");
         }
 
         if (graphMail.IsConfigured)
         {
-            return await graphMail.SendHtmlWithAttachmentAsync(toEmail, subject, htmlBody, attachment, fileName, contentType);
+            return await graphMail.SendHtmlWithAttachmentsAsync(toEmail, subject, htmlBody, attachments);
         }
 
         var smtpHost = config["Email:Smtp:Host"];
         if (!string.IsNullOrWhiteSpace(smtpHost))
         {
-            return await SendViaSmtpAsync(smtpHost.Trim(), toEmail, subject, htmlBody,
-                (attachment, fileName, contentType));
+            return await SendViaSmtpAsync(smtpHost.Trim(), toEmail, subject, htmlBody, attachments);
         }
 
         return (false, "Attachments require Microsoft Graph or SMTP to be configured; " +
@@ -69,7 +76,7 @@ public class EmailDispatcher(
     }
 
     private async Task<(bool, string?)> SendViaSmtpAsync(string host, string to, string subject, string html,
-        (byte[] Bytes, string FileName, string ContentType)? attachment = null)
+        IReadOnlyList<(byte[] Bytes, string FileName, string ContentType)>? attachments = null)
     {
         try
         {
@@ -97,13 +104,18 @@ public class EmailDispatcher(
             };
             message.To.Add(to);
 
-            // MemoryStream must outlive SendMailAsync, so it's disposed after the send (not with `using`
-            // inline, which would dispose it before the attachment is read).
-            MemoryStream? attachmentStream = null;
-            if (attachment is { } a)
+            // The MemoryStreams must outlive SendMailAsync, so they're disposed after the send (not inline,
+            // which would dispose them before the attachment bytes are read).
+            var streams = new List<MemoryStream>();
+            if (attachments is not null)
             {
-                attachmentStream = new MemoryStream(a.Bytes);
-                message.Attachments.Add(new Attachment(attachmentStream, a.FileName, a.ContentType));
+                foreach (var a in attachments)
+                {
+                    if (a.Bytes is null || a.Bytes.Length == 0) { continue; }
+                    var s = new MemoryStream(a.Bytes);
+                    streams.Add(s);
+                    message.Attachments.Add(new Attachment(s, a.FileName, a.ContentType));
+                }
             }
 
             try
@@ -112,7 +124,7 @@ public class EmailDispatcher(
             }
             finally
             {
-                attachmentStream?.Dispose();
+                foreach (var s in streams) { s.Dispose(); }
             }
             return (true, null);
         }

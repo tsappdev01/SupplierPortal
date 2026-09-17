@@ -2149,11 +2149,69 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int>("NotificationGroupId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("ReportDefinitionId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NotificationGroupId");
 
+                    b.HasIndex("ReportDefinitionId");
+
                     b.ToTable("ScheduledReports");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ReportDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColumnsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("FiltersJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SchemaName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ReportDefinitions");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.BankBranch", b =>
@@ -2640,7 +2698,14 @@ namespace SupplierPortal.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SupplierPortal.Web.Models.ReportDefinition", "ReportDefinition")
+                        .WithMany()
+                        .HasForeignKey("ReportDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("NotificationGroup");
+
+                    b.Navigation("ReportDefinition");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Bank", b =>

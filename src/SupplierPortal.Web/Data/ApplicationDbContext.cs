@@ -16,6 +16,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<NotificationGroup> NotificationGroups => Set<NotificationGroup>();
     public DbSet<ScheduledReport> ScheduledReports => Set<ScheduledReport>();
+    public DbSet<ReportDefinition> ReportDefinitions => Set<ReportDefinition>();
     public DbSet<SupplierFieldSetting> SupplierFieldSettings => Set<SupplierFieldSetting>();
     public DbSet<SupplierTabSetting> SupplierTabSettings => Set<SupplierTabSetting>();
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
@@ -103,6 +104,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(r => r.NotificationGroupId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // A scheduled report may reference a reusable report definition; a definition in use cannot be
+        // deleted (the service blocks it) — restrict rather than cascade.
+        modelBuilder.Entity<ScheduledReport>()
+            .HasOne(r => r.ReportDefinition)
+            .WithMany()
+            .HasForeignKey(r => r.ReportDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ReportDefinition>()
+            .HasIndex(d => d.Name)
+            .IsUnique();
 
         modelBuilder.Entity<BusinessUnit>()
             .HasIndex(b => b.Code)

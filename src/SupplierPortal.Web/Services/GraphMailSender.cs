@@ -57,17 +57,23 @@ public sealed class GraphMailSender(IOptions<GraphMailOptions> options, ILogger<
 
     public Task<(bool Ok, string? Error)> SendHtmlAsync(
         string toEmail, string subject, string htmlBody, CancellationToken ct = default) =>
-        SendAsync(toEmail, subject, htmlBody, attachment: null, fileName: null, contentType: null, ct);
+        SendAsync(toEmail, subject, htmlBody, attachments: null, ct);
 
     /// <summary>Sends an HTML email with a single file attachment (used by the scheduled report runner).</summary>
     public Task<(bool Ok, string? Error)> SendHtmlWithAttachmentAsync(
         string toEmail, string subject, string htmlBody,
         byte[] attachment, string fileName, string contentType, CancellationToken ct = default) =>
-        SendAsync(toEmail, subject, htmlBody, attachment, fileName, contentType, ct);
+        SendAsync(toEmail, subject, htmlBody, [(attachment, fileName, contentType)], ct);
+
+    /// <summary>Sends an HTML email with one or more file attachments (PDF and/or Excel report files).</summary>
+    public Task<(bool Ok, string? Error)> SendHtmlWithAttachmentsAsync(
+        string toEmail, string subject, string htmlBody,
+        IReadOnlyList<(byte[] Bytes, string FileName, string ContentType)> attachments, CancellationToken ct = default) =>
+        SendAsync(toEmail, subject, htmlBody, attachments, ct);
 
     private async Task<(bool Ok, string? Error)> SendAsync(
         string toEmail, string subject, string htmlBody,
-        byte[]? attachment, string? fileName, string? contentType, CancellationToken ct)
+        IReadOnlyList<(byte[] Bytes, string FileName, string ContentType)>? attachments, CancellationToken ct)
     {
         try
         {
@@ -81,18 +87,18 @@ public sealed class GraphMailSender(IOptions<GraphMailOptions> options, ILogger<
                 ],
             };
 
-            if (attachment is not null)
+            if (attachments is not null && attachments.Count > 0)
             {
-                message.Attachments =
-                [
-                    new FileAttachment
+                message.Attachments = attachments
+                    .Where(a => a.Bytes is not null && a.Bytes.Length > 0)
+                    .Select(a => (Attachment)new FileAttachment
                     {
                         OdataType = "#microsoft.graph.fileAttachment",
-                        Name = fileName,
-                        ContentType = contentType,
-                        ContentBytes = attachment,
-                    }
-                ];
+                        Name = a.FileName,
+                        ContentType = a.ContentType,
+                        ContentBytes = a.Bytes,
+                    })
+                    .ToList();
             }
 
             var request = new SendMailPostRequestBody

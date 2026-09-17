@@ -10,6 +10,8 @@ public enum ReportFrequency
     Daily = 1,
     Weekly = 2,
     Monthly = 3,
+    Quarterly = 4,
+    Yearly = 5,
 }
 
 /// <summary>The file format the report is generated in and attached to the email.</summary>
@@ -17,6 +19,8 @@ public enum ReportFormat
 {
     Pdf = 0,
     Excel = 1,
+    /// <summary>Both a PDF and an Excel file are generated and attached.</summary>
+    PdfAndExcel = 2,
 }
 
 /// <summary>An administrator-defined schedule that generates a supplier report and emails it as a file
@@ -44,9 +48,16 @@ public class ScheduledReport
     /// <summary>When false, the schedule is kept but never fires.</summary>
     public bool IsActive { get; set; } = true;
 
-    /// <summary>Optional business-unit filter. When set, the report only includes that BU's suppliers;
-    /// when null, it includes all suppliers.</summary>
+    /// <summary>Optional business-unit filter (legacy supplier report only). When set, the report includes
+    /// only that BU's suppliers; when null, all suppliers. Ignored for definition-based reports, whose data,
+    /// columns and filters come from the <see cref="ReportDefinition"/>.</summary>
     public int? BusinessUnitId { get; set; }
+
+    /// <summary>The reusable report definition (data source, columns, filters, title, format) this schedule
+    /// runs. When set, the runner builds the report from the definition; when null, it falls back to the
+    /// legacy fixed supplier export.</summary>
+    public int? ReportDefinitionId { get; set; }
+    public ReportDefinition? ReportDefinition { get; set; }
 
     /// <summary>The notification group whose active members receive the report. The group must itself be
     /// active at run time for the report to be sent.</summary>

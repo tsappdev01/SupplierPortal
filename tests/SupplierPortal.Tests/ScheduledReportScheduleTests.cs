@@ -30,6 +30,20 @@ public class ScheduledReportScheduleTests
     }
 
     [Fact]
+    public void Quarterly_advances_three_months()
+    {
+        var next = ScheduledReportService.AdvancePast(Base, ReportFrequency.Quarterly, Base);
+        Assert.Equal(new DateTime(2026, 4, 10, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void Yearly_advances_one_year()
+    {
+        var next = ScheduledReportService.AdvancePast(Base, ReportFrequency.Yearly, Base);
+        Assert.Equal(new DateTime(2027, 1, 10, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
     public void Skips_missed_occurrences_to_first_future_run()
     {
         // Scheduled daily starting 10 days ago; after a downtime the next run should be the first
