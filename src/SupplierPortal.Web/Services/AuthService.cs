@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
@@ -10,8 +11,13 @@ namespace SupplierPortal.Web.Services;
 
 public class AuthService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher,
-    ActiveDirectoryService activeDirectory, IMemoryCache cache)
+    ActiveDirectoryService activeDirectory, IMemoryCache cache, IConfiguration configuration)
 {
+    /// <summary>Public self-registration is OFF unless explicitly enabled (Auth:AllowSelfRegistration=true).
+    /// Keeping it off closes the anonymous "/account/register" write path that a scanner floods with junk;
+    /// accounts are created by administrators via Manage Users.</summary>
+    public bool SelfRegistrationEnabled => configuration.GetValue("Auth:AllowSelfRegistration", false);
+
     // Throttle password guessing: after this many failed attempts for a given login the account is
     // temporarily locked (in-memory, per web instance). Successful sign-in clears the counter.
     private const int MaxFailedAttempts = 5;
@@ -19,6 +25,12 @@ public class AuthService(
     private static string FailKey(string login) => $"login-fail:{login.ToLowerInvariant()}";
     public async Task<(bool Success, string? Error)> RegisterAsync(string email, string password)
     {
+        // Authoritative block: refuse self-registration when it is disabled, even for a crafted direct POST.
+        if (!SelfRegistrationEnabled)
+        {
+            return (false, "Self-registration is disabled. Please contact your administrator to request an account.");
+        }
+
         email = (email ?? "").Trim();
 
         // Authoritative server-side format check (a direct form POST bypasses the component's client

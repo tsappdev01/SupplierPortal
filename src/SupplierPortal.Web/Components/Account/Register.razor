@@ -6,10 +6,17 @@
 
 <PageTitle>Register - Supplier Portal</PageTitle>
 
-<h1>Register</h1>
-
-@if (registered)
+@if (!AuthService.SelfRegistrationEnabled)
 {
+    <h1>Register</h1>
+    <div class="alert alert-secondary">
+        Self-registration is disabled. Please contact your administrator to request an account.
+    </div>
+    <p><a href="/account/login">Back to login</a></p>
+}
+else if (registered)
+{
+    <h1>Register</h1>
     <div class="alert alert-success">
         Registration received. An administrator will link your account with a company before you can log in.
     </div>
@@ -17,6 +24,7 @@
 }
 else
 {
+    <h1>Register</h1>
     <EditForm Model="Input" method="post" OnValidSubmit="RegisterAsync" FormName="register">
         <DataAnnotationsValidator />
         <ValidationSummary class="text-danger" />
