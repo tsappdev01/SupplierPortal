@@ -49,6 +49,8 @@ kids.push(bullet("Staff send a branded self-service link; the supplier verifies 
 kids.push(bullet("The supplier completes only the fields made visible to them; locked/hidden fields are protected server-side."));
 kids.push(bullet("Document upload (trade licence, VAT certificate, bank confirmation letter, other)."));
 kids.push(bullet("A declaration must be acknowledged and signed (typed name plus a hand-drawn signature) before submission; the system stores a signed declaration PDF with the supplier's documents."));
+kids.push(bullet("Merged Address & Contact tab in the supplier wizard; VAT-registered suppliers must provide a 15-digit TRN and upload a VAT Certificate; a structured VAT Group entity table captures each group entity with TRN (15-digit) and TIN (10-digit) length validation."));
+kids.push(bullet("Where the VAT-certificate address differs from the trade licence, an alternate VAT-certificate address (Address Line 1, Country, City/Emirate) is captured; Trade Licence upload is mandatory; and a completion e-mail is sent to the supplier on submission."));
 kids.push(bullet("On submission the record moves to review, the requestor is notified, and the link is invalidated to prevent re-submission."));
 kids.push(h2("4.3 Review, notifications & audit"));
 kids.push(bullet("Reviewers see supplier-made changes highlighted for acknowledgement; confirmation is requested before sending notification e-mails."));
@@ -57,13 +59,18 @@ kids.push(h2("4.4 Import / export & printing"));
 kids.push(bullet("Import suppliers from an Excel template (duplicates detected by supplier number; re-import preserves app-managed fields)."));
 kids.push(bullet("Export to the ERP/Oracle-Fusion Excel format and PDF; print any tab's full list with a chosen set of columns."));
 kids.push(bullet("Download a supplier's documents individually or as a zip named by supplier number and name, with each file prefixed by its document type."));
-kids.push(h2("4.5 Administration"));
-kids.push(bullet("Manage users (roles, business units, active status), business units (branding + contact e-mail), departments, supplier field settings, lookups, and the audit log."));
+kids.push(h2("4.5 Notifications, scheduled reports & emergency access"));
+kids.push(bullet("Notification Groups: administrators maintain named recipient lists (for example ALL_USERS) of portal users, each with an enable/disable (Active) flag; disabled groups are retained but excluded from notifications."));
+kids.push(bullet("Scheduled Reports: administrators schedule a supplier report (PDF or Excel) to be e-mailed as a file attachment to the active members of an active notification group, on a chosen date/time and frequency (Once / Daily / Weekly / Monthly), with optional business-unit scope; a \"Run now\" action is supported and the last-run status is shown."));
+kids.push(bullet("Break-Glass emergency access: administrators can set or rotate an emergency-access secret from Settings; it is stored only as a salted hash (never in plaintext or the database), and the master switch is a deployment setting."));
+kids.push(h2("4.6 Administration"));
+kids.push(bullet("Manage users (roles, business units, active status), business units (branding + contact e-mail), departments, supplier field settings, lookups, notification groups, scheduled reports, and the audit log."));
 
 kids.push(h1("5. Non-Functional Requirements"));
 kids.push(table(["Area", "Requirement"],
- [["Security","Public self-service must not expose the database; strong OTP + token model; role/business-unit-scoped access; protected fields; document uploads cannot execute as script; SSRF-safe external fetches; security response headers; login lockout, idle lockout and active-session revocation."],
+ [["Security","Public self-registration is disabled by default (accounts are created by administrators); public self-service must not expose the database; strong OTP + token model; role/business-unit-scoped access; protected fields; break-glass emergency access secret stored only as a salted hash; document uploads cannot execute as script; SSRF-safe external fetches; security response headers; login lockout, idle lockout and active-session revocation."],
   ["Compliance","Capture UAE e-invoicing / VAT attributes; retain a signed declaration; full audit trail."],
+  ["Integrations / e-mail","Outbound e-mail, including scheduled-report file attachments, is sent via Microsoft Graph or SMTP."],
   ["Availability / resilience","Retry Azure SQL transient faults; best-effort integrations (OCR, e-mail) never block a save; blob storage falls back to DB/disk."],
   ["Performance","Reference data cached; short-lived DB contexts; paginated lists."],
   ["Usability","Guided multi-step forms; per-field help; progress indicators on long operations; branded, accessible UI in light/dark."],

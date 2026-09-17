@@ -49,6 +49,9 @@ K.push(table(["Menu", "What it is"], [
   ["Settings ▸ Manage Users", "Create users, set roles and business-unit access, and handle pending registrations. Administrators only."],
   ["Settings ▸ Supplier Fields", "The Supplier Field Manager — choose which fields the supplier sees, which are mandatory, and their order. Administrators only."],
   ["Settings ▸ Customer Fields / Document Types", "Configuration for the customer module and document categories. Administrators only."],
+  ["Settings ▸ Notification Group", "Named recipient lists used as the recipients for Scheduled Reports. Administrators only."],
+  ["Settings ▸ Scheduled Reports", "Schedule supplier reports to be e-mailed automatically to a notification group. Administrators only."],
+  ["Settings ▸ Break-Glass Access", "Set or rotate the emergency-access secret. Administrators only."],
   ["Settings ▸ Audit Log", "A searchable record of key actions (who did what, when). Administrators only."],
 ], [3400, 6200]));
 
@@ -155,7 +158,7 @@ K.push(para([t("When a supplier's submission differs from the stored record, a "
 // ---------- 9. Printing ----------
 K.push(h1("9. Printing & Exporting"));
 K.push(bullet([t("Print: ", { bold: true }), t("the Print button opens a dialog where you choose the columns to include; the whole filtered list is printed (not just the current page), with a clean, readable layout.")]));
-K.push(bullet([t("Export: ", { bold: true }), t("where enabled, export the filtered supplier list to a file for use outside the portal.")]));
+K.push(bullet([t("Export: ", { bold: true }), t("export the filtered supplier list to Excel or PDF for use outside the portal.")]));
 
 // ---------- 10. Settings ----------
 K.push(h1("10. Settings (Administrators)"));
@@ -165,6 +168,7 @@ K.push(h2("10.1 Business Unit"));
 K.push(para("Create and edit the group entities suppliers are registered under. Each business unit has a name and code, a logo (shown on the supplier's self-service page and e-mails), and a contact e-mail used, for example, on the “session expired” help screen."));
 
 K.push(h2("10.2 Manage Users"));
+K.push(bullet([t("Accounts are admin-created: ", { bold: true }), t("public self-registration is disabled by default, so administrators create all accounts here in Manage Users.")]));
 K.push(bullet([t("Roles: ", { bold: true }), t("Administrators manage configuration and users; Normal Users work with suppliers. Grant each user access to the specific portals and business units they need.")]));
 K.push(bullet([t("New / edit user: ", { bold: true }), t("use New User to add someone, or the edit action on a row to change their role, access or status.")]));
 K.push(bullet([t("Pending registrations: ", { bold: true }), t("people who self-register appear in a banner “awaiting linking” until an administrator links or rejects them. Reject an individual entry with its × button, or use “Remove N invalid” to clear malformed (spam / scanner) entries in one click. Real registrations are preserved.")]));
@@ -181,6 +185,17 @@ K.push(para("Equivalent configuration for the customer module, and the list of d
 
 K.push(h2("10.5 Audit Log"));
 K.push(para("A record of significant actions — user changes, deletions, notifications and more — with who performed them and when. Use it to review activity and support investigations."));
+
+K.push(h2("10.6 Notification Groups"));
+K.push(para([t("Settings ▸ Notification Group", { bold: true }), t(" lets you build named recipient lists (for example ALL_USERS) that are used as the recipients for Scheduled Reports. Give the group a unique name and pick its members from the user list. Use the Active toggle to enable or disable it — a disabled group is kept but receives nothing.")]));
+
+K.push(h2("10.7 Scheduled Reports"));
+K.push(para([t("Settings ▸ Scheduled Reports", { bold: true }), t(" e-mails a supplier report on a schedule to the active members of a notification group, sent as a file attachment. Configure the report name, the format (PDF or Excel), the frequency (Once, Daily, Weekly or Monthly), the start / next-run date and time (shown in Gulf Standard Time), the recipient notification group, and an optional Business Unit scope (otherwise all suppliers are included).")]));
+K.push(bullet([t("Monitor and control: ", { bold: true }), t("the list shows the next run and the last-run status (Sent / Partial / Skipped / Failed), an enable/disable toggle, and a Run now button to send on demand. Due schedules also run automatically in the background — Once runs once and turns off; recurring schedules move to the next occurrence.")]));
+K.push(note("Note:", "Attachments need e-mail sending via Microsoft Graph or SMTP; if only SQL Server Database Mail is configured a run cannot attach the file and is recorded as Failed."));
+
+K.push(h2("10.8 Break-Glass Access"));
+K.push(para([t("Settings ▸ Break-Glass Access", { bold: true }), t(" lets an administrator set or rotate the emergency-access secret used for time-boxed emergency Administrator sign-in. The secret is stored only as a salted hash (never shown and never kept in the database), and every set or rotate is audited. Break-glass works only when it is enabled in the deployment settings and a secret has been configured.")]));
 
 // ---------- 11. Troubleshooting ----------
 K.push(h1("11. Tips & Troubleshooting"));

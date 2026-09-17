@@ -13,7 +13,7 @@ kids.push(...titlePage("Supplier Portal", "Administration Guide", [
 kids.push(...tocPage());
 
 kids.push(h1("1. Administrator Role"));
-kids.push(para("Administrators have full access to configuration and all supplier data. Administration is reached from the Settings section of the navigation menu: Business Unit, Manage Users, Supplier Fields, and Audit Log. Register and Upload actions and all Admin pages are restricted to Administrators server-side."));
+kids.push(para("Administrators have full access to configuration and all supplier data. Administration is reached from the Settings section of the navigation menu: Business Unit, Manage Users, Supplier Fields, Audit Log, Notification Group, Scheduled Reports and Break-Glass Access. Register and Upload actions and all Admin pages are restricted to Administrators server-side."));
 
 kids.push(h1("2. Manage Users"));
 kids.push(h2("2.1 Create / edit a user"));
@@ -26,6 +26,7 @@ kids.push(num("Set Active on/off. Save."));
 kids.push(h2("2.2 Status filter & lifecycle"));
 kids.push(bullet("The user list filters by status and defaults to Active. Pending registrations await approval; deactivating a user revokes their access — an active session ends within about two minutes."));
 kids.push(bullet("Authentication source is Local or Active Directory; AD users validate against the directory, local users against a stored password."));
+kids.push(bullet("Public self-registration is disabled by default; administrators create all accounts here in Manage Users."));
 
 kids.push(h1("3. Business Units"));
 kids.push(bullet("Create business units with a Code and Name. Upload a Logo (full-size) and thumbnail — these brand the UI, e-mails and documents for that unit; the uploaded logo is also shown on the public self-service pages."));
@@ -51,10 +52,30 @@ kids.push(h1("8. E-mail Configuration"));
 kids.push(bullet("E-mail is sent via SMTP when configured, otherwise via SQL Server Database Mail. On Azure SQL, SMTP must be configured (Database Mail is unavailable). See the Configuration Document for the Email:Smtp:* settings."));
 kids.push(bullet("Logos are embedded in e-mails per business unit; confirm branding after changing a unit's logo."));
 
-kids.push(h1("9. Emergency Access (Break-glass)"));
-kids.push(bullet("Break-glass provides time-boxed emergency Administrator access and is disabled unless a secret hash is configured. Every activation is rate-limited, constant-time verified and audit-logged. Use only per your security procedure; disable when not required."));
+kids.push(h1("9. Notification Groups"));
+kids.push(para("Settings › Notification Group defines named recipient lists (for example ALL_USERS) that are used as the recipients for Scheduled Reports. Administrator only."));
+kids.push(bullet("Each group has a unique name, a set of member users, and an Active enable/disable toggle. A disabled group is kept but excluded from notifications."));
+kids.push(bullet("Administrators create, edit and delete groups and pick members from a filterable user list."));
+kids.push(bullet("Only the active members of an active group receive a scheduled report."));
 
-kids.push(h1("10. Operational Notes"));
+kids.push(h1("10. Scheduled Reports"));
+kids.push(para("Settings › Scheduled Reports schedules a supplier report that is generated and e-mailed as a file attachment to the active members of a selected notification group (the group itself must also be active). Administrator only."));
+kids.push(h2("10.1 Configuring a schedule"));
+kids.push(bullet("Report name and format — a PDF, or Excel (all fields)."));
+kids.push(bullet("Frequency — Once, Daily, Weekly or Monthly."));
+kids.push(bullet("Start / next-run date and time — entered and displayed in Gulf Standard Time (Asia/Dubai); the time zone is configurable."));
+kids.push(bullet("Recipient notification group, and an optional Business Unit scope (otherwise all suppliers are included)."));
+kids.push(h2("10.2 Running and monitoring"));
+kids.push(bullet("The list shows the next run, the last-run status (Sent / Partial / Skipped / Failed) with detail, an enable/disable toggle, and a Run now button for on-demand sending."));
+kids.push(bullet("A background runner fires due schedules automatically: a Once schedule disables itself after running, while a recurring schedule advances to the next occurrence."));
+kids.push(bullet("Important: attachments require e-mail delivery via Microsoft Graph or SMTP. SQL Server Database Mail cannot attach in-memory files, so with only Database Mail configured a run is recorded as Failed."));
+
+kids.push(h1("11. Emergency Access (Break-Glass)"));
+kids.push(bullet("Settings › Break-Glass Access lets an Administrator set or rotate the emergency-access secret. The secret is stored only as a salted PBKDF2-SHA256 hash — never in plaintext and never in the database — is never displayed, and every set or rotate is audited."));
+kids.push(bullet("The master on/off is a deployment setting (BreakGlass:Enabled), not a UI toggle. Break-glass works only when it is enabled AND a secret has been configured."));
+kids.push(bullet("Break-glass provides time-boxed emergency Administrator access. Every activation is rate-limited, constant-time verified and audit-logged. Use only per your security procedure."));
+
+kids.push(h1("12. Operational Notes"));
 kids.push(bullet("Change the seeded default administrator password immediately after deployment."));
 kids.push(bullet("Keep all secrets (connection strings, SMTP/OCR keys, client secrets) out of committed configuration; rotate periodically."));
 kids.push(bullet("Before high-volume concurrent registration, run the recommended supplier-number de-duplication and unique-index migration (see the PAT Report residual items)."));
