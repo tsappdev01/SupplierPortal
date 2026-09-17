@@ -1,0 +1,148 @@
+@page "/admin/break-glass"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.Extensions.Options
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject BreakGlassSecretStore SecretStore
+@inject IOptions<BreakGlassOptions> Options
+@inject AuditService AuditService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Break-Glass Access - Supplier Portal</PageTitle>
+
+<h1 class="mb-3">Break-Glass Emergency Access</h1>
+
+<p class="text-muted" style="max-width: 760px;">
+    Break-glass is a last-resort way to obtain Administrator access when single sign-on is unavailable.
+    Set the emergency secret here; it is stored only as a salted PBKDF2-SHA256 hash in a protected file
+    (never in the database and never as plaintext). To activate it in an emergency, POST the secret to
+    <code>/api/breakglass</code>.
+</p>
+
+<div class="card mb-4" style="max-width: 760px;">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Current status</h5>
+        <table class="table table-sm mb-0">
+            <tbody>
+                <tr>
+                    <th style="width: 40%;">Emergency access</th>
+                    <td>
+                        @if (opts.Enabled)
+                        {
+                            <span class="badge bg-success">Enabled</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Disabled</span>
+                        }
+                        <span class="text-muted small ms-2">Turned on/off via the <code>BreakGlass:Enabled</code> deployment setting.</span>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Secret configured</th>
+                    <td>
+                        @if (SecretStore.IsConfigured)
+                        {
+                            <span class="badge bg-success">Yes</span>
+                            @if (SecretStore.SetAtUtc is DateTime set)
+                            {
+                                <span class="text-muted small ms-2">Last set @set.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Not set</span>
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <th>Access window</th>
+                    <td>@opts.WindowMinutes minute(s) of Administrator after activation</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+    <div class="card-body">
+        <h5 class="card-title mb-3">@(SecretStore.IsConfigured ? "Rotate the secret" : "Set the secret")</h5>
+
+        @if (error is not null)
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+        @if (message is not null)
+        {
+            <div class="alert alert-success">@message</div>
+        }
+
+        <div class="mb-3" style="max-width: 420px;">
+            <label class="form-label fw-semibold">New secret (min @opts.MinSecretLength characters)</label>
+            <input type="password" class="form-control" @bind="secret" autocomplete="new-password" />
+        </div>
+        <div class="mb-3" style="max-width: 420px;">
+            <label class="form-label fw-semibold">Confirm secret</label>
+            <input type="password" class="form-control" @bind="confirm" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
+            @(saving ? "Saving…" : SecretStore.IsConfigured ? "Rotate secret" : "Set secret")
+        </button>
+
+        @if (!opts.Enabled)
+        {
+            <div class="alert alert-secondary mt-3 mb-0">
+                Note: emergency access is currently <strong>disabled</strong>. Setting a secret here does not
+                turn it on — an operator must set <code>BreakGlass:Enabled = true</code> (App Service settings
+                / Key Vault) and restart before the secret can be used.
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private BreakGlassOptions opts = new();
+    private string secret = "";
+    private string confirm = "";
+    private bool saving;
+    private string? error;
+    private string? message;
+    private string currentUser = "unknown";
+
+    protected override async Task OnInitializedAsync()
+    {
+        opts = Options.Value;
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+    }
+
+    private async Task SaveAsync()
+    {
+        error = message = null;
+        if (secret != confirm)
+        {
+            error = "The two secrets do not match.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var (ok, err) = SecretStore.SetSecret(secret);
+            if (!ok)
+            {
+                error = err;
+                return;
+            }
+            // Never log the secret itself — only that it was rotated, by whom.
+            await AuditService.LogAsync(currentUser, AuditAction.Update, "BreakGlass", null,
+                "Break-glass secret was set/rotated by an administrator.");
+            secret = confirm = "";
+            message = "The break-glass secret has been saved.";
+        }
+        finally { saving = false; }
+    }
+}

@@ -16,15 +16,21 @@ namespace SupplierPortal.Web.Services;
 /// never stored (only its SHA-256 hash, compared in constant time); the grant is time-boxed and every
 /// activation is written to the audit log.</summary>
 public class BreakGlassService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IOptions<BreakGlassOptions> options)
+    IDbContextFactory<ApplicationDbContext> dbFactory, IOptions<BreakGlassOptions> options,
+    BreakGlassSecretStore secretStore)
 {
     private readonly BreakGlassOptions _options = options.Value;
 
-    public bool IsEnabled => _options.Enabled && !string.IsNullOrWhiteSpace(_options.SecretHashBase64);
+    /// <summary>Emergency access is live only when it is switched on (deployment setting) AND a secret has
+    /// been configured (by an admin via Settings, or seeded in config).</summary>
+    public bool IsEnabled => _options.Enabled && secretStore.IsConfigured;
+
+    /// <summary>Whether a secret has been set at all (independent of the on/off switch).</summary>
+    public bool IsSecretConfigured => secretStore.IsConfigured;
 
     public async Task<bool> TryActivateAsync(HttpContext http, string secret, CancellationToken ct = default)
     {
-        if (!IsEnabled || string.IsNullOrWhiteSpace(secret) || !SecretMatches(secret))
+        if (!IsEnabled || string.IsNullOrWhiteSpace(secret) || !secretStore.Verify(secret))
         {
             return false;
         }
@@ -50,20 +56,6 @@ public class BreakGlassService(
         });
         await db.SaveChangesAsync(ct);
         return true;
-    }
-
-    private bool SecretMatches(string secret)
-    {
-        var computed = SHA256.HashData(Encoding.UTF8.GetBytes(secret));
-        try
-        {
-            return CryptographicOperations.FixedTimeEquals(
-                computed, Convert.FromBase64String(_options.SecretHashBase64!));
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
     }
 }
 

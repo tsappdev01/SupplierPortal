@@ -358,6 +358,7 @@ if (selfServiceApiEnabled)
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IClaimsTransformation, RoleClaimsTransformation>();
+builder.Services.AddSingleton<BreakGlassSecretStore>();
 builder.Services.AddScoped<BreakGlassService>();
 
 // Deny-by-default for [Authorize] pages/endpoints: require an authenticated, provisioned app user.
