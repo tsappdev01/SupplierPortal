@@ -25,7 +25,7 @@ public class NotificationGroupService(
 
     /// <summary>Creates a group with the given name and members. Returns (false, error) if the name is blank
     /// or already used.</summary>
-    public async Task<(bool Success, string? Error, int Id)> CreateAsync(string name, IEnumerable<int> userIds, string actor)
+    public async Task<(bool Success, string? Error, int Id)> CreateAsync(string name, IEnumerable<int> userIds, bool isActive, string actor)
     {
         name = (name ?? "").Trim();
         if (string.IsNullOrWhiteSpace(name))
@@ -39,7 +39,7 @@ public class NotificationGroupService(
             return (false, "A group with this name already exists.", 0);
         }
 
-        var group = new NotificationGroup { Name = name, CreatedAt = DateTime.UtcNow };
+        var group = new NotificationGroup { Name = name, IsActive = isActive, CreatedAt = DateTime.UtcNow };
         var ids = userIds?.Distinct().ToList() ?? [];
         if (ids.Count > 0)
         {
@@ -54,7 +54,7 @@ public class NotificationGroupService(
     }
 
     /// <summary>Renames a group and replaces its membership with the supplied user ids.</summary>
-    public async Task<(bool Success, string? Error)> UpdateAsync(int id, string name, IEnumerable<int> userIds, string actor)
+    public async Task<(bool Success, string? Error)> UpdateAsync(int id, string name, IEnumerable<int> userIds, bool isActive, string actor)
     {
         name = (name ?? "").Trim();
         if (string.IsNullOrWhiteSpace(name))
@@ -74,6 +74,7 @@ public class NotificationGroupService(
         }
 
         group.Name = name;
+        group.IsActive = isActive;
         var ids = userIds?.Distinct().ToList() ?? [];
         group.Users = ids.Count > 0 ? await db.Users.Where(u => ids.Contains(u.Id)).ToListAsync() : [];
 
@@ -81,6 +82,23 @@ public class NotificationGroupService(
         await auditService.LogAsync(actor, AuditAction.Update, "NotificationGroup", group.Id,
             $"Updated notification group '{group.Name}' ({group.Users.Count} member(s)).");
         return (true, null);
+    }
+
+    /// <summary>Enables or disables a group without changing its members.</summary>
+    public async Task<bool> SetActiveAsync(int id, bool isActive, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var group = await db.NotificationGroups.FirstOrDefaultAsync(g => g.Id == id);
+        if (group is null || group.IsActive == isActive)
+        {
+            return false;
+        }
+
+        group.IsActive = isActive;
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actor, AuditAction.Update, "NotificationGroup", group.Id,
+            $"{(isActive ? "Enabled" : "Disabled")} notification group '{group.Name}'.");
+        return true;
     }
 
     public async Task<bool> DeleteAsync(int id, string actor)

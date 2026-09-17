@@ -11,6 +11,9 @@ public class NotificationGroup
     [Required, MaxLength(128)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>When false, the group is kept but excluded from notifications.</summary>
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>The users that belong to this group.</summary>
