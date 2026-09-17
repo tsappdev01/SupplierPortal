@@ -154,18 +154,24 @@ public class SelfServiceApiService(
 
         await supplierService.UpdateAsync(supplier, actor, session.Id, markComplete: true);
 
-        // Best-effort notifications (must not fail the submission): notify the internal requestor, and send
-        // the supplier their "Supplier Registration Completed" confirmation — same emails the internal
-        // self-service path sends on completion.
-        try { await emailService.NotifyRequestorOfSubmissionAsync(supplier, session.CreatedBy, baseUrl); } catch { }
-        try
-        {
-            await emailService.NotifySupplierCompletedAsync(
-                supplier.Id, supplier.SupplierName, supplier.ContactEmail, actor, supplier.BusinessUnitId);
-        }
-        catch { }
+        // Best-effort notifications (must not fail OR stall the submission): notify the internal requestor,
+        // and send the supplier their "Supplier Registration Completed" confirmation. The signed submission
+        // is already committed above; each notification is bounded so a slow/unreachable mail provider can
+        // never hold the submit response past the caller's request timeout (which previously surfaced as a
+        // "form won't submit" hang on the self-service page).
+        await SendBestEffortAsync(() => emailService.NotifyRequestorOfSubmissionAsync(supplier, session.CreatedBy, baseUrl));
+        await SendBestEffortAsync(() => emailService.NotifySupplierCompletedAsync(
+            supplier.Id, supplier.SupplierName, supplier.ContactEmail, actor, supplier.BusinessUnitId));
 
         return new SubmitResponse { Success = true };
+    }
+
+    // Runs an optional notification, never throwing and never blocking longer than a few seconds. The mail
+    // helpers already return a result rather than throwing; the timeout guards against a hung network call.
+    private static async Task SendBestEffortAsync(Func<Task> send)
+    {
+        try { await send().WaitAsync(TimeSpan.FromSeconds(8)); }
+        catch { /* timed out or failed — the notification is optional and must not affect the submission */ }
     }
 
     private static List<string> ValidateEmails(SupplierDto dto)
