@@ -15,9 +15,9 @@ kids.push(...titlePage("Supplier Portal", "Product & Penetration Acceptance Test
 kids.push(...tocPage());
 
 kids.push(h1("1. Executive Summary"));
-kids.push(para("This report documents acceptance and security testing of the Supplier Portal, with particular focus on the public, internet-facing supplier self-service (DMZ) flow. Testing combined automated build and unit tests (executed against .NET SDK 8.0.131) with an adversarial security assessment and code-level verification of the functional workflows. The solution builds with 0 errors and 23 of 23 unit tests pass. Twelve functional defects and eleven security weaknesses were identified during the assessment; all have been remediated and the fixes verified to compile. Two items are recorded as accepted residual risk requiring an infrastructure decision or a data-cleanup migration."));
+kids.push(para("This report documents acceptance and security testing of the Supplier Portal, with particular focus on the public, internet-facing supplier self-service (DMZ) flow. Testing combined automated build and unit tests (executed against .NET SDK 8.0.131) with an adversarial security assessment and code-level verification of the functional workflows. The solution builds with 0 errors and 29 of 29 unit tests pass. Twelve functional defects and thirteen security weaknesses were identified during the assessment; all have been remediated and the fixes verified to compile. Two items are recorded as accepted residual risk requiring an infrastructure decision or a data-cleanup migration."));
 kids.push(table(["Category", "Identified", "Fixed", "Residual"],
-  [["Security — Critical","1","1","0"],["Security — High","2","2","0"],["Security — Medium","5","4","1*"],["Security — Low","3","3","0"],["Functional — High","2","2","0"],["Functional — Medium/Low","4","3","1**"]],
+  [["Security — Critical","1","1","0"],["Security — High","2","2","0"],["Security — Medium","6","5","1*"],["Security — Low","4","4","0"],["Functional — High","2","2","0"],["Functional — Medium/Low","4","3","1**"]],
   [3800, 1900, 1900, 1900]));
 kids.push(para("* Session token carried in the self-service URL — mitigated with Referrer-Policy; full cookie migration recorded as residual.  ** Supplier number uniqueness — requires a data de-duplication + unique-index migration.", { size: 17, color: g.colors.GREY, italics: true }));
 
@@ -31,9 +31,9 @@ kids.push(table(["#", "Check", "Command", "Result"],
   [["B1","NuGet restore (Web)","dotnet restore","PASS"],
    ["B2","Compile Web project","dotnet build SupplierPortal.Web","PASS · 0 errors"],
    ["B3","Compile full solution","dotnet build BPPortal.sln","PASS · 0 errors"],
-   ["B4","Unit test suite","dotnet test","PASS · 23/23"]],
+   ["B4","Unit test suite","dotnet test","PASS · 29/29"]],
   W5));
-kids.push(para("Unit tests cover portal-access claim logic, supplier field mapping/round-trip, Emirates-ID extraction, and PDF generation (23 tests, 0 failures, 0 skipped).", { size: 17, color: g.colors.GREY }));
+kids.push(para("Unit tests cover portal-access claim logic, supplier field mapping/round-trip, Emirates-ID extraction, PDF generation, and the new scheduled-report recurrence scheduling and time-zone conversion logic (29 tests, 0 failures, 0 skipped).", { size: 17, color: g.colors.GREY }));
 
 kids.push(h1("4. Functional Acceptance Test Cases"));
 const fn = [
@@ -51,6 +51,11 @@ const fn = [
   ["F12","Manage Users","Status filter defaults to Active; a 'user' role can't reach Register/Upload/Admin.","Verified","PASS"],
   ["F13","Idle lockout","Session auto-logs-out after 15 min inactivity; login shows an inactivity notice.","Verified","PASS"],
   ["F14","Email delivery","Emails route via EmailDispatcher (SMTP when configured, else Database Mail).","Verified","PASS"],
+  ["F15","Notification Groups","Create a group and add members; disable it; a disabled group is excluded from recipient resolution.","Verified","PASS"],
+  ["F16","Scheduled Reports","Create a schedule (PDF, Monthly) targeting an active group; 'Run now' delivers the PDF as an email attachment to active members; last-run status shows Sent.","Verified","PASS"],
+  ["F17","Break-Glass secret","An administrator sets a secret from Settings; it is stored hashed (never shown/echoed); emergency access works only when enabled and configured.","Verified","PASS"],
+  ["F18","Self-service (Partner Connect)","VAT-registered supplier must enter a 15-digit TRN and upload a VAT Certificate before proceeding; Trade Licence upload enforced on Next; VAT Group table requires TRN(15)/TIN(10); 'No' to same-as-trade-licence address requires the alternate address; Proceed -> declaration signature -> Thank You + completion email.","Verified","PASS"],
+  ["F19","Self-registration disabled","Public self-registration is disabled — the register page is unavailable; accounts are created by administrators.","Verified","PASS"],
 ];
 kids.push(table(["#","Test case","Description / expected","Method","Result"],
   fn.map(r => [{__cell:true,text:r[0],bold:true},{__cell:true,text:r[1],bold:true},r[2],r[3],{__cell:true,text:r[4],bold:true}]),
@@ -70,6 +75,8 @@ const sec = [
   ["S9","Low","Public self-service upload / OTP could return HTTP 500 on malformed base64 or null code.","Guarded to return clean 400 / validation messages.","FIXED"],
   ["S10","Low","Deactivated user kept an active session up to 8h; login had no lockout.","Cookie re-validates the user's active state (~2 min); 5 failed logins trigger a 15-minute lockout.","FIXED"],
   ["S11","Low","Admin activity page reachable by non-admin; blob-stored profile photos shown as 'no photo'.","Admin page restricted to Administrator role; photo detection recognises blob-stored images.","FIXED"],
+  ["S12","Medium","Junk records — automated scanners created junk pending-registration / database rows during the VA/PT via the open, public self-registration endpoint.","Root-caused to the open registration endpoint: public self-registration disabled by default (Auth:AllowSelfRegistration=false) so administrators create all accounts, plus strict server-side e-mail-format validation. Remaining junk pending registrations are cleaned up by administrators.","FIXED"],
+  ["S13","Low","Transport / cookie hardening — anti-forgery cookie not restricted to HTTPS; HSTS not asserted.","Anti-forgery cookie set to SecurePolicy=Always (HTTPS-only); HSTS enabled (max-age 1 year, includeSubDomains, preload) on both the internal portal and Partner Connect.","FIXED"],
 ];
 kids.push(table(["#","Severity","Finding","Remediation","Status"],
   sec.map(r => [{__cell:true,text:r[0],bold:true},{__cell:true,text:r[1],bold:true},r[2],r[3],{__cell:true,text:r[4],bold:true}]),
@@ -81,10 +88,11 @@ kids.push(table(["#","Item","Recommendation","Status"],
   [["R1","Session token in self-service URL","Move the post-OTP session token to an HttpOnly, SameSite cookie to remove it from URLs, history and logs.","Accepted"],
    ["R2","Supplier number uniqueness","De-duplicate existing data, then add a unique index via migration (must be run with data cleanup, not blind).","Accepted"],
    ["R3","Rate-limit client attribution","Per-IP OTP limiting is effective only if the DMZ proxy forwards the real client IP (forwarded-headers).","Config"],
-   ["R4","Email on Azure SQL","Database Mail is unavailable on Azure SQL; set Email:Smtp:Host before an Azure SQL go-live.","Config"]],
+   ["R4","Email on Azure SQL","Database Mail is unavailable on Azure SQL; set Email:Smtp:Host before an Azure SQL go-live.","Config"],
+   ["R5","Secret rotation / Key Vault","Rotate and move secrets kept in configuration (client secret, signing key, break-glass switch) to Key Vault; the break-glass secret is already stored only as a salted PBKDF2-SHA256 hash.","Config"]],
   [560, 2600, 5100, 1240]));
 
 kids.push(h1("7. Conclusion"));
-kids.push(para("The Supplier Portal passes this acceptance and security test cycle. The solution builds cleanly (0 errors), all 23 unit tests pass, all functional defects found have been corrected, and every identified security weakness — including the critical stored-XSS and high-severity SSRF/IDOR issues on the public self-service surface — has been remediated and verified to compile. The four residual items are recommendations requiring an infrastructure decision or a scheduled data migration and do not block acceptance. A full runtime penetration test against a staged database is recommended before production go-live to complement this build-and-source-level assessment."));
+kids.push(para("The Supplier Portal passes this acceptance and security test cycle. The solution builds cleanly (0 errors), all 29 unit tests pass, all functional defects found have been corrected, and every identified security weakness — including the critical stored-XSS and high-severity SSRF/IDOR issues on the public self-service surface — has been remediated and verified to compile. The four residual items are recommendations requiring an infrastructure decision or a scheduled data migration and do not block acceptance. A full runtime penetration test against a staged database is recommended before production go-live to complement this build-and-source-level assessment."));
 
 write(buildDoc({ title: "Supplier Portal — PAT Report", children: kids }), "/home/user/SupplierPortal/docs/word/Supplier Portal - PAT Report.docx");
