@@ -18,7 +18,7 @@ kids.push(...titlePage("Supplier Portal", "Database Schema & Relationships", [
 kids.push(...tocPage());
 
 kids.push(h1("1. Overview"));
-kids.push(para("This document describes the Supplier Portal data model only. The Supplier Portal persists data in Microsoft SQL Server (on-premises) or Azure SQL Database, accessed through Entity Framework Core 8 using the DbContextFactory pattern. The supplier, user and master-data schema lives in ApplicationDbContext (default dbo schema)."));
+kids.push(para("This document describes the Supplier Portal data model only. The Supplier Portal persists data in Microsoft SQL Server (on-premises) or Azure SQL Database, accessed through Entity Framework Core 8 using the DbContextFactory pattern. The supplier, user, master-data, notification-group and scheduled-report schema all lives in ApplicationDbContext (default dbo schema). EF Core migrations are hand-written and applied at startup."));
 kids.push(para("Conventions: every entity has an identity integer primary key named Id unless stated. String lengths shown are the declared [MaxLength]. Foreign keys use ON DELETE RESTRICT unless noted (child collections cascade). Navigation properties are not columns.", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("2. Master Data & Security (dbo)"));
@@ -98,16 +98,55 @@ kids.push(ent([
   ["SupplierFieldChange","","FK → Supplier (Cascade)","Self-service change audit; FK → SupplierAccessToken (NoAction); index (SupplierId, IsAcknowledged)"],
 ]));
 
-kids.push(h1("4. Relationships Summary"));
+kids.push(h1("4. Notifications & Scheduled Reporting (dbo)"));
+
+kids.push(h2("4.1 NotificationGroup"));
+kids.push(para("A named recipient list (e.g. ALL_USERS) used to address notifications and scheduled reports. Membership is a many-to-many with User through the NotificationGroupUsers join table."));
+kids.push(ent([
+  ["Id","int","PK",""],
+  ["Name","string(128)","","NOT NULL; unique index"],
+  ["IsActive","bool","","Default true; when false the group is kept but excluded from notifications"],
+  ["CreatedAt","DateTime","",""],
+]));
+
+kids.push(h2("4.2 NotificationGroupUsers (join table)"));
+kids.push(para("The many-to-many join between NotificationGroups and Users. Composite primary key (NotificationGroupId, UserId); both foreign keys cascade on delete; a secondary index on UserId supports reverse lookups."));
+kids.push(ent([
+  ["NotificationGroupId","int","FK → NotificationGroup","Composite PK; ON DELETE CASCADE"],
+  ["UserId","int","FK → User","Composite PK; ON DELETE CASCADE; index on UserId"],
+]));
+
+kids.push(h2("4.3 ScheduledReport"));
+kids.push(para("An administrator-defined schedule that emails a supplier report (PDF/Excel) as a file attachment to the active members of a notification group. The runner fires a schedule when NextRunUtc is due; recurring frequencies advance, and a Once schedule disables itself after running."));
+kids.push(ent([
+  ["Id","int","PK",""],
+  ["Name","string(150)","","NOT NULL"],
+  ["Format","enum (int)","","NOT NULL; 0 = Pdf, 1 = Excel"],
+  ["Frequency","enum (int)","","NOT NULL; 0 = Once, 1 = Daily, 2 = Weekly, 3 = Monthly"],
+  ["NextRunUtc","DateTime","","NOT NULL; stored in UTC, advanced after each run"],
+  ["IsActive","bool","","NOT NULL; only active schedules fire"],
+  ["BusinessUnitId","int?","","Optional BU scope; null = all suppliers"],
+  ["NotificationGroupId","int","FK → NotificationGroup","NOT NULL; recipient group; ON DELETE CASCADE; index"],
+  ["CreatedAt","DateTime","",""],
+  ["CreatedBy","string(150)?","",""],
+  ["LastRunUtc","DateTime?","","Last attempt (UTC), or null"],
+  ["LastRunStatus","string(40)?","","e.g. Sent / Skipped / Failed"],
+  ["LastRunDetail","string(1000)?","","Recipient count, error or skip reason"],
+]));
+
+kids.push(h1("5. Relationships Summary"));
 kids.push(bullet("BusinessUnit 1—* Supplier (BusinessUnitId, required, Restrict) plus 4 optional BU refs (Site/Procurement/Client/BillTo)."));
 kids.push(bullet("User ⇄ BusinessUnit many-to-many (UserBusinessUnits); BusinessUnit 1—* User (CompanyBusinessUnitId)."));
 kids.push(bullet("Department 1—* User and 1—* Supplier; User 1—* Supplier (AssignedToUserId)."));
 kids.push(bullet("Supplier 1—* {Contact, BankAccount, VatGroupEntity, AccessToken, FieldChange, Document, Partner} — all cascade."));
 kids.push(bullet("Bank 1—* BankBranch (cascade); LookupValue 1—* Supplier/SupplierContact/SupplierBankAccount (Restrict)."));
 kids.push(bullet("SupplierAccessToken 1—* SupplierFieldChange (NoAction, to avoid multiple cascade paths)."));
+kids.push(bullet("User ⇄ NotificationGroup many-to-many (NotificationGroupUsers, both FKs cascade)."));
+kids.push(bullet("NotificationGroup 1—* ScheduledReport (NotificationGroupId, required, cascade)."));
 
-kids.push(h1("5. Indexes & Integrity Notes"));
-kids.push(bullet("Unique indexes: BusinessUnit.Code, User.Email, LookupValue(Category, Code), SupplierFieldSetting.FieldKey, SupplierTabSetting.Step, SupplierAccessToken.TokenHash."));
+kids.push(h1("6. Indexes & Integrity Notes"));
+kids.push(bullet("Unique indexes: BusinessUnit.Code, User.Email, LookupValue(Category, Code), SupplierFieldSetting.FieldKey, SupplierTabSetting.Step, SupplierAccessToken.TokenHash, NotificationGroup.Name."));
+kids.push(bullet("Non-unique indexes: NotificationGroupUsers.UserId, ScheduledReport.NotificationGroupId."));
 kids.push(bullet("[NotMapped] (not a column): Supplier.DisclaimerSignatureImage (the drawn declaration signature, carried on submit only)."));
 kids.push(bullet("Blob columns (byte[]): BusinessUnit.Logo/Thumbnail, User.ProfilePhoto, SupplierDocument.Content (files store to blob when configured, else the DB Content column, else legacy disk)."));
 kids.push(bullet("ApplicationDbContext is registered with EnableRetryOnFailure() for Azure SQL transient-fault resilience."));

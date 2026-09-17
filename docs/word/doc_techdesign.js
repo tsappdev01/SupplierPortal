@@ -38,7 +38,9 @@ kids.push(table(["Service", "Responsibility"],
   ["SupplierDocumentService","Stores supplier documents (blob → DB → disk fallback); OCR-driven TRN/DUNS extraction."],
   ["SupplierAccessTokenService","Opaque link tokens + OTP + session for supplier self-service."],
   ["SupplierFieldSettingService / SupplierActivityService","Per-field visibility/mandatory/tab settings; self-service change review."],
-  ["EmailDispatcher / SupplierEmailService / EmailBrandingService","Central email send (SMTP or Database Mail); notifications; per-BU logo branding."],
+  ["EmailDispatcher / SupplierEmailService / EmailBrandingService","Central email send (Microsoft Graph → SMTP → Database Mail); notifications; per-BU logo branding."],
+  ["ScheduledReportRunner (hosted BackgroundService)","Polls for due ScheduledReports, generates the report via ExportService and emails it as an attachment to a NotificationGroup's active members."],
+  ["NotificationGroupService","Named user recipient lists (many-to-many User⇄NotificationGroup) with an Active flag, used by scheduled reports."],
   ["SupplierDeclarationPdfService / ExportService","Signed declaration PDF; Excel/CSV/PDF export and re-import."],
   ["UserService / BusinessUnitService","User and business-unit administration."],
   ["AuthService / RoleClaimsTransformation / ActiveDirectoryService / BreakGlassService","Authentication, claims resolution, LDAP, emergency access."],
@@ -68,7 +70,7 @@ kids.push(bullet("Local/AD sign-in via AuthService: matched by e-mail or AD logi
 kids.push(bullet("RoleClaimsTransformation maps the authenticated identity to a Users row each request, resolving role + business units; unknown/inactive users get only a resolved marker so deny-by-default blocks them."));
 kids.push(bullet("Deny-by-default authorization; the portal policy (Portal.Supplier) and role attributes ([Authorize(Roles=\"Administrator\")]) are applied on the Razor components server-side."));
 kids.push(bullet("Login lockout: 5 failed attempts → 15-minute lock (in-memory). Active-session revocation: OnValidatePrincipal re-checks IsActive (throttled to every 2 min) and signs out deactivated users. Idle lockout: a client-side 15-minute auto-logout."));
-kids.push(bullet("Break-glass: time-boxed emergency admin, disabled unless a SHA-256 secret is configured; anonymous, rate-limited, constant-time compared and fully audited."));
+kids.push(bullet("Break-glass: time-boxed emergency admin gated by BreakGlass:Enabled (deployment) plus an admin-set secret. The secret is stored only as a salted PBKDF2-SHA256 hash in a protected file (BreakGlassSecretStore) — never plaintext, never in the database — and is verified via a claims transformation; access is anonymous, rate-limited, constant-time compared and fully audited."));
 
 kids.push(h1("6. Security Controls"));
 kids.push(table(["Control", "Design"],
@@ -78,7 +80,8 @@ kids.push(table(["Control", "Design"],
   ["Per-record scoping","Document/export endpoints enforce the dashboard's business-unit + assignment/department visibility; out-of-scope ids return 404."],
   ["Self-service tokens","32-byte CSPRNG link token stored as SHA-256 hash, 14-day validity; 6-digit OTP hashed with a salted hasher, 10-min validity, max 5 attempts / 5 sends; session token issued on verify; final submit expires link + session."],
   ["Field protection","On self-service saves the server restores hidden fields and an always-locked set of internal classification/payment flags, so a crafted submit can't change a locked field."],
-  ["Rate limiting","A credential/OTP fixed-window limiter partitioned per client IP (5/min); the API adds token/otp/upload limiters plus a global per-IP backstop."]],
+  ["Rate limiting","A credential/OTP fixed-window limiter partitioned per client IP (5/min); the API adds token/otp/upload limiters plus a global per-IP backstop."],
+  ["Registration & transport","Public self-registration is disabled by default; the antiforgery cookie is marked Secure; HSTS is enabled (max-age 1 year, includeSubDomains, preload)."]],
  [2100, 7400]));
 
 kids.push(h1("7. External Integrations"));
@@ -86,7 +89,8 @@ kids.push(table(["Integration", "Purpose & behaviour"],
  [["Azure Blob Storage","Durable file store (documents, photos, logos) via IFileStorageService; auto-disables when unconfigured/unreachable, falling back to DB/disk."],
   ["Azure AI Document Intelligence (OCR)","Prebuilt-read text extraction for TRN/Trade-Licence/DUNS and Emirates-ID; best-effort (never blocks an upload)."],
   ["License QR / DED fetch","ZXing + ImageSharp + PdfPig read the trade-licence QR to get the DED verification URL, fetched under the SSRF/DoS guards."],
-  ["Email (EmailDispatcher)","SMTP when Email:Smtp:Host is set (works on Azure SQL), otherwise SQL Server Database Mail; logos embedded as base64 data URIs."],
+  ["Email (EmailDispatcher)","Selects a provider per message: Microsoft Graph (app-only client-credentials, preferred when Email:Graph is configured) → SMTP → SQL Server Database Mail. Graph and SMTP support file attachments (used by scheduled reports); Database Mail does not carry in-memory attachments. Logos embedded as base64 data URIs."],
+  ["Scheduled reporting","A hosted BackgroundService (ScheduledReportRunner) polls (~60s, Reports:PollSeconds; on/off via Reports:SchedulerEnabled) for due ScheduledReports, generates the supplier report through ExportService (QuestPDF for PDF, ClosedXML for Excel) and emails it as an attachment to the active members of an active NotificationGroup. Recurring schedules advance; one-off (Once) schedules disable themselves. Due times use a configurable time zone (Asia/Dubai default), stored in UTC."],
   ["QuestPDF","Signed declaration and images→PDF generation."]],
  [2500, 7000]));
 
@@ -95,6 +99,7 @@ kids.push(bullet("Caching: reference data cached in IMemoryCache with short TTLs
 kids.push(bullet("Audit: AuditService writes AuditLog rows for every workflow transition and break-glass activation, surfaced on the Admin › Audit Log page."));
 kids.push(bullet("Provider flag: Database:Provider = Azure | Local selects AzureConnection vs DefaultConnection; both contexts use EnableRetryOnFailure() for transient-fault resilience."));
 kids.push(bullet("Secrets hygiene: each host loads an optional gitignored appsettings.Local.json for real secrets; committed appsettings hold no secrets. Kestrel server headers suppressed on API and SelfService."));
+kids.push(bullet("Data model: alongside the supplier/user/master-data schema, the model adds NotificationGroups, the NotificationGroupUsers join table (many-to-many User⇄NotificationGroup) and ScheduledReports. EF Core migrations are hand-written and applied at startup (MigrateAsync) in Internal mode."));
 
 kids.push(h1("9. Deployment Topology"));
 kids.push(para("Internal deployment: a single Web site in the trusted zone with SQL Server. DMZ deployment: the public SelfService/Web front-end in the DMZ (no DB), reaching the internal API/Web tier through a firewall that exposes only /api/ss/* (or /connect/token + /api/selfservice/*). See the Deployment Guide on Azure for the cloud topology (App Service / VM, Azure SQL, Blob, Entra, SMTP)."));
