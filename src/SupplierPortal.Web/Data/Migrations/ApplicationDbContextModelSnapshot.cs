@@ -2058,6 +2058,45 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("UserBusinessUnits", (string)null);
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.NotificationGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("NotificationGroups");
+                });
+
+            modelBuilder.Entity("NotificationGroupUser", b =>
+                {
+                    b.Property<int>("NotificationGroupId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NotificationGroupId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("NotificationGroupUsers", (string)null);
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.BankBranch", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Bank", "Bank")
@@ -2509,6 +2548,21 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", null)
                         .WithMany()
                         .HasForeignKey("BusinessUnitId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SupplierPortal.Web.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("NotificationGroupUser", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationGroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

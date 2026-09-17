@@ -14,6 +14,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Bank> Banks => Set<Bank>();
     public DbSet<BankBranch> BankBranches => Set<BankBranch>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<NotificationGroup> NotificationGroups => Set<NotificationGroup>();
     public DbSet<SupplierFieldSetting> SupplierFieldSettings => Set<SupplierFieldSetting>();
     public DbSet<SupplierTabSetting> SupplierTabSettings => Set<SupplierTabSetting>();
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
@@ -77,6 +78,23 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .WithMany()
             .HasForeignKey(u => u.CompanyBusinessUnitId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<NotificationGroup>()
+            .HasIndex(g => g.Name)
+            .IsUnique();
+
+        modelBuilder.Entity<NotificationGroup>()
+            .HasMany(g => g.Users)
+            .WithMany()
+            .UsingEntity<Dictionary<string, object>>(
+                "NotificationGroupUser",
+                j => j.HasOne<User>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade),
+                j => j.HasOne<NotificationGroup>().WithMany().HasForeignKey("NotificationGroupId").OnDelete(DeleteBehavior.Cascade),
+                j =>
+                {
+                    j.HasKey("NotificationGroupId", "UserId");
+                    j.ToTable("NotificationGroupUsers");
+                });
 
         modelBuilder.Entity<BusinessUnit>()
             .HasIndex(b => b.Code)

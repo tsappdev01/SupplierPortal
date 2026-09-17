@@ -1,0 +1,202 @@
+@page "/admin/notification-groups"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject NotificationGroupService GroupService
+@inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Notification Groups - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Notification Groups</h1>
+    @if (!editing)
+    {
+        <button class="btn btn-primary" @onclick="StartNew">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" /></svg>
+            New Group
+        </button>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+@if (message is not null)
+{
+    <div class="alert alert-success py-2">@message</div>
+}
+
+@if (editing)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">@(editId is null ? "New Group" : "Edit Group")</h5>
+
+            <div class="mb-3" style="max-width: 420px;">
+                <label class="form-label fw-semibold">Group Name</label>
+                <input class="form-control" @bind="editName" placeholder="e.g. ALL_USERS" />
+            </div>
+
+            <div class="mb-2 d-flex align-items-center justify-content-between">
+                <label class="form-label fw-semibold mb-0">User(s) in the group (@selectedUserIds.Count selected)</label>
+                <input class="form-control form-control-sm" style="max-width: 260px;" placeholder="Filter users…" @bind="userFilter" @bind:event="oninput" />
+            </div>
+            <div class="border rounded" style="max-height: 320px; overflow-y: auto;">
+                @foreach (var u in FilteredUsers)
+                {
+                    <label class="d-flex align-items-center gap-2 px-3 py-2 border-bottom" style="cursor: pointer;">
+                        <input type="checkbox" checked="@selectedUserIds.Contains(u.Id)" @onchange="() => ToggleUser(u.Id)" />
+                        <span class="fw-semibold">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                        <span class="text-muted small">@u.Email</span>
+                    </label>
+                }
+                @if (!FilteredUsers.Any())
+                {
+                    <div class="px-3 py-2 text-muted small">No users match your filter.</div>
+                }
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+                <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div style="overflow-x: auto;">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Group Name</th>
+                <th>User(s) in the group</th>
+                <th style="width: 130px;">Members</th>
+                <th style="width: 120px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var g in groups)
+            {
+                <tr>
+                    <td class="fw-semibold">@g.Name</td>
+                    <td>
+                        @if (g.Users.Count == 0)
+                        {
+                            <span class="text-muted small">No users</span>
+                        }
+                        else
+                        {
+                            @string.Join(", ", g.Users.OrderBy(u => u.Email).Select(u => u.Email))
+                        }
+                    </td>
+                    <td>@g.Users.Count</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(g)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(g)">Delete</button>
+                    </td>
+                </tr>
+            }
+            @if (groups.Count == 0)
+            {
+                <tr><td colspan="4"><em class="text-muted">No notification groups yet. Use "New Group" to add one.</em></td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<NotificationGroup> groups = [];
+    private List<User> allUsers = [];
+    private string currentUser = "unknown";
+
+    private bool editing;
+    private int? editId;
+    private string editName = "";
+    private HashSet<int> selectedUserIds = [];
+    private string userFilter = "";
+    private bool saving;
+    private string? error;
+    private string? message;
+
+    private IEnumerable<User> FilteredUsers =>
+        string.IsNullOrWhiteSpace(userFilter)
+            ? allUsers
+            : allUsers.Where(u =>
+                (u.FullName ?? "").Contains(userFilter, StringComparison.OrdinalIgnoreCase)
+                || u.Username.Contains(userFilter, StringComparison.OrdinalIgnoreCase)
+                || u.Email.Contains(userFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        allUsers = await UserService.GetAllAsync();
+        groups = await GroupService.GetAllAsync();
+    }
+
+    private void StartNew()
+    {
+        editId = null;
+        editName = "";
+        selectedUserIds = [];
+        userFilter = "";
+        error = message = null;
+        editing = true;
+    }
+
+    private void StartEdit(NotificationGroup g)
+    {
+        editId = g.Id;
+        editName = g.Name;
+        selectedUserIds = g.Users.Select(u => u.Id).ToHashSet();
+        userFilter = "";
+        error = message = null;
+        editing = true;
+    }
+
+    private void CancelEdit() { editing = false; error = null; }
+
+    private void ToggleUser(int userId)
+    {
+        if (!selectedUserIds.Remove(userId)) { selectedUserIds.Add(userId); }
+    }
+
+    private async Task SaveAsync()
+    {
+        error = message = null;
+        saving = true;
+        try
+        {
+            if (editId is null)
+            {
+                var (ok, err, _) = await GroupService.CreateAsync(editName, selectedUserIds, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Group '{editName.Trim()}' created.";
+            }
+            else
+            {
+                var (ok, err) = await GroupService.UpdateAsync(editId.Value, editName, selectedUserIds, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Group '{editName.Trim()}' updated.";
+            }
+            groups = await GroupService.GetAllAsync();
+            editing = false;
+        }
+        finally { saving = false; }
+    }
+
+    private async Task DeleteAsync(NotificationGroup g)
+    {
+        error = message = null;
+        if (await GroupService.DeleteAsync(g.Id, currentUser))
+        {
+            message = $"Group '{g.Name}' deleted.";
+            groups = await GroupService.GetAllAsync();
+        }
+    }
+}
