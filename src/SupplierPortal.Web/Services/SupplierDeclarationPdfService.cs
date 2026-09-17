@@ -101,26 +101,9 @@ public class SupplierDeclarationPdfService
                         ("Phone", V($"{s.PhoneAreaCode} {s.Phone}".Trim())),
                         ("Mobile", V($"{s.MobileAreaCode} {s.Mobile}".Trim())));
 
-                    Section("Site / Business Unit",
-                        ("Supplier Site", V(s.SupplierSite)),
-                        ("Procurement BU", V(s.ProcurementBu?.Name)),
-                        ("Client BU", V(s.ClientBu?.Name)),
-                        ("Bill-to BU", V(s.BillToBu?.Name)),
-                        ("Communication Method", V(s.CommunicationMethod?.DisplayName)),
-                        ("Communication E-Mail", V(s.CommunicationEmail)));
-
-                    Section("Payment / Banking",
-                        ("Payment Method", V(s.PaymentMethod?.DisplayName)),
-                        ("Payment Terms", V(s.PaymentTerms?.DisplayName)),
-                        ("Bank Name", V(s.Bank?.Name)),
-                        ("Branch Name", V(s.BankBranch?.Name)),
-                        ("Account Country Code", V(s.AccountCountryCode?.DisplayName)),
-                        ("Account Name", V(s.AccountName)),
-                        ("Account Number", V(s.AccountNumber)),
-                        ("Account Currency", V(s.AccountCurrencyCode?.DisplayName)),
-                        ("SWIFT / BIC", V(s.SwiftCode)),
-                        ("IBAN", V(s.Iban)),
-                        ("Account Start Date", D(s.AccountStartDate)));
+                    // Note: the "Site / Business Unit" and "Payment / Banking" sections are intentionally
+                    // omitted from the signed declaration document (internal/banking details are not part of
+                    // the supplier's declaration).
 
                     // Declaration text acknowledged by the supplier.
                     col.Item().PaddingTop(4).Column(c =>
