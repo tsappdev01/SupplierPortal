@@ -1264,3 +1264,13 @@
 @keyframes di-thankyou-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes di-thankyou-pop { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
 @keyframes di-thankyou-draw { to { stroke-dashoffset: 0; } }
+
+/* Field help info-popups (same as the internal supplier form) */
+.di-help-btn { border: none; background: transparent; color: #3b5bdb; cursor: pointer; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; display: inline-flex; }
+.di-help-btn:hover { color: #1e40af; }
+.di-help-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.5); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 24px; }
+.di-help-pop { background: #fff; border-radius: 10px; width: min(420px, 100%); padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+.di-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.di-help-title { margin: 0; font-size: 16px; font-weight: 700; color: #0b2545; }
+.di-help-close { border: none; background: transparent; font-size: 22px; line-height: 1; color: #6b7280; cursor: pointer; }
+.di-help-body { margin: 0; font-size: 14px; color: #2f3a4c; line-height: 1.6; white-space: pre-line; }

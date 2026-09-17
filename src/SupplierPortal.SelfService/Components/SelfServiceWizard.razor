@@ -227,6 +227,19 @@
         </EditForm>
     }
 
+    @if (helpKey is not null && fieldHelp.TryGetValue(helpKey, out var help))
+    {
+        <div class="di-help-backdrop" @onclick="CloseHelp">
+            <div class="di-help-pop" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+                <div class="di-help-head">
+                    <h3 class="di-help-title">@help.Title</h3>
+                    <button type="button" class="di-help-close" title="Close" @onclick="CloseHelp">&times;</button>
+                </div>
+                <p class="di-help-body">@help.Body</p>
+            </div>
+        </div>
+    }
+
     @if (viewerUrl is not null)
     {
         <div class="di-viewer-backdrop" @onclick="CloseViewer">
@@ -419,6 +432,64 @@
             builder.AddContent(2, "*");
             builder.CloseElement();
         }
+    };
+
+    // ----- Field help pop-ups (same wording as the internal supplier form, sourced from the business Excel) -----
+    private string? helpKey;
+    private void ShowHelp(string fieldKey) => helpKey = fieldKey;
+    private void CloseHelp() => helpKey = null;
+
+    private static readonly Dictionary<string, (string Title, string Body)> fieldHelp = new()
+    {
+        ["SupplierName"] = ("Supplier Name (Legal Name)",
+            "Enter name as per valid Trade License"),
+        ["TaxRegistrationNumber"] = ("Tax Registration Number",
+            "Tax Registration Number mentioned in the VAT Registration certificate"),
+        ["VatRegistrationTypeId"] = ("VAT Registration Type",
+            "Please select whether the supplier is part of a VAT Tax group or not"),
+        ["VatGroup"] = ("VAT Group",
+            "Number of Entities if VAT Group: Please mention number of entities part of the VAT tax group dealing with DI PJSC.\n\n" +
+            "Legal Names of all Entities under the VAT Group: Please enter details of entities part of the VAT Tax Group as per " +
+            "VAT Tax Group certificate dealing with DI PJSC."),
+        ["SupplierTin"] = ("Supplier TIN",
+            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+            "How to obtain TIN from Emaratax Portal\n\n" +
+            "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
+            "2. View the profile of your entity.\n" +
+            "3. From the left-side menu, click on E-Invoicing.\n" +
+            "4. Your TIN (Tax Identification Number) will be displayed there for reference. 10 Digit number"),
+        ["EInvoicingWaveId"] = ("eINvoicing Wave Applicability",
+            "Revenue greater than or equal to AED 50million - Wave 1\n" +
+            "Revenue less than AED 50million - Wave 2"),
+        ["TradeLicenseIssuingBodyId"] = ("Trade License Issuing Body",
+            "As per valid Trade License"),
+        ["AddressLine1"] = ("Address Line 1",
+            "Address as per valid Trade License"),
+        ["AddressLine2"] = ("Address Line 2",
+            "Address as per valid Trade License"),
+        ["CityId"] = ("City",
+            "As per valid Trade License"),
+        ["CountryId"] = ("Country",
+            "As per valid Trade License"),
+    };
+
+    /// <summary>Renders a small "info" button next to a label when help text exists for that field.</summary>
+    private RenderFragment Help(string fieldKey) => builder =>
+    {
+        if (!fieldHelp.ContainsKey(fieldKey)) { return; }
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "type", "button");
+        builder.AddAttribute(2, "class", "di-help-btn");
+        builder.AddAttribute(3, "title", "What's this?");
+        builder.AddAttribute(4, "aria-label", "What's this?");
+        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create(this, () => ShowHelp(fieldKey)));
+        builder.AddEventStopPropagationAttribute(6, "onclick", true);
+        builder.AddEventPreventDefaultAttribute(7, "onclick", true);
+        builder.AddMarkupContent(8,
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\">" +
+            "<path d=\"M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z\"/>" +
+            "<path d=\"M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z\"/></svg>");
+        builder.CloseElement();
     };
 
     private bool BankAccountChanged() =>
@@ -913,23 +984,23 @@
         var f = new Dictionary<string, RenderFragment>();
 
         // Step 1 — Business / Organization
-        f["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")"><label>Supplier Name@(Req("SupplierName"))</label><InputText @bind-Value="model.SupplierName" /></div>;
+        f["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")"><label>Supplier Name@(Req("SupplierName"))@Help("SupplierName")</label><InputText @bind-Value="model.SupplierName" /></div>;
         f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["SupplierTypeId"] = @<div class="di-field @FieldClass("SupplierTypeId")"><label>Supplier Type@(Req("SupplierTypeId"))</label><InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["TaxpayerCountryId"] = @<div class="di-field @FieldClass("TaxpayerCountryId")"><label>Taxpayer Country@(Req("TaxpayerCountryId"))</label><InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
-        f["TaxRegistrationNumber"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))</label><InputText @bind-Value="model.TaxRegistrationNumber" maxlength="15" inputmode="numeric" pattern="[0-9]*" title="15 digits" /></div>}</text>;
+        f["TaxRegistrationNumber"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))@Help("TaxRegistrationNumber")</label><InputText @bind-Value="model.TaxRegistrationNumber" maxlength="15" inputmode="numeric" pattern="[0-9]*" title="15 digits" /></div>}</text>;
         f["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")"><label>VAT Registered?@(Req("VatRegistered"))</label><select class="form-select" @bind="VatRegisteredStr"><option value="">— Select —</option><option value="true">Yes</option><option value="false">No</option></select></div>;
-        f["VatRegistrationTypeId"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>}</text>;
-        f["NumberOfVatGroupEntities"] = @<div class="di-field @FieldClass("NumberOfVatGroupEntities")"><label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))</label><InputNumber @bind-Value="model.NumberOfVatGroupEntities" /></div>;
+        f["VatRegistrationTypeId"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))@Help("VatRegistrationTypeId")</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>}</text>;
+        f["NumberOfVatGroupEntities"] = @<div class="di-field @FieldClass("NumberOfVatGroupEntities")"><label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))@Help("VatGroup")</label><InputNumber @bind-Value="model.NumberOfVatGroupEntities" /></div>;
         f["VatGroupEntityNames"] = @<div class="di-field di-full @FieldClass("VatGroupEntityNames")"><label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label><InputTextArea @bind-Value="model.VatGroupEntityNames" /></div>;
-        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))</label><InputText @bind-Value="model.SupplierTin" maxlength="10" inputmode="numeric" pattern="[0-9]*" title="10 digits" /></div>;
+        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))@Help("SupplierTin")</label><InputText @bind-Value="model.SupplierTin" maxlength="10" inputmode="numeric" pattern="[0-9]*" title="10 digits" /></div>;
         f["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")"><label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label><InputSelect @bind-Value="model.BusinessPartnerTypeId"><option value="">— Select —</option>@foreach (var l in businessPartnerTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["BusinessLocationTypeId"] = @<div class="di-field @FieldClass("BusinessLocationTypeId")"><label>Business Location Type@(Req("BusinessLocationTypeId"))</label><InputSelect @bind-Value="model.BusinessLocationTypeId"><option value="">— Select —</option>@foreach (var l in businessLocationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
-        f["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")"><label>eInvoicing Wave Applicability@(Req("EInvoicingWaveId"))</label><InputSelect @bind-Value="model.EInvoicingWaveId"><option value="">— Select —</option>@foreach (var l in eInvoicingWaves){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")"><label>eInvoicing Wave Applicability@(Req("EInvoicingWaveId"))@Help("EInvoicingWaveId")</label><InputSelect @bind-Value="model.EInvoicingWaveId"><option value="">— Select —</option>@foreach (var l in eInvoicingWaves){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["TradeLicenseNumber"] = @<div class="di-field @FieldClass("TradeLicenseNumber")"><label>Trade License Number@(Req("TradeLicenseNumber"))</label><InputText @bind-Value="model.TradeLicenseNumber" /></div>;
         f["TradeLicenseIssueDate"] = @<div class="di-field @FieldClass("TradeLicenseIssueDate")"><label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label><InputDate @bind-Value="model.TradeLicenseIssueDate" /></div>;
         f["TradeLicenseExpiryDate"] = @<div class="di-field @FieldClass("TradeLicenseExpiryDate")"><label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label><InputDate @bind-Value="model.TradeLicenseExpiryDate" /></div>;
-        f["TradeLicenseIssuingBodyId"] = @<div class="di-field @FieldClass("TradeLicenseIssuingBodyId")"><label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))</label><InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TradeLicenseIssuingBodyId"] = @<div class="di-field @FieldClass("TradeLicenseIssuingBodyId")"><label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))@Help("TradeLicenseIssuingBodyId")</label><InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["IssuingBodyIfOthers"] = @<div class="di-field @FieldClass("IssuingBodyIfOthers")" style="display:@(IsOthersIssuingBody() ? "flex" : "none")"><label>Issuing Body (if Others)@(Req("IssuingBodyIfOthers"))</label><InputText @bind-Value="model.IssuingBodyIfOthers" /></div>;
         f["VatCodeId"] = @<div class="di-field @FieldClass("VatCodeId")"><label>VAT Code@(Req("VatCodeId"))</label><InputSelect @bind-Value="model.VatCodeId"><option value="">— Select —</option>@foreach (var l in vatCodes){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>;
         f["BusinessRelationshipId"] = @<div class="di-field @FieldClass("BusinessRelationshipId")"><label>Business Relationship@(Req("BusinessRelationshipId"))</label><InputSelect @bind-Value="model.BusinessRelationshipId"><option value="">— Select —</option>@foreach (var l in businessRelationships){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
@@ -938,10 +1009,10 @@
 
         // Step 2 — Address
         f["AddressName"] = @<div class="di-field @FieldClass("AddressName")"><label>Address Name@(Req("AddressName"))</label><InputText @bind-Value="model.AddressName" /></div>;
-        f["AddressLine1"] = @<div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))</label><InputText @bind-Value="model.AddressLine1" /></div>;
-        f["AddressLine2"] = @<div class="di-field di-full @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))</label><InputText @bind-Value="model.AddressLine2" /></div>;
-        f["CityId"] = @<div class="di-field @FieldClass("CityId")"><label>City / Emirate@(Req("CityId"))</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
-        f["CountryId"] = @<div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["AddressLine1"] = @<div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))@Help("AddressLine1")</label><InputText @bind-Value="model.AddressLine1" /></div>;
+        f["AddressLine2"] = @<div class="di-field di-full @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))@Help("AddressLine2")</label><InputText @bind-Value="model.AddressLine2" /></div>;
+        f["CityId"] = @<div class="di-field @FieldClass("CityId")"><label>City / Emirate@(Req("CityId"))@Help("CityId")</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["CountryId"] = @<div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))@Help("CountryId")</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
         f["PostalCode"] = @<div class="di-field @FieldClass("PostalCode")"><label>PO Box / Postal Code@(Req("PostalCode"))</label><InputText @bind-Value="model.PostalCode" /></div>;
         f["State"] = @<div class="di-field @FieldClass("State")"><label>State@(Req("State"))</label><InputText @bind-Value="model.State" /></div>;
         f["CorporateWebSite"] = @<div class="di-field @FieldClass("CorporateWebSite")"><label>Corporate Web Site@(Req("CorporateWebSite"))</label><InputText @bind-Value="model.CorporateWebSite" placeholder="https://" /></div>;
