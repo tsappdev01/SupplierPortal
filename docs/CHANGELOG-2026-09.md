@@ -1,0 +1,240 @@
+# Supplier Portal — Change Log (September 2026)
+
+219 changes (excluding merge commits), 2026-09-01 to 2026-09-17.
+
+## 2026-09-01  (1)
+- `3cc9315` E-invoicing portal updates: frozen Tax Org Type, VAT Group table, signed declaration, doc alignment, mobile
+
+## 2026-09-07  (19)
+- `84a1bcb` Default status filter to All Statuses; black field text; branded Choose File buttons
+- `5da8c89` db _(nayyar)_
+- `b674c36` updte db _(nayyar)_
+- `c54151e` Clean up document upload UI
+- `2f69cee` Fix broken phone/mobile control layout (regression from black-text change)
+- `b8807f0` Redesign document upload as rich cards
+- `878dc83` Scope suppliers to a user's assigned business units (incl. admins); documents in two-column rows
+- `94381ad` Attached Documents: show all documents on one screen with inline preview + download
+- `8273979` Tax Organization Type: editable for internal staff, frozen only on self-service
+- `c7cc527` Fix save failure (field-change value overflow), default AE/AED, validate IBAN, surface real errors
+- `8ef613a` Thank-you email on Complete; scope Customer portal to assigned business units
+- `24a7045` Show the business unit logo before the supplier name in the Manage Supplier list
+- `a1a9dcd` Customer wizard: LOV dropdowns, Supplier-matched design, required defaults, email logos
+- `0db0438` Fix CustomerEdit build error: declare step in a code block
+- `0cf7c1f` Add "Download all (zip)" for a supplier's attached documents
+- `b2bb417` Remove IBAN format validation from the supplier form
+- `eb7ddc8` Add Manage Customer export toolbar (Excel, Excel all-fields, template, PDF)
+- `57a5169` Scope supplier Upload/Register business-unit dropdown to assigned units
+- `4451ed1` Customer Generate Template: choose blank or populated by business unit
+
+## 2026-09-08  (36)
+- `55191ba` Add Business Unit Logo URL, used as the brand image in emails
+- `318d9b1` Show only the logo (drop the brand-name text) in email headers
+- `6ec4c45` Brand the self-service public header with the business unit logo
+- `0e02f9a` Validate trade-license dates; show validation toasts one per message (2s)
+- `8768d44` Make customer VAT Structure a lookup (VAT Group / Individual VAT)
+- `c3cb272` Make customer Licensing Authority and Gender lookups
+- `ef7d1ec` Add supplier Priority (P1/P2/P3) with dashboard filter and sort
+- `f0f0543` Hide the supplier Priority field from the self-service portal
+- `4fcd298` Customer template: show progress while generating; drop LOV label badge
+- `c7c368f` Customer wizard: combined Country dropdown and Yes/No toggle buttons
+- `2156576` Customer self-service portal: link + OTP + public update flow (mirrors supplier)
+- `bb358f9` Yes/No fields: iOS-style switch toggle (green Yes / red No)
+- `4d117b0` Add Customer Code field; hide the raw customer GUID in the header
+- `6c1abe1` Enforce required fields on each customer wizard step (Save & Next)
+- `0d38c73` Customer KYC documents: master checklist, upload, view/download, enforcement
+- `4b408cb` Admin screen to manage customer document types; rename nav to Manage Customer
+- `a7290e3` Move Customer Fields to the Settings menu, renamed from Field Settings
+- `cbcadc4` Customer edit: Details / Documents / Email History tabs; remove Overview nav
+- `259cfa7` Fix customer import failure on over-length values; surface real save error
+- `a91af43` Show customer required-field/document validation as toasts
+- `acf2f9b` Validate customer trade-license dates (issue not future, expiry after issue)
+- `53ca84d` Make customer Trade License Issuing Body a lookup (Mainland / Free Zone)
+- `31d2ee6` Make customer Title a lookup (Mr / Mrs / Ms / M/s / Dr)
+- `bc5a1b8` Make contact passport country fields lookups
+- `78df757` Group the customer Identification step into sub-sections
+- `5a45300` Customer documents viewer modal with Download all (zip)
+- `417d1a9` Expire the customer self-service link when the record is marked Completed
+- `7c14fd0` Move Document Types to the Settings menu
+- `c6d139b` Point the Customer Portal launcher card to Manage Customer
+- `38b94e1` Incorporation Country + Passport Issue Place/Country as Code-Name LOV; hide Passport Issue Country Code
+- `4d1a464` Align customer upload template and importer to the visible field set
+- `0ee1214` Return to customer: send self-service link and set Awaiting Customer Response
+- `48cf5ee` Show customer Email History timestamps in local time
+- `22eee6d` Show supplier Email History timestamps in local time
+- `90b7b50` Customer BU filter: logo + name dropdown like the supplier list
+- `2a64f05` text edited _(nayyar)_
+
+## 2026-09-11  (20)
+- `9558a5f` Validate email format, TIN (10 digits) and TRN (15 digits) in both portals
+- `c8e5ded` Hide TRN/VAT Registration Number and VAT Registration Type when supplier is not VAT-registered
+- `83b767f` Add Priority and Department User Name columns to supplier export reports (Excel, CSV, PDF)
+- `777d4fe` Add 'address same as Trade License/VAT Certificate' iOS toggle with conditional VAT-certificate address
+- `6eb1058` Supplier update email: white header background with dark blue title text
+- `56b4228` Enforce stricter email regex (require domain + TLD) for contact/email fields
+- `aa5070e` Cap TIN/TRN input length at source (TIN 10, TRN 15) with numeric input hint
+- `de1bfaf` Enforce TIN (10) / TRN (15) digit length and email format on internal edits too
+- `d61d942` Auto-complete supplier records on self-service submission (remove For Review step)
+- `254cebd` Label the Address section header as '(As per Trade License)'
+- `b6ac8d8` Repeat full address block as 'Address (As per VAT Certificate)' when toggle = No
+- `8b2811f` Remove the Reject/Rejected status from the supplier workflow
+- `a5ad48a` OTP verification email: white header background with dark blue title text
+- `91be2cc` Assign suppliers to a user (owner) from the Manage Supplier dashboard
+- `3f30761` Submission-notification email: white header background with dark blue title text
+- `9ace74d` Scope supplier list/exports to the logged-in user's assigned suppliers (non-admins)
+- `8acf537` Name the supplier documents zip after the supplier (sanitized) instead of supplier-<id>
+- `303eb56` Full Excel export: drop Draft/Active/Created At/By/Updated At/By, add assigned-user Username
+- `571f3b0` Show all active users in the supplier assignment picker
+- `6218988` Revert assignment picker to Business-Unit scope
+
+## 2026-09-13  (4)
+- `0335637` DMZ deployment stage 0: deployment-mode switch + self-service gateway seam
+- `ccf3d77` DMZ stages 1-2 (access flow): internal /api/ss/supplier API + DMZ HTTP access gateway
+- `8108b08` DMZ data-plane contracts (WIP scaffolding, additive/unused)
+- `ba3fb4f` Speed up supplier Edit: cache reference data, parallelize + defer loads, split query, progress indicator
+
+## 2026-09-14  (15)
+- `bf17037` Per-business-unit self-service URL: build emailed links from the unit's Domain
+- `de92eb3` DMZ stage 2 (supplier data plane): DB-less self-service form via internal API
+- `413ecfa` DMZ stage 3 (WIP): customer self-service contracts + gateway interfaces + bytes upload overload (additive)
+- `cb293f9` Add Departments table (seeded) and link Users to a department
+- `2d70478` Assign suppliers to a department; department members manage their department's suppliers
+- `c7128ae` Complete DMZ Stage 3: database-less customer self-service
+- `86a0c3c` Fix CS0234: drop non-existent SupplierPortal.Web.Services.Customer using
+- `2aba014` Add bulk assign-supplier-to-department action on the dashboard
+- `d00b132` Scope non-admin supplier visibility to (business unit + department) OR assigned-to-me
+- `6313a81` Gate the assigned-to-me branch by business unit too
+- `d4491c4` Add step-by-step deployment guide for Internal and DMZ topologies
+- `fce112d` Update supplier invitation email to UAE e-invoicing compliance wording
+- `100da45` Update pre-submission declaration wording (e-invoicing + non-VAT registration)
+- `93a508f` Make declaration company name per business unit
+- `4f02400` Name supplier documents zip "Supplier Number_Supplier Name.zip"
+
+## 2026-09-15  (66)
+- `6f72236` Add Supplier Portal user manual (Word)
+- `1332397` Use full-size business-unit logo in communication emails
+- `37e973b` Fix spurious "session expired" on self-service document upload
+- `dd77c7c` Add diagnostic logging to supplier session validation
+- `d79d987` Surface the session-rejection reason in the self-service error message
+- `4d8d4ad` Pre-compute token hash outside the EF query in session validation
+- `a475dc2` Fix self-service upload "link-not-found" by pinning token/session in the form
+- `642b841` Fix self-service upload: bind token/session with @ (were passed as literals)
+- `899cac8` Trim self-service session diagnostic to a clean supplier-facing message
+- `b7a6ef0` Add "What's this?" info popups to key supplier fields
+- `c3ebee0` Align field help tooltips to the business-provided Excel
+- `ad2a3c6` Show sidebar brand logo without the white chip
+- `d6de461` Store supplier & customer documents in Azure Blob Storage (new uploads)
+- `6938ed1` Store user photos and business-unit logos in Azure Blob Storage too
+- `0b02529` Store supplier documents in the database when blob storage is disabled
+- `3c834f5` commi _(nayyar)_
+- `b52da30` SSO enabled _(nayyar)_
+- `1b6c2fc` Treat Supplier Site as free text with no validation
+- `bff7357` Restrict Register and Upload Supplier to administrators
+- `a735f30` Point at Azure SQL and enable transient-fault retry
+- `bbe6c51` Add Database:Provider flag to switch between local and Azure SQL
+- `934d099` commit _(nayyar)_
+- `ee65cf1` Add status filter (default Active) to Manage Users
+- `e72827b` Confirm before sending a supplier notification email
+- `eb40f05` Polish the send-notification confirmation dialog
+- `53d526f` Add mouse-drawn signature and signed declaration PDF for supplier submission
+- `14eea2f` Make supplier email header white with blue text
+- `6be29cb` Show download progress for 'Download all (zip)'
+- `c7508ba` Fix document download crash on ?download=1 (bool bind failure)
+- `0453c43` QA fixes: admin authz, blob-photo detection, zip dedup, download filename
+- `2e1bbda` QA fixes: protect signed declaration, import wipe, re-submit loop
+- `278bfe2` QA fixes: scope supplier document endpoints; fix public landlord doc View
+- `72b0538` QA fixes: harden self-service OTP verify and document upload
+- `e1b8979` Show download progress for single-document downloads too
+- `596fe8b` Add 15-minute idle lockout; friendlier 'no images' handling
+- `f9513cb` Scope customer document endpoints to the caller's business units
+- `6e45021` Advanced Print dialog: choose columns, print all rows, adaptive layout; hide Excel/PDF buttons
+- `ccb2c68` Enhance Generate Template dialog to the advanced dialog style
+- `9f39fdd` Route supplier/customer emails through SMTP-capable EmailDispatcher
+- `d8814cb` Enhance Attached Documents modal to advanced view
+- `c0fe54a` Add login lockout and active-session revocation (yellow items)
+- `f2868ec` Guard customer OTP verify against null code (public-facing NRE)
+- `bcd094d` Show a loading spinner on each document preview until it renders
+- `62a837b` QA fixes: prevent import wipe of Priority/VAT-address; clear bulk selection on tab change
+- `9e396d7` Security: block stored-XSS via document content-type, SSRF via license QR; zip names by type
+- `47461ea` Security hardening: 6-digit OTP, encode email names, guard customer upload, scope edit page
+- `8b06bee` Security: lock internal classification/payment flags on self-service saves
+- `babccc3` Security: partition OTP rate limiter by client IP
+- `035f21c` Fix build error: inline document content-type allowlist
+- `a5bbb48` Add Supplier Portal PAT (acceptance + security test) report
+- `0161b91` Fix OTP entry: accept 6-digit codes (match backend), was still 4-digit
+- `668fc3f` Add 'Back to Supplier List' button on the supplier Edit page
+- `8912c07` Add project documentation set (Word): BRD, Tech Design, DB Schema, User/Admin/Self-Service guides, Azure deployment, configuration, PAT
+- `c2c24bf` Use the uploaded Business Unit logo on public self-service pages
+- `a2075f6` Add Business Unit email; brand & reword 'Link Not Available' page; faster back link
+- `da2febe` docs: rework all Word documents to Supplier Portal-only scope
+- `6e5067e` feat(ui): collapsible left navigation with full-width content
+- `5698603` fix(ui): make sidebar toggle work reliably by inlining diSidebar
+- `48a2bb3` fix(ui): keep theme (and sidebar state) across enhanced navigation
+- `5690ae3` feat(notifications): clear awaiting-review on complete; add dismiss / dismiss all
+- `5aac89a` fix(ui): dark-mode contrast for form fields, action buttons and tabs
+- `84f017a` feat(dashboard): instant nav feedback + Full Name column
+- `9fc6e0a` feat(audit-log): filter by user and date range, sort by date, paginate 50/page
+- `49eeda5` feat(dashboard): sticky supplier table header while scrolling
+- `c368411` feat(dashboard): keep action toolbar pinned while scrolling
+- `0f2b664` fix(dashboard): remove business-unit logo from supplier list rows
+
+## 2026-09-16  (50)
+- `af7cd06` fix(supplier): QA pass — data-loss, self-service integrity, sticky header
+- `bedbda8` feat(email): add Microsoft Graph (app-only) as a preferred email provider
+- `28b2e11` appsetting updateds _(nayyar)_
+- `2452a4b` docs: record environment provisioning (Entra apps, Graph mail, SQL, blob, topology)
+- `0af8208` appsettings update _(nayyar)_
+- `1bb0e32` update settings _(nayyar)_
+- `aeb9c09` setting updated _(nayyar)_
+- `eb9eeee` updated settings _(nayyar)_
+- `65d7a65` feat(storage): add BlobStorage:Enabled flag (true = blob, false = database)
+- `5727e72` chore(config): record deployment appsettings (incl. BlobStorage:Enabled flag)
+- `771b234` feat(storage): lay supplier blob files out like the download-all zip
+- `69ccddc` fix(selfservice): match emailed link route (/supplier/self-service/{token})
+- `d3bf518` Host self-service OAuth API inside SupplierPortal.Web (retire separate API app)
+- `4f7c631` Enable self-service OAuth API in appsettings (SigningKey + client)
+- `45b94c1` Point Partner Connect at the main portal's in-process self-service API
+- `c315fff` updated setting _(nayyar)_
+- `681cf58` Fix duplicate/refresh OTP sends and add self-service landing page
+- `e1e16c4` Harden security response headers on both sites (OWASP)
+- `6273527` Bump ImageSharp to patched 2.1.11; add security hardening checklist doc
+- `f97ebe2` Self-service UX: Bootstrap CSS, toasts, upload progress, BU logo, fix doc preview
+- `8af1f06` Persist self-service session in an HttpOnly cookie (OTP entered once)
+- `cbb00f7` Self-service form: add Trade License detail fields, prevent mandatory soft-lock, tidy logo
+- `b921a16` Make self-service form fully settings-driven (fields + tabs), matching the portal
+- `d938365` Use the internal supplier form's stylesheet in self-service for exact CSS parity
+- `396ed6f` Self-service header logo: use the same uploaded-logo source as the portal
+- `5676df2` Fix self-service sign-in 'Invalid request origin' (cookie session)
+- `69d4af1` Self-service header: prefer the business unit's configured LogoUrl
+- `98eb6d4` Add local Development overrides (local SQL, local sign-in, no blob/cloud email)
+- `462bc7a` Revert local Development overrides (restore original appsettings.Development.json)
+- `a8dd05d` Speed up first load: response compression + static asset caching (both apps)
+- `a538f06` Self-service: BU logo on the form page + rich document cards (match portal)
+- `b8fce1f` Align self-service checkboxes: full-width rows instead of grid cells
+- `4659841` Log startup DB timing (migrate/seed phases) to diagnose slow first load
+- `0a93ee1` Inline the business-unit logo server-side so it always renders in self-service
+- `4dc2a5a` Self-service form: use full width (remove 1240px cap)
+- `1f21361` Self-service: add the declaration + digital-signature step on Submit (match portal)
+- `c7cffdd` Smooth signature pad (pointer events + curve smoothing); revert long static cache
+- `9a69ecf` Match self-service form header design to internal supplier form
+- `88601db` Update self-service declaration text (VAT non-registration names Dubai Investments PJSC)
+- `4c5ac62` Bring self-service wizard to parity with SupplierForm validations/fields
+- `3b414fa` logo updated _(nayyar)_
+- `306a5ea` Show progress on self-service OTP Resend code
+- `46892fb` Self-service form polish: combined phone control, Thank You card, Proceed button
+- `c65470c` Enhance session-expired screen; send supplier completion email on self-service submit
+- `09925f5` Fix unreadable text in Manage Supplier print output
+- `a401964` Session-expired screen: new copy + business-unit support email
+- `f6b843e` Reject invalid/injection emails at self-registration intake
+- `735183e` Add admin action to remove invalid (junk) pending registrations
+- `53c5c2a` Add per-row reject for pending registrations
+- `81cc558` QA fixes: cleanup confirmation visibility + friendlier email validation
+
+## 2026-09-17  (8)
+- `6ec9aab` Use business-unit name (not hardcoded parent) in VAT non-registration declaration
+- `f6711a3` Add P4 to supplier priority (dropdowns + sort)
+- `1f59432` Add column chooser to Manage Supplier table
+- `63897e8` Always show the supplier list pager (never appears 'missing')
+- `b070196` Add internal user guide (Word) for the Supplier Portal admin site
+- `476c8c0` Fix silent self-service submit failure after signing the declaration
+- `c498fd6` Prevent slow completion emails from stalling self-service submit
+- `cdd1722` Add Notification Group module under Settings
