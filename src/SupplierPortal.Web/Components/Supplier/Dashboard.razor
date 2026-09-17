@@ -595,12 +595,14 @@ else
 {
     <p><em>No supplier data yet. Use "Register Supplier" or "Upload Supplier Data" to add records.</em></p>
 }
-else if (TotalPages > 1)
+else if (TabFilteredSuppliers.Any())
 {
-    <div class="d-flex align-items-center gap-2 no-print">
-        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == 1)" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+    @* Always shown when the current tab has rows so the pager is never "missing"; Previous/Next simply
+       disable when there is a single page. *@
+    <div class="d-flex align-items-center gap-2 no-print mt-2">
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage <= 1)" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
         <span>Page @currentPage of @TotalPages (@TabFilteredSuppliers.Count() suppliers)</span>
-        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage >= TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
     </div>
 }
 }
