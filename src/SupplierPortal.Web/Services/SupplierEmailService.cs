@@ -191,19 +191,32 @@ public class SupplierEmailService(
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var logo = await BusinessUnitLogoAsync(businessUnitId, actorUsername);
         var safeName = System.Net.WebUtility.HtmlEncode(supplierName);
-        var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
-  <div style=""max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
-    <div style=""background:#ffffff;padding:18px 24px;border-bottom:1px solid #e2e5ea"">{BrandBlock(logo, brand)}
-      <div style=""color:#1a2233;font-size:13px"">Supplier Data Gathering Portal</div>
-    </div>
-    <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
-      <h2 style=""margin:0 0 12px;color:#1a2233;font-size:19px"">Thank you, {safeName}</h2>
-      <p style=""margin:0 0 12px"">We're pleased to confirm that your response has been <strong>received and updated</strong>,
-        and your supplier registration is now <strong>complete</strong>. No further action is required from you at this time.</p>
-      <p style=""margin:0 0 12px"">Thank you for taking the time to provide your information and for partnering with us.</p>
-      <p style=""margin:18px 0 0;color:#7b8697;font-size:13px"">This is an automated message — please do not reply.</p>
-    </div>
-  </div>
+        // Email-safe centering: a full-width table with an align=center cell holding a fixed-width inner
+        // table. (A max-width div with margin:0 auto is not reliably centered by Gmail, which pushed the
+        // card off to one side.) Mirrors the supplier_update_notification.html template layout.
+        var body = $@"<div style=""margin:0;padding:0;background-color:#f4f6f9;font-family:Segoe UI,Arial,Helvetica,sans-serif;"">
+  <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""background-color:#f4f6f9;padding:30px 0;border-collapse:collapse;"">
+    <tr>
+      <td align=""center"" style=""padding:0 16px;"">
+        <table role=""presentation"" width=""600"" cellpadding=""0"" cellspacing=""0"" border=""0"" style=""width:600px;max-width:600px;background-color:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea;border-collapse:collapse;"">
+          <tr>
+            <td style=""background:#ffffff;padding:18px 24px;border-bottom:1px solid #e2e5ea;"">{BrandBlock(logo, brand)}
+              <div style=""color:#1a2233;font-size:13px;"">Supplier Data Gathering Portal</div>
+            </td>
+          </tr>
+          <tr>
+            <td style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6;"">
+              <h2 style=""margin:0 0 12px;color:#1a2233;font-size:19px;"">Thank you, {safeName}</h2>
+              <p style=""margin:0 0 12px;"">We're pleased to confirm that your response has been <strong>received and updated</strong>,
+                and your supplier registration is now <strong>complete</strong>. No further action is required from you at this time.</p>
+              <p style=""margin:0 0 12px;"">Thank you for taking the time to provide your information and for partnering with us.</p>
+              <p style=""margin:18px 0 0;color:#7b8697;font-size:13px;"">This is an automated message — please do not reply.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </div>";
 
         var subject = $"Supplier Registration Completed — {supplierName}";
