@@ -36,7 +36,40 @@ public class EmailDispatcher(
             : await SendViaSmtpAsync(smtpHost.Trim(), toEmail, subject, htmlBody);
     }
 
-    private async Task<(bool, string?)> SendViaSmtpAsync(string host, string to, string subject, string html)
+    /// <summary>Sends an HTML email with a single file attachment. Used by the scheduled report runner to
+    /// deliver the generated PDF/Excel. Graph is preferred when configured, then SMTP. SQL Server Database
+    /// Mail cannot attach in-memory bytes, so when neither Graph nor SMTP is configured this returns a clear
+    /// error rather than silently dropping the attachment.</summary>
+    public async Task<(bool Ok, string? Error)> SendHtmlWithAttachmentAsync(
+        string toEmail, string subject, string htmlBody, byte[] attachment, string fileName, string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(toEmail))
+        {
+            return (false, "No recipient email address.");
+        }
+        if (attachment is null || attachment.Length == 0)
+        {
+            return (false, "No attachment content.");
+        }
+
+        if (graphMail.IsConfigured)
+        {
+            return await graphMail.SendHtmlWithAttachmentAsync(toEmail, subject, htmlBody, attachment, fileName, contentType);
+        }
+
+        var smtpHost = config["Email:Smtp:Host"];
+        if (!string.IsNullOrWhiteSpace(smtpHost))
+        {
+            return await SendViaSmtpAsync(smtpHost.Trim(), toEmail, subject, htmlBody,
+                (attachment, fileName, contentType));
+        }
+
+        return (false, "Attachments require Microsoft Graph or SMTP to be configured; " +
+                       "SQL Server Database Mail cannot attach in-memory files.");
+    }
+
+    private async Task<(bool, string?)> SendViaSmtpAsync(string host, string to, string subject, string html,
+        (byte[] Bytes, string FileName, string ContentType)? attachment = null)
     {
         try
         {
@@ -64,7 +97,23 @@ public class EmailDispatcher(
             };
             message.To.Add(to);
 
-            await client.SendMailAsync(message);
+            // MemoryStream must outlive SendMailAsync, so it's disposed after the send (not with `using`
+            // inline, which would dispose it before the attachment is read).
+            MemoryStream? attachmentStream = null;
+            if (attachment is { } a)
+            {
+                attachmentStream = new MemoryStream(a.Bytes);
+                message.Attachments.Add(new Attachment(attachmentStream, a.FileName, a.ContentType));
+            }
+
+            try
+            {
+                await client.SendMailAsync(message);
+            }
+            finally
+            {
+                attachmentStream?.Dispose();
+            }
             return (true, null);
         }
         catch (Exception ex)

@@ -55,22 +55,49 @@ public sealed class GraphMailSender(IOptions<GraphMailOptions> options, ILogger<
         return _graph;
     }
 
-    public async Task<(bool Ok, string? Error)> SendHtmlAsync(
-        string toEmail, string subject, string htmlBody, CancellationToken ct = default)
+    public Task<(bool Ok, string? Error)> SendHtmlAsync(
+        string toEmail, string subject, string htmlBody, CancellationToken ct = default) =>
+        SendAsync(toEmail, subject, htmlBody, attachment: null, fileName: null, contentType: null, ct);
+
+    /// <summary>Sends an HTML email with a single file attachment (used by the scheduled report runner).</summary>
+    public Task<(bool Ok, string? Error)> SendHtmlWithAttachmentAsync(
+        string toEmail, string subject, string htmlBody,
+        byte[] attachment, string fileName, string contentType, CancellationToken ct = default) =>
+        SendAsync(toEmail, subject, htmlBody, attachment, fileName, contentType, ct);
+
+    private async Task<(bool Ok, string? Error)> SendAsync(
+        string toEmail, string subject, string htmlBody,
+        byte[]? attachment, string? fileName, string? contentType, CancellationToken ct)
     {
         try
         {
+            var message = new Message
+            {
+                Subject = subject,
+                Body = new ItemBody { ContentType = BodyType.Html, Content = htmlBody },
+                ToRecipients =
+                [
+                    new Recipient { EmailAddress = new EmailAddress { Address = toEmail } }
+                ],
+            };
+
+            if (attachment is not null)
+            {
+                message.Attachments =
+                [
+                    new FileAttachment
+                    {
+                        OdataType = "#microsoft.graph.fileAttachment",
+                        Name = fileName,
+                        ContentType = contentType,
+                        ContentBytes = attachment,
+                    }
+                ];
+            }
+
             var request = new SendMailPostRequestBody
             {
-                Message = new Message
-                {
-                    Subject = subject,
-                    Body = new ItemBody { ContentType = BodyType.Html, Content = htmlBody },
-                    ToRecipients =
-                    [
-                        new Recipient { EmailAddress = new EmailAddress { Address = toEmail } }
-                    ],
-                },
+                Message = message,
                 SaveToSentItems = true,   // keep a copy in the sender's Sent Items
             };
 

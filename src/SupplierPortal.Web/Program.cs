@@ -116,6 +116,11 @@ builder.Services.AddSingleton<ActiveDirectoryService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<NotificationGroupService>();
+builder.Services.AddScoped<ScheduledReportService>();
+// Configure the local time zone used to display/enter report schedules (default Gulf Standard Time).
+ReportTimeZone.Configure(builder.Configuration["Reports:TimeZone"]);
+// Background runner: fire due scheduled reports and email the PDF/Excel to the target group's active members.
+builder.Services.AddHostedService<ScheduledReportRunner>();
 builder.Services.AddMemoryCache(); // caches reference data (lookups, banks, business units, field settings)
 builder.Services.AddScoped<EmailBrandingService>();
 builder.Services.AddScoped<PublicBrandingState>();

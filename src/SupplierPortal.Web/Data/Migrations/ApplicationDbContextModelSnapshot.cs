@@ -2100,6 +2100,62 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("NotificationGroupUsers", (string)null);
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BusinessUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastRunDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("LastRunUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastRunStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("NextRunUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("NotificationGroupId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationGroupId");
+
+                    b.ToTable("ScheduledReports");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.BankBranch", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Bank", "Bank")
@@ -2574,6 +2630,17 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", "NotificationGroup")
+                        .WithMany()
+                        .HasForeignKey("NotificationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NotificationGroup");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Bank", b =>

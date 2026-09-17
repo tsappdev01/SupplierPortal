@@ -1,0 +1,355 @@
+@page "/admin/scheduled-reports"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject ScheduledReportService ReportService
+@inject NotificationGroupService GroupService
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Scheduled Reports - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-1">
+    <div>
+        <h1 class="mb-0">Scheduled Reports</h1>
+        <p class="text-muted mb-0">
+            Email a supplier report (PDF or Excel) to a notification group's active members on a schedule.
+            Times are in @ReportTimeZone.DisplayName.
+        </p>
+    </div>
+    @if (!editing)
+    {
+        <button class="btn btn-primary" @onclick="StartNew">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" /></svg>
+            New Schedule
+        </button>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+@if (message is not null)
+{
+    <div class="alert alert-success py-2 mt-3">@message</div>
+}
+
+@if (editing)
+{
+    <div class="card mb-4 mt-3 di-sr-card">
+        <div class="card-body">
+            <h5 class="card-title mb-3">@(editId is null ? "New Schedule" : "Edit Schedule")</h5>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Report Name</label>
+                    <input class="form-control" @bind="editName" placeholder="e.g. Monthly Supplier Master" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Format</label>
+                    <select class="form-select" @bind="editFormat">
+                        <option value="@ReportFormat.Pdf">PDF</option>
+                        <option value="@ReportFormat.Excel">Excel (all fields)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Frequency</label>
+                    <select class="form-select" @bind="editFrequency">
+                        <option value="@ReportFrequency.Once">Once</option>
+                        <option value="@ReportFrequency.Daily">Daily</option>
+                        <option value="@ReportFrequency.Weekly">Weekly</option>
+                        <option value="@ReportFrequency.Monthly">Monthly</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Start / Next Run (@ReportTimeZone.DisplayName)</label>
+                    <input type="datetime-local" class="form-control"
+                           value="@editStart.ToString("yyyy-MM-ddTHH:mm")" @onchange="OnStartChanged" />
+                    <div class="form-text">
+                        @(editFrequency == ReportFrequency.Once
+                            ? "The report runs once at this time."
+                            : $"First run at this time, then repeats {editFrequency.ToString().ToLower()}.")
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Notification Group</label>
+                    <select class="form-select" @bind="editGroupId">
+                        <option value="0">— Select a group —</option>
+                        @foreach (var g in groups)
+                        {
+                            <option value="@g.Id">@g.Name (@g.Users.Count member@(g.Users.Count == 1 ? "" : "s"))@(g.IsActive ? "" : " — disabled")</option>
+                        }
+                    </select>
+                    <div class="form-text">Only <strong>active</strong> members of an <strong>active</strong> group receive the report.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Business Unit</label>
+                    <select class="form-select" @bind="editBusinessUnitId">
+                        <option value="0">All business units</option>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <option value="@bu.Id">@bu.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-12 d-flex align-items-center gap-2">
+                    <label class="di-switch" title="@(editActive ? "Enabled" : "Disabled")">
+                        <input type="checkbox" checked="@editActive" @onchange="e => editActive = (bool)e.Value!" />
+                        <span class="di-switch-slider"></span>
+                    </label>
+                    <span class="fw-semibold @(editActive ? "text-success" : "text-danger")">@(editActive ? "Schedule enabled" : "Schedule disabled")</span>
+                </div>
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+                <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="di-sr-table-wrap mt-3">
+    <table class="table align-middle di-sr-table mb-0">
+        <thead>
+            <tr>
+                <th>Report</th>
+                <th>Recipients (group)</th>
+                <th>Frequency</th>
+                <th>Next Run</th>
+                <th>Last Run</th>
+                <th class="text-center" style="width: 110px;">Enabled</th>
+                <th class="text-end" style="width: 210px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in reports)
+            {
+                <tr class="@(r.IsActive ? null : "di-sr-inactive")">
+                    <td>
+                        <div class="fw-semibold">@r.Name</div>
+                        <span class="badge rounded-pill text-bg-light border">@(r.Format == ReportFormat.Excel ? "Excel" : "PDF")</span>
+                        <span class="text-muted small">@(r.BusinessUnitId is null ? "All BUs" : BuName(r.BusinessUnitId.Value))</span>
+                    </td>
+                    <td>
+                        @if (r.NotificationGroup is { } g)
+                        {
+                            <span class="fw-semibold">@g.Name</span>
+                            @if (!g.IsActive)
+                            {
+                                <span class="badge rounded-pill text-bg-danger ms-1">group disabled</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted small">—</span>
+                        }
+                    </td>
+                    <td>@r.Frequency</td>
+                    <td class="small">@ReportTimeZone.ToLocal(r.NextRunUtc).ToString("dd MMM yyyy HH:mm")</td>
+                    <td class="small">
+                        @if (r.LastRunUtc is null)
+                        {
+                            <span class="text-muted">Never</span>
+                        }
+                        else
+                        {
+                            <div>
+                                <span class="badge rounded-pill @LastRunClass(r.LastRunStatus)">@r.LastRunStatus</span>
+                                <span class="text-muted">@ReportTimeZone.ToLocal(r.LastRunUtc.Value).ToString("dd MMM HH:mm")</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(r.LastRunDetail))
+                            {
+                                <div class="text-muted" style="max-width: 320px;">@r.LastRunDetail</div>
+                            }
+                        }
+                    </td>
+                    <td class="text-center">
+                        <label class="di-switch" title="@(r.IsActive ? "Enabled — click to disable" : "Disabled — click to enable")">
+                            <input type="checkbox" checked="@r.IsActive" @onchange="e => ToggleActiveAsync(r, (bool)e.Value!)" />
+                            <span class="di-switch-slider"></span>
+                        </label>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-success" title="Run now" @onclick="() => RunNowAsync(r)">Run now</button>
+                        <button class="btn btn-sm btn-outline-primary ms-1" @onclick="() => StartEdit(r)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteAsync(r)">Delete</button>
+                    </td>
+                </tr>
+            }
+            @if (reports.Count == 0)
+            {
+                <tr><td colspan="7" class="text-center text-muted py-4"><em>No scheduled reports yet. Use "New Schedule" to add one.</em></td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .di-sr-table thead th { background: #0b2545; color: #fff; font-weight: 600; font-size: 13px; border: none; padding: 12px 14px; }
+    .di-sr-table tbody td { padding: 12px 14px; vertical-align: middle; }
+    .di-sr-table tbody tr { border-bottom: 1px solid #eef1f5; }
+    .di-sr-table tbody tr:last-child { border-bottom: none; }
+    .di-sr-inactive td { opacity: .55; }
+    .di-sr-card { border: 1px solid #e2e5ea; border-radius: 12px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+
+    .di-switch { position: relative; display: inline-block; width: 40px; height: 22px; vertical-align: middle; margin: 0; }
+    .di-switch input { opacity: 0; width: 0; height: 0; }
+    .di-switch-slider { position: absolute; cursor: pointer; inset: 0; background-color: #dc3545; border-radius: 22px; transition: background-color .15s ease; }
+    .di-switch-slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: transform .15s ease; }
+    .di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+    .di-switch input:checked + .di-switch-slider::before { transform: translateX(18px); }
+</style>
+
+@code {
+    private List<ScheduledReport> reports = [];
+    private List<NotificationGroup> groups = [];
+    private List<BusinessUnit> businessUnits = [];
+    private string currentUser = "unknown";
+
+    private bool editing;
+    private int? editId;
+    private string editName = "";
+    private ReportFormat editFormat = ReportFormat.Pdf;
+    private ReportFrequency editFrequency = ReportFrequency.Monthly;
+    private DateTime editStart = DateTime.Now;
+    private int editGroupId;
+    private int editBusinessUnitId;   // 0 = all
+    private bool editActive = true;
+    private bool saving;
+
+    private string? error;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        businessUnits = await BusinessUnitService.GetAllAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        groups = await GroupService.GetAllAsync();
+        reports = await ReportService.GetAllAsync();
+    }
+
+    private string BuName(int id) => businessUnits.FirstOrDefault(b => b.Id == id)?.Name ?? $"BU #{id}";
+
+    private static string LastRunClass(string? status) => status switch
+    {
+        "Sent" => "text-bg-success",
+        "Partial" => "text-bg-warning",
+        "Skipped" => "text-bg-secondary",
+        "Failed" => "text-bg-danger",
+        _ => "text-bg-light border",
+    };
+
+    private void OnStartChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+        {
+            editStart = dt;
+        }
+    }
+
+    private void StartNew()
+    {
+        editId = null;
+        editName = "";
+        editFormat = ReportFormat.Pdf;
+        editFrequency = ReportFrequency.Monthly;
+        // Default to the next top of the hour, local time.
+        var now = DateTime.Now;
+        editStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0).AddHours(1);
+        editGroupId = groups.FirstOrDefault(g => g.IsActive)?.Id ?? groups.FirstOrDefault()?.Id ?? 0;
+        editBusinessUnitId = 0;
+        editActive = true;
+        error = message = null;
+        editing = true;
+    }
+
+    private void StartEdit(ScheduledReport r)
+    {
+        editId = r.Id;
+        editName = r.Name;
+        editFormat = r.Format;
+        editFrequency = r.Frequency;
+        editStart = ReportTimeZone.ToLocal(r.NextRunUtc);
+        editGroupId = r.NotificationGroupId;
+        editBusinessUnitId = r.BusinessUnitId ?? 0;
+        editActive = r.IsActive;
+        error = message = null;
+        editing = true;
+    }
+
+    private void CancelEdit() { editing = false; error = null; }
+
+    private async Task SaveAsync()
+    {
+        error = message = null;
+        if (editGroupId == 0)
+        {
+            error = "Select a notification group.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var input = new ScheduledReportInput(
+                editName, editFormat, editFrequency, editStart,
+                editBusinessUnitId == 0 ? null : editBusinessUnitId, editGroupId, editActive);
+
+            if (editId is null)
+            {
+                var (ok, err, _) = await ReportService.CreateAsync(input, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Schedule '{editName.Trim()}' created.";
+            }
+            else
+            {
+                var (ok, err) = await ReportService.UpdateAsync(editId.Value, input, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Schedule '{editName.Trim()}' updated.";
+            }
+            await ReloadAsync();
+            editing = false;
+        }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleActiveAsync(ScheduledReport r, bool isActive)
+    {
+        error = message = null;
+        await ReportService.SetActiveAsync(r.Id, isActive, currentUser);
+        await ReloadAsync();
+        message = $"Schedule '{r.Name}' {(isActive ? "enabled" : "disabled")}.";
+    }
+
+    private async Task RunNowAsync(ScheduledReport r)
+    {
+        error = message = null;
+        await ReportService.TriggerNowAsync(r.Id, currentUser);
+        await ReloadAsync();
+        message = $"'{r.Name}' has been queued to run — it will be sent within a minute.";
+    }
+
+    private async Task DeleteAsync(ScheduledReport r)
+    {
+        error = message = null;
+        if (await ReportService.DeleteAsync(r.Id, currentUser))
+        {
+            message = $"Schedule '{r.Name}' deleted.";
+            await ReloadAsync();
+        }
+    }
+}

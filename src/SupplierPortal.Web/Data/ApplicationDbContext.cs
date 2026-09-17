@@ -15,6 +15,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<BankBranch> BankBranches => Set<BankBranch>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<NotificationGroup> NotificationGroups => Set<NotificationGroup>();
+    public DbSet<ScheduledReport> ScheduledReports => Set<ScheduledReport>();
     public DbSet<SupplierFieldSetting> SupplierFieldSettings => Set<SupplierFieldSetting>();
     public DbSet<SupplierTabSetting> SupplierTabSettings => Set<SupplierTabSetting>();
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
@@ -95,6 +96,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                     j.HasKey("NotificationGroupId", "UserId");
                     j.ToTable("NotificationGroupUsers");
                 });
+
+        // A scheduled report targets one notification group; deleting a group removes its schedules.
+        modelBuilder.Entity<ScheduledReport>()
+            .HasOne(r => r.NotificationGroup)
+            .WithMany()
+            .HasForeignKey(r => r.NotificationGroupId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<BusinessUnit>()
             .HasIndex(b => b.Code)
