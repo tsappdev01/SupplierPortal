@@ -129,7 +129,8 @@
                             <label class="form-label fw-semibold">Available fields</label>
                             <input class="form-control form-control-sm mb-2" placeholder="Filter fields…" @bind="colFilter" @bind:event="oninput" />
                             <div class="border rounded di-rb-scroll">
-                                @foreach (var c in availableColumns.Where(c => string.IsNullOrWhiteSpace(colFilter) || c.Name.Contains(colFilter, StringComparison.OrdinalIgnoreCase)))
+                                <div class="px-3 py-1 di-rb-grouphdr">@wizTable</div>
+                                @foreach (var c in availableColumns.Where(c => MatchesFilter(c.Name)))
                                 {
                                     <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
                                         <input type="checkbox" checked="@wizColumns.Contains(c.Name)" @onchange="() => ToggleColumn(c.Name)" />
@@ -137,7 +138,40 @@
                                         <span class="text-muted small ms-auto">@c.DataType</span>
                                     </label>
                                 }
+                                @{ var lookups = LookupFields().Where(l => MatchesFilter(l.Label)).ToList(); }
+                                @if (lookups.Count > 0)
+                                {
+                                    <div class="px-3 py-1 di-rb-grouphdr">Lookups (display value)</div>
+                                    @foreach (var l in lookups)
+                                    {
+                                        <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
+                                            <input type="checkbox" checked="@wizColumns.Contains(l.Key)" @onchange="() => ToggleColumn(l.Key)" />
+                                            <span class="fw-semibold">@l.Label</span>
+                                            <span class="text-muted small ms-auto">text</span>
+                                        </label>
+                                    }
+                                }
+                                @foreach (var g in relatedGroups)
+                                {
+                                    var visible = g.Cols.Where(c => MatchesFilter(c.Name) || MatchesFilter(g.Rel.Label)).ToList();
+                                    @if (visible.Count > 0)
+                                    {
+                                        <div class="px-3 py-1 di-rb-grouphdr">
+                                            @g.Rel.Label <span class="text-muted fw-normal">→ @g.Rel.RefTable (via @g.Rel.FkColumn)</span>
+                                        </div>
+                                        @foreach (var c in visible)
+                                        {
+                                            var key = ReportSchemaService.EncodeRelated(g.Rel.FkColumn, c.Name);
+                                            <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
+                                                <input type="checkbox" checked="@wizColumns.Contains(key)" @onchange="() => ToggleColumn(key)" />
+                                                <span class="fw-semibold">@g.Rel.Label.@c.Name</span>
+                                                <span class="text-muted small ms-auto">@c.DataType</span>
+                                            </label>
+                                        }
+                                    }
+                                }
                             </div>
+                            <div class="form-text">Fields under a relationship (e.g. <em>@(relatedGroups.FirstOrDefault().Rel?.Label ?? "User").Name</em>) are pulled from the related table via its foreign key.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Selected columns &amp; order (@wizColumns.Count)</label>
@@ -152,7 +186,7 @@
                                     var name = wizColumns[idx];
                                     <div class="d-flex align-items-center gap-2 px-3 py-1 border-bottom">
                                         <span class="text-muted small" style="width:22px;">@(idx + 1).</span>
-                                        <span class="fw-semibold">@name</span>
+                                        <span class="fw-semibold">@FieldLabel(name)</span>
                                         <span class="ms-auto d-flex gap-1">
                                             <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Up" disabled="@(idx == 0)" @onclick="() => MoveColumn(idx, -1)">↑</button>
                                             <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Down" disabled="@(idx == wizColumns.Count - 1)" @onclick="() => MoveColumn(idx, 1)">↓</button>
@@ -185,11 +219,32 @@
                 {
                     var cond = f;
                     <div class="d-flex gap-2 mb-2 align-items-center">
-                        <select class="form-select form-select-sm" style="max-width:220px;" @bind="cond.Column">
+                        <select class="form-select form-select-sm" style="max-width:260px;" @bind="cond.Column">
                             <option value="">— Field —</option>
-                            @foreach (var c in availableColumns)
+                            <optgroup label="@wizTable">
+                                @foreach (var c in availableColumns)
+                                {
+                                    <option value="@c.Name">@c.Name</option>
+                                }
+                            </optgroup>
+                            @{ var lookupOpts = LookupFields().ToList(); }
+                            @if (lookupOpts.Count > 0)
                             {
-                                <option value="@c.Name">@c.Name</option>
+                                <optgroup label="Lookups (display value)">
+                                    @foreach (var l in lookupOpts)
+                                    {
+                                        <option value="@l.Key">@l.Label</option>
+                                    }
+                                </optgroup>
+                            }
+                            @foreach (var g in relatedGroups)
+                            {
+                                <optgroup label="@g.Rel.Label → @g.Rel.RefTable">
+                                    @foreach (var c in g.Cols)
+                                    {
+                                        <option value="@ReportSchemaService.EncodeRelated(g.Rel.FkColumn, c.Name)">@g.Rel.Label.@c.Name</option>
+                                    }
+                                </optgroup>
                             }
                         </select>
                         <select class="form-select form-select-sm" style="max-width:170px;" @bind="cond.Operator">
@@ -405,6 +460,7 @@
     .di-rb-scroll { max-height: 300px; overflow-y: auto; }
     .di-rb-colrow { cursor: pointer; }
     .di-rb-colrow:hover { background: #f4f6fb; }
+    .di-rb-grouphdr { background: #eef2fb; color: #33477a; font-weight: 700; font-size: 12px; position: sticky; top: 0; }
 
     .di-rb-steps { display: flex; flex-wrap: wrap; gap: 8px; }
     .di-rb-step { display: flex; align-items: center; gap: 8px; border: 1px solid #dbe2ee; background: #fff; border-radius: 999px;
@@ -451,7 +507,28 @@
     private string wizTable = "";
     private string wizTableKey = "";          // "schema|table" for the dropdown
     private List<ReportColumn> availableColumns = [];
+    private List<(ReportRelation Rel, List<ReportColumn> Cols)> relatedGroups = [];
+    private Dictionary<string, string> lookupDisplayByFk = new(StringComparer.OrdinalIgnoreCase); // FK column -> display column
     private bool loadingCols;
+
+    // Column names (in priority order) used as the readable "display value" of a looked-up (FK) row.
+    private static readonly string[] DisplayColPrefs = ["DisplayName", "Name", "Title", "Label", "Code", "Description"];
+
+    private static string? DisplayColumnFor(List<ReportColumn> cols)
+    {
+        foreach (var pref in DisplayColPrefs)
+        {
+            var m = cols.FirstOrDefault(c => string.Equals(c.Name, pref, StringComparison.OrdinalIgnoreCase));
+            if (m is not null) { return m.Name; }
+        }
+        return cols.FirstOrDefault(c => c.DataType.Contains("char", StringComparison.OrdinalIgnoreCase))?.Name;
+    }
+
+    // The convenience "display value" lookup fields (one per FK that has a display column), e.g. Status, City.
+    private IEnumerable<(string Key, string Label)> LookupFields() =>
+        relatedGroups
+            .Where(g => lookupDisplayByFk.ContainsKey(g.Rel.FkColumn))
+            .Select(g => (ReportSchemaService.EncodeRelated(g.Rel.FkColumn, lookupDisplayByFk[g.Rel.FkColumn]), g.Rel.Label));
     private string colFilter = "";
     private List<string> wizColumns = [];
     private FilterMatch wizMatch = FilterMatch.And;
@@ -542,7 +619,7 @@
         wizSchema = def.SchemaName; wizTable = def.TableName; wizTableKey = $"{def.SchemaName}|{def.TableName}";
         wizName = def.Name; wizTitle = def.Title; wizFormat = def.Format;
         await OnTableChangedAsync();
-        wizColumns = def.GetColumns().Where(c => availableColumns.Any(a => a.Name == c)).ToList();
+        wizColumns = def.GetColumns().Where(IsFieldAvailable).ToList();
         var f = def.GetFilters();
         wizMatch = f.Match;
         wizFilters = f.Conditions.Select(c => new ReportFilterCondition { Column = c.Column, Operator = c.Operator, Value = c.Value }).ToList();
@@ -565,15 +642,59 @@
         var parts = (wizTableKey ?? "").Split('|', 2);
         wizSchema = parts.Length == 2 ? parts[0] : "dbo";
         wizTable = parts.Length == 2 ? parts[1] : "";
-        availableColumns = [];
+        availableColumns = []; relatedGroups = [];
         if (string.IsNullOrEmpty(wizTable)) { return; }
         loadingCols = true;
-        try { availableColumns = await SchemaService.GetColumnsAsync(wizSchema, wizTable); }
+        try
+        {
+            availableColumns = await SchemaService.GetColumnsAsync(wizSchema, wizTable);
+            // Related fields reachable via this table's foreign keys (applies to any table).
+            var groups = new List<(ReportRelation, List<ReportColumn>)>();
+            foreach (var rel in await SchemaService.GetRelationsAsync(wizSchema, wizTable))
+            {
+                var cols = await SchemaService.GetColumnsAsync(rel.RefSchema, rel.RefTable);
+                if (cols.Count > 0) { groups.Add((rel, cols)); }
+            }
+            relatedGroups = groups;
+            // Surface each FK's readable display value (e.g. Status, City) as a direct table field.
+            lookupDisplayByFk = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in relatedGroups)
+            {
+                var dc = DisplayColumnFor(g.Cols);
+                if (dc is not null) { lookupDisplayByFk[g.Rel.FkColumn] = dc; }
+            }
+        }
         catch (Exception ex) { stepError = "Could not read columns: " + ex.Message; }
         finally { loadingCols = false; }
-        // Drop any selected columns / filters that no longer exist.
-        wizColumns = wizColumns.Where(c => availableColumns.Any(a => a.Name == c)).ToList();
-        wizFilters = wizFilters.Where(f => availableColumns.Any(a => a.Name == f.Column)).ToList();
+        // Drop any selected fields / filters that no longer resolve against this source.
+        wizColumns = wizColumns.Where(IsFieldAvailable).ToList();
+        wizFilters = wizFilters.Where(f => string.IsNullOrEmpty(f.Column) || IsFieldAvailable(f.Column)).ToList();
+    }
+
+    private bool MatchesFilter(string text) =>
+        string.IsNullOrWhiteSpace(colFilter) || text.Contains(colFilter, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsFieldAvailable(string field)
+    {
+        if (ReportSchemaService.TryDecodeRelated(field, out var fk, out var refCol))
+        {
+            return relatedGroups.Any(g => string.Equals(g.Rel.FkColumn, fk, StringComparison.OrdinalIgnoreCase)
+                && g.Cols.Any(c => string.Equals(c.Name, refCol, StringComparison.OrdinalIgnoreCase)));
+        }
+        return availableColumns.Any(c => string.Equals(c.Name, field, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string FieldLabel(string field)
+    {
+        if (ReportSchemaService.TryDecodeRelated(field, out var fk, out var refCol))
+        {
+            var rel = relatedGroups.FirstOrDefault(g => string.Equals(g.Rel.FkColumn, fk, StringComparison.OrdinalIgnoreCase)).Rel;
+            if (rel is null) { return $"{fk}.{refCol}"; }
+            // The FK's display value is shown as just the relationship label (e.g. "Status"), not "Status.DisplayName".
+            return lookupDisplayByFk.TryGetValue(fk, out var dc) && string.Equals(dc, refCol, StringComparison.OrdinalIgnoreCase)
+                ? rel.Label : $"{rel.Label}.{refCol}";
+        }
+        return field;
     }
 
     private void ToggleColumn(string name)
