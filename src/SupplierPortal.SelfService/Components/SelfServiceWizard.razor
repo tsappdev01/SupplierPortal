@@ -26,16 +26,16 @@
     </div>
 
     <div class="di-stepper">
-        @for (var i = 0; i < visibleTabs.Count; i++)
+        @for (var i = 0; i < displayTabs.Count; i++)
         {
             var idx = i;
-            var tab = visibleTabs[idx];
+            var tab = displayTabs[idx];
             <button type="button" class="di-stepper-item @(currentIndex == idx ? "active" : "") reached"
                     @onclick="() => GoToIndex(idx)">
                 <span class="di-stepper-num">@(idx + 1)</span>
                 <span class="di-stepper-label">@tab.Title</span>
             </button>
-            @if (i < visibleTabs.Count - 1)
+            @if (i < displayTabs.Count - 1)
             {
                 <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
@@ -75,32 +75,34 @@
                 </div>
             }
 
-            @for (var i = 0; i < visibleTabs.Count; i++)
+            @for (var i = 0; i < displayTabs.Count; i++)
             {
                 var idx = i;
-                var tab = visibleTabs[idx];
+                var tab = displayTabs[idx];
                 <div class="di-section" style="display:@(currentIndex == idx ? "block" : "none")">
+                    @foreach (var step in tab.Steps)
+                    {
                     <div class="di-section-header">
-                        <span class="di-section-icon">@SectionIcon(tab.Step)</span>
+                        <span class="di-section-icon">@SectionIcon(step)</span>
                         <span class="di-section-heading">
-                            <span class="di-section-title">@tab.Title</span>
-                            <span class="di-section-desc">@SectionDesc(tab.Step)</span>
+                            <span class="di-section-title">@SectionTitle(step)</span>
+                            <span class="di-section-desc">@SectionDesc(step)</span>
                         </span>
                     </div>
                     <div class="di-section-body">
-                        @if (tab.Step == 1)
+                        @if (step == 1)
                         {
                             <div class="di-field">
                                 <label>Supplier Number</label>
                                 <input type="text" value="@(string.IsNullOrWhiteSpace(model.SupplierNumber) ? "System generated" : model.SupplierNumber)" disabled />
                             </div>
                         }
-                        @foreach (var key in KeysForStep(tab.Step))
+                        @foreach (var key in KeysForStep(step))
                         {
                             @fieldFragments[key]
                         }
 
-                        @if (tab.Step == 2)
+                        @if (step == 2)
                         {
                             <!-- Is the address above the same as on the Trade License and VAT Certificate?
                                  When "No", the supplier must give the alternate address per their VAT Certificate. -->
@@ -160,7 +162,7 @@
                             }
                         }
 
-                        @if (tab.Step == 1 && IsVatGroupSelected)
+                        @if (step == 1 && IsVatGroupSelected)
                         {
                             <div class="di-field di-full di-vatgroup">
                                 <div class="di-vatgroup-head">
@@ -221,11 +223,11 @@
                             </div>
                         }
 
-                        @if (tab.Step == 1)
+                        @if (step == 1)
                         {
                             <div class="di-documents-grid">
                                 @DocCard("Trade License", SelfServiceDocumentType.TradeLicense, "di-thumb-red", true, !HasTradeLicenseDocument(), "Required — attach the Trade License before submitting.")
-                                @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", false, false, "")
+                                @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", IsVatRegistered, RequiresVatCertificate(), "Required — attach the VAT Certificate because VAT Registered is set to Yes.")
                                 <div class="di-doccard">
                                     <div class="di-doccard-thumb di-thumb-amber">
                                         <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
@@ -261,13 +263,14 @@
                                 </div>
                             </div>
                         }
-                        @if (tab.Step == 5)
+                        @if (step == 5)
                         {
                             <div class="di-documents-grid">
                                 @DocCard("Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
                             </div>
                         }
                     </div>
+                    }
                 </div>
             }
 
@@ -276,7 +279,7 @@
                 {
                     <button class="di-btn di-btn-secondary" type="button" @onclick="Back" disabled="@isSaving">Back</button>
                 }
-                @if (currentIndex < visibleTabs.Count - 1)
+                @if (currentIndex < displayTabs.Count - 1)
                 {
                     <button class="di-btn di-btn-primary" type="button" @onclick="NextAsync" disabled="@isSaving">Next</button>
                 }
@@ -403,7 +406,14 @@
     private List<SupplierDocumentDto> documents = [];
 
     private List<TabSettingDto> visibleTabs = [];
+    // The tabs actually shown in the wizard. Address (step 2) and Contact Information (step 3) are merged
+    // into a single "Address & Contact Information" tab; every other visible step is its own tab.
+    private List<WizardTab> displayTabs = [];
+    private Dictionary<int, string> stepTitles = new();
     private Dictionary<string, RenderFragment> fieldFragments = new();
+
+    /// <summary>A wizard tab, carrying one or more underlying SETTINGS steps (the Address+Contact tab carries two).</summary>
+    private sealed record WizardTab(string Title, List<int> Steps);
 
     private HashSet<string> mandatoryKeys = [];
     private HashSet<string> hiddenKeys = [];
@@ -454,11 +464,55 @@
                 .ToList();
         }
 
+        stepTitles = visibleTabs
+            .GroupBy(t => t.Step)
+            .ToDictionary(g => g.Key, g => g.First().Title);
+        displayTabs = BuildDisplayTabs(visibleTabs);
+
         BuildFragments();
 
         originalBankId = model.BankId;
         originalAccountNumber = model.AccountNumber;
     }
+
+    // Merge the Address (step 2) and Contact Information (step 3) sections into one tab; keep every other
+    // visible step as its own tab, preserving the configured order.
+    private static List<WizardTab> BuildDisplayTabs(List<TabSettingDto> tabs)
+    {
+        var result = new List<WizardTab>();
+        WizardTab? addressContact = null;
+        foreach (var t in tabs)
+        {
+            if (t.Step is 2 or 3)
+            {
+                if (addressContact is null)
+                {
+                    addressContact = new WizardTab("Address & Contact Information", []);
+                    result.Add(addressContact);
+                }
+                addressContact.Steps.Add(t.Step);
+            }
+            else
+            {
+                result.Add(new WizardTab(t.Title, [t.Step]));
+            }
+        }
+        return result;
+    }
+
+    // The section heading for a step: the admin-configured tab title when present, else a sensible default.
+    private string SectionTitle(int step) =>
+        stepTitles.TryGetValue(step, out var t) && !string.IsNullOrWhiteSpace(t)
+            ? t
+            : step switch
+            {
+                1 => "Business / Organization",
+                2 => "Address",
+                3 => "Contact Information",
+                4 => "Site / Business Unit",
+                5 => "Payment / Banking",
+                _ => $"Section {step}"
+            };
 
     // Fields assigned to a step, in Sequence order, that are visible to the supplier and that this form
     // knows how to render (has a fragment for). Drives the exact set + order the admin configured.
@@ -508,7 +562,10 @@
         {
             builder.OpenElement(0, "span");
             builder.AddAttribute(1, "class", "di-req");
-            builder.AddContent(2, "*");
+            // Inline style: this span is built programmatically, so Blazor's scoped CSS (.di-req[b-..])
+            // does not target it — inline keeps the required asterisk visibly red.
+            builder.AddAttribute(2, "style", "color:#d64545;font-weight:700;margin-left:2px;");
+            builder.AddContent(3, "*");
             builder.CloseElement();
         }
     };
@@ -552,21 +609,26 @@
             "As per valid Trade License"),
     };
 
-    /// <summary>Renders a small "info" button next to a label when help text exists for that field.</summary>
+    /// <summary>Renders a small "info" icon next to a label when help text exists for that field. The icon
+    /// is a real image (/images/info-icon.svg) inside an inline-styled button — this fragment is built
+    /// programmatically, so Blazor's scoped CSS never targets it; an image + inline styles guarantee it
+    /// renders as a proper icon rather than an unstyled empty box.</summary>
     private RenderFragment Help(string fieldKey) => builder =>
     {
         if (!fieldHelp.ContainsKey(fieldKey)) { return; }
         builder.OpenElement(0, "button");
         builder.AddAttribute(1, "type", "button");
         builder.AddAttribute(2, "class", "di-help-btn");
-        builder.AddAttribute(3, "title", "What's this?");
-        builder.AddAttribute(4, "aria-label", "What's this?");
-        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create(this, () => ShowHelp(fieldKey)));
-        builder.AddEventStopPropagationAttribute(6, "onclick", true);
-        builder.AddEventPreventDefaultAttribute(7, "onclick", true);
-        builder.AddMarkupContent(8,
-            "<svg viewBox=\"0 0 16 16\" fill=\"currentColor\" aria-hidden=\"true\">" +
-            "<path d=\"M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z\"/></svg>");
+        builder.AddAttribute(3, "style",
+            "border:none;background:none;padding:0;margin:0 0 0 6px;cursor:pointer;line-height:0;vertical-align:-3px;");
+        builder.AddAttribute(4, "title", "What's this?");
+        builder.AddAttribute(5, "aria-label", "What's this?");
+        builder.AddAttribute(6, "onclick", EventCallback.Factory.Create(this, () => ShowHelp(fieldKey)));
+        builder.AddEventStopPropagationAttribute(7, "onclick", true);
+        builder.AddEventPreventDefaultAttribute(8, "onclick", true);
+        builder.AddMarkupContent(9,
+            "<img src=\"/images/info-icon.svg\" alt=\"Info\" width=\"16\" height=\"16\" " +
+            "style=\"display:block;width:16px;height:16px;\" />");
         builder.CloseElement();
     };
 
@@ -581,7 +643,19 @@
 
     private void OnBankChanged() => model.BankBranchId = null;
     private void Back() => currentIndex = Math.Max(0, currentIndex - 1);
-    private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, visibleTabs.Count - 1);
+    private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, displayTabs.Count - 1);
+
+    private bool HasVatCertificateDocument() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.VatCertification);
+    // When the supplier is VAT registered, a VAT Certificate document must be attached before submitting.
+    private bool RequiresVatCertificate() => IsVatRegistered && !HasVatCertificateDocument();
+
+    // Formats validation errors for a toast: a single message as-is, several as a readable bulleted list
+    // (rendered on separate lines by the toast's white-space:pre-line styling).
+    private static string FormatErrors(IEnumerable<string> errors)
+    {
+        var list = errors.ToList();
+        return list.Count <= 1 ? (list.FirstOrDefault() ?? "") : string.Join("\n", list.Select(e => "• " + e));
+    }
 
     // Fields only meaningful / required when the supplier is VAT registered (same rule as the internal form).
     private static readonly HashSet<string> VatDependentKeys =
@@ -621,10 +695,10 @@
         return d.Length == length && d.All(char.IsDigit);
     }
 
-    // Circular progress: position within the visible tabs (matches the internal supplier form).
+    // Circular progress: position within the displayed tabs (matches the internal supplier form).
     private int ProgressPct =>
-        visibleTabs.Count == 0 ? 0
-        : (int)Math.Round(Math.Clamp(currentIndex + 1, 1, visibleTabs.Count) / (double)visibleTabs.Count * 100);
+        displayTabs.Count == 0 ? 0
+        : (int)Math.Round(Math.Clamp(currentIndex + 1, 1, displayTabs.Count) / (double)displayTabs.Count * 100);
 
     // Per-step section description (mirrors the internal supplier form's di-section-desc text).
     private static string SectionDesc(int step) => step switch
@@ -758,10 +832,18 @@
 
     private async Task NextAsync()
     {
-        var step = visibleTabs[currentIndex].Step;
-        var errors = ValidateStep(step);
-        if (errors.Count > 0) { errorMessage = string.Join(" ", errors); return; }
-        if (step == 5 && RequiresBankConfirmationLetter())
+        // Validate every underlying step in the current tab (the Address+Contact tab carries two).
+        var tab = displayTabs[currentIndex];
+        var errors = tab.Steps.SelectMany(ValidateStep).ToList();
+        if (errors.Count > 0) { errorMessage = FormatErrors(errors); return; }
+
+        // Document requirements whose upload lives on a step within this tab.
+        if (tab.Steps.Contains(1) && RequiresVatCertificate())
+        {
+            errorMessage = "Please attach the VAT Certificate — it is required because VAT Registered is set to \"Yes\".";
+            return;
+        }
+        if (tab.Steps.Contains(5) && RequiresBankConfirmationLetter())
         {
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
@@ -769,33 +851,43 @@
         isSaving = true;
         try
         {
-            if (await PersistAsync()) { currentIndex = Math.Min(currentIndex + 1, visibleTabs.Count - 1); }
+            if (await PersistAsync()) { currentIndex = Math.Min(currentIndex + 1, displayTabs.Count - 1); }
         }
         finally { isSaving = false; }
     }
 
     private async Task SubmitAsync()
     {
-        var allErrors = visibleTabs.SelectMany(t => ValidateStep(t.Step)).ToList();
-        if (allErrors.Count > 0)
+        // Re-check every mandatory field across all tabs. Jump to the first tab that has errors and show
+        // just that tab's errors as a readable bulleted list.
+        for (var i = 0; i < displayTabs.Count; i++)
         {
-            for (var i = 0; i < visibleTabs.Count; i++)
+            var tabErrors = displayTabs[i].Steps.SelectMany(ValidateStep).ToList();
+            if (tabErrors.Count > 0)
             {
-                if (ValidateStep(visibleTabs[i].Step).Count > 0) { currentIndex = i; break; }
+                currentIndex = i;
+                errorMessage = "Please complete all required fields before submitting:\n"
+                    + string.Join("\n", tabErrors.Select(e => "• " + e));
+                return;
             }
-            errorMessage = "Complete all required fields before submitting: " + string.Join(" ", allErrors);
-            return;
         }
         if (!HasTradeLicenseDocument())
         {
-            var i = visibleTabs.FindIndex(t => t.Step == 1);
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(1));
             if (i >= 0) { currentIndex = i; }
             errorMessage = "A Trade License document must be attached before submitting.";
             return;
         }
+        if (RequiresVatCertificate())
+        {
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(1));
+            if (i >= 0) { currentIndex = i; }
+            errorMessage = "A VAT Certificate must be attached because VAT Registered is set to \"Yes\".";
+            return;
+        }
         if (RequiresBankConfirmationLetter())
         {
-            var i = visibleTabs.FindIndex(t => t.Step == 5);
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(5));
             if (i >= 0) { currentIndex = i; }
             errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
             return;
