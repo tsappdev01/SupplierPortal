@@ -837,7 +837,13 @@
         var errors = tab.Steps.SelectMany(ValidateStep).ToList();
         if (errors.Count > 0) { errorMessage = FormatErrors(errors); return; }
 
-        // Document requirements whose upload lives on a step within this tab.
+        // Document requirements whose upload lives on a step within this tab — enforced on Next (not only on
+        // Proceed) so the supplier can't move past the tab that carries a required, still-missing document.
+        if (tab.Steps.Contains(1) && !HasTradeLicenseDocument())
+        {
+            errorMessage = "Please attach the Trade License document before continuing.";
+            return;
+        }
         if (tab.Steps.Contains(1) && RequiresVatCertificate())
         {
             errorMessage = "Please attach the VAT Certificate — it is required because VAT Registered is set to \"Yes\".";
