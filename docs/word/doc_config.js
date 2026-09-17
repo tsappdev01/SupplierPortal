@@ -36,6 +36,7 @@ kids.push(cfg([
   ["Auth:Entra:ClientSecret","(secret)","App registration secret — Local.json / Key Vault only."],
   ["Auth:Entra:CallbackPath / SignedOutCallbackPath","/…/signin-oidc","OIDC redirect paths (must match the app registration)."],
   ["Auth:BootstrapAdminEmails","[]","E-mails provisioned as Administrator on first SSO login."],
+  ["Auth:AllowSelfRegistration","false","When false (the default) the public /account/register page is disabled and accounts are created by administrators. Closes the vector that let scanners create junk registrations."],
   ["Auth:DevBypassEnabled","false","Enables /account/dev-login (one-click admin). Impossible while SSO is the active mode; keep false in production."],
 ]));
 kids.push(h2("3.1 Active Directory (local/AD mode)"));
@@ -46,10 +47,14 @@ kids.push(cfg([
   ["ActiveDirectory:Domain / NetbiosName","domain.local / DIPARK","AD domain and NetBIOS name."],
   ["ActiveDirectory:LoginFormat","UPN","Bind format (UPN or DOMAIN\\login)."],
 ]));
-kids.push(h2("3.2 Break-glass"));
+kids.push(h2("3.2 Break-glass (emergency access)"));
+kids.push(para("Break-glass works only when BreakGlass:Enabled=true AND a secret has been configured. The emergency secret is set/rotated by an administrator inside the app (Settings > Break-Glass Access) and is stored only as a salted PBKDF2-SHA256 hash (~210,000 iterations) in a protected file — never in plaintext and never in the database.", { size: 18 }));
 kids.push(cfg([
-  ["BreakGlass:Enabled","false","Emergency Administrator access. Disabled unless a SHA-256 secret hash is configured."],
-  ["BreakGlass:SecretHash","(secret)","SHA-256 hash of the emergency secret (constant-time compared)."],
+  ["BreakGlass:Enabled","false","Deployment master switch for emergency Administrator access. Even when true, break-glass stays inactive until a secret has been configured in-app."],
+  ["BreakGlass:SecretStorePath","App_Data/break-glass-secret.json","Protected file holding the salted PBKDF2-SHA256 hash of the emergency secret. Must be writable/persisted; never committed and never in the database."],
+  ["BreakGlass:Iterations","210000","PBKDF2-SHA256 iteration count used to hash the emergency secret."],
+  ["BreakGlass:MinSecretLength","12","Minimum length enforced when an administrator sets the emergency secret."],
+  ["BreakGlass:SaltBase64","(optional)","Optional base64 salt override; a per-secret salt is generated when omitted."],
   ["BreakGlass:PrincipalName","Break-Glass Admin","Audit principal name."],
   ["BreakGlass:WindowMinutes","30","Grant lifetime."],
 ]));
@@ -93,7 +98,15 @@ kids.push(cfg([
   ["Email:Smtp:From / FromName","no-reply@… / Supplier Portal","Envelope sender address and display name."],
 ]));
 
-kids.push(h1("7. OCR (Azure Document Intelligence)"));
+kids.push(h1("7. Scheduled Reports"));
+kids.push(cfg([
+  ["Reports:SchedulerEnabled","true","Turns the background scheduled-report runner on/off."],
+  ["Reports:PollSeconds","60","How often (seconds) the runner checks for due schedules. Minimum 15."],
+  ["Reports:TimeZone","Asia/Dubai","Local time zone administrators enter/see schedule times in (IANA 'Asia/Dubai' or Windows 'Arabian Standard Time'); schedules are stored in UTC."],
+]));
+kids.push(para("Report e-mails are sent as PDF/Excel attachments, which require Microsoft Graph or SMTP email; SQL Server Database Mail cannot attach in-memory files.", { size: 18, color: g.colors.AMBER, bold: true }));
+
+kids.push(h1("8. OCR (Azure Document Intelligence)"));
 kids.push(cfg([
   ["Ocr:Provider","Azure","OCR provider."],
   ["Ocr:Endpoint","https://…cognitiveservices.azure.com","Document Intelligence endpoint."],
@@ -102,7 +115,7 @@ kids.push(cfg([
   ["Ocr:ApiVersion","2024-11-30","Service API version."],
 ]));
 
-kids.push(h1("8. Self-Service OAuth API (hosted in SupplierPortal.Web)"));
+kids.push(h1("9. Self-Service OAuth API (hosted in SupplierPortal.Web)"));
 kids.push(para("The self-service OAuth API (/connect/token + /api/selfservice/*) is hosted in-process by the main portal (SupplierPortal.Web); there is no separate SupplierPortal.Api app to deploy. Partner Connect points Api:BaseUrl at the main portal URL. The whole API is disabled until ApiSecurity:SigningKey is set — when it is blank the endpoints are not mapped and the portal is unchanged."));
 kids.push(cfg([
   ["ApiSecurity:SigningKey","(secret)","JWT signing key for portal/session tokens (>= 32 chars). Blank = the API is off. Supply via env var ApiSecurity__SigningKey / Key Vault."],
@@ -112,7 +125,7 @@ kids.push(cfg([
   ["SelfService:ApiKey","(secret)","Shared X-SelfService-Key accepted on /api/ss/* (must match the DMZ front-end)."],
 ]));
 
-kids.push(h1("9. General"));
+kids.push(h1("10. General"));
 kids.push(cfg([
   ["Logging:LogLevel:Default","Information","Default log level."],
   ["AllowedHosts","*","Host filtering."],
@@ -121,7 +134,7 @@ kids.push(cfg([
 ]));
 kids.push(para("Note: a valid production appsettings must not contain any secret values or stray keys; store all secrets in appsettings.Local.json, environment variables, or Azure Key Vault, and rotate any credential that has ever been committed.", { size: 18, color: g.colors.AMBER, bold: true }));
 
-kids.push(h1("10. Environment Provisioning Steps"));
+kids.push(h1("11. Environment Provisioning Steps"));
 kids.push(para("The production environment (Dubai Investments) is provisioned as below. Identifiers (app/client, object and tenant ids, endpoints, host names) are recorded for reference; all secret values — passwords and client secrets — are stored only in Azure Key Vault / environment variables and are shown here as '(secret)'.", { size: 18 }));
 kids.push(para("Never commit the secret values; supply them at deploy time via the environment-variable names given below or a Key Vault reference, and rotate any credential that has ever been shared or committed.", { size: 18, color: g.colors.AMBER, bold: true }));
 

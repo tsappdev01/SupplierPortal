@@ -74,18 +74,25 @@ kids.push(table(["App Setting", "Value"],
   ["Email__Smtp__Host / __User / __Password / __From","(SMTP relay values — only if not using Graph)"],
   ["Auth__Mode","Sso (or local)"],
   ["Auth__Entra__TenantId / __ClientId / __ClientSecret","(Entra values)"],
+  ["Auth__AllowSelfRegistration","false (default — keeps the public /account/register page disabled; accounts are created by administrators)"],
   ["Ocr__Endpoint / Ocr__ApiKey","(Document Intelligence)"],
+  ["Reports__SchedulerEnabled","true (run scheduled reports); optional Reports__PollSeconds (default 60, min 15) and Reports__TimeZone (default Asia/Dubai)"],
+  ["BreakGlass__Enabled","true to allow emergency access (secret is set in-app; App_Data must be writable/persisted)"],
   ["Deployment__Mode","Internal (or Dmz for the public front-end)"],
   ["SelfService__PortalUrl / __InternalUrl","(public / internal base URLs)"],
   ["ASPNETCORE_FORWARDEDHEADERS_ENABLED","true (so client IPs are seen behind the proxy — needed for per-IP rate limiting)"]],
  [4200, 5300]));
 kids.push(para("Data-Protection keys: on App Service, persist keys to Azure Blob + protect with Key Vault (or use a mounted share) so auth cookies survive restarts and scale-out. Enable 'Always On' and HTTPS-only.", { size: 18, color: g.colors.GREY }));
+kids.push(para("Public registration: leave Auth__AllowSelfRegistration=false (the default) so the public /account/register page stays disabled and accounts are created by administrators.", { size: 18, color: g.colors.GREY }));
+kids.push(para("Scheduled reports: set Reports__SchedulerEnabled=true (optionally Reports__PollSeconds and Reports__TimeZone). Report e-mails are sent as PDF/Excel attachments, so Microsoft Graph or SMTP must be configured — SQL Server Database Mail cannot send attachments, so report deliveries would fail on it.", { size: 18, color: g.colors.GREY }));
+kids.push(para("Break-glass: set BreakGlass__Enabled=true to allow emergency access; the secret is set by an administrator in-app (Settings > Break-Glass Access) and persists as a salted PBKDF2-SHA256 hash in the App_Data secret file (ensure App_Data is writable/persisted). Never store the secret as plaintext or in the database.", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("6. Database Migration"));
 kids.push(para("Apply EF Core migrations before first use (run from CI with the app user granted db_ddladmin, or generate an idempotent SQL script and run it against Azure SQL):"));
 kids.push(code("dotnet ef database update --project src/SupplierPortal.Web --context ApplicationDbContext"));
 kids.push(code("# or: dotnet ef migrations script --idempotent -o migrate.sql   (then run in Azure SQL)"));
 kids.push(para("In Internal mode the app seeds master data at startup; ensure the runtime user has the needed rights, or pre-apply the scripts and grant only datareader/datawriter at runtime.", { size: 18, color: g.colors.GREY }));
+kids.push(para("New tables added by recent migrations (NotificationGroups, NotificationGroupUsers, ScheduledReports) are applied automatically by the app's EF Core MigrateAsync on startup — no manual step is required (grant the runtime user db_ddladmin, or pre-apply the idempotent script above).", { size: 18, color: g.colors.GREY }));
 
 kids.push(h1("7. DMZ Topology on Azure"));
 kids.push(bullet("Internal tier (SupplierPortal.Web/Api): VNet-integrated, private endpoint or IP-restricted so only the DMZ front-end (and internal users) can reach it. Expose only /api/ss/* (shared-key seam) or /connect/token + /api/selfservice/* (OAuth seam)."));
@@ -103,6 +110,8 @@ kids.push(h1("9. Operations"));
 kids.push(bullet("Scaling: App Service can scale out; ensure Data-Protection keys are shared (Blob/Key Vault) and forwarded headers are enabled for correct client-IP rate limiting."));
 kids.push(bullet("Backups: enable Azure SQL automated backups / PITR; storage account soft-delete for blobs."));
 kids.push(bullet("Secrets: rotate SQL, Graph/SMTP, OCR, Entra and API signing secrets periodically; never commit them. Prefer a certificate over a client secret for the Graph mailing app."));
+kids.push(bullet("Break-glass: keep BreakGlass__Enabled aligned with policy; the emergency secret is managed in-app (Settings > Break-Glass Access) and stored as a salted PBKDF2-SHA256 hash in the App_Data secret file — ensure that path stays writable and persisted across restarts and scale-out, and never place the secret in plaintext or the database."));
+kids.push(bullet("Scheduled reports: report attachments (PDF/Excel) require Microsoft Graph or SMTP; monitor delivery and confirm Reports__SchedulerEnabled/PollSeconds match the intended cadence."));
 kids.push(bullet("Monitoring: alert on 5xx rate, failed logins, and SQL DTU/throttling; both DbContexts already retry transient faults."));
 
 write(buildDoc({ title: "Supplier Portal — Azure Deployment Guide", children: kids }), "/home/user/SupplierPortal/docs/word/Supplier Portal - Deployment Guide on Azure.docx");
