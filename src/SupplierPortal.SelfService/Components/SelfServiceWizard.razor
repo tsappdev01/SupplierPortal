@@ -676,9 +676,14 @@
         try
         {
             var submit = await Api.SubmitAsync(SessionToken, request);
-            if (!submit.Success) { errorMessage = submit.Error ?? "Could not submit."; return; }
+            if (!submit.Success) { errorMessage = submit.Error ?? "Could not submit. Please try again."; return; }
             showDeclaration = false;
             submitted = true;
+        }
+        catch (Exception)
+        {
+            // Never leave the button silently dead — always tell the supplier what to do next.
+            errorMessage = "Could not submit your details. Please check your connection and try again.";
         }
         finally { isSaving = false; }
     }

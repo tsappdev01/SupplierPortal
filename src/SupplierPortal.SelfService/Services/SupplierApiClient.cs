@@ -166,13 +166,23 @@ public class SupplierApiClient(
 
     public async Task<SubmitResponse> SubmitAsync(string sessionToken, SubmitRequest declaration)
     {
-        var http = await AuthedClientAsync(sessionToken);
-        var res = await http.PostAsJsonAsync("/api/selfservice/submit", declaration);
-        if (!res.IsSuccessStatusCode)
+        try
         {
-            return new SubmitResponse { Success = false, Error = "Could not submit. Please try again." };
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.PostAsJsonAsync("/api/selfservice/submit", declaration);
+            if (!res.IsSuccessStatusCode)
+            {
+                return new SubmitResponse { Success = false, Error = "Could not submit. Please try again." };
+            }
+            return await res.Content.ReadFromJsonAsync<SubmitResponse>()
+                   ?? new SubmitResponse { Success = false, Error = "Unexpected response." };
         }
-        return await res.Content.ReadFromJsonAsync<SubmitResponse>()
-               ?? new SubmitResponse { Success = false, Error = "Unexpected response." };
+        catch (Exception ex)
+        {
+            // Network error, timeout, or a dropped session — surface a friendly message instead of letting
+            // the exception bubble up and leave the Submit button silently dead.
+            logger.LogError(ex, "Submit failed");
+            return new SubmitResponse { Success = false, Error = "Could not submit. Please check your connection and try again." };
+        }
     }
 }
