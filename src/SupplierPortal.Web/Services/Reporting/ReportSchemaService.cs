@@ -20,6 +20,10 @@ public record ReportRelation(string FkColumn, string RefSchema, string RefTable,
 
 public record ReportData(List<string> Headers, List<string[]> Rows, bool Truncated);
 
+/// <summary>A report source loaded for the builder: the base table's columns plus each FK relationship
+/// with the related table's columns.</summary>
+public record ReportSource(List<ReportColumn> Columns, List<(ReportRelation Rel, List<ReportColumn> Cols)> Related);
+
 /// <summary>Read-only database metadata browser and safe query executor for the Report Builder. Administrators
 /// pick a table/view plus (optionally) columns reached through its foreign keys; every table, view, column and
 /// relationship is re-validated against live metadata, identifiers are taken only from that metadata and
@@ -34,6 +38,7 @@ public class ReportSchemaService(IDbContextFactory<ApplicationDbContext> dbFacto
     private const int MaxColumns = 60;
     private const int DefaultMaxRows = 5000;
     private const int HardMaxRows = 20000;
+    private const int MetaTimeoutSeconds = 90;  // metadata queries can be slow on a loaded/serverless DB
 
     private static readonly HashSet<string> BlockedSchemas =
         new(StringComparer.OrdinalIgnoreCase) { "sys", "INFORMATION_SCHEMA", "guest" };
@@ -65,6 +70,7 @@ public class ReportSchemaService(IDbContextFactory<ApplicationDbContext> dbFacto
         var conn = db.Database.GetDbConnection();
         await OpenAsync(conn, ct);
         await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = MetaTimeoutSeconds;
         cmd.CommandText =
             "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES " +
             "WHERE TABLE_TYPE IN ('BASE TABLE','VIEW') ORDER BY TABLE_SCHEMA, TABLE_NAME";
@@ -93,6 +99,7 @@ public class ReportSchemaService(IDbContextFactory<ApplicationDbContext> dbFacto
     {
         if (BlockedSchemas.Contains(schema) || BlockedTables.Contains(table)) { return []; }
         await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = MetaTimeoutSeconds;
         cmd.CommandText =
             "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
             "WHERE TABLE_SCHEMA = @s AND TABLE_NAME = @t ORDER BY ORDINAL_POSITION";
@@ -111,6 +118,71 @@ public class ReportSchemaService(IDbContextFactory<ApplicationDbContext> dbFacto
         return cols;
     }
 
+    private static bool IsSelectable(string columnName, string dataType) =>
+        !BinaryTypes.Contains(dataType)
+        && !SensitiveColumnMarkers.Any(m => columnName.Contains(m, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Fetches selectable columns for several tables in ONE query (avoids a round-trip per table).
+    /// Returns a map keyed "schema|table" (case-insensitive).</summary>
+    private static async Task<Dictionary<string, List<ReportColumn>>> FetchColumnsForTablesAsync(
+        DbConnection conn, IReadOnlyList<(string Schema, string Table)> pairs, CancellationToken ct)
+    {
+        var result = new Dictionary<string, List<ReportColumn>>(StringComparer.OrdinalIgnoreCase);
+        var distinct = pairs
+            .Where(p => !BlockedSchemas.Contains(p.Schema) && !BlockedTables.Contains(p.Table))
+            .Select(p => (p.Schema, p.Table))
+            .Distinct()
+            .ToList();
+        if (distinct.Count == 0) { return result; }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = MetaTimeoutSeconds;
+        var ors = new List<string>();
+        for (var i = 0; i < distinct.Count; i++)
+        {
+            ors.Add($"(TABLE_SCHEMA = @s{i} AND TABLE_NAME = @t{i})");
+            AddParam(cmd, $"@s{i}", distinct[i].Schema);
+            AddParam(cmd, $"@t{i}", distinct[i].Table);
+        }
+        cmd.CommandText =
+            "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE " + string.Join(" OR ", ors) + " ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION";
+
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct))
+        {
+            var schema = r.GetString(0);
+            var table = r.GetString(1);
+            var name = r.GetString(2);
+            var type = r.GetString(3);
+            if (!IsSelectable(name, type)) { continue; }
+            var key = $"{schema}|{table}";
+            (result.TryGetValue(key, out var list) ? list : result[key] = []).Add(new ReportColumn(name, type));
+        }
+        return result;
+    }
+
+    /// <summary>Loads everything the Report Builder needs for a source in as few round-trips as possible:
+    /// the base table's columns, its FK relations, and every related table's columns — batched.</summary>
+    public async Task<ReportSource> GetSourceAsync(string schema, string table, CancellationToken ct = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var conn = db.Database.GetDbConnection();
+        await OpenAsync(conn, ct);
+
+        var relations = await GetRelationsAsync(conn, schema, table, ct);
+        var pairs = new List<(string, string)> { (schema, table) };
+        pairs.AddRange(relations.Select(rel => (rel.RefSchema, rel.RefTable)));
+        var cols = await FetchColumnsForTablesAsync(conn, pairs, ct);
+
+        var baseCols = cols.TryGetValue($"{schema}|{table}", out var bc) ? bc : [];
+        var related = relations
+            .Select(rel => (Rel: rel, Cols: cols.TryGetValue($"{rel.RefSchema}|{rel.RefTable}", out var rc) ? rc : []))
+            .Where(x => x.Cols.Count > 0)
+            .ToList();
+        return new ReportSource(baseCols, related);
+    }
+
     /// <summary>The single-column foreign-key relationships from a base table to other tables (empty for views).</summary>
     public async Task<List<ReportRelation>> GetRelationsAsync(string schema, string table, CancellationToken ct = default)
     {
@@ -124,6 +196,7 @@ public class ReportSchemaService(IDbContextFactory<ApplicationDbContext> dbFacto
     {
         if (BlockedSchemas.Contains(schema) || BlockedTables.Contains(table)) { return []; }
         await using var cmd = conn.CreateCommand();
+        cmd.CommandTimeout = MetaTimeoutSeconds;
         // One row per FK column; multi-column FKs are grouped out afterwards (only single-column FKs are used).
         cmd.CommandText = @"
 SELECT fk.name AS FkName, pc.name AS FkColumn, rs.name AS RefSchema, rt.name AS RefTable, rc.name AS RefColumn
@@ -296,14 +369,20 @@ ORDER BY fk.name";
 
     private static async Task<FieldResolver> BuildResolverAsync(DbConnection conn, string schema, string table, CancellationToken ct)
     {
-        var baseCols = (await GetColumnsAsync(conn, schema, table, ct))
+        var relationList = await GetRelationsAsync(conn, schema, table, ct);
+        var relations = relationList.ToDictionary(r => r.FkColumn, r => r, StringComparer.OrdinalIgnoreCase);
+
+        // Fetch base + all referenced tables' columns in a single query.
+        var pairs = new List<(string, string)> { (schema, table) };
+        pairs.AddRange(relationList.Select(rel => (rel.RefSchema, rel.RefTable)));
+        var colsByTable = await FetchColumnsForTablesAsync(conn, pairs, ct);
+
+        var baseCols = (colsByTable.TryGetValue($"{schema}|{table}", out var bc) ? bc : [])
             .ToDictionary(c => c.Name, c => c.DataType, StringComparer.OrdinalIgnoreCase);
-        var relations = (await GetRelationsAsync(conn, schema, table, ct))
-            .ToDictionary(r => r.FkColumn, r => r, StringComparer.OrdinalIgnoreCase);
         var refCols = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var rel in relations.Values)
         {
-            refCols[rel.FkColumn] = (await GetColumnsAsync(conn, rel.RefSchema, rel.RefTable, ct))
+            refCols[rel.FkColumn] = (colsByTable.TryGetValue($"{rel.RefSchema}|{rel.RefTable}", out var rc) ? rc : [])
                 .ToDictionary(c => c.Name, c => c.DataType, StringComparer.OrdinalIgnoreCase);
         }
         return new FieldResolver { BaseColumns = baseCols, Relations = relations, RefColumns = refCols };
