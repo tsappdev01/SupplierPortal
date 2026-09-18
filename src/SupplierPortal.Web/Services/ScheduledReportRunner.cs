@@ -29,6 +29,14 @@ public class ScheduledReportRunner(
         try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); }
         catch (OperationCanceledException) { return; }
 
+        // Warm the report metadata catalog so the first admin who opens the Report Builder gets it cached.
+        try
+        {
+            using var warmScope = services.CreateScope();
+            await warmScope.ServiceProvider.GetRequiredService<ReportSchemaService>().GetCatalogAsync(stoppingToken);
+        }
+        catch (Exception ex) { logger.LogWarning(ex, "Report catalog warm-up failed (will load on demand)."); }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
