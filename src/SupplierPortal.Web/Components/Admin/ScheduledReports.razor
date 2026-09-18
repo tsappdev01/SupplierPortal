@@ -378,76 +378,168 @@
     </div>
 }
 
-<div class="di-sr-table-wrap mt-3">
-    <table class="table align-middle di-sr-table mb-0">
-        <thead>
-            <tr>
-                <th>Report</th>
-                <th>Recipients (group)</th>
-                <th>Format</th>
-                <th>Frequency</th>
-                <th>Next Run</th>
-                <th>Last Run</th>
-                <th class="text-center" style="width: 100px;">Enabled</th>
-                <th class="text-end" style="width: 210px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var r in reports)
+@if (!building)
+{
+    @* ===== Toolbar: search + filters ===== *@
+    <div class="di-sr-toolbar mt-3">
+        <div class="di-sr-search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" /></svg>
+            <input type="text" placeholder="Search reports or groups…" @bind="search" @bind:event="oninput" />
+        </div>
+        <select class="form-select form-select-sm di-sr-filter" @bind="statusFilter">
+            <option value="">All statuses</option>
+            <option value="Sent">Sent</option>
+            <option value="Partial">Partial</option>
+            <option value="Skipped">Skipped</option>
+            <option value="Failed">Failed</option>
+            <option value="Never">Never run</option>
+        </select>
+        <select class="form-select form-select-sm di-sr-filter" @bind="freqFilter">
+            <option value="">All frequencies</option>
+            @foreach (var f in Enum.GetValues<ReportFrequency>())
             {
-                <tr class="@(r.IsActive ? null : "di-sr-inactive")">
-                    <td class="fw-semibold">@r.Name</td>
-                    <td>
-                        @if (r.NotificationGroup is { } g)
-                        {
-                            <span class="fw-semibold">@g.Name</span>
-                            @if (!g.IsActive)
-                            {
-                                <span class="badge rounded-pill text-bg-danger ms-1">group disabled</span>
-                            }
-                        }
-                        else { <span class="text-muted small">—</span> }
-                    </td>
-                    <td><span class="badge rounded-pill text-bg-light border">@FormatLabel(r.Format)</span></td>
-                    <td>@r.Frequency</td>
-                    <td class="small">@ReportTimeZone.ToLocal(r.NextRunUtc).ToString("dd MMM yyyy HH:mm")</td>
-                    <td class="small">
-                        @if (r.LastRunUtc is null)
-                        {
-                            <span class="text-muted">Never</span>
-                        }
-                        else
-                        {
-                            <div>
-                                <span class="badge rounded-pill @LastRunClass(r.LastRunStatus)">@r.LastRunStatus</span>
-                                <span class="text-muted">@ReportTimeZone.ToLocal(r.LastRunUtc.Value).ToString("dd MMM HH:mm")</span>
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(r.LastRunDetail))
-                            {
-                                <div class="text-muted" style="max-width: 300px;">@r.LastRunDetail</div>
-                            }
-                        }
-                    </td>
-                    <td class="text-center">
-                        <label class="di-switch" title="@(r.IsActive ? "Enabled — click to disable" : "Disabled — click to enable")">
-                            <input type="checkbox" checked="@r.IsActive" @onchange="e => ToggleActiveAsync(r, (bool)e.Value!)" />
-                            <span class="di-switch-slider"></span>
-                        </label>
-                    </td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-success" title="Run now" @onclick="() => RunNowAsync(r)">Run now</button>
-                        <button class="btn btn-sm btn-outline-primary ms-1" @onclick="() => StartEditAsync(r)">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteAsync(r)">Delete</button>
-                    </td>
+                <option value="@f">@f</option>
+            }
+        </select>
+    </div>
+
+    @* ===== Bulk action bar ===== *@
+    @if (selectedIds.Count > 0)
+    {
+        <div class="di-sr-bulk">
+            <span class="fw-semibold">@selectedIds.Count selected</span>
+            <button class="btn btn-sm btn-light" @onclick="() => BulkSetActiveAsync(true)">Enable</button>
+            <button class="btn btn-sm btn-light" @onclick="() => BulkSetActiveAsync(false)">Disable</button>
+            <button class="btn btn-sm btn-light" @onclick="BulkRunAsync">Run now</button>
+            <button class="btn btn-sm btn-link ms-auto text-white" @onclick="ClearSelection">Clear</button>
+        </div>
+    }
+
+    <div class="di-sr-table-wrap mt-2">
+        <table class="table align-middle di-sr-table mb-0">
+            <thead>
+                <tr>
+                    <th style="width:38px;"><input type="checkbox" checked="@AllVisibleSelected" @onchange="ToggleSelectAll" /></th>
+                    <th style="width:28px;"></th>
+                    <th>Report</th>
+                    <th>Recipients</th>
+                    <th>Format</th>
+                    <th>Frequency</th>
+                    <th>Next Run</th>
+                    <th>Last Run</th>
+                    <th class="text-center" style="width: 90px;">Enabled</th>
+                    <th class="text-end" style="width: 140px;">Actions</th>
                 </tr>
-            }
-            @if (reports.Count == 0)
-            {
-                <tr><td colspan="8" class="text-center text-muted py-4"><em>No scheduled reports yet. Use "New Report" to build one.</em></td></tr>
-            }
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                @foreach (var r in FilteredReports)
+                {
+                    var rid = r.Id;
+                    <tr class="@(r.IsActive ? null : "di-sr-inactive") @(selectedIds.Contains(rid) ? "di-sr-selected" : null)">
+                        <td><input type="checkbox" checked="@selectedIds.Contains(rid)" @onchange="() => ToggleSelect(rid)" /></td>
+                        <td>
+                            <button type="button" class="di-sr-expand @(expandedId == rid ? "open" : "")" title="Run history" @onclick="() => ToggleExpandAsync(rid)">▸</button>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">@r.Name</div>
+                            <div class="text-muted small">@(r.ReportDefinition is { } d ? $"from {d.SchemaName}.{d.TableName}" : "supplier export")</div>
+                        </td>
+                        <td>
+                            @if (r.NotificationGroup is { } g)
+                            {
+                                <span class="fw-semibold">@g.Name</span>
+                                @if (!g.IsActive)
+                                {
+                                    <span class="badge rounded-pill text-bg-danger ms-1">group disabled</span>
+                                }
+                            }
+                            else { <span class="text-muted small">—</span> }
+                        </td>
+                        <td><span class="badge rounded-pill text-bg-light border">@FormatLabel(r.Format)</span></td>
+                        <td>@r.Frequency</td>
+                        <td class="small">@ReportTimeZone.ToLocal(r.NextRunUtc).ToString("dd MMM yyyy HH:mm")</td>
+                        <td class="small">
+                            @if (r.LastRunUtc is null)
+                            {
+                                <span class="badge rounded-pill text-bg-light border">Never</span>
+                            }
+                            else
+                            {
+                                <div><span class="badge rounded-pill @LastRunClass(r.LastRunStatus)">@r.LastRunStatus</span></div>
+                                <span class="text-muted">@ReportTimeZone.ToLocal(r.LastRunUtc.Value).ToString("dd MMM HH:mm")</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            <label class="di-switch" title="@(r.IsActive ? "Enabled — click to disable" : "Disabled — click to enable")">
+                                <input type="checkbox" checked="@r.IsActive" @onchange="e => ToggleActiveAsync(r, (bool)e.Value!)" />
+                                <span class="di-switch-slider"></span>
+                            </label>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-1">
+                                <button class="btn btn-sm btn-outline-success di-sr-run" title="Run now" @onclick="() => RunNowAsync(r)">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11a.5.5 0 0 0 .77.42l8.5-5.5a.5.5 0 0 0 0-.84l-8.5-5.5A.5.5 0 0 0 4 2.5z"/></svg>
+                                    Run
+                                </button>
+                                <div class="di-menu">
+                                    <button class="di-menu-btn" title="More actions" @onclick="() => ToggleMenu(rid)">⋯</button>
+                                    @if (openMenuId == rid)
+                                    {
+                                        <div class="di-menu-pop" @onclick:stopPropagation="true">
+                                            <button @onclick="() => StartEditAsync(r)">Edit</button>
+                                            <button @onclick="() => DuplicateAsync(r)">Duplicate</button>
+                                            <a href="/admin/reports/@rid/preview?format=pdf" target="_blank" rel="noopener" @onclick="CloseMenu">Preview PDF</a>
+                                            <a href="/admin/reports/@rid/preview?format=xlsx" target="_blank" rel="noopener" @onclick="CloseMenu">Preview Excel</a>
+                                            <div class="di-menu-sep"></div>
+                                            <button class="di-menu-danger" @onclick="() => DeleteAsync(r)">Delete</button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    @if (expandedId == rid)
+                    {
+                        <tr class="di-sr-historyrow">
+                            <td colspan="10">
+                                <div class="di-timeline">
+                                    <div class="di-timeline-title">Run history</div>
+                                    @if (expandedRuns.Count == 0)
+                                    {
+                                        <div class="text-muted small">No runs recorded yet — use <strong>Run</strong> to send it now.</div>
+                                    }
+                                    @foreach (var run in expandedRuns)
+                                    {
+                                        <div class="di-tl-item">
+                                            <span class="di-tl-dot" style="background:@RunColor(run.Status)"></span>
+                                            <div class="di-tl-body">
+                                                <span class="badge rounded-pill @LastRunClass(run.Status)">@run.Status</span>
+                                                <span class="text-muted small ms-1">@ReportTimeZone.ToLocal(run.RunAtUtc).ToString("dd MMM yyyy HH:mm")</span>
+                                                @if (!string.IsNullOrWhiteSpace(run.Detail))
+                                                {
+                                                    <div class="text-muted small">@run.Detail</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (FilteredReports.Count == 0)
+                {
+                    <tr><td colspan="10" class="text-center text-muted py-4"><em>@(reports.Count == 0 ? "No scheduled reports yet. Use \"New Report\" to build one." : "No reports match your search / filters.")</em></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (openMenuId is not null)
+    {
+        <div class="di-menu-backdrop" @onclick="CloseMenu"></div>
+    }
+}
 
 <style>
     .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
@@ -456,6 +548,47 @@
     .di-sr-table tbody tr { border-bottom: 1px solid #eef1f5; }
     .di-sr-table tbody tr:last-child { border-bottom: none; }
     .di-sr-inactive td { opacity: .55; }
+    .di-sr-selected td { background: #eef4ff !important; }
+
+    /* Toolbar */
+    .di-sr-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .di-sr-search { position: relative; flex: 1 1 280px; max-width: 460px; }
+    .di-sr-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .di-sr-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #d9e0ec; border-radius: 10px; font-size: 14px; background: #fff; }
+    .di-sr-search input:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px rgba(59,91,219,.12); }
+    .di-sr-filter { max-width: 190px; border-radius: 10px; }
+
+    /* Bulk bar */
+    .di-sr-bulk { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 14px; border-radius: 10px;
+        background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff; box-shadow: 0 4px 14px rgba(11,37,69,.22); }
+
+    /* Expand + run-history timeline */
+    .di-sr-expand { border: none; background: none; cursor: pointer; color: #64748b; font-size: 13px; line-height: 1;
+        transition: transform .15s ease; padding: 4px; }
+    .di-sr-expand.open { transform: rotate(90deg); color: #3b5bdb; }
+    .di-sr-historyrow td { background: #f8fafc; padding: 0 !important; }
+    .di-timeline { padding: 14px 22px 16px 46px; }
+    .di-timeline-title { font-weight: 700; color: #33477a; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
+    .di-tl-item { position: relative; padding: 0 0 12px 20px; border-left: 2px solid #e2e8f0; }
+    .di-tl-item:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .di-tl-dot { position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #e2e8f0; }
+
+    /* Run button */
+    .di-sr-run { display: inline-flex; align-items: center; gap: 4px; }
+
+    /* Row actions "…" menu */
+    .di-menu { position: relative; display: inline-block; }
+    .di-menu-btn { border: 1px solid #d9e0ec; background: #fff; border-radius: 8px; width: 30px; height: 30px; cursor: pointer;
+        color: #475569; font-size: 16px; line-height: 1; }
+    .di-menu-btn:hover { background: #f1f5f9; }
+    .di-menu-pop { position: absolute; right: 0; top: 34px; z-index: 30; min-width: 168px; background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 10px; box-shadow: 0 12px 30px rgba(15,23,42,.18); padding: 6px; text-align: left; }
+    .di-menu-pop button, .di-menu-pop a { display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+        border-radius: 7px; font-size: 13.5px; color: #1e293b; cursor: pointer; text-decoration: none; }
+    .di-menu-pop button:hover, .di-menu-pop a:hover { background: #f1f5f9; }
+    .di-menu-danger { color: #b42318 !important; }
+    .di-menu-sep { height: 1px; background: #eef1f5; margin: 4px 2px; }
+    .di-menu-backdrop { position: fixed; inset: 0; z-index: 20; background: transparent; }
     .di-rb-card { border: 1px solid #e2e5ea; border-radius: 12px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
     .di-rb-scroll { max-height: 300px; overflow-y: auto; }
     .di-rb-colrow { cursor: pointer; }
@@ -493,6 +626,80 @@
     private string currentUser = "unknown";
     private string? error;
     private string? message;
+
+    // List view: search / filter / bulk / expand / row menu
+    private string search = "";
+    private string statusFilter = "";
+    private string freqFilter = "";
+    private HashSet<int> selectedIds = [];
+    private int? openMenuId;
+    private int? expandedId;
+    private List<ScheduledReportRun> expandedRuns = [];
+
+    private List<ScheduledReport> FilteredReports => reports.Where(r =>
+        (string.IsNullOrWhiteSpace(search)
+            || r.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (r.NotificationGroup?.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        && (string.IsNullOrWhiteSpace(statusFilter)
+            || (statusFilter == "Never" ? r.LastRunUtc is null
+                : string.Equals(r.LastRunStatus, statusFilter, StringComparison.OrdinalIgnoreCase)))
+        && (string.IsNullOrWhiteSpace(freqFilter) || r.Frequency.ToString() == freqFilter)
+    ).ToList();
+
+    private bool AllVisibleSelected
+    {
+        get { var f = FilteredReports; return f.Count > 0 && f.All(r => selectedIds.Contains(r.Id)); }
+    }
+
+    private void ToggleSelect(int id) { if (!selectedIds.Remove(id)) { selectedIds.Add(id); } }
+    private void ToggleSelectAll()
+    {
+        var f = FilteredReports;
+        if (AllVisibleSelected) { foreach (var r in f) { selectedIds.Remove(r.Id); } }
+        else { foreach (var r in f) { selectedIds.Add(r.Id); } }
+    }
+    private void ClearSelection() => selectedIds.Clear();
+    private void ToggleMenu(int id) => openMenuId = openMenuId == id ? null : id;
+    private void CloseMenu() => openMenuId = null;
+
+    private async Task ToggleExpandAsync(int id)
+    {
+        if (expandedId == id) { expandedId = null; expandedRuns = []; return; }
+        expandedId = id;
+        expandedRuns = await ReportService.GetRunsAsync(id);
+    }
+
+    private static string RunColor(string? status) => status switch
+    {
+        "Sent" => "#1e7d52", "Partial" => "#b7791f", "Skipped" => "#6b7280", "Failed" => "#b42318", _ => "#94a3b8"
+    };
+
+    private async Task BulkSetActiveAsync(bool active)
+    {
+        error = message = null; CloseMenu();
+        var n = await ReportService.SetActiveManyAsync(selectedIds, active, currentUser);
+        ClearSelection();
+        await ReloadAsync();
+        message = $"{n} schedule(s) {(active ? "enabled" : "disabled")}.";
+    }
+
+    private async Task BulkRunAsync()
+    {
+        error = message = null; CloseMenu();
+        var n = await ReportService.TriggerManyAsync(selectedIds, currentUser);
+        ClearSelection();
+        await ReloadAsync();
+        message = $"{n} schedule(s) queued to run — they will be sent within a minute.";
+    }
+
+    private async Task DuplicateAsync(ScheduledReport r)
+    {
+        error = message = null; CloseMenu();
+        var (ok, err, _) = await ReportService.DuplicateAsync(r.Id, currentUser);
+        if (!ok) { error = err; return; }
+        await ReloadAsync();
+        message = $"'{r.Name}' duplicated (created disabled — enable it when ready).";
+    }
 
     // Wizard state
     private bool building;

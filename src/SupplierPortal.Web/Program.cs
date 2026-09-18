@@ -790,6 +790,39 @@ app.MapGet("/export/{format}", async (string format, int? businessUnitId, string
     };
 }).RequireAuthorization();
 
+// Preview a scheduled report's output (PDF/Excel) WITHOUT emailing it — used by the "Preview" action on the
+// Scheduled Reports admin page. Administrator only.
+app.MapGet("/admin/reports/{id:int}/preview", async (int id, string? format,
+    ScheduledReportService reports,
+    SupplierPortal.Web.Services.Reporting.ReportDefinitionService defs,
+    SupplierPortal.Web.Services.Reporting.ReportSchemaService schema,
+    SupplierPortal.Web.Services.Reporting.ReportRenderService render,
+    SupplierService supplierService, ExportService export) =>
+{
+    const string xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    var report = await reports.GetByIdAsync(id);
+    if (report is null) { return Results.NotFound(); }
+    var wantExcel = string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(format, "excel", StringComparison.OrdinalIgnoreCase);
+    var safe = new string(report.Name.Where(c => !System.IO.Path.GetInvalidFileNameChars().Contains(c)).ToArray());
+    if (string.IsNullOrWhiteSpace(safe)) { safe = "Report"; }
+
+    if (report.ReportDefinitionId is int defId)
+    {
+        var def = await defs.GetByIdAsync(defId);
+        if (def is null) { return Results.NotFound(); }
+        var data = await schema.RunAsync(def, maxRows: 2000);
+        return wantExcel
+            ? Results.File(render.RenderExcel(def.Title, data.Headers, data.Rows), xlsx, $"{safe} (preview).xlsx")
+            : Results.File(render.RenderPdf(def.Title, data.Headers, data.Rows, data.Truncated), "application/pdf", $"{safe} (preview).pdf");
+    }
+
+    var suppliers = await supplierService.GetSuppliersAsync(report.BusinessUnitId is int bu ? new List<int> { bu } : null);
+    return wantExcel
+        ? Results.File(export.ExportToExcelFull(suppliers), xlsx, $"{safe} (preview).xlsx")
+        : Results.File(export.ExportToPdf(suppliers), "application/pdf", $"{safe} (preview).pdf");
+}).RequireAuthorization(p => p.RequireRole("Administrator"));
+
 // Generates a supplier upload template (importer-compatible columns). Optionally pre-populated with a
 // business unit's existing suppliers so the business can update and re-upload; otherwise a blank sheet.
 app.MapGet("/export/template", async (int? businessUnitId, bool? populate, HttpContext ctx, SupplierService supplierService, UserService userService, ExportService exportService) =>

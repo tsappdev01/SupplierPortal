@@ -17,6 +17,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<NotificationGroup> NotificationGroups => Set<NotificationGroup>();
     public DbSet<ScheduledReport> ScheduledReports => Set<ScheduledReport>();
     public DbSet<ReportDefinition> ReportDefinitions => Set<ReportDefinition>();
+    public DbSet<ScheduledReportRun> ScheduledReportRuns => Set<ScheduledReportRun>();
     public DbSet<SupplierFieldSetting> SupplierFieldSettings => Set<SupplierFieldSetting>();
     public DbSet<SupplierTabSetting> SupplierTabSettings => Set<SupplierTabSetting>();
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
@@ -116,6 +117,16 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<ReportDefinition>()
             .HasIndex(d => d.Name)
             .IsUnique();
+
+        // Run-history rows are deleted with their schedule.
+        modelBuilder.Entity<ScheduledReportRun>()
+            .HasOne(r => r.ScheduledReport)
+            .WithMany()
+            .HasForeignKey(r => r.ScheduledReportId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ScheduledReportRun>()
+            .HasIndex(r => new { r.ScheduledReportId, r.RunAtUtc });
 
         modelBuilder.Entity<BusinessUnit>()
             .HasIndex(b => b.Code)

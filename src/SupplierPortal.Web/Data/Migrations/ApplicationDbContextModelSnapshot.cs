@@ -2214,6 +2214,36 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("ReportDefinitions");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("RunAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ScheduledReportId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduledReportId", "RunAtUtc");
+
+                    b.ToTable("ScheduledReportRuns");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.BankBranch", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Bank", "Bank")
@@ -2706,6 +2736,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("NotificationGroup");
 
                     b.Navigation("ReportDefinition");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.ScheduledReport", "ScheduledReport")
+                        .WithMany()
+                        .HasForeignKey("ScheduledReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ScheduledReport");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Bank", b =>

@@ -21,6 +21,7 @@ public class ScheduledReportService(
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.ScheduledReports
             .Include(r => r.NotificationGroup)
+            .Include(r => r.ReportDefinition)
             .OrderBy(r => r.Name)
             .ToListAsync();
     }
@@ -175,9 +176,16 @@ public class ScheduledReportService(
             return;
         }
 
+        var trimmed = detail.Length > 1000 ? detail[..1000] : detail;
         report.LastRunUtc = nowUtc;
         report.LastRunStatus = status;
-        report.LastRunDetail = detail.Length > 1000 ? detail[..1000] : detail;
+        report.LastRunDetail = trimmed;
+
+        // Append to the run-history timeline.
+        db.ScheduledReportRuns.Add(new ScheduledReportRun
+        {
+            ScheduledReportId = id, RunAtUtc = nowUtc, Status = status, Detail = trimmed
+        });
 
         if (report.Frequency == ReportFrequency.Once)
         {
@@ -189,6 +197,79 @@ public class ScheduledReportService(
         }
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>The most recent run-history rows for a schedule (newest first), for the timeline.</summary>
+    public async Task<List<ScheduledReportRun>> GetRunsAsync(int reportId, int take = 8)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.ScheduledReportRuns
+            .Where(r => r.ScheduledReportId == reportId)
+            .OrderByDescending(r => r.RunAtUtc)
+            .Take(take)
+            .ToListAsync();
+    }
+
+    /// <summary>Duplicates a schedule (same definition, group, format, frequency and timing), disabled, with a
+    /// "(copy)" name, so an administrator can tweak and enable it.</summary>
+    public async Task<(bool Success, string? Error, int Id)> DuplicateAsync(int id, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var src = await db.ScheduledReports.FirstOrDefaultAsync(r => r.Id == id);
+        if (src is null) { return (false, "Scheduled report not found.", 0); }
+
+        var baseName = $"{src.Name} (copy)";
+        var name = baseName;
+        var n = 2;
+        while (await db.ScheduledReports.AnyAsync(r => r.Name == name)) { name = $"{baseName} {n++}"; }
+
+        var copy = new ScheduledReport
+        {
+            Name = name,
+            Format = src.Format,
+            Frequency = src.Frequency,
+            NextRunUtc = src.NextRunUtc,
+            IsActive = false,
+            BusinessUnitId = src.BusinessUnitId,
+            NotificationGroupId = src.NotificationGroupId,
+            ReportDefinitionId = src.ReportDefinitionId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = actor,
+        };
+        db.ScheduledReports.Add(copy);
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actor, AuditAction.Create, "ScheduledReport", copy.Id,
+            $"Duplicated scheduled report '{src.Name}' as '{copy.Name}'.");
+        return (true, null, copy.Id);
+    }
+
+    /// <summary>Enables or disables several schedules at once. Returns how many changed.</summary>
+    public async Task<int> SetActiveManyAsync(IEnumerable<int> ids, bool isActive, string actor)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0) { return 0; }
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var reports = await db.ScheduledReports.Where(r => idList.Contains(r.Id) && r.IsActive != isActive).ToListAsync();
+        foreach (var r in reports) { r.IsActive = isActive; }
+        if (reports.Count > 0)
+        {
+            await db.SaveChangesAsync();
+            await auditService.LogAsync(actor, AuditAction.Update, "ScheduledReport", null,
+                $"{(isActive ? "Enabled" : "Disabled")} {reports.Count} scheduled report(s) in bulk.");
+        }
+        return reports.Count;
+    }
+
+    /// <summary>Queues several schedules to run now. Returns how many were queued.</summary>
+    public async Task<int> TriggerManyAsync(IEnumerable<int> ids, string actor)
+    {
+        var idList = ids.Distinct().ToList();
+        var count = 0;
+        foreach (var id in idList)
+        {
+            if (await TriggerNowAsync(id, actor)) { count++; }
+        }
+        return count;
     }
 
     /// <summary>Advances a next-run time by whole intervals until it is strictly after <paramref name="afterUtc"/>.</summary>
