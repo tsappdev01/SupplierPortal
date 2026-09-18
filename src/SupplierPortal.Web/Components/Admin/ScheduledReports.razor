@@ -542,8 +542,11 @@
 }
 
 <style>
-    .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    /* overflow must stay visible so the row actions "…" dropdown isn't clipped; corners are rounded on the header cells instead. */
+    .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: visible; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
     .di-sr-table thead th { background: #0b2545; color: #fff; font-weight: 600; font-size: 13px; border: none; padding: 12px 14px; }
+    .di-sr-table thead th:first-child { border-top-left-radius: 11px; }
+    .di-sr-table thead th:last-child { border-top-right-radius: 11px; }
     .di-sr-table tbody td { padding: 12px 14px; vertical-align: middle; }
     .di-sr-table tbody tr { border-bottom: 1px solid #eef1f5; }
     .di-sr-table tbody tr:last-child { border-bottom: none; }
