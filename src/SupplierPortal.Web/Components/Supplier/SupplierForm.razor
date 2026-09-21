@@ -28,9 +28,10 @@ else
     </div>;
     fieldFragments["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")">
         <label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label>
-        @* Editable for internal admins/staff, but frozen (read-only) on the supplier self-service
-           portal so suppliers cannot change a value set by the business. *@
-        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="@SupplierFacing" class="@(SupplierFacing ? "di-frozen" : null)">
+        @* Tax Organization Type is frozen (read-only) once the supplier exists: internal staff set it when
+           creating the supplier, and it cannot be changed afterwards; on the self-service portal it is always
+           frozen (the record always already exists there). *@
+        <InputSelect @bind-Value="formModel.TaxOrganizationTypeId" disabled="@TaxOrgTypeFrozen" class="@(TaxOrgTypeFrozen ? "di-frozen" : null)">
             <option value="">— Select —</option>
             @foreach (var lov in taxOrgTypes)
             {
@@ -1218,6 +1219,10 @@ else
     /// marked "not visible to supplier" are hidden, and adding a new bank account requires a Bank
     /// Confirmation Letter attachment.</summary>
     [Parameter] public bool SupplierFacing { get; set; }
+
+    /// <summary>Tax Organization Type is frozen (read-only) on the self-service portal and once the supplier
+    /// record exists; internal staff can only set it while creating a new supplier.</summary>
+    private bool TaxOrgTypeFrozen => SupplierFacing || Supplier.Id != 0;
 
     /// <summary>Self-service data gateway supplied by the public self-service page. When set, the form
     /// loads/saves/manages documents through this gateway (which is HTTP-backed on the DMZ) instead of the
