@@ -77,6 +77,18 @@ public class UserService(
         return await db.Users.FirstOrDefaultAsync(u => u.Username == username);
     }
 
+    /// <summary>Resolves a user from whatever identifier was captured as the "actor" (e.g. an access token's
+    /// CreatedBy). Sign-in name varies by provider — local username, AD login/UPN, or Entra subject — so this
+    /// matches on Username, Email, AdLogin or Subject, letting notifications reach the real person who acted.</summary>
+    public async Task<User?> GetByIdentifierAsync(string? identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier)) { return null; }
+        var id = identifier.Trim();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Users.FirstOrDefaultAsync(u =>
+            u.Username == id || u.Email == id || u.AdLogin == id || u.Subject == id);
+    }
+
     public async Task<List<User>> GetPendingRegistrationsAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();

@@ -143,8 +143,18 @@ public class SupplierEmailService(
     /// failure is swallowed rather than surfaced to the supplier completing the public form.</summary>
     public async Task NotifyRequestorOfSubmissionAsync(Supplier supplier, string requestedByUsername, string baseUrl)
     {
-        var requestor = await userService.GetByUsernameAsync(requestedByUsername);
-        if (requestor is null || string.IsNullOrWhiteSpace(requestor.Email))
+        // Primary recipient: the person who sent the self-service link (the access token's CreatedBy). Resolve
+        // them from whatever identifier was captured (local username, AD login/UPN or Entra subject) so SSO/AD
+        // senders are matched too. Only if the sender can't be resolved to an email do we fall back to the
+        // Business Unit contact address, so the notification is never silently lost.
+        var requestor = await userService.GetByIdentifierAsync(requestedByUsername);
+        var recipient = requestor?.Email;
+        var sentToRequestor = !string.IsNullOrWhiteSpace(recipient);
+        if (!sentToRequestor)
+        {
+            recipient = await branding.GetBusinessUnitEmailAsync(supplier.BusinessUnitId);
+        }
+        if (string.IsNullOrWhiteSpace(recipient))
         {
             return;
         }
@@ -166,14 +176,15 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Update Submitted - {supplier.SupplierName}";
 
-        var (ok, _) = await emailDispatcher.SendHtmlAsync(requestor.Email!, subject, body);
+        var (ok, _) = await emailDispatcher.SendHtmlAsync(recipient!, subject, body);
         if (ok)
         {
             // Best-effort: the supplier's submission has already been saved successfully by this point, so a
             // failed courtesy email to the requestor must not surface as an error to them.
+            var who = sentToRequestor ? $"requestor {recipient}" : $"business-unit inbox {recipient} (sender could not be resolved)";
             await auditService.LogAsync(
                 "Supplier Self-Service", AuditAction.Notify, "Supplier", supplier.Id,
-                $"Notified {requestor.Email} that {supplier.SupplierName} submitted an update");
+                $"Notified {who} that {supplier.SupplierName} submitted an update");
         }
     }
 
