@@ -1866,6 +1866,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("EditableByUserIdsCsv")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<bool>("IsVisible")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")

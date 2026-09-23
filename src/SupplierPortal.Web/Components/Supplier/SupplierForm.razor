@@ -3,6 +3,7 @@
 @inject SupplierService SupplierService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierFieldSettingService SupplierFieldSettingService
+@inject UserService UserService
 @inject SupplierDocumentService SupplierDocumentService
 @inject ToastService ToastService
 @inject LoadingService Loading
@@ -832,6 +833,14 @@ else
 
         <!-- Step 5: Payment / Banking Information -->
         <div class="di-section" style="display:@(CurrentSections.Contains(5) ? "block" : "none")">
+            @if (!CanEditTab(5))
+            {
+                <div class="di-tab-readonly-note">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 0-2 2v4H5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1V3a2 2 0 0 0-2-2H8zm2 6H7V3a1 1 0 0 1 2 0v4h1z"/></svg>
+                    <span>This tab is read-only for you. Only authorised users can edit it — contact an administrator to make changes.</span>
+                </div>
+            }
+            <fieldset class="di-tab-lock" disabled="@(!CanEditTab(5))">
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
@@ -1008,10 +1017,19 @@ else
                              "Required: you changed the bank account, so a Bank Confirmation Letter must be attached."))
                 </div>
             </div>
+            </fieldset>
         </div>
 
         <!-- Step 4: Site / Business Unit -->
         <div class="di-section" style="display:@(CurrentSections.Contains(4) ? "block" : "none")">
+            @if (!CanEditTab(4))
+            {
+                <div class="di-tab-readonly-note">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 0-2 2v4H5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1V3a2 2 0 0 0-2-2H8zm2 6H7V3a1 1 0 0 1 2 0v4h1z"/></svg>
+                    <span>This tab is read-only for you. Only authorised users can edit it — contact an administrator to make changes.</span>
+                </div>
+            }
+            <fieldset class="di-tab-lock" disabled="@(!CanEditTab(4))">
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z" /></svg>
@@ -1041,6 +1059,7 @@ else
                     </div>
                 }
             </div>
+            </fieldset>
         </div>
 
         @* On the last page the supplier signs a declaration in a pop-up when they click Submit (see the
@@ -1188,6 +1207,16 @@ else
     .di-sigpad-clear:hover { background: #f1f4f9; }
     .di-sigpad-hint { font-size: 12px; color: #7b8697; margin-top: 6px; }
     .di-hidden-field { display: none !important; }
+    /* Per-tab edit lock: the fieldset carries no chrome of its own; when disabled it dims and blocks input. */
+    .di-tab-lock { border: 0; margin: 0; padding: 0; min-width: 0; }
+    .di-tab-lock[disabled] { opacity: 0.72; }
+    .di-tab-readonly-note {
+        display: flex; align-items: center; gap: 8px;
+        margin: 0 0 14px; padding: 10px 14px;
+        border: 1px solid #f2d99b; border-radius: 10px;
+        background: #fff8e8; color: #8a5b06; font-size: 13px; font-weight: 500;
+    }
+    .di-tab-readonly-note svg { flex: none; color: #b07d1a; }
     .di-subsection-header {
         grid-column: 1 / -1;
         font-weight: 600;
@@ -1252,6 +1281,22 @@ else
 
     // Admin-configured tab titles + visibility (one row per field-section step 1-5).
     private List<SupplierTabSetting> tabSettings = [];
+
+    // The signed-in internal user's Id, resolved on load only when a tab is edit-restricted. Used by
+    // CanEditTab to decide whether this user may edit a restricted tab.
+    private int? currentUserId;
+
+    /// <summary>Whether the current user may EDIT the given tab (section) on the internal form. The supplier
+    /// self-service form and the internal create form are never restricted; on an internal edit, a tab with a
+    /// non-empty editor list is editable only by a listed user, and read-only for everyone else.</summary>
+    private bool CanEditTab(int step)
+    {
+        if (SupplierFacing || Supplier.Id == 0) { return true; }
+        var csv = tabSettings.FirstOrDefault(t => t.Step == step)?.EditableByUserIdsCsv;
+        if (string.IsNullOrWhiteSpace(csv)) { return true; }
+        var allowed = SupplierFieldSettingService.ParseEditorUserIds(csv);
+        return currentUserId is int id && allowed.Contains(id);
+    }
 
     // Wizard pages group one or more field-sections. Address (2) and Contact (3) share one page and
     // are shown as an accordion; the other sections are each their own page. A page appears only if at
@@ -1769,6 +1814,13 @@ else
         mandatoryKeys = fieldSettings.Where(f => f.IsMandatory).Select(f => f.FieldKey).ToHashSet();
         hiddenFromSupplierKeys = fieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
         tabSettings = tTabs.Result;
+
+        // Resolve the signed-in internal user's Id so per-tab edit restrictions can be enforced. Only needed
+        // when at least one tab is actually restricted; skipped for the supplier self-service form.
+        if (!SupplierFacing && tabSettings.Any(t => !string.IsNullOrWhiteSpace(t.EditableByUserIdsCsv)))
+        {
+            currentUserId = (await UserService.GetByIdentifierAsync(CurrentUser))?.Id;
+        }
         }
 
         // Pre-fill the signature if this record was already signed before.
@@ -2447,7 +2499,11 @@ else
             }
             else
             {
-                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId, markComplete: submitting);
+                // Tabs the current user may not edit are protected server-side too, so a tampered save can
+                // never change a restricted tab's fields — the DB values are kept.
+                var readOnlyTabSteps = tabSettings.Select(t => t.Step).Where(s => !CanEditTab(s)).ToHashSet();
+                await SupplierService.UpdateAsync(Supplier, CurrentUser, AccessTokenId,
+                    markComplete: submitting, readOnlyTabSteps: readOnlyTabSteps);
             }
         });
 
@@ -2490,7 +2546,9 @@ else
 
     private async Task NextAsync()
     {
-        var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
+        // Skip validation for tabs the user may not edit (read-only): they cannot fix those fields, and the
+        // existing DB values are preserved on save, so a locked tab must not block an otherwise-valid save.
+        var errors = CurrentSections.Where(CanEditTab).SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
             ToastService.ShowErrors(errors);
@@ -2527,7 +2585,9 @@ else
 
     private async Task SaveAsDraftAsync()
     {
-        var errors = CurrentSections.SelectMany(s => ValidateStep(formModel, s)).ToList();
+        // Skip validation for tabs the user may not edit (read-only): they cannot fix those fields, and the
+        // existing DB values are preserved on save, so a locked tab must not block an otherwise-valid save.
+        var errors = CurrentSections.Where(CanEditTab).SelectMany(s => ValidateStep(formModel, s)).ToList();
         if (errors.Count > 0)
         {
             ToastService.ShowErrors(errors);

@@ -236,7 +236,19 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     }
 
     /// <summary>One tab's editable state from the admin manager.</summary>
-    public record TabLayout(int Step, string Title, bool IsVisible);
+    public record TabLayout(int Step, string Title, bool IsVisible, string? EditableByUserIdsCsv = null);
+
+    /// <summary>Parses a tab's <see cref="SupplierTabSetting.EditableByUserIdsCsv"/> into a set of user Ids.
+    /// An empty result means "no restriction" (any internal user may edit).</summary>
+    public static HashSet<int> ParseEditorUserIds(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv)) { return []; }
+        return csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => int.TryParse(s, out var id) ? id : (int?)null)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .ToHashSet();
+    }
 
     public async Task SaveTabsAsync(IEnumerable<TabLayout> tabs, string actorUsername)
     {
@@ -259,6 +271,9 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
 
             row.Title = string.IsNullOrWhiteSpace(tab.Title) ? DefaultTabTitles[tab.Step] : tab.Title.Trim();
             row.IsVisible = tab.IsVisible;
+            // Normalise the editor list to a clean CSV of distinct Ids, or null when unrestricted.
+            var ids = ParseEditorUserIds(tab.EditableByUserIdsCsv);
+            row.EditableByUserIdsCsv = ids.Count == 0 ? null : string.Join(",", ids.OrderBy(i => i));
         }
 
         await db.SaveChangesAsync();

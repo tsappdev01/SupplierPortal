@@ -18,4 +18,11 @@ public class SupplierTabSetting
     public string Title { get; set; } = string.Empty;
 
     public bool IsVisible { get; set; } = true;
+
+    /// <summary>Comma-separated list of internal user Ids (<see cref="User.Id"/>) permitted to EDIT this tab
+    /// on the internal supplier form. Null/empty = no restriction (any internal user may edit, the default).
+    /// When set, every other internal user sees the tab read-only (view but not change). This restriction
+    /// applies only to the internal edit form; the supplier self-service portal is never affected.</summary>
+    [MaxLength(1000)]
+    public string? EditableByUserIdsCsv { get; set; }
 }

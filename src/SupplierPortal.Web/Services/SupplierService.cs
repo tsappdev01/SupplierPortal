@@ -465,7 +465,11 @@ public class SupplierService(
     private static readonly string[] AlwaysSupplierLockedKeys =
         ["Priority", "IsOrdering", "IsSourcingOnly", "IsPurchasing", "IsPay", "IsPrimaryPay"];
 
-    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null, bool markComplete = false)
+    /// <param name="readOnlyTabSteps">Wizard tab steps the acting user is not allowed to edit (per-tab edit
+    /// restriction on the internal form). Every field on those tabs keeps its current database value regardless
+    /// of what the payload contains, so a read-only tab can never be changed even by a tampered request.</param>
+    public async Task UpdateAsync(Supplier updated, string updatedBy, int? accessTokenId = null,
+        bool markComplete = false, IReadOnlySet<int>? readOnlyTabSteps = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var supplier = await IncludeLookups(db.Suppliers)
@@ -498,6 +502,28 @@ public class SupplierService(
             // when they have no field-settings row: they are set by staff and must never be supplier-editable
             // (a crafted submit could otherwise flip a supplier's payment or purchasing routing).
             foreach (var key in AlwaysSupplierLockedKeys)
+            {
+                if (protectedOriginals.ContainsKey(key)) { continue; }
+                var prop = typeof(Supplier).GetProperty(key);
+                if (prop is not null && prop.CanWrite)
+                {
+                    protectedOriginals[key] = prop.GetValue(supplier);
+                }
+            }
+        }
+
+        // Per-tab edit restriction (internal form): fields on a tab this user may not edit keep their current
+        // values, so the tab is truly read-only server-side, not just hidden in the UI. Driven by the field
+        // settings' Step so the protected set stays in sync with whatever fields live on those tabs.
+        if (readOnlyTabSteps is { Count: > 0 })
+        {
+            var lockedKeys = await db.SupplierFieldSettings
+                .Where(f => readOnlyTabSteps.Contains(f.Step))
+                .Select(f => f.FieldKey)
+                .ToListAsync();
+            // The Supplier Site's BU id has no field-settings row of its own but belongs to the Site tab (4).
+            if (readOnlyTabSteps.Contains(4)) { lockedKeys.Add(nameof(Supplier.SupplierSiteBuId)); }
+            foreach (var key in lockedKeys)
             {
                 if (protectedOriginals.ContainsKey(key)) { continue; }
                 var prop = typeof(Supplier).GetProperty(key);

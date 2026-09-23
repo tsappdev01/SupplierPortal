@@ -6,6 +6,7 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
 @inject SupplierFieldSettingService SupplierFieldSettingService
+@inject UserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Supplier Field Manager - Supplier Portal</PageTitle>
@@ -42,17 +43,25 @@
                 are not shown or required). <strong>Address Information</strong> and
                 <strong>Contact Information</strong> are shown together on one page (both expanded).
             </p>
+            <p class="text-muted mb-2" style="font-size: 13px;">
+                <strong>Editable by</strong> restricts who may <em>change</em> a tab on the internal supplier
+                edit form. Leave it as <em>Anyone</em> for no restriction (the default). When you pick one or
+                more users, every other internal user can still <em>view</em> the tab but its fields become
+                read-only for them. This does not affect the supplier self-service portal.
+            </p>
             <table class="table table-sm align-middle mb-0">
                 <thead>
                     <tr>
                         <th style="width: 60px;">Tab</th>
                         <th>Title</th>
-                        <th style="width: 120px;">Visible</th>
+                        <th style="width: 110px;">Visible</th>
+                        <th style="width: 280px;">Editable by</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var tab in tabs.OrderBy(t => t.Step))
                     {
+                        var editors = EditorsFor(tab.Step);
                         <tr>
                             <td>@tab.Step</td>
                             <td><input class="form-control form-control-sm" @bind="tab.Title" maxlength="150" /></td>
@@ -62,6 +71,31 @@
                                            @onchange="e => tab.IsVisible = (bool)e.Value!" />
                                     <span class="di-switch-slider"></span>
                                 </label>
+                            </td>
+                            <td>
+                                @if (editableUsers.Count == 0)
+                                {
+                                    <span class="text-muted fst-italic">No Supplier-portal users</span>
+                                }
+                                else
+                                {
+                                    <div class="di-editors">
+                                        <div class="di-editors-summary">
+                                            @(editors.Count == 0 ? "Anyone (no restriction)"
+                                                : $"{editors.Count} user(s) only")
+                                        </div>
+                                        <div class="di-editors-list">
+                                            @foreach (var u in editableUsers)
+                                            {
+                                                <label class="di-editor-item">
+                                                    <input type="checkbox" checked="@editors.Contains(u.Id)"
+                                                           @onchange="e => ToggleEditor(tab.Step, u.Id, (bool)e.Value!)" />
+                                                    <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </td>
                         </tr>
                     }
@@ -213,6 +247,11 @@ else
 
     .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
 
+    .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }
+    .di-editors-list { max-height: 108px; overflow-y: auto; border: 1px solid #e2e5ea; border-radius: 6px; padding: 4px 8px; background: #fff; }
+    .di-editor-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; cursor: pointer; }
+    .di-editor-item input { width: 15px; height: 15px; accent-color: #2f6fed; }
+
     .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
 
     .di-fixed-badge {
@@ -266,6 +305,19 @@ else
 
     private List<SupplierTabSetting> tabs = [];
 
+    // Internal users who may be granted per-tab edit rights, and the per-tab selection (keyed by step).
+    private List<User> editableUsers = [];
+    private readonly Dictionary<int, HashSet<int>> tabEditors = [];
+
+    private HashSet<int> EditorsFor(int step) =>
+        tabEditors.TryGetValue(step, out var set) ? set : (tabEditors[step] = []);
+
+    private void ToggleEditor(int step, int userId, bool on)
+    {
+        var set = EditorsFor(step);
+        if (on) { set.Add(userId); } else { set.Remove(userId); }
+    }
+
     private string StepLabel(int step)
     {
         var t = tabs.FirstOrDefault(x => x.Step == step);
@@ -303,6 +355,12 @@ else
         currentUser = state.User.Identity?.Name ?? "unknown";
 
         tabs = await SupplierFieldSettingService.GetTabsAsync();
+
+        editableUsers = await UserService.GetSupplierAssignableUsersAsync();
+        foreach (var tab in tabs)
+        {
+            tabEditors[tab.Step] = SupplierFieldSettingService.ParseEditorUserIds(tab.EditableByUserIdsCsv);
+        }
 
         var settings = await SupplierFieldSettingService.GetAllForAdminAsync();
         rows = settings.Select(f => new FieldRow
@@ -392,7 +450,9 @@ else
                 r.FieldKey, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
             await SupplierFieldSettingService.SaveLayoutAsync(layouts, currentUser);
 
-            var tabLayouts = tabs.Select(t => new SupplierFieldSettingService.TabLayout(t.Step, t.Title, t.IsVisible));
+            var tabLayouts = tabs.Select(t => new SupplierFieldSettingService.TabLayout(
+                t.Step, t.Title, t.IsVisible,
+                EditorsFor(t.Step).Count == 0 ? null : string.Join(",", EditorsFor(t.Step))));
             await SupplierFieldSettingService.SaveTabsAsync(tabLayouts, currentUser);
 
             await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
