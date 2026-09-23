@@ -744,12 +744,45 @@ else if (TabFilteredSuppliers.Any())
             </div>
             <div>
                 <h3 class="di-print-title">Print Suppliers</h3>
-                <p class="di-print-sub">Choose the columns to include. All <strong>@TabFilteredSuppliers.Count()</strong> supplier(s) in the “@ActiveTabLabel” tab will be printed — not just this page.</p>
+                <p class="di-print-sub">Filter by Status, Priority and Assigned To, then choose the columns. All <strong>@PrintFilteredSuppliers.Count()</strong> matching supplier(s) will be printed — across every tab, not just this page.</p>
             </div>
             <button type="button" class="di-print-x" aria-label="Close" @onclick="ClosePrintDialog">✕</button>
         </div>
 
         <div class="di-print-body">
+            <div class="di-print-filters">
+                <div class="di-print-filter">
+                    <label>Status</label>
+                    <select @bind="printStatusFilter">
+                        <option value="">All Statuses</option>
+                        @foreach (var status in SupplierStatuses.All)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Priority</label>
+                    <select @bind="printPriorityFilter">
+                        <option value="">All Priorities</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Assigned To</label>
+                    <select @bind="printAssignedFilter">
+                        <option value="">All Assignees</option>
+                        <option value="unassigned">— Unassigned —</option>
+                        @foreach (var u in assignableUsers)
+                        {
+                            <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                        }
+                    </select>
+                </div>
+            </div>
             <div class="di-print-toolbar">
                 <span class="di-print-count">@printColumns.Count(c => c.Selected) of @printColumns.Count columns</span>
                 <div class="di-print-toolbar-actions">
@@ -775,9 +808,9 @@ else if (TabFilteredSuppliers.Any())
 
         <div class="di-print-actions">
             <button type="button" class="di-btn2 di-btn2-ghost" @onclick="ClosePrintDialog">Cancel</button>
-            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DoPrintAsync" disabled="@(!printColumns.Any(c => c.Selected))">
+            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DoPrintAsync" disabled="@(!printColumns.Any(c => c.Selected) || !PrintFilteredSuppliers.Any())">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a1 1 0 0 0-1 1v3h8v-3a1 1 0 0 0-1-1H5z"/></svg>
-                Print @TabFilteredSuppliers.Count() row(s)
+                Print @PrintFilteredSuppliers.Count() row(s)
             </button>
         </div>
     </div>
@@ -937,6 +970,12 @@ else if (TabFilteredSuppliers.Any())
     .di-opt-main { display: flex; flex-direction: column; gap: 2px; }
     .di-opt-title { font-size: 14px; font-weight: 700; color: #17233a; }
     .di-opt-desc { font-size: 12.5px; color: #6b7686; }
+    .di-print-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
+    .di-print-filter { flex: 1 1 150px; min-width: 140px; }
+    .di-print-filter label { display: block; font-size: 12px; font-weight: 600; color: #46506b; margin-bottom: 5px; }
+    .di-print-filter select { width: 100%; padding: 8px 10px; border: 1.5px solid #d3dae6; border-radius: 9px; font-size: 13.5px; background: #fff; }
+    .di-print-filter select:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47, 111, 237, .15); }
+
     .di-print-field { margin-top: 14px; }
     .di-print-field label { display: block; font-size: 12.5px; font-weight: 600; color: #46506b; margin-bottom: 5px; }
     .di-print-field select { width: 100%; padding: 9px 11px; border: 1.5px solid #d3dae6; border-radius: 10px; font-size: 14px; background: #fff; }
@@ -1778,6 +1817,47 @@ else if (TabFilteredSuppliers.Any())
     private bool showPrintDialog;
     private List<PrintColumn> printColumns = [];
 
+    // Print-dialog filters — independent of the active tab so a print run can target any Status / Priority /
+    // Assigned-To combination across all suppliers. Seeded from the dashboard's current filters when the
+    // dialog opens; "" = no restriction on that dimension.
+    private string printStatusFilter = "";
+    private string printPriorityFilter = "";
+    private string printAssignedFilter = "";
+
+    // Suppliers selected by the print-dialog filters (all suppliers, not restricted to the active tab),
+    // sorted the same way as the on-screen list.
+    private IEnumerable<SupplierListItem> PrintFilteredSuppliers =>
+        suppliers
+            .Where(s => string.IsNullOrEmpty(printStatusFilter) || s.StatusName == printStatusFilter)
+            .Where(s => string.IsNullOrEmpty(printPriorityFilter) || s.Priority == printPriorityFilter)
+            .Where(MatchesPrintAssignedFilter)
+            .OrderBy(s => PriorityRank(s.Priority)).ThenByDescending(EffectiveUpdated);
+
+    private bool MatchesPrintAssignedFilter(SupplierListItem s) => printAssignedFilter switch
+    {
+        "" => true,
+        "unassigned" => s.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => s.AssignedToUserId == uid,
+        _ => true
+    };
+
+    private string PrintFilterSummary
+    {
+        get
+        {
+            var parts = new List<string>();
+            parts.Add(string.IsNullOrEmpty(printStatusFilter) ? "All statuses" : printStatusFilter);
+            if (!string.IsNullOrEmpty(printPriorityFilter)) { parts.Add(printPriorityFilter); }
+            if (printAssignedFilter == "unassigned") { parts.Add("Unassigned"); }
+            else if (int.TryParse(printAssignedFilter, out var uid))
+            {
+                var u = assignableUsers.FirstOrDefault(x => x.Id == uid);
+                parts.Add(u is null ? "Assigned" : (string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName));
+            }
+            return string.Join(" · ", parts);
+        }
+    }
+
     // ----- On-screen column chooser for the Manage Supplier table -----
     // The bulk-select checkbox column is always shown; everything else is toggleable and persisted per
     // browser in localStorage. Extra fields (tax org, supplier type, TRN, trade licence, last updated) are
@@ -1854,7 +1934,16 @@ else if (TabFilteredSuppliers.Any())
         SelectDefaultPrintColumns();
     }
 
-    private void OpenPrintDialog() { EnsurePrintColumns(); showPrintDialog = true; }
+    private void OpenPrintDialog()
+    {
+        EnsurePrintColumns();
+        // Seed the print filters from whatever the dashboard is currently filtered by, so the default print
+        // matches what the user sees; they can then widen or narrow it in the dialog.
+        printStatusFilter = statusFilter;
+        printPriorityFilter = priorityFilter;
+        printAssignedFilter = assignedFilter;
+        showPrintDialog = true;
+    }
     private void ClosePrintDialog() => showPrintDialog = false;
     private void SelectAllPrintColumns() { foreach (var c in printColumns) { c.Selected = true; } }
     private void ClearPrintColumns() { foreach (var c in printColumns) { c.Selected = false; } }
@@ -1868,7 +1957,7 @@ else if (TabFilteredSuppliers.Any())
             ToastService.ShowInfo("Please select at least one column to print.");
             return;
         }
-        var rows = SortedSuppliers.ToList();
+        var rows = PrintFilteredSuppliers.ToList();
         var html = BuildPrintHtml(cols, rows);
         showPrintDialog = false;
         await JS.InvokeVoidAsync("printHtml", html);
@@ -1898,7 +1987,7 @@ else if (TabFilteredSuppliers.Any())
         sb.Append("tr:nth-child(even) td{background:#f4f6fb;}");
         sb.Append("</style></head><body>");
         sb.Append("<div class=\"hd\"><h1>Manage Supplier</h1><div class=\"meta\">");
-        sb.Append($"{Esc(ActiveTabLabel)} &middot; {rows.Count} supplier(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
+        sb.Append($"{Esc(PrintFilterSummary)} &middot; {rows.Count} supplier(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
         sb.Append("</div></div>");
         sb.Append("<table><thead><tr>");
         foreach (var c in cols) { sb.Append($"<th>{Esc(c.Label)}</th>"); }
