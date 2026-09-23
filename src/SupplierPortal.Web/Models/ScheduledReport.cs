@@ -45,6 +45,12 @@ public class ScheduledReport
     /// date/time on save, and advanced by one interval after each run.</summary>
     public DateTime NextRunUtc { get; set; }
 
+    /// <summary>For a Weekly schedule, the specific days of the week it runs, as a bitmask where bit
+    /// (1 &lt;&lt; (int)DayOfWeek) is set for each selected day (Sunday=bit0 … Saturday=bit6). 0 means "no
+    /// specific days" — the legacy behaviour of running once every 7 days from the start day. All selected
+    /// days fire at the same time of day (taken from <see cref="NextRunUtc"/>).</summary>
+    public int WeekDaysMask { get; set; }
+
     /// <summary>When false, the schedule is kept but never fires.</summary>
     public bool IsActive { get; set; } = true;
 

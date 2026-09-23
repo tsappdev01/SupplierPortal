@@ -2152,6 +2152,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("ReportDefinitionId")
                         .HasColumnType("int");
 
+                    b.Property<int>("WeekDaysMask")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NotificationGroupId");

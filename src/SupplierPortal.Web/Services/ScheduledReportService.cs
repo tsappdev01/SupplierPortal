@@ -8,7 +8,8 @@ namespace SupplierPortal.Web.Services;
 /// local wall-clock date/time for the first (or next) run; it is converted to UTC on save.</summary>
 public record ScheduledReportInput(
     string Name, ReportFormat Format, ReportFrequency Frequency, DateTime StartLocal,
-    int? BusinessUnitId, int NotificationGroupId, bool IsActive, int? ReportDefinitionId = null);
+    int? BusinessUnitId, int NotificationGroupId, bool IsActive, int? ReportDefinitionId = null,
+    int WeekDaysMask = 0);
 
 /// <summary>CRUD and scheduling logic for administrator-defined scheduled supplier reports. The next-run
 /// time is stored in UTC and advanced by one interval after each run; a <see cref="ReportFrequency.Once"/>
@@ -55,7 +56,8 @@ public class ScheduledReportService(
             NotificationGroupId = input.NotificationGroupId,
             IsActive = input.IsActive,
             ReportDefinitionId = input.ReportDefinitionId,
-            NextRunUtc = ReportTimeZone.ToUtc(input.StartLocal),
+            WeekDaysMask = input.Frequency == ReportFrequency.Weekly ? input.WeekDaysMask : 0,
+            NextRunUtc = InitialNextRunUtc(input),
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actor,
         };
@@ -93,7 +95,8 @@ public class ScheduledReportService(
         report.NotificationGroupId = input.NotificationGroupId;
         report.IsActive = input.IsActive;
         report.ReportDefinitionId = input.ReportDefinitionId;
-        report.NextRunUtc = ReportTimeZone.ToUtc(input.StartLocal);
+        report.WeekDaysMask = input.Frequency == ReportFrequency.Weekly ? input.WeekDaysMask : 0;
+        report.NextRunUtc = InitialNextRunUtc(input);
 
         await db.SaveChangesAsync();
         await auditService.LogAsync(actor, AuditAction.Update, "ScheduledReport", report.Id,
@@ -193,10 +196,33 @@ public class ScheduledReportService(
         }
         else
         {
-            report.NextRunUtc = AdvancePast(report.NextRunUtc, report.Frequency, nowUtc);
+            report.NextRunUtc = AdvancePast(report.NextRunUtc, report.Frequency, nowUtc, report.WeekDaysMask);
         }
 
         await db.SaveChangesAsync();
+    }
+
+    // ----- Weekly-days helpers -----
+    public static bool IsDaySelected(int mask, DayOfWeek day) => (mask & (1 << (int)day)) != 0;
+
+    /// <summary>The first run time (UTC) for a schedule from its input: for a Weekly schedule with specific
+    /// days, the first selected weekday on/after the chosen start (at the start's time of day); otherwise the
+    /// start itself.</summary>
+    private static DateTime InitialNextRunUtc(ScheduledReportInput input)
+    {
+        if (input.Frequency == ReportFrequency.Weekly && input.WeekDaysMask != 0)
+        {
+            var start = input.StartLocal;
+            for (var i = 0; i < 14; i++)
+            {
+                var day = start.AddDays(i);
+                if (IsDaySelected(input.WeekDaysMask, day.DayOfWeek))
+                {
+                    return ReportTimeZone.ToUtc(day);
+                }
+            }
+        }
+        return ReportTimeZone.ToUtc(input.StartLocal);
     }
 
     /// <summary>The most recent run-history rows for a schedule (newest first), for the timeline.</summary>
@@ -233,6 +259,7 @@ public class ScheduledReportService(
             BusinessUnitId = src.BusinessUnitId,
             NotificationGroupId = src.NotificationGroupId,
             ReportDefinitionId = src.ReportDefinitionId,
+            WeekDaysMask = src.WeekDaysMask,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actor,
         };
@@ -272,9 +299,27 @@ public class ScheduledReportService(
         return count;
     }
 
-    /// <summary>Advances a next-run time by whole intervals until it is strictly after <paramref name="afterUtc"/>.</summary>
-    public static DateTime AdvancePast(DateTime nextRunUtc, ReportFrequency frequency, DateTime afterUtc)
+    /// <summary>Advances a next-run time to its next occurrence strictly after <paramref name="afterUtc"/>.
+    /// For a Weekly schedule with specific days (<paramref name="weekDaysMask"/> != 0), the next selected
+    /// weekday at the same local time of day; otherwise whole intervals of the frequency.</summary>
+    public static DateTime AdvancePast(DateTime nextRunUtc, ReportFrequency frequency, DateTime afterUtc, int weekDaysMask = 0)
     {
+        if (frequency == ReportFrequency.Weekly && weekDaysMask != 0)
+        {
+            // Compute in the local zone so "which weekday" and "same time of day" are correct (UAE has no DST).
+            var timeOfDay = ReportTimeZone.ToLocal(nextRunUtc).TimeOfDay;
+            var afterLocal = ReportTimeZone.ToLocal(afterUtc);
+            var day = afterLocal.Date + timeOfDay;
+            for (var i = 0; i < 14; i++, day = day.AddDays(1))
+            {
+                if (day > afterLocal && IsDaySelected(weekDaysMask, day.DayOfWeek))
+                {
+                    return ReportTimeZone.ToUtc(day);
+                }
+            }
+            return ReportTimeZone.ToUtc(afterLocal.Date.AddDays(7) + timeOfDay); // safety fallback
+        }
+
         var next = nextRunUtc;
         // Guard against a pathological loop if a schedule is far in the past.
         for (var i = 0; i < 5000 && next <= afterUtc; i++)

@@ -343,10 +343,19 @@
                         </select>
                     </div>
                     <div class="col-md-5">
-                        <label class="form-label fw-semibold">Start / Next Run (@ReportTimeZone.DisplayName)</label>
+                        <label class="form-label fw-semibold">@(wizFreq == ReportFrequency.Weekly ? "Time of day" : "Start / Next Run") (@ReportTimeZone.DisplayName)</label>
                         <input type="datetime-local" class="form-control"
                                value="@wizStart.ToString("yyyy-MM-ddTHH:mm")" @onchange="OnStartChanged" />
-                        <div class="form-text">First run at this time, then repeats @wizFreq.ToString().ToLower().</div>
+                        <div class="form-text">
+                            @if (wizFreq == ReportFrequency.Weekly)
+                            {
+                                <text>Runs on the selected days below, at this time on each day.</text>
+                            }
+                            else
+                            {
+                                <text>First run at this time, then repeats @wizFreq.ToString().ToLower().</text>
+                            }
+                        </div>
                     </div>
                     <div class="col-md-3 d-flex align-items-end">
                         <div>
@@ -357,11 +366,28 @@
                             <span class="ms-2 small fw-semibold @(wizActive ? "text-success" : "text-danger")">@(wizActive ? "Enabled" : "Disabled")</span>
                         </div>
                     </div>
+                    @if (wizFreq == ReportFrequency.Weekly)
+                    {
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Run on these days</label>
+                            <div class="di-daypicker">
+                                @foreach (var d in WeekDayOrder)
+                                {
+                                    <button type="button" class="di-day @(wizWeekDays.Contains(d) ? "on" : "")"
+                                            @onclick="() => ToggleWeekDay(d)">@DayShort(d)</button>
+                                }
+                            </div>
+                            <div class="form-text">The report is emailed on each selected day at the time above.</div>
+                        </div>
+                    }
                     <div class="col-12">
                         <div class="alert alert-light border small mb-0">
                             <strong>Summary:</strong> @wizName — @wizSchema.@wizTable, @wizColumns.Count column(s),
                             @wizFilters.Count filter(s), @FormatLabel(wizFormat), to
-                            @(SelectedGroup?.Name ?? "—"), @wizFreq.
+                            @(SelectedGroup?.Name ?? "—"),
+                            @(wizFreq == ReportFrequency.Weekly
+                                ? (wizWeekDays.Count > 0 ? "Weekly on " + string.Join(", ", WeekDayOrder.Where(wizWeekDays.Contains).Select(DayShort)) : "Weekly (select day(s))")
+                                : wizFreq.ToString()).
                         </div>
                     </div>
                 </div>
@@ -560,6 +586,12 @@
 }
 
 <style>
+    /* Weekly day picker — one toggle button per day of the week (Saturday-first). */
+    .di-daypicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .di-day { min-width: 46px; padding: 8px 10px; border: 1px solid #d9e0ec; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .12s ease; }
+    .di-day:hover { border-color: #3b5bdb; color: #1e3a8a; }
+    .di-day.on { background: #0b2545; border-color: #0b2545; color: #fff; }
+
     /* overflow must stay visible so the row actions "…" dropdown isn't clipped; corners are rounded on the header cells instead. */
     .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: visible; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
     .di-sr-table thead th { background: #0b2545; color: #fff; font-weight: 600; font-size: 13px; border: none; padding: 12px 14px; }
@@ -772,6 +804,21 @@
     private int wizGroupId;
     private ReportFrequency wizFreq = ReportFrequency.Monthly;
     private DateTime wizStart = DateTime.Now;
+    private HashSet<DayOfWeek> wizWeekDays = [];
+
+    // Display order for the day picker (UAE convention: Saturday-first).
+    private static readonly DayOfWeek[] WeekDayOrder =
+        [DayOfWeek.Saturday, DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
+
+    private static string DayShort(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Sunday => "Sun", DayOfWeek.Monday => "Mon", DayOfWeek.Tuesday => "Tue", DayOfWeek.Wednesday => "Wed",
+        DayOfWeek.Thursday => "Thu", DayOfWeek.Friday => "Fri", _ => "Sat"
+    };
+
+    private void ToggleWeekDay(DayOfWeek d) { if (!wizWeekDays.Remove(d)) { wizWeekDays.Add(d); } }
+
+    private int WizWeekDaysMask => wizWeekDays.Aggregate(0, (m, d) => m | (1 << (int)d));
     private bool wizActive = true;
 
     private NotificationGroup? SelectedGroup => groups.FirstOrDefault(g => g.Id == wizGroupId);
@@ -822,7 +869,7 @@
         wizColumns = []; wizMatch = FilterMatch.And; wizFilters = [];
         wizName = ""; wizTitle = ""; wizFormat = ReportFormat.Pdf;
         wizGroupId = groups.FirstOrDefault(g => g.IsActive)?.Id ?? groups.FirstOrDefault()?.Id ?? 0;
-        wizFreq = ReportFrequency.Monthly; wizActive = true;
+        wizFreq = ReportFrequency.Monthly; wizActive = true; wizWeekDays = [];
         var now = DateTime.Now;
         wizStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0).AddHours(1);
         error = message = stepError = null; wizStep = 1; building = true;
@@ -835,6 +882,7 @@
         wizGroupId = r.NotificationGroupId;
         wizFreq = r.Frequency == ReportFrequency.Once ? ReportFrequency.Monthly : r.Frequency;
         wizStart = ReportTimeZone.ToLocal(r.NextRunUtc);
+        wizWeekDays = Enum.GetValues<DayOfWeek>().Where(d => ScheduledReportService.IsDaySelected(r.WeekDaysMask, d)).ToHashSet();
         wizActive = r.IsActive;
         wizFormat = r.Format;
         wizName = r.Name;
@@ -952,6 +1000,8 @@
         4 => string.IsNullOrWhiteSpace(wizName) ? "Enter a report name."
              : string.IsNullOrWhiteSpace(wizTitle) ? "Enter a report title." : null,
         5 => wizGroupId == 0 ? "Select a notification group." : null,
+        6 => wizFreq == ReportFrequency.Weekly && wizWeekDays.Count == 0
+             ? "Select at least one day of the week." : null,
         _ => null
     };
 
@@ -1012,7 +1062,8 @@
             }
 
             var sched = new ScheduledReportInput(
-                wizName, wizFormat, wizFreq, wizStart, null, wizGroupId, wizActive, defId);
+                wizName, wizFormat, wizFreq, wizStart, null, wizGroupId, wizActive, defId,
+                WeekDaysMask: WizWeekDaysMask);
             if (editScheduleId is { } sid)
             {
                 var (ok, err) = await ReportService.UpdateAsync(sid, sched, currentUser);
