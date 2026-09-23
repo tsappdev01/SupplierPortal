@@ -18,8 +18,20 @@ public class SelfServiceApiService(
     BusinessUnitService businessUnitService,
     SupplierEmailService emailService,
     EmailBrandingService brandingService,
-    BrandLogoInliner logoInliner)
+    BrandLogoInliner logoInliner,
+    ILogger<SelfServiceApiService> logger)
 {
+    /// <summary>Flattens an exception and its inner exceptions into a single readable line for diagnostics.</summary>
+    private static string Flatten(Exception ex)
+    {
+        var parts = new List<string>();
+        for (Exception? e = ex; e is not null; e = e.InnerException)
+        {
+            parts.Add($"{e.GetType().Name}: {e.Message}");
+        }
+        return string.Join(" → ", parts);
+    }
+
     // Categories the self-service wizard renders (everything except the internal SupplierStatus list).
     private static readonly LookupCategory[] FormCategories =
     [
@@ -109,17 +121,28 @@ public class SelfServiceApiService(
             return new SaveSupplierResponse { Success = false, Errors = ["Supplier not found."] };
         }
 
-        DtoMapper.ApplyToSupplier(dto, supplier);
-        await supplierService.UpdateAsync(supplier, actor, session.Id);
-
-        var updated = await supplierService.GetByIdAsync(session.SupplierId);
-        var pending = await supplierService.GetPendingSupplierEditedFieldsAsync(session.SupplierId);
-        return new SaveSupplierResponse
+        try
         {
-            Success = true,
-            Supplier = updated is null ? null : DtoMapper.ToDto(updated),
-            PendingEditedFieldKeys = pending.ToList()
-        };
+            DtoMapper.ApplyToSupplier(dto, supplier);
+            await supplierService.UpdateAsync(supplier, actor, session.Id);
+
+            var updated = await supplierService.GetByIdAsync(session.SupplierId);
+            var pending = await supplierService.GetPendingSupplierEditedFieldsAsync(session.SupplierId);
+            return new SaveSupplierResponse
+            {
+                Success = true,
+                Supplier = updated is null ? null : DtoMapper.ToDto(updated),
+                PendingEditedFieldKeys = pending.ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            // Full stack trace goes to the internal (API host) logs; a readable summary is returned so the
+            // Partner Connect UI/logs show the actual cause instead of a generic "Could not save".
+            logger.LogError(ex, "Self-service save failed for supplier {SupplierId} (session {SessionId})",
+                session.SupplierId, session.Id);
+            return new SaveSupplierResponse { Success = false, Errors = [$"Save failed — {Flatten(ex)}"] };
+        }
     }
 
     public async Task<SubmitResponse> SubmitAsync(SupplierAccessToken session, string baseUrl, SubmitRequest declaration, string actor)
@@ -152,7 +175,16 @@ public class SelfServiceApiService(
         supplier.DisclaimerSignature = declaration.SignatureName.Trim();
         supplier.DisclaimerSignatureImage = signatureImage;
 
-        await supplierService.UpdateAsync(supplier, actor, session.Id, markComplete: true);
+        try
+        {
+            await supplierService.UpdateAsync(supplier, actor, session.Id, markComplete: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Self-service submit failed for supplier {SupplierId} (session {SessionId})",
+                session.SupplierId, session.Id);
+            return new SubmitResponse { Success = false, Error = $"Submit failed — {Flatten(ex)}" };
+        }
 
         // Best-effort notifications (must not fail OR stall the submission): notify the internal requestor,
         // and send the supplier their "Supplier Registration Completed" confirmation. The signed submission

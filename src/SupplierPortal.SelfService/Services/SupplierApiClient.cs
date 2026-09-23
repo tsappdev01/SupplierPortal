@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using SupplierPortal.Contracts;
 
 namespace SupplierPortal.SelfService.Services;
@@ -13,6 +14,17 @@ namespace SupplierPortal.SelfService.Services;
 public class SupplierApiClient(
     IHttpClientFactory httpClientFactory, PortalTokenProvider tokenProvider, ILogger<SupplierApiClient> logger)
 {
+    private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+
+    private static T? Deserialize<T>(string body)
+    {
+        try { return string.IsNullOrWhiteSpace(body) ? default : JsonSerializer.Deserialize<T>(body, JsonOpts); }
+        catch { return default; }
+    }
+
+    private static string Trim(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max] + "…");
+
     private async Task<HttpClient> AuthedClientAsync(string? sessionToken = null)
     {
         var http = httpClientFactory.CreateClient("Api");
@@ -96,14 +108,31 @@ public class SupplierApiClient(
 
     public async Task<SaveSupplierResponse> SaveAsync(string sessionToken, SupplierDto supplier)
     {
-        var http = await AuthedClientAsync(sessionToken);
-        var res = await http.PutAsJsonAsync("/api/selfservice/supplier", supplier);
-        if (!res.IsSuccessStatusCode)
+        try
         {
-            return new SaveSupplierResponse { Success = false, Errors = ["Could not save. Please try again."] };
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.PutAsJsonAsync("/api/selfservice/supplier", supplier);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                // Log the FULL server response (status + body) to the Partner Connect logs, and surface a
+                // trimmed version to the page so the real cause is visible during testing.
+                logger.LogError("Self-service SaveAsync failed: HTTP {Status}. Response body: {Body}",
+                    (int)res.StatusCode, Trim(body, 4000));
+                return new SaveSupplierResponse
+                {
+                    Success = false,
+                    Errors = [$"Could not save (HTTP {(int)res.StatusCode}). {Trim(body, 500)}"]
+                };
+            }
+            return Deserialize<SaveSupplierResponse>(body)
+                   ?? new SaveSupplierResponse { Success = false, Errors = ["Unexpected response."] };
         }
-        return await res.Content.ReadFromJsonAsync<SaveSupplierResponse>()
-               ?? new SaveSupplierResponse { Success = false, Errors = ["Unexpected response."] };
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Self-service SaveAsync request threw");
+            return new SaveSupplierResponse { Success = false, Errors = [$"Could not save: {ex.Message}"] };
+        }
     }
 
     public async Task<DocumentUploadResponse> UploadDocumentAsync(
@@ -170,11 +199,14 @@ public class SupplierApiClient(
         {
             var http = await AuthedClientAsync(sessionToken);
             var res = await http.PostAsJsonAsync("/api/selfservice/submit", declaration);
+            var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode)
             {
-                return new SubmitResponse { Success = false, Error = "Could not submit. Please try again." };
+                logger.LogError("Self-service SubmitAsync failed: HTTP {Status}. Response body: {Body}",
+                    (int)res.StatusCode, Trim(body, 4000));
+                return new SubmitResponse { Success = false, Error = $"Could not submit (HTTP {(int)res.StatusCode}). {Trim(body, 500)}" };
             }
-            return await res.Content.ReadFromJsonAsync<SubmitResponse>()
+            return Deserialize<SubmitResponse>(body)
                    ?? new SubmitResponse { Success = false, Error = "Unexpected response." };
         }
         catch (Exception ex)
