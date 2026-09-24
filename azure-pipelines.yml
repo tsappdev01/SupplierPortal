@@ -1,0 +1,125 @@
+# Azure DevOps CI/CD pipeline for the Supplier Portal.
+# Builds the two .NET 8 web apps and deploys them to their Azure App Services (Linux):
+#   - SupplierPortal.Web         -> app service 'supplierportal'  (internal portal)
+#   - SupplierPortal.SelfService -> app service 'partnerconnect'  (Partner Connect / self-service)
+#
+# ONE-TIME SETUP in Azure DevOps (details in the chat notes):
+#   1. Project Settings > Service connections > New service connection >
+#      "Azure Resource Manager" > Service principal (automatic) > pick the subscription
+#      and resource group 'DotNetSites' > name it EXACTLY the value of 'azureSubscription' below.
+#   2. Pipelines > New pipeline > choose where this repo lives (GitHub / Azure Repos) >
+#      "Existing Azure Pipelines YAML file" > select '/azure-pipelines.yml' > Run.
+#
+# After that, every push to the trigger branch builds and deploys automatically.
+
+trigger:
+  branches:
+    include:
+      - main            # <-- set this to your real release branch (main / master)
+  paths:
+    include:
+      - src/**
+      - azure-pipelines.yml
+
+variables:
+  buildConfiguration: 'Release'
+  azureSubscription: 'Azure-DotNetSites'    # <-- MUST match the service-connection name you create
+  webAppName: 'supplierportal'
+  selfServiceAppName: 'partnerconnect'
+  vmImage: 'ubuntu-latest'
+
+stages:
+# ---------------------------------------------------------------------------
+- stage: Build
+  displayName: Build & package
+  jobs:
+  - job: build
+    pool:
+      vmImage: $(vmImage)
+    steps:
+    - task: UseDotNet@2
+      displayName: Install .NET 8 SDK
+      inputs:
+        packageType: sdk
+        version: '8.0.x'
+
+    - task: DotNetCoreCLI@2
+      displayName: Restore
+      inputs:
+        command: restore
+        projects: 'BPPortal.sln'
+
+    # Internal portal (Manage Supplier, Scheduled Reports, admin settings, tab restrictions).
+    - task: DotNetCoreCLI@2
+      displayName: Publish SupplierPortal.Web
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: 'src/SupplierPortal.Web/SupplierPortal.Web.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/web'
+        zipAfterPublish: true
+
+    # Partner Connect (supplier self-service / OTP form).
+    - task: DotNetCoreCLI@2
+      displayName: Publish SupplierPortal.SelfService
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: 'src/SupplierPortal.SelfService/SupplierPortal.SelfService.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/selfservice'
+        zipAfterPublish: true
+
+    - publish: $(Build.ArtifactStagingDirectory)
+      artifact: drop
+
+# ---------------------------------------------------------------------------
+- stage: Deploy_Web
+  displayName: Deploy internal portal (supplierportal)
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: deployWeb
+    pool:
+      vmImage: $(vmImage)
+    environment: 'supplierportal-prod'      # add a manual approval on this environment if you want a gate
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            displayName: Deploy to $(webAppName)
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: webAppLinux
+              appName: $(webAppName)
+              package: '$(Pipeline.Workspace)/drop/web/*.zip'
+              startUpCommand: 'dotnet SupplierPortal.Web.dll'
+
+# ---------------------------------------------------------------------------
+# Deploy Partner Connect too. Delete this whole stage if you only ever want to
+# deploy the internal portal from this pipeline.
+- stage: Deploy_SelfService
+  displayName: Deploy Partner Connect (partnerconnect)
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: deploySelfService
+    pool:
+      vmImage: $(vmImage)
+    environment: 'partnerconnect-prod'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - download: current
+            artifact: drop
+          - task: AzureWebApp@1
+            displayName: Deploy to $(selfServiceAppName)
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: webAppLinux
+              appName: $(selfServiceAppName)
+              package: '$(Pipeline.Workspace)/drop/selfservice/*.zip'
+              startUpCommand: 'dotnet SupplierPortal.SelfService.dll'
