@@ -34,6 +34,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<CustomerDocument> CustomerDocuments => Set<CustomerDocument>();
     public DbSet<CustomerDocumentType> CustomerDocumentTypes => Set<CustomerDocumentType>();
     public DbSet<CustomerFieldConfig> CustomerFieldConfigs => Set<CustomerFieldConfig>();
+    public DbSet<CustomerTabSetting> CustomerTabSettings => Set<CustomerTabSetting>();
     public DbSet<CustomerAccessToken> CustomerAccessTokens => Set<CustomerAccessToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -414,6 +415,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .IsUnique();
 
         modelBuilder.Entity<SupplierTabSetting>()
+            .Property(t => t.IsVisible)
+            .HasDefaultValue(true);
+
+        modelBuilder.Entity<CustomerTabSetting>()
+            .HasIndex(t => new { t.Section, t.GroupName })
+            .IsUnique();
+
+        modelBuilder.Entity<CustomerTabSetting>()
             .Property(t => t.IsVisible)
             .HasDefaultValue(true);
 

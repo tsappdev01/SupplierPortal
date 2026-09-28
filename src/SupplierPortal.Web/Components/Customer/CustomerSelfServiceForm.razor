@@ -233,14 +233,10 @@
 
     private record Step(string Title, string Section, string? Group, bool IsReview);
 
-    private static readonly string[] AccountOrder =
-        ["Company Identity & Classification", "Tax, Trade License & Registration", "Contact & Address", "Ownership, Banking & Payment"];
-    private static readonly string[] ContactOrder =
-        ["Personal Details", "Identification", "Contact & UAE Pass", "Employment & Other"];
-
     private Customer? customer;
     private CustomerContact contact = new();
     private List<CustomerFieldConfig> config = [];
+    private List<SsCustomerTab> tabs = [];
     private List<CustomerDocumentType> docTypes = [];
     private List<Step> steps = [];
     private int current;
@@ -276,6 +272,7 @@
         {
             customer = bundle.Customer;
             config = bundle.Config;
+            tabs = bundle.Tabs;
             docTypes = bundle.DocTypes;
             contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
             currentUser = $"Customer Self-Service ({CustomerAccessTokenService.EmailFor(customer)})";
@@ -288,13 +285,20 @@
 
     private void BuildSteps()
     {
+        // Honour the admin-configured tabs (title, order, visibility) sent in the bundle. Fall back to
+        // deriving tabs from the field config's groups if none were sent.
+        var orderedTabs = (tabs.Count > 0
+                ? tabs.Where(t => t.IsVisible)
+                : config.Where(f => f.IsVisible)
+                    .GroupBy(f => new { f.Section, f.GroupName })
+                    .Select(g => new SsCustomerTab(g.Key.Section, g.Key.GroupName, g.Key.GroupName, g.Min(x => x.Sequence), true)))
+            .OrderBy(t => t.Section == "Account" ? 0 : 1).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName)
+            .ToList();
+
         var list = new List<Step>();
-        foreach (var g in AccountOrder)
-            if (config.Any(f => f.IsVisible && f.Section == "Account" && f.GroupName == g))
-                list.Add(new Step(g, "Account", g, false));
-        foreach (var g in ContactOrder)
-            if (config.Any(f => f.IsVisible && f.Section == "Contact" && f.GroupName == g))
-                list.Add(new Step(g, "Contact", g, false));
+        foreach (var t in orderedTabs)
+            if (config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
+                list.Add(new Step(t.Title, t.Section, t.GroupName, false));
         list.Add(new Step("Documents", "", "Documents", false));
         list.Add(new Step("Review & Submit", "", null, true));
         steps = list;

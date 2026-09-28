@@ -6,12 +6,25 @@ using SupplierPortal.Web.Models.Customer;
 namespace SupplierPortal.Web.Services;
 
 /// <summary>Reads and updates the CST portal's per-field configuration (control per role + visibility +
-/// required). Seeded from the onboarding sheet; edited on the Customer Field Settings admin screen. The
+/// required + tab/order/removal) and the customer wizard tabs (title, order, visibility, per-user edit
+/// restriction). Seeded from the onboarding sheet; edited on the Customer Field Settings admin screen. The
 /// same config later drives how the Business and self-service forms render each field.</summary>
 public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService)
 {
-    /// <summary>All field configs, ordered Account section first then Contact, by display order.</summary>
+    /// <summary>Field configs that drive the forms: Account section first then Contact, by display order,
+    /// excluding fields an admin has removed.</summary>
     public async Task<List<CustomerFieldConfig>> GetAllAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerFieldConfigs
+            .Where(f => !f.IsRemoved)
+            .OrderBy(f => f.Section == "Account" ? 0 : 1)
+            .ThenBy(f => f.Sequence)
+            .ToListAsync();
+    }
+
+    /// <summary>All field configs for the admin manager — includes removed fields so they can be restored.</summary>
+    public async Task<List<CustomerFieldConfig>> GetAllForAdminAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.CustomerFieldConfigs
@@ -20,18 +33,19 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             .ToListAsync();
     }
 
-    /// <summary>The visible + required field keys for a section, keyed by FieldKey — used later by the form
-    /// validation. A hidden field is never required.</summary>
+    /// <summary>The visible + required field keys for a section, keyed by FieldKey — used by form validation.
+    /// A hidden or removed field is never required.</summary>
     public async Task<Dictionary<string, bool>> GetRequiredByKeyAsync(string section)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.CustomerFieldConfigs
-            .Where(f => f.Section == section && f.IsVisible && f.IsRequired)
+            .Where(f => f.Section == section && f.IsVisible && f.IsRequired && !f.IsRemoved)
             .ToDictionaryAsync(f => f.FieldKey, _ => true);
     }
 
-    /// <summary>Persists edited control/visibility/required values. Only the four editable columns are
-    /// applied, matched by Id; a field hidden from a role is forced Read-only and never required.</summary>
+    /// <summary>Persists the full edited layout (control per role, visibility, required, tab, order, removed),
+    /// matched by Id. A field hidden from a role can't be edited by it; an invisible or removed field is never
+    /// required.</summary>
     public async Task SaveAsync(IEnumerable<CustomerFieldConfig> edits, string actorUsername)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -45,14 +59,96 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             row.CustomerControl = Normalize(edit.CustomerControl);
             row.IsVisible = edit.IsVisible;
             row.IsRequired = edit.IsRequired;
+            row.IsRemoved = edit.IsRemoved;
+            // Moving a field to another tab keeps it in the same Section (enforced by the admin UI).
+            if (!string.IsNullOrWhiteSpace(edit.GroupName)) row.GroupName = edit.GroupName;
+            row.Sequence = edit.Sequence;
 
-            // A field that isn't shown to a role can't be edited by it, and an invisible field is never required.
-            if (!row.IsVisible) row.IsRequired = false;
+            // A field that isn't shown to a role can't be edited by it; invisible or removed fields are never required.
+            if (!row.IsVisible || row.IsRemoved) row.IsRequired = false;
         }
 
         await db.SaveChangesAsync();
         await auditService.LogAsync(actorUsername, AuditAction.Update, "CustomerFieldConfig", null,
-            "Updated CST customer field configuration");
+            "Updated CST customer field configuration (controls / visibility / tab / order / removed)");
+    }
+
+    // ---- Wizard tabs (groups) ----
+
+    /// <summary>The customer wizard tabs (one per distinct Section+GroupName in the field config) with their
+    /// admin-editable title, order and visibility. Seeds any missing tabs on first use, ordered Account first
+    /// then Contact, then by field order within each section.</summary>
+    public async Task<List<CustomerTabSetting>> GetTabsAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var tabs = await db.CustomerTabSettings.ToListAsync();
+
+        // Discover the distinct groups present in the field config (all fields, so a group made up entirely of
+        // removed fields still has a tab that can be restored).
+        var cfgs = await db.CustomerFieldConfigs
+            .Select(f => new { f.Section, f.GroupName, f.Sequence })
+            .ToListAsync();
+        var groups = cfgs
+            .Where(c => !string.IsNullOrWhiteSpace(c.GroupName))
+            .GroupBy(c => new { c.Section, c.GroupName })
+            .Select(g => new { g.Key.Section, g.Key.GroupName, MinSeq = g.Min(x => x.Sequence) })
+            .ToList();
+
+        var missing = groups
+            .Where(g => !tabs.Any(t => t.Section == g.Section && t.GroupName == g.GroupName))
+            .ToList();
+        if (missing.Count > 0)
+        {
+            foreach (var g in missing)
+            {
+                db.CustomerTabSettings.Add(new CustomerTabSetting
+                {
+                    Section = g.Section,
+                    GroupName = g.GroupName,
+                    Title = g.GroupName,
+                    Sequence = g.MinSeq,
+                    IsVisible = true
+                });
+            }
+            await db.SaveChangesAsync();
+            tabs = await db.CustomerTabSettings.ToListAsync();
+        }
+
+        return tabs
+            .OrderBy(t => t.Section == "Account" ? 0 : 1)
+            .ThenBy(t => t.Sequence)
+            .ThenBy(t => t.GroupName)
+            .ToList();
+    }
+
+    /// <summary>One tab's editable state from the admin manager.</summary>
+    public record CustomerTabLayout(string Section, string GroupName, string Title, int Sequence,
+        bool IsVisible, string? EditableByUserIdsCsv);
+
+    public async Task SaveTabsAsync(IEnumerable<CustomerTabLayout> tabs, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var existing = await db.CustomerTabSettings.ToListAsync();
+
+        foreach (var tab in tabs)
+        {
+            var row = existing.FirstOrDefault(t => t.Section == tab.Section && t.GroupName == tab.GroupName);
+            if (row is null)
+            {
+                row = new CustomerTabSetting { Section = tab.Section, GroupName = tab.GroupName };
+                db.CustomerTabSettings.Add(row);
+            }
+
+            row.Title = string.IsNullOrWhiteSpace(tab.Title) ? tab.GroupName : tab.Title.Trim();
+            row.Sequence = tab.Sequence;
+            row.IsVisible = tab.IsVisible;
+            var ids = SupplierFieldSettingService.ParseEditorUserIds(tab.EditableByUserIdsCsv);
+            row.EditableByUserIdsCsv = ids.Count == 0 ? null : string.Join(",", ids.OrderBy(i => i));
+        }
+
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "CustomerTabSetting", null,
+            "Updated CST customer wizard tab titles / order / visibility / editors");
     }
 
     private static string Normalize(string? control) =>

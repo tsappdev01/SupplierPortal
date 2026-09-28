@@ -431,6 +431,10 @@ table thead th {
 .di-switch input:checked + .di-switch-slider::before { transform: translateX(20px); }
 .di-switch input:disabled + .di-switch-slider { opacity: .45; cursor: not-allowed; }
 
+/* Per-tab read-only banner (customer form; shown when a tab is edit-restricted to other users) */
+.di-tab-readonly-note { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #f2d99b; border-radius: 10px; background: #fff8e8; color: #8a5b06; font-size: 13px; font-weight: 500; }
+.di-tab-readonly-note svg { flex: none; color: #b07d1a; }
+
 /* Light / dark theme toggle in the top bar */
 .di-theme-toggle {
     display: inline-flex;

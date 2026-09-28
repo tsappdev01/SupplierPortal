@@ -935,6 +935,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
@@ -952,6 +955,49 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CustomerFieldConfigs");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerTabSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EditableByUserIdsCsv")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("IsVisible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Section", "GroupName")
+                        .IsUnique();
+
+                    b.ToTable("CustomerTabSettings");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.LookupValue", b =>

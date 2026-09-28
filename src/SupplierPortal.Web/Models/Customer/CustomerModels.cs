@@ -265,4 +265,37 @@ public class CustomerFieldConfig
     public bool IsVisible { get; set; } = true;
 
     public bool IsRequired { get; set; }
+
+    /// <summary>When true the field is removed from the form entirely (not shown to any role, never required)
+    /// but kept so an admin can restore it. Mirrors the supplier field manager's remove/restore.</summary>
+    public bool IsRemoved { get; set; }
+}
+
+/// <summary>Admin-configurable title, order, visibility and per-user edit restriction for one customer wizard
+/// tab (a distinct <see cref="CustomerFieldConfig.GroupName"/> within a <see cref="CustomerFieldConfig.Section"/>).
+/// Mirrors the supplier <c>SupplierTabSetting</c>. Seeded on first use from the groups present in the field
+/// config. A hidden tab is skipped by both customer forms.</summary>
+public class CustomerTabSetting
+{
+    public int Id { get; set; }
+
+    /// <summary>"Account" (the Customer entity) or "Contact" (the CustomerContact entity).</summary>
+    [Required, MaxLength(20)] public string Section { get; set; } = "Account";
+
+    /// <summary>The group key this tab represents — matches <see cref="CustomerFieldConfig.GroupName"/>.
+    /// Unique within a section.</summary>
+    [Required, MaxLength(80)] public string GroupName { get; set; } = "";
+
+    /// <summary>Display title (admin-editable). Defaults to the group name.</summary>
+    [Required, MaxLength(150)] public string Title { get; set; } = string.Empty;
+
+    /// <summary>Tab order within its section.</summary>
+    public int Sequence { get; set; }
+
+    public bool IsVisible { get; set; } = true;
+
+    /// <summary>Comma-separated internal user Ids (<see cref="User.Id"/>) permitted to EDIT this tab on the
+    /// internal customer form. Null/empty = no restriction; otherwise all other internal users see it
+    /// read-only. Does not affect the customer self-service portal.</summary>
+    [MaxLength(1000)] public string? EditableByUserIdsCsv { get; set; }
 }

@@ -76,6 +76,9 @@ public class LocalCustomerSelfServiceDataGateway(
             Config = await fieldConfigService.GetAllAsync(),
             Documents = await documentService.GetDocumentsAsync(access.CustomerId),
             DocTypes = await documentService.GetTypesAsync(),
+            Tabs = (await fieldConfigService.GetTabsAsync())
+                .Select(t => new SsCustomerTab(t.Section, t.GroupName, t.Title, t.Sequence, t.IsVisible))
+                .ToList(),
         };
     }
 

@@ -159,12 +159,20 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     }
 
     /// <summary>Persists edits to the account + its primary contact. The caller has already applied the edited
-    /// values (via the config-driven form) onto the tracked entities returned by <see cref="GetAsync"/>.</summary>
-    public async Task SaveAsync(Customer edited, string actor)
+    /// values (via the config-driven form) onto the tracked entities returned by <see cref="GetAsync"/>.
+    /// <paramref name="readOnlyAccountKeys"/> / <paramref name="readOnlyContactKeys"/> name fields on tabs the
+    /// acting user may not edit (per-tab edit restriction on the internal form): those keep their current
+    /// database values regardless of the payload, so a locked tab can't be changed even by a tampered save.</summary>
+    public async Task SaveAsync(Customer edited, string actor,
+        IReadOnlySet<string>? readOnlyAccountKeys = null, IReadOnlySet<string>? readOnlyContactKeys = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var customer = await db.Customers.Include(c => c.Contact).FirstOrDefaultAsync(c => c.Id == edited.Id);
         if (customer is null) return;
+
+        // Capture the current (DB) values of any read-only fields before the copy so they can be restored.
+        var acctOriginals = Capture(customer, readOnlyAccountKeys);
+        var contactOriginals = customer.Contact is not null ? Capture(customer.Contact, readOnlyContactKeys) : [];
 
         db.Entry(customer).CurrentValues.SetValues(edited);
 
@@ -181,6 +189,10 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         customer.Contact.Id = keepId;
         customer.Contact.CustomerId = keepFk;
 
+        // Restore any read-only (locked-tab) fields so they can't be changed by this save.
+        Restore(customer, acctOriginals);
+        Restore(customer.Contact, contactOriginals);
+
         customer.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         await audit.LogAsync(actor, AuditAction.Update, "Customer", customer.Id, "Updated customer record");
@@ -195,6 +207,28 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         customer.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         await audit.LogAsync(actor, AuditAction.Update, "Customer", id, $"Customer status → {status}");
+    }
+
+    // Reflection helpers for the per-tab read-only guard: capture/restore named scalar fields on an entity.
+    private static Dictionary<string, object?> Capture(object entity, IReadOnlySet<string>? keys)
+    {
+        var captured = new Dictionary<string, object?>();
+        if (keys is null || keys.Count == 0) return captured;
+        foreach (var key in keys)
+        {
+            var prop = entity.GetType().GetProperty(key);
+            if (prop is not null && prop.CanRead && prop.CanWrite) captured[key] = prop.GetValue(entity);
+        }
+        return captured;
+    }
+
+    private static void Restore(object entity, Dictionary<string, object?> originals)
+    {
+        foreach (var (key, val) in originals)
+        {
+            var prop = entity.GetType().GetProperty(key);
+            if (prop is not null && prop.CanWrite) prop.SetValue(entity, val);
+        }
     }
 
     /// <summary>Sets the customer's work priority (P1..P4, or null to clear) from the dashboard.</summary>

@@ -3,18 +3,20 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Models.Customer
 @using SupplierPortal.Web.Services
 @inject CustomerFieldConfigService FieldConfigService
+@inject UserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Customer Field Settings - CST Portal</PageTitle>
+<PageTitle>Customer Field Manager - CST Portal</PageTitle>
 
-<h1>Customer Field Settings</h1>
+<h1>Customer Field Manager</h1>
 <p class="text-muted">
-    For each field from the customer onboarding sheet, choose the control the <strong>Business Relation</strong>
-    department gets versus the <strong>Customer</strong> (self-service) — Editable, Read-only or Lookup — and
-    whether the field is visible and required. These rules drive how the customer forms render, with no code change.
+    Manage the customer form's fields and tabs. Rename or hide a tab, reorder fields within a tab, move a
+    field to another tab, remove it from the form, and set each field's per-role control (Business vs
+    Customer), visibility and required flag. These rules drive both customer forms with no code change.
 </p>
 
 @if (savedMessage is not null)
@@ -22,7 +24,7 @@
     <div class="alert alert-success">@savedMessage</div>
 }
 
-@if (configs.Count == 0)
+@if (rows.Count == 0)
 {
     <p><em>Loading…</em></p>
 }
@@ -32,67 +34,200 @@ else
         <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
             @(saving ? "Saving…" : "Save changes")
         </button>
-        <span class="text-muted">@configs.Count fields · @configs.Count(c => c.Section == "Account") account · @configs.Count(c => c.Section == "Contact") contact</span>
+        <span class="text-muted">@rows.Count(r => !r.IsRemoved) active field(s) · @rows.Count(r => r.IsRemoved) removed</span>
     </div>
 
-    @foreach (var group in configs.GroupBy(c => c.Section).OrderBy(g => g.Key == "Account" ? 0 : 1))
-    {
-        <div class="di-field-settings-section mb-3">
-            <div class="di-field-settings-header">@(group.Key == "Account" ? "Account (Company)" : "Contact (Individual)") — @group.Count() fields</div>
-            <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+    @* ---------- Wizard Tabs ---------- *@
+    <div class="di-field-settings-section mb-3">
+        <div class="di-field-settings-header">Wizard Tabs</div>
+        <div class="p-3">
+            <p class="text-muted mb-2" style="font-size: 13px;">
+                Rename or hide the customer form's tabs and set their order. A hidden tab is skipped by the
+                form. <strong>Editable by</strong> restricts who may <em>change</em> a tab on the internal
+                customer form — leave it as <em>Anyone</em> for no restriction; when you pick users, every
+                other internal user can view the tab but its fields are read-only for them. This does not
+                affect the customer self-service portal.
+            </p>
+            @foreach (var section in Sections)
+            {
+                <div class="fw-semibold mt-2 mb-1">@(section == "Account" ? "Account (Company)" : "Contact (Individual)")</div>
+                <table class="table table-sm align-middle mb-2">
                     <thead>
                         <tr>
-                            <th>Field</th>
-                            <th style="width: 150px;">Business control</th>
-                            <th style="width: 150px;">Customer control</th>
-                            <th style="width: 90px;">Visible</th>
-                            <th style="width: 90px;">Required</th>
+                            <th style="width: 90px;">Order</th>
+                            <th>Tab title</th>
+                            <th style="width: 100px;">Visible</th>
+                            <th style="width: 300px;">Editable by</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var f in group)
+                        @{ var secTabs = TabsForSection(section); }
+                        @for (var i = 0; i < secTabs.Count; i++)
                         {
+                            var tab = secTabs[i];
+                            var index = i;
+                            var editors = EditorsFor(tab);
                             <tr>
                                 <td>
-                                    @f.DisplayLabel
-                                    @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
-                                    else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Date</span> }
-                                    else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Yes/No</span> }
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-secondary" title="Move up" disabled="@(index == 0)"
+                                                @onclick="() => MoveTabUp(section, index)">↑</button>
+                                        <button class="btn btn-outline-secondary" title="Move down" disabled="@(index == secTabs.Count - 1)"
+                                                @onclick="() => MoveTabDown(section, index)">↓</button>
+                                    </div>
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm" @bind="f.BusinessControl">
-                                        @foreach (var c in CustomerFieldControls.All)
-                                        {
-                                            <option value="@c">@c</option>
-                                        }
-                                    </select>
+                                    <input class="form-control form-control-sm" @bind="tab.Title" maxlength="150" />
+                                    <div class="di-field-key">@tab.GroupName</div>
                                 </td>
                                 <td>
-                                    <select class="form-select form-select-sm" @bind="f.CustomerControl">
-                                        @foreach (var c in CustomerFieldControls.All)
-                                        {
-                                            <option value="@c">@c</option>
-                                        }
-                                    </select>
-                                </td>
-                                <td class="text-center">
                                     <label class="di-switch">
-                                        <input type="checkbox" @bind="f.IsVisible" />
+                                        <input type="checkbox" checked="@tab.IsVisible" @onchange="e => tab.IsVisible = (bool)e.Value!" />
                                         <span class="di-switch-slider"></span>
                                     </label>
                                 </td>
-                                <td class="text-center">
-                                    <label class="di-switch">
-                                        <input type="checkbox" @bind="f.IsRequired" disabled="@(!f.IsVisible)" />
-                                        <span class="di-switch-slider"></span>
-                                    </label>
+                                <td>
+                                    @if (editableUsers.Count == 0)
+                                    {
+                                        <span class="text-muted fst-italic">No Customer-portal users</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="di-editors-summary">@(editors.Count == 0 ? "Anyone (no restriction)" : $"{editors.Count} user(s) only")</div>
+                                        <div class="di-editors-list">
+                                            @foreach (var u in editableUsers)
+                                            {
+                                                <label class="di-editor-item">
+                                                    <input type="checkbox" checked="@editors.Contains(u.Id)"
+                                                           @onchange="e => ToggleEditor(tab, u.Id, (bool)e.Value!)" />
+                                                    <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    }
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
+            }
+        </div>
+    </div>
+
+    @* ---------- Fields, grouped by tab ---------- *@
+    @foreach (var section in Sections)
+    {
+        foreach (var tab in TabsForSection(section))
+        {
+            var tabFields = FieldsForTab(section, tab.GroupName);
+            <div class="di-field-settings-section mb-3">
+                <div class="di-field-settings-header">
+                    @(section == "Account" ? "Account" : "Contact") · @tab.Title
+                    <span class="di-tab-count">@tabFields.Count field(s)</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 90px;">Order</th>
+                                <th>Field</th>
+                                <th style="width: 160px;">Move to tab</th>
+                                <th style="width: 140px;">Business control</th>
+                                <th style="width: 140px;">Customer control</th>
+                                <th style="width: 80px;">Visible</th>
+                                <th style="width: 80px;">Required</th>
+                                <th style="width: 80px;">Remove</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (tabFields.Count == 0)
+                            {
+                                <tr><td colspan="8" class="text-muted fst-italic">No fields on this tab.</td></tr>
+                            }
+                            @for (var i = 0; i < tabFields.Count; i++)
+                            {
+                                var f = tabFields[i];
+                                var index = i;
+                                <tr>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-outline-secondary" title="Move up" disabled="@(index == 0)"
+                                                    @onclick="() => MoveFieldUp(section, tab.GroupName, index)">↑</button>
+                                            <button class="btn btn-outline-secondary" title="Move down" disabled="@(index == tabFields.Count - 1)"
+                                                    @onclick="() => MoveFieldDown(section, tab.GroupName, index)">↓</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @f.DisplayLabel
+                                        @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
+                                        else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Date</span> }
+                                        else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Yes/No</span> }
+                                        <div class="di-field-key">@f.FieldKey</div>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" value="@f.GroupName"
+                                                @onchange="e => MoveFieldToTab(f, (string?)e.Value)">
+                                            @foreach (var t in TabsForSection(section))
+                                            {
+                                                <option value="@t.GroupName" selected="@(t.GroupName == f.GroupName)">@t.Title</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="f.BusinessControl">
+                                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" @bind="f.CustomerControl">
+                                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
+                                        </select>
+                                    </td>
+                                    <td class="text-center">
+                                        <label class="di-switch">
+                                            <input type="checkbox" checked="@f.IsVisible" @onchange="e => OnVisibleChanged(f, (bool)e.Value!)" />
+                                            <span class="di-switch-slider"></span>
+                                        </label>
+                                    </td>
+                                    <td class="text-center">
+                                        <label class="di-switch">
+                                            <input type="checkbox" checked="@f.IsRequired" disabled="@(!f.IsVisible)"
+                                                   @onchange="e => f.IsRequired = (bool)e.Value!" />
+                                            <span class="di-switch-slider"></span>
+                                        </label>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger" title="Remove field from the form"
+                                                @onclick="() => f.IsRemoved = true">Remove</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
+        }
+    }
+
+    @if (rows.Any(r => r.IsRemoved))
+    {
+        <div class="di-field-settings-section mb-3">
+            <div class="di-field-settings-header di-removed-header">Removed Fields</div>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr><th>Field</th><th style="width: 220px;">Originally on tab</th><th style="width: 120px;">Restore</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in rows.Where(r => r.IsRemoved).OrderBy(r => r.Section).ThenBy(r => r.DisplayLabel))
+                    {
+                        <tr>
+                            <td>@f.DisplayLabel<div class="di-field-key">@f.FieldKey</div></td>
+                            <td>@f.Section · @f.GroupName</td>
+                            <td><button class="btn btn-sm btn-outline-success" @onclick="() => f.IsRemoved = false">Restore</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     }
 
@@ -101,27 +236,136 @@ else
     </button>
 }
 
+<style>
+    .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
+    .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
+    .di-removed-header { background: #7a1f2b; }
+    .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }
+    .di-editors-list { max-height: 108px; overflow-y: auto; border: 1px solid #e2e5ea; border-radius: 6px; padding: 4px 8px; background: #fff; }
+    .di-editor-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; cursor: pointer; }
+    .di-editor-item input { width: 15px; height: 15px; accent-color: #2f6fed; }
+</style>
+
 @code {
-    private List<CustomerFieldConfig> configs = [];
+    private List<CustomerFieldConfig> rows = [];
+    private List<CustomerTabSetting> tabs = [];
+    private List<User> editableUsers = [];
+    private readonly Dictionary<string, HashSet<int>> tabEditors = [];   // key = Section|GroupName
     private string currentUser = "unknown";
     private string? savedMessage;
     private bool saving;
+
+    private static readonly string[] Sections = ["Account", "Contact"];
+
+    private List<CustomerTabSetting> TabsForSection(string section) =>
+        tabs.Where(t => t.Section == section).OrderBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList();
+
+    private List<CustomerFieldConfig> FieldsForTab(string section, string group) =>
+        rows.Where(r => !r.IsRemoved && r.Section == section && r.GroupName == group)
+            .OrderBy(r => r.Sequence).ToList();
+
+    private static string EditorKey(CustomerTabSetting t) => $"{t.Section}|{t.GroupName}";
+    private HashSet<int> EditorsFor(CustomerTabSetting t) =>
+        tabEditors.TryGetValue(EditorKey(t), out var set) ? set : (tabEditors[EditorKey(t)] = []);
+    private void ToggleEditor(CustomerTabSetting t, int userId, bool on)
+    {
+        var set = EditorsFor(t);
+        if (on) set.Add(userId); else set.Remove(userId);
+    }
 
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
-        configs = await FieldConfigService.GetAllAsync();
+        rows = await FieldConfigService.GetAllForAdminAsync();
+        tabs = await FieldConfigService.GetTabsAsync();
+        editableUsers = await UserService.GetCustomerAssignableUsersAsync();
+        foreach (var t in tabs)
+        {
+            tabEditors[EditorKey(t)] = SupplierFieldSettingService.ParseEditorUserIds(t.EditableByUserIdsCsv);
+        }
+        NormalizeSequences();
+    }
+
+    private void OnVisibleChanged(CustomerFieldConfig f, bool visible)
+    {
+        f.IsVisible = visible;
+        if (!visible) f.IsRequired = false;
+    }
+
+    private void MoveTabUp(string section, int index)
+    {
+        var list = TabsForSection(section);
+        if (index <= 0) return;
+        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveTabDown(string section, int index)
+    {
+        var list = TabsForSection(section);
+        if (index >= list.Count - 1) return;
+        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveFieldUp(string section, string group, int index)
+    {
+        var list = FieldsForTab(section, group);
+        if (index <= 0) return;
+        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveFieldDown(string section, string group, int index)
+    {
+        var list = FieldsForTab(section, group);
+        if (index >= list.Count - 1) return;
+        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
+    }
+
+    // Move a field to another tab within the same section (placed at the end of the destination tab).
+    private void MoveFieldToTab(CustomerFieldConfig f, string? newGroup)
+    {
+        if (string.IsNullOrWhiteSpace(newGroup) || newGroup == f.GroupName) return;
+        var maxSeq = rows.Where(r => !r.IsRemoved && r.Section == f.Section && r.GroupName == newGroup && r != f)
+            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
+        f.GroupName = newGroup;
+        f.Sequence = maxSeq + 1;
+    }
+
+    // Renumber field sequences per (section, group) and tab sequences per section to contiguous 1..n so
+    // up/down swaps stay unambiguous after each render.
+    private void NormalizeSequences()
+    {
+        foreach (var section in Sections)
+        {
+            var seq = 1;
+            foreach (var t in tabs.Where(t => t.Section == section).OrderBy(t => t.Sequence).ThenBy(t => t.GroupName))
+                t.Sequence = seq++;
+
+            foreach (var t in tabs.Where(t => t.Section == section))
+            {
+                var fseq = 1;
+                foreach (var f in rows.Where(r => !r.IsRemoved && r.Section == section && r.GroupName == t.GroupName)
+                             .OrderBy(r => r.Sequence))
+                    f.Sequence = fseq++;
+            }
+        }
     }
 
     private async Task SaveAsync()
     {
         saving = true;
         savedMessage = null;
-        // Keep the grid consistent: an invisible field can't be required.
-        foreach (var f in configs.Where(f => !f.IsVisible)) f.IsRequired = false;
-        await FieldConfigService.SaveAsync(configs, currentUser);
+        NormalizeSequences();
+        foreach (var f in rows.Where(f => !f.IsVisible || f.IsRemoved)) f.IsRequired = false;
+
+        await FieldConfigService.SaveAsync(rows, currentUser);
+
+        var tabLayouts = tabs.Select(t => new CustomerFieldConfigService.CustomerTabLayout(
+            t.Section, t.GroupName, t.Title, t.Sequence, t.IsVisible,
+            EditorsFor(t).Count == 0 ? null : string.Join(",", EditorsFor(t))));
+        await FieldConfigService.SaveTabsAsync(tabLayouts, currentUser);
+
         saving = false;
-        savedMessage = "Field settings saved.";
+        savedMessage = "Field layout saved.";
     }
 }

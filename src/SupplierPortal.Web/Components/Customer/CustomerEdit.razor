@@ -10,6 +10,7 @@
 @inject CustomerDocumentService DocumentService
 @inject CustomerAccessTokenService AccessTokenService
 @inject CustomerEmailService CustomerEmailService
+@inject UserService UserService
 @inject ToastService ToastService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Nav
@@ -99,7 +100,15 @@ else
     else if (!step.IsReview)
     {
         var entity = step.Section == "Account" ? (object)customer : contact;
+        var tabEditable = CanEditTab(step);
         <div class="di-section">
+            @if (!tabEditable)
+            {
+                <div class="di-tab-readonly-note">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 0-2 2v4H5a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1V3a2 2 0 0 0-2-2H8zm2 6H7V3a1 1 0 0 1 2 0v4h1z"/></svg>
+                    <span>This tab is read-only for you. Only authorised users can edit it — contact an administrator to make changes.</span>
+                </div>
+            }
             <div class="di-section-header">
                 <span class="di-section-icon">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M9.05.435c-.58-.58-1.52-.58-2.1 0L.436 6.95c-.58.58-.58 1.519 0 2.098l6.516 6.516c.58.58 1.519.58 2.098 0l6.516-6.516c.58-.58.58-1.519 0-2.098L9.05.435z"/></svg>
@@ -119,7 +128,7 @@ else
                     if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
                     var target = entity;
                     var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
-                    var editable = !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
+                    var editable = tabEditable && !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                     var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
                     var sub = step.Group == "Identification" ? Subcategory(cfg.FieldKey) : null;
                     if (sub is not null && sub != lastSub)
@@ -317,14 +326,11 @@ else
 
     private record Step(string Title, string Section, string? Group, bool IsReview);
 
-    private static readonly string[] AccountOrder =
-        ["Company Identity & Classification", "Tax, Trade License & Registration", "Contact & Address", "Ownership, Banking & Payment"];
-    private static readonly string[] ContactOrder =
-        ["Personal Details", "Identification", "Contact & UAE Pass", "Employment & Other"];
-
     private Customer? customer;
     private CustomerContact contact = new();
     private List<CustomerFieldConfig> config = [];
+    private List<CustomerTabSetting> tabs = [];
+    private int? currentUserId;
     private List<Step> steps = [];
     private int current;
     private string currentUser = "unknown";
@@ -338,6 +344,12 @@ else
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
         config = await FieldConfigService.GetAllAsync();
+        tabs = await FieldConfigService.GetTabsAsync();
+        // Resolve the signed-in user's Id only when a tab is actually edit-restricted (for the per-tab lock).
+        if (tabs.Any(t => !string.IsNullOrWhiteSpace(t.EditableByUserIdsCsv)))
+        {
+            currentUserId = (await UserService.GetByIdentifierAsync(currentUser))?.Id;
+        }
         await LoadAsync();
         BuildSteps();
         if (customer is not null)
@@ -365,15 +377,44 @@ else
 
     private void BuildSteps()
     {
+        // Tabs come from the admin-editable CustomerTabSetting (order, title, visibility). A tab renders only
+        // when it is visible and has at least one visible field in the config.
         var list = new List<Step>();
-        foreach (var g in AccountOrder)
-            if (config.Any(f => f.IsVisible && f.Section == "Account" && f.GroupName == g))
-                list.Add(new Step(g, "Account", g, false));
-        foreach (var g in ContactOrder)
-            if (config.Any(f => f.IsVisible && f.Section == "Contact" && f.GroupName == g))
-                list.Add(new Step(g, "Contact", g, false));
+        foreach (var t in tabs.Where(t => t.IsVisible)
+                     .OrderBy(t => t.Section == "Account" ? 0 : 1).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName))
+        {
+            if (config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
+                list.Add(new Step(t.Title, t.Section, t.GroupName, false));
+        }
         list.Add(new Step("Review & Save", "", null, true));
         steps = list;
+    }
+
+    /// <summary>Whether the current user may EDIT the given tab. A tab with a non-empty editor list is editable
+    /// only by a listed user; everyone else sees it read-only. Review/Documents steps are never restricted.</summary>
+    private bool CanEditTab(Step step)
+    {
+        if (step.IsReview || step.Group is null) return true;
+        var csv = tabs.FirstOrDefault(t => t.Section == step.Section && t.GroupName == step.Group)?.EditableByUserIdsCsv;
+        if (string.IsNullOrWhiteSpace(csv)) return true;
+        var allowed = SupplierFieldSettingService.ParseEditorUserIds(csv);
+        return currentUserId is int id && allowed.Contains(id);
+    }
+
+    /// <summary>Field keys (per section) on tabs this user may not edit, for the server-side save guard.</summary>
+    private (HashSet<string> Account, HashSet<string> Contact) LockedKeys()
+    {
+        var acct = new HashSet<string>();
+        var cont = new HashSet<string>();
+        foreach (var t in tabs)
+        {
+            if (string.IsNullOrWhiteSpace(t.EditableByUserIdsCsv)) continue;
+            var allowed = SupplierFieldSettingService.ParseEditorUserIds(t.EditableByUserIdsCsv);
+            if (currentUserId is int id && allowed.Contains(id)) continue;   // this user may edit → not locked
+            foreach (var f in config.Where(f => f.Section == t.Section && f.GroupName == t.GroupName))
+                (t.Section == "Account" ? acct : cont).Add(f.FieldKey);
+        }
+        return (acct, cont);
     }
 
     /// <summary>Sub-section a field belongs to within the Identification step, so the tab is grouped into
@@ -412,7 +453,8 @@ else
         busy = true;
         if (!silent) message = null;
         customer.Contact = contact;
-        await CustomerService.SaveAsync(customer, currentUser);
+        var (lockedAcct, lockedCont) = LockedKeys();
+        await CustomerService.SaveAsync(customer, currentUser, lockedAcct, lockedCont);
         busy = false;
         if (!silent) { isError = false; message = "Saved."; }
         savedTick = true;
@@ -421,13 +463,17 @@ else
     private async Task NextAsync()
     {
         await SaveAsync(true);
-        var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
-            .Concat(DateErrorsForStep(steps[current]))
-            .Concat(FormatErrors(FieldsFor(steps[current]))).ToList();
-        if (problems.Count > 0)
+        // A tab this user can't edit is read-only, so don't block them on its validation.
+        if (CanEditTab(steps[current]))
         {
-            ToastService.ShowErrors(problems);
-            return;
+            var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
+                .Concat(DateErrorsForStep(steps[current]))
+                .Concat(FormatErrors(FieldsFor(steps[current]))).ToList();
+            if (problems.Count > 0)
+            {
+                ToastService.ShowErrors(problems);
+                return;
+            }
         }
         if (current < steps.Count - 1) current++;
         message = null;
@@ -567,7 +613,8 @@ else
         if (customer is null) return;
         busy = true; message = null;
         customer.Contact = contact;
-        await CustomerService.SaveAsync(customer, currentUser);
+        var (retAcct, retCont) = LockedKeys();
+        await CustomerService.SaveAsync(customer, currentUser, retAcct, retCont);
         var (ok, err) = await CustomerEmailService.NotifyCustomerAsync(
             customer.Id, customer.LegalName ?? "Customer",
             CustomerAccessTokenService.EmailFor(customer), currentUser, Nav.BaseUri);
@@ -623,7 +670,8 @@ else
         }
         busy = true; message = null;
         customer.Contact = contact;
-        await CustomerService.SaveAsync(customer, currentUser);
+        var (setAcct, setCont) = LockedKeys();
+        await CustomerService.SaveAsync(customer, currentUser, setAcct, setCont);
         await CustomerService.SetStatusAsync(customer.Id, status, currentUser);
         customer.Status = status;
         busy = false; isError = false;

@@ -15,7 +15,15 @@ public class SsCustomerFormData
     public List<CustomerFieldConfig> Config { get; set; } = [];
     public List<CustomerDocument> Documents { get; set; } = [];
     public List<CustomerDocumentType> DocTypes { get; set; } = [];
+
+    /// <summary>Admin-configured wizard tabs (title, order, visibility) so the self-service form honours tab
+    /// renames/reordering/hiding. The per-user edit restriction is intentionally NOT sent — it applies only to
+    /// the internal form.</summary>
+    public List<SsCustomerTab> Tabs { get; set; } = [];
 }
+
+/// <summary>A customer wizard tab as seen by the self-service form (no internal editor list).</summary>
+public record SsCustomerTab(string Section, string GroupName, string Title, int Sequence, bool IsVisible);
 
 public record SsCustomerSubmitRequest(string Token, string Session, Customer Customer, bool Complete);
 public record SsCustomerSaveResult(bool Success, string? Error, Customer? Saved);
