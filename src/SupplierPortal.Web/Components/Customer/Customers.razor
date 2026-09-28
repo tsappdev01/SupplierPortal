@@ -234,9 +234,9 @@
             <tr>
                 <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
                 <th>Customer Number</th>
-                <th>Customer Name</th>
                 <th>Priority</th>
-                <th>First Name</th>
+                <th>Customer Name</th>
+                <th>Full Name</th>
                 <th>Contact Email</th>
                 <th>Status</th>
                 <th class="no-print">Assigned To</th>
@@ -260,7 +260,6 @@
                     <tr>
                         <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(row.Id)" @onchange="() => ToggleSelected(row.Id)" /></td>
                         <td>@row.Number</td>
-                        <td>@row.Name</td>
                         <td>
                             <select class="di-inline-select di-prio-@(row.Priority?.ToLowerInvariant() ?? "none")"
                                     value="@row.Priority" @onchange="e => SetPriorityAsync(row, (string?)e.Value)">
@@ -271,7 +270,8 @@
                                 <option value="P4">P4</option>
                             </select>
                         </td>
-                        <td>@row.FirstName</td>
+                        <td>@row.Name</td>
+                        <td>@row.FullName</td>
                         <td>@row.Email</td>
                         <td><span class="badge @StatusClass(row.Status)">@row.Status</span></td>
                         <td class="no-print">
@@ -665,9 +665,9 @@
         printColumns =
         [
             new() { Label = "Customer Number", Value = r => r.Number },
-            new() { Label = "Customer Name", Value = r => r.Name },
             new() { Label = "Priority", Value = r => r.Priority ?? "" },
-            new() { Label = "First Name", Value = r => r.FirstName ?? "" },
+            new() { Label = "Customer Name", Value = r => r.Name },
+            new() { Label = "Full Name", Value = r => r.FullName ?? "" },
             new() { Label = "Contact Email", Value = r => r.Email ?? "" },
             new() { Label = "Status", Value = r => r.Status },
             new() { Label = "Assigned To", Value = r => r.AssignedToUserName ?? "" },

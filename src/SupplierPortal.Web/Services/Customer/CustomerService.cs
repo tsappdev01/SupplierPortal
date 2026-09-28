@@ -88,7 +88,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     }
 
     /// <summary>A lightweight row for the Manage Customer dashboard (mirrors the supplier list columns).</summary>
-    public record CustomerRow(int Id, string Number, string Name, string? FirstName, string? Email,
+    public record CustomerRow(int Id, string Number, string Name, string? FullName, string? Email,
         string Status, DateTime Updated, int? BusinessUnitId,
         string? Priority, int? AssignedToUserId, string? AssignedToUserName);
 
@@ -109,6 +109,8 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 c.LegalName,
                 c.CommercialName,
                 FirstName = c.Contact != null ? c.Contact.FirstName : null,
+                MiddleName = c.Contact != null ? c.Contact.MiddleName : null,
+                LastName = c.Contact != null ? c.Contact.LastName : null,
                 Email = c.Contact != null ? c.Contact.Email : null,
                 c.Status,
                 Updated = c.UpdatedAt ?? c.CreatedAt,
@@ -125,7 +127,8 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             r.Id,
             string.IsNullOrWhiteSpace(r.Number) ? $"#{r.Id}" : r.Number!,
             string.IsNullOrWhiteSpace(r.LegalName) ? (r.CommercialName ?? "(unnamed draft)") : r.LegalName!,
-            r.FirstName, r.Email, r.Status, r.Updated, r.BusinessUnitId,
+            string.Join(" ", new[] { r.FirstName, r.MiddleName, r.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))),
+            r.Email, r.Status, r.Updated, r.BusinessUnitId,
             r.Priority, r.AssignedToUserId, r.AssignedToUserName)).ToList();
     }
 
