@@ -519,6 +519,7 @@ app.MapRazorComponents<App>()
 if (selfServiceApiEnabled)
 {
     SupplierPortal.Web.SelfServiceApi.SelfServiceEndpoints.MapSelfServiceApi(app);
+    SupplierPortal.Web.SelfServiceApi.CustomerSelfServiceEndpoints.MapCustomerSelfServiceApi(app);
 }
 
 app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService) =>
