@@ -17,6 +17,7 @@
 @inject NavigationManager Nav
 @inject ToastService ToastService
 @inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Manage Customer - CST Portal</PageTitle>
 
@@ -352,15 +353,21 @@
 @if (showDocsModal)
 {
     <div class="di-modal-backdrop no-print" @onclick="CloseDocsModal"></div>
-    <div class="di-modal no-print" role="dialog" aria-modal="true">
+    <div class="di-modal di-modal-adv no-print" role="dialog" aria-modal="true">
         <div class="di-modal-head">
-            <h2 class="h6 mb-0 text-truncate">Attached Documents &mdash; @docsCustomerName</h2>
-            <button type="button" class="btn-close" aria-label="Close" @onclick="CloseDocsModal"></button>
+            <div class="di-modal-head-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5z" fill="#fff" opacity=".92"/><path d="M14 2.5v4h4" fill="#cbd8ee"/><path d="M8.5 12h7M8.5 15h7M8.5 18h4.5" stroke="#274a7d" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div class="di-modal-head-text">
+                <h2 class="di-modal-title text-truncate">Attached Documents</h2>
+                <p class="di-modal-subtitle text-truncate">@docsCustomerName@(modalDocuments.Count > 0 ? $" · {modalDocuments.Count} file(s)" : "")</p>
+            </div>
+            <button type="button" class="di-modal-x" aria-label="Close" @onclick="CloseDocsModal">✕</button>
         </div>
-        <div class="di-modal-body">
+        <div class="di-modal-body" tabindex="0" @ref="docsViewerRef" @onkeydown="OnDocsKeyDown">
             @if (modalDocsLoading)
             {
-                <p><em>Documents are being retrieved, please wait…</em></p>
+                <LoadingIndicator Message="Documents are being retrieved, please wait…" />
             }
             else if (modalDocuments.Count == 0)
             {
@@ -371,21 +378,60 @@
                 <div class="di-docsall-toolbar">
                     <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
                     <div class="di-docsall-toolbar-actions">
-                        <a class="btn btn-sm btn-dark" href="/customers/@docsCustomerId/documents.zip">⬇ Download all (zip)</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OpenImagesPdfAsync">All images as PDF</button>
+                        <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@(zipDownloading || downloadingDocId is not null)">
+                            @if (zipDownloading)
+                            {
+                                <span class="di-dl-spinner" aria-hidden="true"></span>
+                                <span>@(dlPercent < 0 ? "Downloading…" : $"Downloading… {dlPercent}%")</span>
+                            }
+                            else
+                            {
+                                <span>⬇ Download all (zip)</span>
+                            }
+                        </button>
                     </div>
                 </div>
+                @if (zipDownloading)
+                {
+                    <div class="di-dl-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
+                        <div class="di-dl-progress-track">
+                            <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                 style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
+                        </div>
+                        <span class="di-dl-progress-label">
+                            @if (dlPercent < 0)
+                            {
+                                <text>Preparing your download…</text>
+                            }
+                            else
+                            {
+                                <text>@dlPercent%@(string.IsNullOrEmpty(dlTotalText) ? "" : $" — {dlReceivedText} of {dlTotalText}")</text>
+                            }
+                        </span>
+                    </div>
+                }
                 <div class="di-docsall-grid">
                     @foreach (var doc in modalDocuments)
                     {
                         <div class="di-docsall-card">
                             <div class="di-docsall-preview">
+                                @if (!previewLoaded.Contains(doc.Id))
+                                {
+                                    <div class="di-preview-loading">
+                                        <span class="di-preview-spinner" aria-hidden="true"></span>
+                                        <span>Loading preview…</span>
+                                    </div>
+                                }
                                 @if (doc.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <img src="/customers/documents/@doc.Id" alt="@doc.FileName" loading="lazy" />
+                                    <img src="/customers/documents/@doc.Id" alt="@doc.FileName" loading="lazy"
+                                         @onload="() => MarkPreviewLoaded(doc.Id)" @onerror="() => MarkPreviewLoaded(doc.Id)" />
                                 }
                                 else
                                 {
-                                    <iframe src="/customers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"></iframe>
+                                    <iframe src="/customers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"
+                                            @onload="() => MarkPreviewLoaded(doc.Id)"></iframe>
                                 }
                             </div>
                             <div class="di-docsall-info">
@@ -394,12 +440,33 @@
                             </div>
                             <div class="di-docsall-actions">
                                 <a class="btn btn-sm btn-outline-primary" href="/customers/documents/@doc.Id" target="_blank" title="Open in a new tab">Open</a>
-                                <a class="btn btn-sm btn-primary" href="/customers/documents/@doc.Id?download=1" title="Download the original file">Download</a>
+                                <button type="button" class="btn btn-sm btn-primary" title="Download the original file"
+                                        @onclick="() => DownloadDocAsync(doc)"
+                                        disabled="@(zipDownloading || downloadingDocId is not null)">
+                                    @if (downloadingDocId == doc.Id)
+                                    {
+                                        <span class="di-dl-spinner" aria-hidden="true"></span>
+                                        <span>@(dlPercent < 0 ? "Downloading…" : $"{dlPercent}%")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Download</span>
+                                    }
+                                </button>
                             </div>
+                            @if (downloadingDocId == doc.Id)
+                            {
+                                <div class="di-dl-progress di-dl-progress-card" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
+                                    <div class="di-dl-progress-track">
+                                        <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                             style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                 </div>
-                <div class="small text-muted mt-2">Tip: click a preview's Open to view full size, or Download to save the original.</div>
+                <div class="small text-muted mt-2">Tip: click a preview's Open to view full size, or Download to save the original. Esc closes.</div>
             }
         </div>
     </div>
@@ -478,17 +545,47 @@
 }
 
 <style>
-    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); z-index: 1080; }
-    .di-modal { position: fixed; inset: 24px; z-index: 1081; background: #fff; border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0,0,0,0.35); overflow: hidden; }
-    .di-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #e2e5ea; }
-    .di-modal-body { padding: 16px 18px; overflow: auto; }
+    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1055; }
+    .di-modal { position: fixed; z-index: 1060; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: min(1160px, 95vw); max-height: 92vh; display: flex; flex-direction: column;
+        background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .di-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e2e5ea; }
+    .di-modal-body { padding: 12px 16px; overflow: auto; outline: none; }
+
+    /* Advanced modal: gradient header with icon + subtitle, softer frame (matches supplier). */
+    .di-modal-adv { border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(2, 10, 40, .4); }
+    .di-modal-adv .di-modal-head { align-items: flex-start; gap: 14px; padding: 18px 20px; border-bottom: 0; background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff; }
+    .di-modal-head-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.16); }
+    .di-modal-head-text { min-width: 0; flex: 1; }
+    .di-modal-title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
+    .di-modal-subtitle { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; }
+    .di-modal-x { flex: none; background: rgba(255,255,255,.14); border: 0; color: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .di-modal-x:hover { background: rgba(255,255,255,.28); }
+    .di-modal-adv .di-modal-body { padding: 16px 20px; }
+
+    /* "Download all (zip)" / single-file progress bar + button spinner. */
+    .di-dl-progress { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .di-dl-progress-track { flex: 1; height: 8px; background: #e7ebf2; border-radius: 999px; overflow: hidden; }
+    .di-dl-progress-fill { height: 100%; background: linear-gradient(90deg, #1a2233, #2f4a7a); border-radius: 999px; transition: width .15s ease; }
+    .di-dl-progress-fill.di-dl-indeterminate { width: 40%; animation: di-dl-slide 1.1s ease-in-out infinite; }
+    @@keyframes di-dl-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .di-dl-progress-label { font-size: 12.5px; font-weight: 600; color: #46506b; white-space: nowrap; min-width: 140px; text-align: right; }
+    .di-dl-progress-card { margin: 0 12px 12px; }
+    .di-dl-progress-card .di-dl-progress-track { height: 5px; }
+    .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
+    @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
+
+    /* Per-card "Loading preview…" overlay. */
+    .di-preview-loading { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: #7488a6; font-size: 12.5px; font-weight: 600; background: linear-gradient(180deg, #fbfcfe, #f1f4f9); }
+    .di-preview-spinner { width: 24px; height: 24px; border: 3px solid #d9e0ec; border-top-color: #2f6fed; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
+
     .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
     .di-docsall-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .di-docsall-count { font-size: 13px; font-weight: 600; color: #46506b; }
     .di-docsall-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
     .di-docsall-card { border: 1px solid #e2e5ea; border-radius: 10px; overflow: hidden; background: #fff; transition: box-shadow .15s ease; }
     .di-docsall-card:hover { box-shadow: 0 6px 20px rgba(20, 30, 50, 0.1); }
-    .di-docsall-preview { height: 200px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .di-docsall-preview { height: 200px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
     .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
     .di-docsall-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
@@ -687,19 +784,28 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        try
+        if (firstRender)
         {
-            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", ColsKey);
-            if (!string.IsNullOrWhiteSpace(saved))
+            try
             {
-                var visible = saved.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
-                hiddenCols.Clear();
-                foreach (var c in ChoosableCols) { if (!visible.Contains(c.Key)) hiddenCols.Add(c.Key); }
-                StateHasChanged();
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", ColsKey);
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    var visible = saved.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                    hiddenCols.Clear();
+                    foreach (var c in ChoosableCols) { if (!visible.Contains(c.Key)) hiddenCols.Add(c.Key); }
+                    StateHasChanged();
+                }
             }
+            catch { /* localStorage unavailable — show all columns */ }
         }
-        catch { /* localStorage unavailable — show all columns */ }
+
+        // Focus the documents modal body when it opens, so Esc/arrow keys work immediately.
+        if (focusDocsPending)
+        {
+            focusDocsPending = false;
+            try { await docsViewerRef.FocusAsync(); } catch { /* element not ready; harmless */ }
+        }
     }
 
     private async Task ToggleColumnAsync(string key)
@@ -900,23 +1006,149 @@
     private string docsCustomerName = "";
     private List<CustomerDocument> modalDocuments = [];
     private bool modalDocsLoading;
+    private ElementReference docsViewerRef;
+    private bool focusDocsPending;
+    private readonly HashSet<int> previewLoaded = [];
+    private void MarkPreviewLoaded(int docId) { previewLoaded.Add(docId); StateHasChanged(); }
+
+    // Download progress (shared by the "Download all (zip)" button and each row's Download button;
+    // zipDownloading vs downloadingDocId says which UI to light up). dlPercent < 0 = "preparing".
+    private bool zipDownloading;
+    private int? downloadingDocId;
+    private int dlPercent;
+    private string dlReceivedText = "";
+    private string dlTotalText = "";
+    private DotNetObjectReference<Customers>? dlDotNetRef;
 
     private async Task ShowDocumentsAsync(CustomerService.CustomerRow row)
     {
+        // Open immediately with a loading indicator, then fetch (so the progress shows while retrieving).
+        showDocsModal = true;
+        docsCustomerId = row.Id;
+        docsCustomerName = row.Name;
+        modalDocuments = [];
+        previewLoaded.Clear();
+        modalDocsLoading = true;
+        StateHasChanged();
+
         var docs = await DocumentService.GetDocumentsAsync(row.Id);
+        modalDocsLoading = false;
         if (docs.Count == 0)
         {
+            showDocsModal = false;
             ToastService.ShowInfo($"No documents have been uploaded for {row.Name}.");
             return;
         }
-        docsCustomerId = row.Id;
-        docsCustomerName = row.Name;
         modalDocuments = docs;
-        modalDocsLoading = false;
-        showDocsModal = true;
+        focusDocsPending = true;
     }
 
     private void CloseDocsModal() => showDocsModal = false;
+
+    private static bool IsImage(CustomerDocument doc) =>
+        doc.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Opens the "combine images into one PDF" view — only when the customer has image attachments.</summary>
+    private async Task OpenImagesPdfAsync()
+    {
+        if (!modalDocuments.Any(IsImage))
+        {
+            ToastService.ShowInfo("This customer has no image attachments (e.g. scans/photos) to combine into a PDF.");
+            return;
+        }
+        await JS.InvokeVoidAsync("open", $"/customers/{docsCustomerId}/documents.pdf", "_blank");
+    }
+
+    /// <summary>Streams the "download all" zip via JS so the user sees a live progress bar (0→100%). The
+    /// server names the archive "{CustomerNumber}_{CustomerName}.zip" (its Content-Disposition wins).</summary>
+    private async Task DownloadAllZipAsync()
+    {
+        if (zipDownloading || downloadingDocId is not null) { return; }
+        zipDownloading = true;
+        BeginDownloadState(preparing: true);   // "Preparing…" until the first bytes (server builds the archive)
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/{docsCustomerId}/documents.zip", $"customer-{docsCustomerId}.zip", dlDotNetRef);
+        }
+        catch
+        {
+            zipDownloading = false;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    /// <summary>Streams a single document via JS so its Download button shows the same live progress.</summary>
+    private async Task DownloadDocAsync(CustomerDocument doc)
+    {
+        if (zipDownloading || downloadingDocId is not null) { return; }
+        downloadingDocId = doc.Id;
+        BeginDownloadState(preparing: false);
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/documents/{doc.Id}?download=1",
+                string.IsNullOrWhiteSpace(doc.FileName) ? $"document-{doc.Id}" : doc.FileName, dlDotNetRef);
+        }
+        catch
+        {
+            downloadingDocId = null;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    private void BeginDownloadState(bool preparing)
+    {
+        dlPercent = preparing ? -1 : 0;
+        dlReceivedText = "";
+        dlTotalText = "";
+        dlDotNetRef ??= DotNetObjectReference.Create(this);
+    }
+
+    [JSInvokable]
+    public Task OnDownloadProgress(int percent, long received, long total)
+    {
+        dlPercent = percent;
+        dlReceivedText = FormatBytes(received);
+        dlTotalText = total > 0 ? FormatBytes(total) : "";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadComplete(string fileName)
+    {
+        zipDownloading = false;
+        downloadingDocId = null;
+        dlPercent = 100;
+        ToastService.ShowSuccess($"Downloaded {fileName}");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadError(string message)
+    {
+        zipDownloading = false;
+        downloadingDocId = null;
+        ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) { return "0 KB"; }
+        double kb = bytes / 1024d;
+        return kb < 1024 ? $"{kb:0} KB" : $"{kb / 1024:0.0} MB";
+    }
+
+    private void OnDocsKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { CloseDocsModal(); }
+    }
+
+    public void Dispose() => dlDotNetRef?.Dispose();
 
     private int? notifyingId;
     private bool bulkSending;

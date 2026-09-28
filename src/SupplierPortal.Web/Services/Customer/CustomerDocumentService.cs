@@ -204,6 +204,27 @@ public class CustomerDocumentService(
         return result;
     }
 
+    /// <summary>Only the image attachments (bytes + file name), for the "combine images into one PDF" view.</summary>
+    public async Task<List<(byte[] Bytes, string FileName)>> GetImageFilesAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var docs = await db.CustomerDocuments.AsNoTracking()
+            .Where(d => d.CustomerId == customerId && d.ContentType.StartsWith("image/"))
+            .OrderBy(d => d.DocumentType)
+            .ToListAsync();
+
+        var result = new List<(byte[] Bytes, string FileName)>();
+        foreach (var doc in docs)
+        {
+            var bytes = await ReadStoredBytesAsync(doc);
+            if (bytes is not null)
+            {
+                result.Add((bytes, doc.FileName));
+            }
+        }
+        return result;
+    }
+
     /// <summary>The owning customer id for a document, or null when it does not exist. Lets the download
     /// endpoint enforce per-customer access scope before serving the file.</summary>
     public async Task<int?> GetCustomerIdForDocumentAsync(int documentId)

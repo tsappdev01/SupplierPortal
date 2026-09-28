@@ -1082,6 +1082,17 @@ app.MapGet("/customers/{id:int}/documents.zip", async (int id, HttpContext ctx,
     return Results.File(ms.ToArray(), "application/zip", zipName);
 }).RequireAuthorization("Portal.Customer");
 
+// Combine a customer's image attachments (scans/photos) into one PDF — mirrors the supplier endpoint.
+app.MapGet("/customers/{id:int}/documents.pdf", async (int id, HttpContext ctx,
+    CustomerService customerService, CustomerDocumentService documentService, ExportService exportService) =>
+{
+    if (!await CanAccessCustomerAsync(ctx, customerService, id)) return Results.NotFound();
+    var images = await documentService.GetImageFilesAsync(id);
+    return images.Count == 0
+        ? Results.NotFound("This customer has no image attachments.")
+        : Results.File(exportService.ImagesToPdf(images), "application/pdf", $"customer-{id}-documents.pdf");
+}).RequireAuthorization("Portal.Customer");
+
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
 // Without ?download=1 the file is served inline (preview); with it, as an attachment.
 app.MapGet("/landlord-documents/{id:int}", async (int id, string? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
