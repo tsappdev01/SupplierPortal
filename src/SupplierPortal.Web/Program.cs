@@ -1049,6 +1049,13 @@ app.MapGet("/customers/{id:int}/documents.zip", async (int id, HttpContext ctx,
     var files = await documentService.GetAllFilesAsync(id);
     if (files.Count == 0) return Results.NotFound("This customer has no attachments.");
 
+    // Name the archive "Customer Number_Customer Name.zip" (sanitized), falling back to the id — mirrors
+    // the supplier documents zip.
+    var (customerNumber, customerName) = await customerService.GetNumberAndNameAsync(id);
+    var rawName = string.Join("_",
+        new[] { customerNumber, customerName }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    var zipName = SafeFileName(rawName, $"customer-{id}") + ".zip";
+
     using var ms = new MemoryStream();
     using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
     {
@@ -1070,7 +1077,7 @@ app.MapGet("/customers/{id:int}/documents.zip", async (int id, HttpContext ctx,
             await entryStream.WriteAsync(bytes);
         }
     }
-    return Results.File(ms.ToArray(), "application/zip", $"customer-{id}-documents.zip");
+    return Results.File(ms.ToArray(), "application/zip", zipName);
 }).RequireAuthorization("Portal.Customer");
 
 // Landlord document preview/download for leasing reviewers (users granted the Landlord portal).

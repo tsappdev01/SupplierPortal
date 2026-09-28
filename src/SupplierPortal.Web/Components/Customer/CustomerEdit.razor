@@ -19,7 +19,7 @@
 
 @if (customer is null)
 {
-    <p><em>Loading…</em></p>
+    <LoadingIndicator Message="Loading customer…" />
 }
 else
 {
@@ -51,7 +51,19 @@ else
                 @if (!string.IsNullOrWhiteSpace(customer.CustomerCode)) { <span class="ms-2">@customer.CustomerCode</span> }
             </p>
         </div>
-        <a class="di-btn di-btn-secondary" href="/admin/customers">← Back to list</a>
+        <div class="di-form-topbar-right">
+            <div class="di-progress" title="@ProgressPct% complete">
+                <svg class="di-progress-ring" viewBox="0 0 36 36">
+                    <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                    <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(System.Globalization.CultureInfo.InvariantCulture) 100"></circle>
+                </svg>
+                <div class="di-progress-center">
+                    <span class="di-progress-pct">@ProgressPct%</span>
+                    <span class="di-progress-word">Complete</span>
+                </div>
+            </div>
+            <a class="di-btn di-btn-secondary" href="/admin/customers">← Back to list</a>
+        </div>
     </div>
 
     @* ---------- Stepper (matches the Supplier form) ---------- *@
@@ -278,7 +290,7 @@ else
     <p class="text-muted">Every self-service update link sent for this customer.</p>
     @if (!emailHistoryLoaded)
     {
-        <p><em>Loading…</em></p>
+        <LoadingIndicator Message="Loading email history…" />
     }
     else if (emailHistory.Count == 0)
     {
@@ -333,6 +345,11 @@ else
     private int? currentUserId;
     private List<Step> steps = [];
     private int current;
+
+    /// <summary>Percent complete for the header progress ring (current step of total), matching the supplier form.</summary>
+    private int ProgressPct => steps.Count == 0
+        ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
+
     private string currentUser = "unknown";
     private string? message;
     private bool isError;

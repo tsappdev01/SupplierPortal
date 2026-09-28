@@ -376,3 +376,13 @@
         justify-content: center;
     }
 }
+
+/* ---- Header progress ring (matches SupplierForm.razor.css) ---- */
+.di-form-topbar-right { display: flex; align-items: center; gap: 16px; }
+.di-progress { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.di-progress-ring { width: 64px; height: 64px; transform: rotate(-90deg); }
+.di-progress-bg { fill: none; stroke: #e9edf5; stroke-width: 3.2; }
+.di-progress-bar { fill: none; stroke: var(--blue); stroke-width: 3.2; stroke-linecap: round; transition: stroke-dasharray 0.45s ease; }
+.di-progress-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; }
+.di-progress-pct { font-size: 15px; font-weight: 700; color: var(--navy); }
+.di-progress-word { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8a94a6; }

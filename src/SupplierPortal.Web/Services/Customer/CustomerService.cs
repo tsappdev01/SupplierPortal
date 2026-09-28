@@ -231,6 +231,23 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         }
     }
 
+    /// <summary>The customer's display number and name, for naming the documents zip (mirrors the supplier
+    /// "Number_Name.zip"). Number falls back Customer Code → Customer Id → Baan Ref; name falls back Legal →
+    /// Commercial.</summary>
+    public async Task<(string? Number, string? Name)> GetNumberAndNameAsync(int id)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.Customers.Where(c => c.Id == id)
+            .Select(c => new { c.CustomerCode, c.CustomerId, c.BaanRef, c.LegalName, c.CommercialName })
+            .FirstOrDefaultAsync();
+        if (row is null) return (null, null);
+        var number = new[] { row.CustomerCode, row.CustomerId, row.BaanRef }
+            .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        var name = new[] { row.LegalName, row.CommercialName }
+            .FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+        return (number, name);
+    }
+
     /// <summary>Sets the customer's work priority (P1..P4, or null to clear) from the dashboard.</summary>
     public async Task SetPriorityAsync(int id, string? priority, string actor)
     {

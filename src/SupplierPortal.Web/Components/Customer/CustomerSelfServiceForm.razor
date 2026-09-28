@@ -13,7 +13,7 @@
 <div class="di-selfservice-wrap">
     @if (loading)
     {
-        <p><em>Loading…</em></p>
+        <LoadingIndicator Message="Loading your information…" />
     }
     else if (customer is null)
     {
@@ -41,6 +41,16 @@
                 <div class="di-form-headings">
                     <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "Your Information" : customer.LegalName)</h1>
                     <p class="di-form-sub">Please review and update your information below.</p>
+                </div>
+                <div class="di-progress" title="@ProgressPct% complete">
+                    <svg class="di-progress-ring" viewBox="0 0 36 36">
+                        <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                        <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(System.Globalization.CultureInfo.InvariantCulture) 100"></circle>
+                    </svg>
+                    <div class="di-progress-center">
+                        <span class="di-progress-pct">@ProgressPct%</span>
+                        <span class="di-progress-word">Complete</span>
+                    </div>
                 </div>
             </div>
 
@@ -240,6 +250,10 @@
     private List<CustomerDocumentType> docTypes = [];
     private List<Step> steps = [];
     private int current;
+
+    /// <summary>Percent complete for the header progress ring (current step of total), matching the supplier form.</summary>
+    private int ProgressPct => steps.Count == 0
+        ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
     private string currentUser = "Customer Self-Service";
     private string? message;
     private bool isError;
