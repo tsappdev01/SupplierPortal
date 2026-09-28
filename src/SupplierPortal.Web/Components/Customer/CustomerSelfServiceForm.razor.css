@@ -388,7 +388,7 @@
 .di-progress-word { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8a94a6; }
 
 /* ---- Declaration pop-up + signature pad (matches the supplier submit) ---- */
-.di-decl-backdrop { position: fixed; inset: 0; background: rgba(15, 22, 35, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 20px; }
+.di-decl-backdrop { --navy: #1a2233; --blue: #3b5bdb; --border: #e2e5ea; --gold: #b5892f; --required: #c0392b; position: fixed; inset: 0; background: rgba(15, 22, 35, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 20px; }
 .di-decl { background: #fff; border-radius: 10px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35); }
 .di-decl-head { padding: 18px 22px 10px; border-bottom: 1px solid #e2e5ea; text-align: center; }
 .di-decl-title { margin: 0; font-size: 17px; font-weight: 700; color: #3b5bdb; text-transform: uppercase; letter-spacing: 0.02em; }
