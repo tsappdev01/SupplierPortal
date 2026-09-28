@@ -32,8 +32,23 @@ public class Customer
     [MaxLength(60)] public string? CustomerCode { get; set; }
 
     [MaxLength(40)] public string Status { get; set; } = CustomerStatuses.NotSubmitted;
+
+    /// <summary>Work priority (P1..P4), mirroring the supplier workflow. Null = unset. Drives the dashboard
+    /// priority filter/column and sort.</summary>
+    [MaxLength(4)] public string? Priority { get; set; }
+
     public int? BusinessUnitId { get; set; }
     public BusinessUnit? BusinessUnit { get; set; }
+
+    /// <summary>The internal user (from Manage Users) this customer is assigned to / owned by. Optional;
+    /// set to null (unassigned) if the user is later removed.</summary>
+    public int? AssignedToUserId { get; set; }
+    public User? AssignedToUser { get; set; }
+
+    /// <summary>Draft flag mirroring the supplier workflow: a record still being entered by staff. Defaults
+    /// to true on create; cleared once the record is progressed. Only an internal (non-token) save may change it.</summary>
+    public bool IsDraft { get; set; } = true;
+
     [MaxLength(150)] public string? CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

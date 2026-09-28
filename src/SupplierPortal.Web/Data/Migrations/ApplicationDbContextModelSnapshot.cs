@@ -194,6 +194,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<int?>("AssignedToUserId")
+                        .HasColumnType("int");
+
                     b.Property<string>("AuthorityCode")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
@@ -282,6 +285,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("IncorporationCountry")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsDraft")
+                        .HasColumnType("bit");
 
                     b.Property<string>("LandlineMobile")
                         .HasMaxLength(300)
@@ -385,6 +391,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("Priority")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
                     b.Property<string>("SecondaryEmailAddress")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
@@ -439,6 +449,8 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasColumnType("nvarchar(300)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedToUserId");
 
                     b.HasIndex("BusinessUnitId");
 
@@ -2264,10 +2276,17 @@ namespace SupplierPortal.Web.Data.Migrations
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.Customer", b =>
                 {
+                    b.HasOne("SupplierPortal.Web.Models.User", "AssignedToUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "BusinessUnit")
                         .WithMany()
                         .HasForeignKey("BusinessUnitId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AssignedToUser");
 
                     b.Navigation("BusinessUnit");
                 });

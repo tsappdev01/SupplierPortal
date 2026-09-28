@@ -89,7 +89,8 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
 
     /// <summary>A lightweight row for the Manage Customer dashboard (mirrors the supplier list columns).</summary>
     public record CustomerRow(int Id, string Number, string Name, string? FirstName, string? Email,
-        string Status, DateTime Updated, int? BusinessUnitId);
+        string Status, DateTime Updated, int? BusinessUnitId,
+        string? Priority, int? AssignedToUserId, string? AssignedToUserName);
 
     /// <summary>All customers the user may see (BU-scoped), projected for the dashboard grid + KPI tiles.</summary>
     public async Task<List<CustomerRow>> GetDashboardAsync(List<int> scopeBusinessUnitIds)
@@ -111,7 +112,12 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 Email = c.Contact != null ? c.Contact.Email : null,
                 c.Status,
                 Updated = c.UpdatedAt ?? c.CreatedAt,
-                c.BusinessUnitId
+                c.BusinessUnitId,
+                c.Priority,
+                c.AssignedToUserId,
+                AssignedToUserName = c.AssignedToUser != null
+                    ? (c.AssignedToUser.FullName ?? c.AssignedToUser.Username)
+                    : null
             })
             .ToListAsync();
 
@@ -119,7 +125,8 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             r.Id,
             string.IsNullOrWhiteSpace(r.Number) ? $"#{r.Id}" : r.Number!,
             string.IsNullOrWhiteSpace(r.LegalName) ? (r.CommercialName ?? "(unnamed draft)") : r.LegalName!,
-            r.FirstName, r.Email, r.Status, r.Updated, r.BusinessUnitId)).ToList();
+            r.FirstName, r.Email, r.Status, r.Updated, r.BusinessUnitId,
+            r.Priority, r.AssignedToUserId, r.AssignedToUserName)).ToList();
     }
 
     public async Task<Customer?> GetAsync(int id)
