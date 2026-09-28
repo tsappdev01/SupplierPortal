@@ -95,7 +95,11 @@ public class LocalCustomerSelfServiceDataGateway(
             return new SsCustomerSaveResult(false, "This record does not match your session.", null);
         }
 
-        await customerService.SaveAsync(updated, Actor);
+        var persisted = await customerService.SaveAsync(updated, Actor);
+        if (!persisted)
+        {
+            return new SsCustomerSaveResult(false, "We couldn't save your information (record not found). Please use the link from your email again.", null);
+        }
 
         if (complete)
         {

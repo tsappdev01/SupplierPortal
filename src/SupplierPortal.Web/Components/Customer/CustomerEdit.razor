@@ -745,7 +745,8 @@ else
     private async Task SaveAndSetStatus(string status)
     {
         if (customer is null) return;
-        if (status == CustomerStatuses.ForReview)
+        // Validate the full record before completing it (required fields, date logic, formats, required docs).
+        if (status == CustomerStatuses.Complete)
         {
             var missing = config.Where(f => f.IsVisible && f.IsRequired)
                 .Where(IsConditionallyVisible)

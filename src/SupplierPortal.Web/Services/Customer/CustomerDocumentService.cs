@@ -146,7 +146,17 @@ public class CustomerDocumentService(
             return (false, $"'{fileName}' is over the {MaxFileSize / (1024 * 1024)} MB limit.");
         }
 
-        var resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+        // Derive the stored content-type from the validated extension rather than trusting the client-supplied
+        // MIME — otherwise a file named x.png with bytes of HTML and Content-Type text/html could be re-inlined
+        // as a same-origin document in the DMZ preview (self-XSS). Only pdf/jpg/png pass the extension check.
+        var resolvedContentType = ext switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            _ => "application/octet-stream"
+        };
+        _ = contentType; // intentionally ignored: type is derived from the (allow-listed) extension
 
         // When blob storage is enabled, store the bytes in Azure Blob Storage and keep only the key in the
         // database; otherwise the bytes are stored inline in the Content column (existing behaviour).

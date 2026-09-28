@@ -480,19 +480,25 @@
 
     // ---- Save / navigation ----
 
-    private async Task SaveAsync()
+    private async Task<bool> SaveAsync()
     {
-        if (bootstrap is null) return;
+        if (bootstrap is null) return false;
         busy = true;
         ClearHiddenConditionalFields();
         var result = await Api.SaveAsync(link, session, new SaveCustomerRequest { AccountValues = account, ContactValues = contact });
         busy = false;
         savedTick = result.Success;
+        if (!result.Success)
+        {
+            // Never let the customer move on / submit believing their data was saved when it wasn't.
+            Toast.ShowErrors(result.Errors.Count > 0 ? result.Errors : new[] { "Could not save your changes. Please try again." });
+        }
+        return result.Success;
     }
 
     private async Task NextAsync()
     {
-        await SaveAsync();
+        if (!await SaveAsync()) return;
         var problems = Validate(steps[current]);
         if (problems.Count > 0) { Toast.ShowErrors(problems); return; }
         if (current < steps.Count - 1) current++;
@@ -646,7 +652,7 @@
     private async Task SubmitAsync()
     {
         if (bootstrap is null) return;
-        await SaveAsync();
+        if (!await SaveAsync()) return;   // do not submit if the final save didn't persist
 
         var problems = new List<string>();
         problems.AddRange(config.Where(f => f.IsVisible && f.IsRequired).Where(IsConditionallyVisible)

@@ -176,12 +176,14 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     /// <paramref name="readOnlyAccountKeys"/> / <paramref name="readOnlyContactKeys"/> name fields on tabs the
     /// acting user may not edit (per-tab edit restriction on the internal form): those keep their current
     /// database values regardless of the payload, so a locked tab can't be changed even by a tampered save.</summary>
-    public async Task SaveAsync(Customer edited, string actor,
+    /// <summary>Persists the edited customer (+ its 1:1 contact). Returns false when no customer row matches
+    /// <paramref name="edited"/>.Id (so callers/gateways can surface a real failure instead of a false success).</summary>
+    public async Task<bool> SaveAsync(Customer edited, string actor,
         IReadOnlySet<string>? readOnlyAccountKeys = null, IReadOnlySet<string>? readOnlyContactKeys = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var customer = await db.Customers.Include(c => c.Contact).FirstOrDefaultAsync(c => c.Id == edited.Id);
-        if (customer is null) return;
+        if (customer is null) return false;
 
         // Capture the current (DB) values of any read-only fields before the copy so they can be restored.
         var acctOriginals = Capture(customer, readOnlyAccountKeys);
@@ -209,6 +211,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         customer.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         await audit.LogAsync(actor, AuditAction.Update, "Customer", customer.Id, "Updated customer record");
+        return true;
     }
 
     public async Task SetStatusAsync(int id, string status, string actor)

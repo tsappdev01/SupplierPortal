@@ -109,16 +109,25 @@ public static class CustomerSelfServiceEndpoints
         });
 
         group.MapPut("/form", async (
-            HttpContext ctx, SaveCustomerRequest req, ICustomerSelfServiceDataGateway data) =>
+            HttpContext ctx, SaveCustomerRequest req, ICustomerSelfServiceDataGateway data, ILoggerFactory lf) =>
         {
+            var log = lf.CreateLogger("CustomerSelfServiceSave");
             var (link, session) = ReadSession(ctx);
             var form = await data.LoadFormAsync(link, session);
             if (form is null)
             {
+                log.LogWarning("Customer save: session/link invalid — no form loaded.");
                 return Results.Unauthorized();
             }
-            ApplyValues(form.Customer, req.AccountValues, req.ContactValues);
+            log.LogInformation(
+                "Customer save IN: customerId={Id}, accountKeys={A}, contactKeys={C}, in.CommercialName='{CN}', in.NumberOfEntities='{NE}'",
+                form.Customer.Id, req.AccountValues.Count, req.ContactValues.Count,
+                req.AccountValues.GetValueOrDefault("CommercialName"), req.AccountValues.GetValueOrDefault("NumberOfEntities"));
+            ApplyValues(form, req.AccountValues, req.ContactValues);
             var result = await data.SaveAsync(link, session, form.Customer, complete: false);
+            log.LogInformation(
+                "Customer save OUT: success={S}, error='{E}', persisted.CommercialName='{CN}', persisted.NumberOfEntities='{NE}'",
+                result.Success, result.Error, result.Saved?.CommercialName, result.Saved?.NumberOfEntities);
             return Results.Ok(new SaveCustomerResponse
             {
                 Success = result.Success,
@@ -136,11 +145,24 @@ public static class CustomerSelfServiceEndpoints
                 return Results.Unauthorized();
             }
 
+            // Server-side re-validation (defence in depth — the client validates too): a submission must be
+            // signed and have every required visible field and required document before it can complete.
+            if (!req.Acknowledged || string.IsNullOrWhiteSpace(req.SignatureName))
+            {
+                return Results.Ok(new SubmitCustomerResponse { Success = false, Error = "The declaration must be signed before submitting." });
+            }
+            var problems = ValidateForSubmit(form);
+            if (problems.Count > 0)
+            {
+                return Results.Ok(new SubmitCustomerResponse { Success = false, Error = string.Join(" ", problems) });
+            }
+
             var customer = form.Customer;
-            customer.DisclaimerAcknowledged = req.Acknowledged;
+            customer.DisclaimerAcknowledged = true;
             customer.DisclaimerAcknowledgedAt = DateTime.UtcNow;
             customer.DisclaimerAcknowledgedBy = req.SignatureName;
             customer.DisclaimerSignature = req.SignatureName;
+            customer.DisclaimerText = DeclarationText;
             if (!string.IsNullOrWhiteSpace(req.SignatureImageBase64))
             {
                 try { customer.DisclaimerSignatureImage = Convert.FromBase64String(req.SignatureImageBase64); }
@@ -236,21 +258,107 @@ public static class CustomerSelfServiceEndpoints
     private static (string Link, string Session) ReadSession(HttpContext ctx) =>
         (ctx.Request.Headers[LinkHeader].ToString(), ctx.Request.Headers[SessionHeader].ToString());
 
-    /// <summary>Writes the incoming FieldKey-&gt;value dictionaries onto the Customer (Account) and its
-    /// Contact (Contact), using the same reflection accessor the internal form uses.</summary>
-    private static void ApplyValues(Customer customer, Dictionary<string, string?> account, Dictionary<string, string?> contact)
+    /// <summary>Writes the incoming FieldKey-&gt;value dictionaries onto the Customer (Account) and its Contact,
+    /// but ONLY for fields the configuration marks visible + customer-editable (never Readonly/removed and never
+    /// a scaffolding/workflow field such as Status, IsDraft, BaanRef, CustomerId, CustomerCode, CreatedBy — none
+    /// of which are field-config entries). This prevents a crafted self-service payload from mass-assigning
+    /// locked or workflow fields via reflection.</summary>
+    private static void ApplyValues(SsCustomerFormData form, Dictionary<string, string?> account, Dictionary<string, string?> contact)
     {
+        var customer = form.Customer;
         var contactEntity = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+
+        var editableAccount = EditableKeys(form.Config, "Account");
+        // The combined Country control writes CountryName alongside the editable CountryCode.
+        if (editableAccount.Contains("CountryCode")) { editableAccount.Add("CountryName"); }
+        var editableContact = EditableKeys(form.Config, "Contact");
+
         foreach (var (key, value) in account)
         {
-            CustomerFieldAccessor.SetString(customer, key, value);
+            if (editableAccount.Contains(key)) { CustomerFieldAccessor.SetString(customer, key, value); }
         }
         foreach (var (key, value) in contact)
         {
-            CustomerFieldAccessor.SetString(contactEntity, key, value);
+            if (editableContact.Contains(key)) { CustomerFieldAccessor.SetString(contactEntity, key, value); }
         }
         customer.Contact = contactEntity;
     }
+
+    /// <summary>The declaration wording recorded against a completed submission (mirrors the DMZ form text).</summary>
+    private const string DeclarationText =
+        "Customer Declaration\n\nCustomer Data Gathering Portal\n\n" +
+        "Declaration (For true and correct information provided):\n\n" +
+        "I/We hereby declare that the information and data provided in this form are true, correct, and complete " +
+        "to the best of our knowledge, and are furnished in compliance with the applicable UAE regulatory and " +
+        "e-invoicing requirements issued by the Ministry of Finance / Federal Tax Authority. We undertake to " +
+        "promptly inform Dubai Investments of any changes to the above.\n\n" +
+        "By signing below, I/We acknowledge and accept the declaration set out above.";
+
+    /// <summary>Required visible fields (honouring conditional visibility) and required documents that must be
+    /// present before a self-service submission can complete.</summary>
+    private static List<string> ValidateForSubmit(SsCustomerFormData form)
+    {
+        var customer = form.Customer;
+        var contact = customer.Contact ?? new CustomerContact();
+        object Ent(CustomerFieldConfig f) => f.Section == "Account" ? (object)customer : contact;
+
+        bool Visible(CustomerFieldConfig f)
+        {
+            if (string.IsNullOrWhiteSpace(f.ControllingFieldKey)) { return true; }
+            var cur = CustomerFieldAccessor.GetString(Ent(f), f.ControllingFieldKey);
+            return string.Equals(cur, f.ControllingValue, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var problems = new List<string>();
+        foreach (var f in form.Config
+                     .Where(f => f.IsVisible && f.IsRequired && !f.IsRemoved)
+                     .Where(Visible)
+                     .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName")))
+        {
+            if (string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(Ent(f), f.FieldKey)))
+            {
+                problems.Add($"{f.DisplayLabel} is required.");
+            }
+        }
+
+        // Date logic: an issue date cannot be in the future and an expiry cannot precede its issue date.
+        foreach (var (section, issueKey, expiryKey, label) in IssueExpiryPairs)
+        {
+            var ent = section == "Account" ? (object)customer : contact;
+            var iss = ParseDate(CustomerFieldAccessor.GetString(ent, issueKey));
+            var exp = ParseDate(CustomerFieldAccessor.GetString(ent, expiryKey));
+            if (iss is { } i && i.Date > DateTime.Today) { problems.Add($"{label} Issue Date cannot be a future date."); }
+            if (iss is { } i2 && exp is { } e && e.Date < i2.Date) { problems.Add($"{label} Expiry Date cannot be before the {label} Issue Date."); }
+        }
+
+        var have = form.Documents.Select(d => d.DocumentType).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in form.DocTypes.Where(t => t.IsActive && t.IsRequired))
+        {
+            if (!have.Contains(t.Name)) { problems.Add($"{t.Name} document is required."); }
+        }
+        return problems;
+    }
+
+    /// <summary>Issue/expiry date-field pairs whose expiry must not precede the issue date (and whose issue
+    /// date cannot be in the future). Section says which entity the keys live on.</summary>
+    private static readonly (string Section, string Issue, string Expiry, string Label)[] IssueExpiryPairs =
+    {
+        ("Account", "TradeLicenseIssueDate", "TradeLicenseExpiryDate", "Trade License"),
+        ("Contact", "PassportIssueDate", "PassportExpiryDate", "Passport"),
+        ("Contact", "DualPassportIssueDate", "DualPassportExpiryDate", "Dual Passport"),
+        ("Contact", "CountryGovtIDIssueDate", "CountryGovtIDExpiryDate", "Country Govt ID"),
+        ("Contact", "EmiratesIDIssueDate", "EmirateIDExpiryDate", "Emirates ID"),
+    };
+
+    private static DateTime? ParseDate(string? s) =>
+        DateTime.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d)
+            ? d : null;
+
+    private static HashSet<string> EditableKeys(IEnumerable<CustomerFieldConfig> config, string section) =>
+        config.Where(c => c.Section == section && c.IsVisible && !c.IsRemoved
+                          && !string.Equals(c.CustomerControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase))
+              .Select(c => c.FieldKey)
+              .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static async Task<CustomerFormBootstrapDto> ToBootstrapAsync(SsCustomerFormData form, BrandLogoInliner logoInliner)
     {
