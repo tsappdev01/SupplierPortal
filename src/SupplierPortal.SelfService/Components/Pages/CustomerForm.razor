@@ -5,6 +5,7 @@
 @inject SelfServiceBranding Branding
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject ToastService Toast
 
 <PageTitle>Your information — Customer Self-Service</PageTitle>
 
@@ -65,13 +66,6 @@
                     </button>
                 }
             </div>
-
-            @if (validationErrors.Count > 0)
-            {
-                <div class="alert alert-danger">
-                    <ul class="mb-0">@foreach (var e in validationErrors) { <li>@e</li> }</ul>
-                </div>
-            }
 
             @{ var step = steps[current]; }
 
@@ -351,7 +345,6 @@
 
     private int ProgressPct => steps.Count == 0
         ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
-    private readonly List<string> validationErrors = [];
     private bool busy;
     private bool savedTick;
     private bool loading = true;
@@ -501,15 +494,13 @@
     {
         await SaveAsync();
         var problems = Validate(steps[current]);
-        if (problems.Count > 0) { validationErrors.Clear(); validationErrors.AddRange(problems); return; }
-        validationErrors.Clear();
+        if (problems.Count > 0) { Toast.ShowErrors(problems); return; }
         if (current < steps.Count - 1) current++;
     }
 
     private async Task BackAsync()
     {
         await SaveAsync();
-        validationErrors.Clear();
         if (current > 0) current--;
     }
 
@@ -517,7 +508,6 @@
     {
         if (index == current) return;
         await SaveAsync();
-        validationErrors.Clear();
         current = Math.Clamp(index, 0, steps.Count - 1);
     }
 
@@ -601,13 +591,11 @@
         if (file is null) return;
         if (file.Size > 10 * 1024 * 1024)
         {
-            validationErrors.Clear();
-            validationErrors.Add("File exceeds the 10 MB size limit.");
+            Toast.ShowError("File exceeds the 10 MB size limit.");
             return;
         }
         uploadingDocument = true;
         uploadingFileName = file.Name;
-        validationErrors.Clear();
         try
         {
             await using var stream = file.OpenReadStream(10 * 1024 * 1024);
@@ -616,7 +604,7 @@
             ms.Position = 0;
             var result = await Api.UploadDocumentAsync(link, session, documentType, ms, file.Name, file.ContentType);
             if (result.Success) { documents = result.Documents; }
-            else { validationErrors.Add(result.Error ?? "Upload failed."); }
+            else { Toast.ShowError(result.Error ?? "Upload failed."); }
         }
         finally
         {
@@ -672,9 +660,8 @@
         problems.AddRange(bootstrap.DocumentTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name))
             .Select(t => $"{t.Name} document is required."));
 
-        if (problems.Count > 0) { validationErrors.Clear(); validationErrors.AddRange(problems); return; }
+        if (problems.Count > 0) { Toast.ShowErrors(problems); return; }
 
-        validationErrors.Clear();
         showDeclaration = true;
     }
 
@@ -695,16 +682,14 @@
         if (bootstrap is null) return;
         if (string.IsNullOrWhiteSpace(declarationSignature))
         {
-            validationErrors.Clear();
-            validationErrors.Add("Please type your full name as your signature.");
+            Toast.ShowError("Please type your full name as your signature.");
             return;
         }
         string dataUrl = "";
         try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
         if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
         {
-            validationErrors.Clear();
-            validationErrors.Add("Please draw your signature in the box before submitting.");
+            Toast.ShowError("Please draw your signature in the box before submitting.");
             return;
         }
         var comma = dataUrl.IndexOf(',');
@@ -723,10 +708,10 @@
 
         if (!result.Success)
         {
-            validationErrors.Clear();
-            validationErrors.Add(result.Error ?? "Submission failed. Please try again.");
+            Toast.ShowError(result.Error ?? "Submission failed. Please try again.");
             return;
         }
         completed = true;
+        Toast.ShowSuccess("Your information has been submitted.");
     }
 }

@@ -21,6 +21,12 @@ public class ToastService
     public void ShowError(string? text) => Add(ToastLevel.Error, text);
     public void ShowInfo(string? text) => Add(ToastLevel.Info, text);
 
+    /// <summary>Raises one error toast per message (used for form-validation problem lists).</summary>
+    public void ShowErrors(IEnumerable<string> texts)
+    {
+        foreach (var t in texts) { ShowError(t); }
+    }
+
     private void Add(ToastLevel level, string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
