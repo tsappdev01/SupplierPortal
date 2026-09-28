@@ -76,7 +76,7 @@
 
             @{ var step = steps[current]; }
 
-            @if (step.Group == "Documents")
+            @if (step.IsDocuments)
             {
                 <div class="di-section">
                     <div class="di-section-header">
@@ -94,7 +94,6 @@
             }
             else if (!step.IsReview)
             {
-                var entity = step.Section == "Account" ? (object)customer : contact;
                 <div class="di-section">
                     <div class="di-section-header">
                         <div class="di-section-heading">
@@ -107,11 +106,11 @@
                         {
                             var cfg = f;
                             if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
-                            var target = entity;
+                            var target = cfg.Section == "Account" ? (object)customer : contact;
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                             var editable = !string.Equals(cfg.CustomerControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                             var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
-                            var sub = step.Group == "Identification" ? Subcategory(cfg.FieldKey) : null;
+                            var sub = Subcategory(cfg.FieldKey);
                             if (sub is not null && sub != lastSub)
                             {
                                 lastSub = sub;
@@ -193,10 +192,10 @@
             else
             {
                 <p class="di-form-sub mb-3">Review everything captured, then submit.</p>
-                @foreach (var g in steps.Where(s => !s.IsReview && s.Group != "Documents"))
+                @foreach (var g in steps.Where(s => !s.IsReview && !s.IsDocuments))
                 {
-                    var entity = g.Section == "Account" ? (object)customer : contact;
-                    var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey))).ToList();
+                    object Ent(CustomerFieldConfig f) => f.Section == "Account" ? (object)customer : contact;
+                    var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(Ent(f), f.FieldKey))).ToList();
                     <div class="di-section">
                         <div class="di-section-header">
                             <div class="di-section-heading"><span class="di-section-title">@g.Title</span></div>
@@ -213,7 +212,7 @@
                                 {
                                     <div class="di-review-item">
                                         <div class="di-review-label">@f.DisplayLabel</div>
-                                        <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(entity, f.FieldKey)</div>
+                                        <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(Ent(f), f.FieldKey)</div>
                                     </div>
                                 }
                             }
@@ -285,7 +284,10 @@
     [Parameter] public string Token { get; set; } = "";
     [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
 
-    private record Step(string Title, string Section, string? Group, bool IsReview);
+    private record Step(string Title, IReadOnlyList<(string Section, string Group)> Groups, bool IsReview)
+    {
+        public bool IsDocuments => Groups.Count == 1 && Groups[0].Group == "Documents";
+    }
 
     private Customer? customer;
     private CustomerContact contact = new();
@@ -350,22 +352,33 @@
                 : config.Where(f => f.IsVisible)
                     .GroupBy(f => new { f.Section, f.GroupName })
                     .Select(g => new SsCustomerTab(g.Key.Section, g.Key.GroupName, g.Key.GroupName, g.Min(x => x.Sequence), true)))
-            .OrderBy(t => t.Section == "Account" ? 0 : 1).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName)
+            .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
             .ToList();
 
-        var list = new List<Step>();
-        foreach (var t in orderedTabs)
-            if (config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
-                list.Add(new Step(t.Title, t.Section, t.GroupName, false));
-        list.Add(new Step("Documents", "", "Documents", false));
-        list.Add(new Step("Review & Submit", "", null, true));
+        // Tabs sharing a Title merge into one step (spanning their groups, across sections). Account groups
+        // sort before Contact, then by sequence.
+        static int Rank(SsCustomerTab t) => (t.Section == "Account" ? 0 : 1000) + t.Sequence;
+        var list = orderedTabs
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new
+            {
+                g.First().Title,
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).Select(t => (t.Section, t.GroupName)).ToList(),
+                Order = g.Min(Rank)
+            })
+            .OrderBy(x => x.Order)
+            .Select(x => new Step(x.Title, x.Groups, false))
+            .ToList();
+        list.Add(new Step("Documents", new[] { ("", "Documents") }, false));
+        list.Add(new Step("Review & Submit", Array.Empty<(string, string)>(), true));
         steps = list;
     }
 
     private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
-        config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group)
-              .Where(IsConditionallyVisible)
-              .OrderBy(f => f.Sequence);
+        step.Groups.SelectMany(g =>
+            config.Where(f => f.IsVisible && f.Section == g.Section && f.GroupName == g.Group)
+                  .Where(IsConditionallyVisible)
+                  .OrderBy(f => f.Sequence));
 
     /// <summary>A conditional field is shown only while its controlling Yes/No field holds the configured
     /// value; otherwise it is hidden (and cleared on save). Fields with no rule are always shown.</summary>
@@ -495,13 +508,13 @@
     private List<string> MissingRequired(Step step)
     {
         if (step.IsReview || customer is null) return [];
-        var entity = step.Section == "Account" ? (object)customer : contact;
-        return config
-            .Where(f => f.IsVisible && f.IsRequired && f.Section == step.Section && f.GroupName == step.Group)
+        return step.Groups.SelectMany(g => config
+            .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
-            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
-            .Select(f => f.DisplayLabel)
+            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+                f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
+            .Select(f => f.DisplayLabel))
             .ToList();
     }
 
@@ -538,9 +551,10 @@
 
     private List<string> DateErrorsForStep(Step step)
     {
-        if (step.IsReview || step.Section != "Account") return [];
-        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group
-            && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate"));
+        if (step.IsReview) return [];
+        var onThisStep = step.Groups.Any(g => g.Section == "Account"
+            && config.Any(f => f.Section == "Account" && f.GroupName == g.Group
+                && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate")));
         return onThisStep ? TradeLicenseDateErrors() : [];
     }
 

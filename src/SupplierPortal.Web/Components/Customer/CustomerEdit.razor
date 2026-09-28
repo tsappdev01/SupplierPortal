@@ -92,7 +92,7 @@ else
 
     @{ var step = steps[current]; }
 
-    @if (step.Group == "Documents")
+    @if (step.IsDocuments)
     {
         <div class="di-section">
             <div class="di-section-header">
@@ -111,7 +111,6 @@ else
     }
     else if (!step.IsReview)
     {
-        var entity = step.Section == "Account" ? (object)customer : contact;
         var tabEditable = CanEditTab(step);
         <div class="di-section">
             @if (!tabEditable)
@@ -127,7 +126,7 @@ else
                 </span>
                 <div class="di-section-heading">
                     <span class="di-section-title">@step.Title</span>
-                    <span class="di-section-desc">@(step.Section == "Account" ? "Company / account details" : "Primary contact details")</span>
+                    <span class="di-section-desc">Company / contact details</span>
                 </div>
             </div>
             <div class="di-section-body">
@@ -138,11 +137,11 @@ else
                     // Country Name is merged into the combined Country Code dropdown below, so don't render
                     // it as its own field.
                     if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
-                    var target = entity;
+                    var target = cfg.Section == "Account" ? (object)customer : contact;
                     var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                     var editable = tabEditable && !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                     var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
-                    var sub = step.Group == "Identification" ? Subcategory(cfg.FieldKey) : null;
+                    var sub = Subcategory(cfg.FieldKey);
                     if (sub is not null && sub != lastSub)
                     {
                         lastSub = sub;
@@ -229,10 +228,10 @@ else
     {
         @* ---------- Review step ---------- *@
         <p class="di-form-sub mb-3">Review everything captured, then save or submit for review.</p>
-        @foreach (var g in steps.Where(s => !s.IsReview && s.Group != "Documents"))
+        @foreach (var g in steps.Where(s => !s.IsReview && !s.IsDocuments))
         {
-            var entity = g.Section == "Account" ? (object)customer : contact;
-            var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey))).ToList();
+            object Ent(CustomerFieldConfig f) => f.Section == "Account" ? (object)customer : contact;
+            var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(Ent(f), f.FieldKey))).ToList();
             <div class="di-section">
                 <div class="di-section-header">
                     <div class="di-section-heading">
@@ -251,7 +250,7 @@ else
                         {
                             <div class="di-review-item">
                                 <div class="di-review-label">@f.DisplayLabel</div>
-                                <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(entity, f.FieldKey)</div>
+                                <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(Ent(f), f.FieldKey)</div>
                             </div>
                         }
                     }
@@ -344,7 +343,11 @@ else
     private List<CustomerAccessToken> emailHistory = [];
     private bool emailHistoryLoaded;
 
-    private record Step(string Title, string Section, string? Group, bool IsReview);
+    private record Step(string Title, IReadOnlyList<(string Section, string Group)> Groups, bool IsReview)
+    {
+        /// <summary>The special standalone Documents step (self-service only).</summary>
+        public bool IsDocuments => Groups.Count == 1 && Groups[0].Group == "Documents";
+    }
 
     private Customer? customer;
     private CustomerContact contact = new();
@@ -422,25 +425,36 @@ else
 
     private void BuildSteps()
     {
-        // Tabs come from the admin-editable CustomerTabSetting (order, title, visibility). A tab renders only
-        // when it is visible and has at least one visible field in the config.
-        var list = new List<Step>();
-        foreach (var t in tabs.Where(t => t.IsVisible)
-                     .OrderBy(t => t.Section == "Account" ? 0 : 1).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName))
-        {
-            if (config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
-                list.Add(new Step(t.Title, t.Section, t.GroupName, false));
-        }
-        list.Add(new Step("Review & Save", "", null, true));
+        // Tabs come from the admin-editable CustomerTabSetting (order, title, visibility). Tabs that share the
+        // same Title MERGE into one wizard step (spanning their groups, across sections), so an admin can merge
+        // or split tabs simply by giving them the same or different titles. A tab renders only when visible and
+        // has at least one visible field. Order: Account groups before Contact, then by sequence.
+        static int Rank(CustomerTabSetting t) => (t.Section == "Account" ? 0 : 1000) + t.Sequence;
+        var visible = tabs.Where(t => t.IsVisible)
+            .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
+            .ToList();
+        var list = visible
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new
+            {
+                g.First().Title,
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).Select(t => (t.Section, t.GroupName)).ToList(),
+                Order = g.Min(Rank)
+            })
+            .OrderBy(x => x.Order)
+            .Select(x => new Step(x.Title, x.Groups, false))
+            .ToList();
+        list.Add(new Step("Review & Save", Array.Empty<(string, string)>(), true));
         steps = list;
     }
 
-    /// <summary>Whether the current user may EDIT the given tab. A tab with a non-empty editor list is editable
-    /// only by a listed user; everyone else sees it read-only. Review/Documents steps are never restricted.</summary>
-    private bool CanEditTab(Step step)
+    /// <summary>Whether the current user may EDIT the given step — true only when every constituent tab is
+    /// editable (a merged step is read-only if any of its tabs is restricted for this user).</summary>
+    private bool CanEditTab(Step step) => step.IsReview || step.Groups.All(g => CanEditGroup(g.Section, g.Group));
+
+    private bool CanEditGroup(string section, string group)
     {
-        if (step.IsReview || step.Group is null) return true;
-        var csv = tabs.FirstOrDefault(t => t.Section == step.Section && t.GroupName == step.Group)?.EditableByUserIdsCsv;
+        var csv = tabs.FirstOrDefault(t => t.Section == section && t.GroupName == group)?.EditableByUserIdsCsv;
         if (string.IsNullOrWhiteSpace(csv)) return true;
         var allowed = SupplierFieldSettingService.ParseEditorUserIds(csv);
         return currentUserId is int id && allowed.Contains(id);
@@ -478,9 +492,10 @@ else
     };
 
     private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
-        config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group)
-              .Where(IsConditionallyVisible)
-              .OrderBy(f => f.Sequence);
+        step.Groups.SelectMany(g =>
+            config.Where(f => f.IsVisible && f.Section == g.Section && f.GroupName == g.Group)
+                  .Where(IsConditionallyVisible)
+                  .OrderBy(f => f.Sequence));
 
     /// <summary>A conditional field is shown only while its controlling Yes/No field currently holds the
     /// configured value; otherwise it is hidden (and cleared on save). Fields with no rule are always shown.</summary>
@@ -639,9 +654,10 @@ else
     /// check fires as the user leaves that step, not on unrelated steps).</summary>
     private List<string> DateErrorsForStep(Step step)
     {
-        if (step.IsReview || step.Section != "Account") return [];
-        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group
-            && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate"));
+        if (step.IsReview) return [];
+        var onThisStep = step.Groups.Any(g => g.Section == "Account"
+            && config.Any(f => f.Section == "Account" && f.GroupName == g.Group
+                && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate")));
         return onThisStep ? TradeLicenseDateErrors() : [];
     }
 
@@ -650,13 +666,13 @@ else
     private List<string> MissingRequired(Step step)
     {
         if (step.IsReview || customer is null) return [];
-        var entity = step.Section == "Account" ? (object)customer : contact;
-        return config
-            .Where(f => f.IsVisible && f.IsRequired && f.Section == step.Section && f.GroupName == step.Group)
+        return step.Groups.SelectMany(g => config
+            .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
-            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
-            .Select(f => f.DisplayLabel)
+            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+                f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
+            .Select(f => f.DisplayLabel))
             .ToList();
     }
 
