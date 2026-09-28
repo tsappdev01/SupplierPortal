@@ -133,6 +133,11 @@
                                            onkeydown="return false" onpaste="return false"
                                            @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                                 }
+                                else if (cfg.FieldKind == "phone")
+                                {
+                                    <SupplierPortal.Web.Components.Shared.CustomerPhoneField
+                                        Value="@cur" ValueChanged="v => OnChange(target, cfg.FieldKey, v)" />
+                                }
                                 else if (cfg.FieldKind == "yesno")
                                 {
                                     <div class="di-switch-wrap">

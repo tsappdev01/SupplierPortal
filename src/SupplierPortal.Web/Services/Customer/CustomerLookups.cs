@@ -265,6 +265,34 @@ public static class CustomerLookups
 
     private static readonly string[] CountryNames = Countries.Select(c => c.Name).ToArray();
     private static readonly string[] CountryCodes = Countries.Select(c => c.Code).ToArray();
+
+    /// <summary>ISO-2 → international dialing code, for the phone controls. Comprehensive common set;
+    /// countries without an entry simply don't appear in the dial-code dropdown.</summary>
+    private static readonly Dictionary<string, string> DialByIso = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AE"]="971",["SA"]="966",["QA"]="974",["KW"]="965",["BH"]="973",["OM"]="968",["YE"]="967",
+        ["EG"]="20",["JO"]="962",["LB"]="961",["SY"]="963",["IQ"]="964",["IR"]="98",["IL"]="972",["PS"]="970",
+        ["TR"]="90",["PK"]="92",["IN"]="91",["BD"]="880",["LK"]="94",["NP"]="977",["AF"]="93",["CN"]="86",
+        ["HK"]="852",["TW"]="886",["JP"]="81",["KR"]="82",["SG"]="65",["MY"]="60",["ID"]="62",["TH"]="66",
+        ["PH"]="63",["VN"]="84",["KH"]="855",["MM"]="95",["KZ"]="7",["UZ"]="998",["AZ"]="994",["GE"]="995",
+        ["US"]="1",["CA"]="1",["MX"]="52",["BR"]="55",["AR"]="54",["CL"]="56",["CO"]="57",["PE"]="51",["VE"]="58",
+        ["GB"]="44",["IE"]="353",["FR"]="33",["DE"]="49",["ES"]="34",["PT"]="351",["IT"]="39",["NL"]="31",
+        ["BE"]="32",["LU"]="352",["CH"]="41",["AT"]="43",["SE"]="46",["NO"]="47",["DK"]="45",["FI"]="358",
+        ["IS"]="354",["PL"]="48",["CZ"]="420",["SK"]="421",["HU"]="36",["RO"]="40",["BG"]="359",["GR"]="30",
+        ["RU"]="7",["UA"]="380",["BY"]="375",["HR"]="385",["RS"]="381",["SI"]="386",["CY"]="357",["MT"]="356",
+        ["ZA"]="27",["NG"]="234",["KE"]="254",["GH"]="233",["ET"]="251",["TZ"]="255",["UG"]="256",["MA"]="212",
+        ["DZ"]="213",["TN"]="216",["LY"]="218",["SD"]="249",["SO"]="252",["SN"]="221",["CI"]="225",["CM"]="237",
+        ["AU"]="61",["NZ"]="64",["FJ"]="679",["AD"]="376",["MC"]="377",["LI"]="423",["SM"]="378",
+    };
+
+    /// <summary>Countries that carry a dial code, as (Iso, Dial, Name), UAE first then alphabetical by name —
+    /// the option list for the customer phone controls.</summary>
+    public static readonly (string Iso, string Dial, string Name)[] PhoneCountries =
+        Countries.Where(c => DialByIso.ContainsKey(c.Code))
+                 .Select(c => (c.Code, DialByIso[c.Code], c.Name))
+                 .OrderByDescending(c => c.Code == "AE")
+                 .ThenBy(c => c.Name)
+                 .ToArray();
     /// <summary>Combined "Code - Name" options, e.g. "AE - United Arab Emirates".</summary>
     private static readonly string[] CountryCodeNames = Countries.Select(c => $"{c.Code} - {c.Name}").ToArray();
 
