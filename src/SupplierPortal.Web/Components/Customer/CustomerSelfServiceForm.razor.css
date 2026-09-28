@@ -386,3 +386,23 @@
 .di-progress-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; }
 .di-progress-pct { font-size: 15px; font-weight: 700; color: var(--navy); }
 .di-progress-word { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8a94a6; }
+
+/* ---- Declaration pop-up + signature pad (matches the supplier submit) ---- */
+.di-decl-backdrop { position: fixed; inset: 0; background: rgba(15, 22, 35, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 20px; }
+.di-decl { background: #fff; border-radius: 10px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35); }
+.di-decl-head { padding: 18px 22px 10px; border-bottom: 1px solid #e2e5ea; text-align: center; }
+.di-decl-title { margin: 0; font-size: 17px; font-weight: 700; color: #3b5bdb; text-transform: uppercase; letter-spacing: 0.02em; }
+.di-decl-subtitle { font-size: 12.5px; font-style: italic; color: #7b8697; margin-top: 4px; }
+.di-decl-body { padding: 16px 22px; overflow-y: auto; font-size: 13.5px; line-height: 1.5; color: #3a4457; }
+.di-decl-body p { margin: 0 0 10px; }
+.di-decl-section { font-weight: 700; color: #1a2233; }
+.di-decl-certify { font-style: italic; }
+.di-decl-siglabel { display: block; font-weight: 700; color: #1a2233; margin: 14px 0 5px; font-size: 13.5px; }
+.di-decl-sig { width: 100%; padding: 10px 12px; border: 1px solid #e2e5ea; border-radius: 6px; font-size: 15px; font-family: inherit; }
+.di-decl-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid #e2e5ea; }
+.di-sigpad-wrap { position: relative; margin-top: 6px; }
+.di-sigpad { display: block; width: 100%; height: 150px; border: 1.5px dashed #b7c2d6; border-radius: 10px; background: #fbfcfe; cursor: crosshair; touch-action: none; }
+.di-sigpad-clear { position: absolute; top: 8px; right: 8px; border: 1px solid #d3dae6; background: #fff; color: #46618f; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.di-sigpad-clear:hover { background: #f1f4f9; }
+.di-sigpad-hint { font-size: 12px; color: #7b8697; margin-top: 6px; }
+@media (max-width: 640px) { .di-decl-actions { flex-wrap: wrap; } .di-decl-actions .di-btn { flex: 1 1 auto; justify-content: center; } }

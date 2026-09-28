@@ -144,6 +144,7 @@ builder.Services.AddScoped<EmailDispatcher>();
 builder.Services.AddScoped<CustomerAccessTokenService>();
 builder.Services.AddScoped<CustomerEmailService>();
 builder.Services.AddScoped<CustomerDocumentService>();
+builder.Services.AddScoped<CustomerDeclarationPdfService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();

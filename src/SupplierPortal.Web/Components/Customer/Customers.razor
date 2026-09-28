@@ -903,13 +903,17 @@
 
     private async Task ShowDocumentsAsync(CustomerService.CustomerRow row)
     {
+        var docs = await DocumentService.GetDocumentsAsync(row.Id);
+        if (docs.Count == 0)
+        {
+            ToastService.ShowInfo($"No documents have been uploaded for {row.Name}.");
+            return;
+        }
         docsCustomerId = row.Id;
         docsCustomerName = row.Name;
-        modalDocuments = [];
-        modalDocsLoading = true;
-        showDocsModal = true;
-        modalDocuments = await DocumentService.GetDocumentsAsync(row.Id);
+        modalDocuments = docs;
         modalDocsLoading = false;
+        showDocsModal = true;
     }
 
     private void CloseDocsModal() => showDocsModal = false;

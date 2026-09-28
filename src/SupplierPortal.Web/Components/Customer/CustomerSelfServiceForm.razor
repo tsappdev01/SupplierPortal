@@ -7,6 +7,7 @@
 @inject ICustomerSelfServiceDataGateway DataGateway
 @inject PublicBrandingState PublicBranding
 @inject ToastService ToastService
+@inject IJSRuntime JS
 
 <PageTitle>Customer Information - Customer Portal</PageTitle>
 
@@ -233,6 +234,41 @@
         </div>
     }
 </div>
+
+@if (showDeclaration && customer is not null)
+{
+    <div class="di-decl-backdrop">
+        <div class="di-decl" role="dialog" aria-modal="true">
+            <div class="di-decl-head">
+                <h2 class="di-decl-title">@DeclarationTitle</h2>
+                <div class="di-decl-subtitle">@DeclarationSubtitle</div>
+            </div>
+            <div class="di-decl-body">
+                <p class="di-decl-section">Declaration (For true and correct information provided):</p>
+                <p>@GeneralDeclaration</p>
+                <p class="di-decl-certify">@DeclarationCertify</p>
+
+                <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
+                <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
+                       placeholder="Type your full name here" />
+
+                <label class="di-decl-siglabel" style="margin-top:14px;">Sign here <span class="di-req">*</span></label>
+                <div class="di-sigpad-wrap">
+                    <canvas @ref="sigCanvas" class="di-sigpad"></canvas>
+                    <button type="button" class="di-sigpad-clear" @onclick="ClearSignatureAsync" title="Clear signature">Clear</button>
+                </div>
+                <div class="di-sigpad-hint">Draw your signature in the box using your mouse (or finger on a touch screen).</div>
+            </div>
+            <div class="di-decl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@busy">Cancel</button>
+                <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmDeclarationAsync"
+                        disabled="@(busy || string.IsNullOrWhiteSpace(declarationSignature))">
+                    Agree &amp; Submit
+                </button>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .di-selfservice-wrap { width: 100%; display: flex; justify-content: center; }
@@ -531,9 +567,75 @@
             return;
         }
 
+        // The customer must sign the declaration before the record is submitted — open the pop-up; the
+        // submission finishes only once signed (see ConfirmDeclarationAsync).
+        customer.Contact = contact;
+        showDeclaration = true;
+    }
+
+    // ---- Declaration + digital signature (mirrors the supplier self-service submit) ----
+    private bool showDeclaration;
+    private string declarationSignature = "";
+    private ElementReference sigCanvas;
+    private bool sigInitialized;
+
+    private string DeclarationTitle => "Customer Declaration";
+    private string DeclarationSubtitle => "Customer Data Gathering Portal";
+    private string GeneralDeclaration =>
+        "I/We hereby declare that the information and data provided in this form are true, correct, and " +
+        "complete to the best of our knowledge, and are furnished in compliance with the applicable UAE " +
+        "regulatory and e-invoicing requirements issued by the Ministry of Finance / Federal Tax Authority. " +
+        "We undertake to promptly inform Dubai Investments of any changes to the above.";
+    private string DeclarationCertify =>
+        "By signing below, I/We acknowledge and accept the declaration set out above.";
+
+    private string DeclarationFullText() => string.Join("\n\n", new[]
+    {
+        DeclarationTitle, DeclarationSubtitle,
+        "Declaration (For true and correct information provided):",
+        GeneralDeclaration, DeclarationCertify
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showDeclaration && !sigInitialized)
+        {
+            sigInitialized = true;
+            try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { /* best-effort */ }
+        }
+    }
+
+    private void CancelDeclaration() { showDeclaration = false; sigInitialized = false; }
+    private async Task ClearSignatureAsync() { try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { } }
+
+    private async Task ConfirmDeclarationAsync()
+    {
+        if (customer is null) return;
+        if (string.IsNullOrWhiteSpace(declarationSignature))
+        {
+            ToastService.ShowError("Please type your full name as your signature.");
+            return;
+        }
+        string dataUrl = "";
+        try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
+        if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
+        {
+            ToastService.ShowError("Please draw your signature in the box before submitting.");
+            return;
+        }
+        var comma = dataUrl.IndexOf(',');
+        customer.DisclaimerSignatureImage = comma >= 0 ? Convert.FromBase64String(dataUrl[(comma + 1)..]) : null;
+        customer.DisclaimerAcknowledged = true;
+        customer.DisclaimerAcknowledgedAt = DateTime.UtcNow;
+        customer.DisclaimerAcknowledgedBy = currentUser;
+        customer.DisclaimerText = DeclarationFullText();
+        customer.DisclaimerSignature = declarationSignature.Trim();
+
+        showDeclaration = false;
+        sigInitialized = false;
+
         busy = true; message = null;
         customer.Contact = contact;
-        // Final submit: the gateway saves, sets the status, expires the link and notifies the requestor.
         var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: true);
         busy = false;
         if (!result.Success)

@@ -263,6 +263,23 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<bool>("DisclaimerAcknowledged")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("DisclaimerAcknowledgedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DisclaimerAcknowledgedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("DisclaimerSignature")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DisclaimerText")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("EINvoicingWaveApplicability")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");

@@ -47,6 +47,7 @@ public class LocalCustomerSelfServiceDataGateway(
     CustomerService customerService,
     CustomerFieldConfigService fieldConfigService,
     CustomerDocumentService documentService,
+    CustomerDeclarationPdfService declarationPdf,
     EmailBrandingService branding,
     CustomerEmailService emailService,
     IConfiguration configuration)
@@ -98,6 +99,20 @@ public class LocalCustomerSelfServiceDataGateway(
 
         if (complete)
         {
+            // Render the signed declaration into a PDF and store it with the customer's documents (mirrors
+            // the supplier). Best-effort: a PDF failure must not fail the submission.
+            if (updated.DisclaimerAcknowledged && updated.DisclaimerSignatureImage is { Length: > 0 })
+            {
+                try
+                {
+                    var pdf = declarationPdf.Build(updated, updated.DisclaimerSignatureImage);
+                    var name = updated.LegalName ?? updated.CustomerCode ?? updated.CustomerId ?? updated.Id.ToString();
+                    await documentService.UploadBytesAsync(updated.Id, "Signed Declaration", pdf,
+                        $"Signed Declaration - {name}.pdf", "application/pdf", Actor);
+                }
+                catch { /* declaration PDF is best-effort */ }
+            }
+
             await customerService.SetStatusAsync(updated.Id, CustomerStatuses.ForReview, Actor);
             await accessTokenService.MarkUsedAsync(access.Id);
             var internalBase = configuration["SelfService:InternalUrl"] ?? "";

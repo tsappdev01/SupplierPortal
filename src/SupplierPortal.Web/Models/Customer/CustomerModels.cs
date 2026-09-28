@@ -53,6 +53,20 @@ public class Customer
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
+    // ---- Declaration / digital signature (captured on self-service submit; mirrors the supplier) ----
+    /// <summary>True once the customer has signed the declaration on submit.</summary>
+    public bool DisclaimerAcknowledged { get; set; }
+    public DateTime? DisclaimerAcknowledgedAt { get; set; }
+    [MaxLength(150)] public string? DisclaimerAcknowledgedBy { get; set; }
+    /// <summary>The full declaration wording the customer acknowledged (kept for audit).</summary>
+    public string? DisclaimerText { get; set; }
+    /// <summary>The typed full name used as the digital signature.</summary>
+    [MaxLength(200)] public string? DisclaimerSignature { get; set; }
+    /// <summary>The hand-drawn signature PNG bytes, carried from the form to the server to render into the
+    /// signed declaration PDF. Not stored on the customer row (the PDF is stored as a document instead).</summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public byte[]? DisclaimerSignatureImage { get; set; }
+
     // ---- account fields (generated from the sheet) ----
     [MaxLength(300)] public string? LegalName { get; set; }  // Legal Name [required]
     [MaxLength(300)] public string? CommercialName { get; set; }  // Commercial Name
