@@ -47,7 +47,7 @@ public static class CustomerSelfServiceEndpoints
             {
                 Success = success,
                 Error = error,
-                MaskedEmail = SupplierAccessTokenService.MaskEmail(CustomerAccessTokenService.EmailFor(t.Customer)),
+                MaskedEmail = SupplierAccessTokenService.MaskEmail(t.Customer is null ? null : CustomerAccessTokenService.EmailFor(t.Customer)),
                 ExpiresInMinutes = 10,
                 LogoUrl = logo
             });
@@ -94,7 +94,7 @@ public static class CustomerSelfServiceEndpoints
                 Success = true,
                 SessionToken = session,
                 CustomerName = t.Customer?.LegalName,
-                ContactEmail = CustomerAccessTokenService.EmailFor(t.Customer)
+                ContactEmail = t.Customer is null ? null : CustomerAccessTokenService.EmailFor(t.Customer)
             });
         })
         .RequireRateLimiting("otp");
