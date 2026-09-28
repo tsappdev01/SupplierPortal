@@ -158,10 +158,12 @@ else
                         }
                         else if (cfg.FieldKind == "date")
                         {
-                            @* Calendar-only: block manual typing/paste so the date can only be picked; past-only
+                            @* Calendar-only: clicking anywhere in the field opens the native date picker, and
+                               typing/paste is blocked so the date can only be chosen from the calendar. Past-only
                                fields (issue / establishment / birth) cap at today so a future date can't be chosen. *@
-                            <input type="date" value="@cur" max="@DateMax(cfg.FieldKey)"
+                            <input type="date" class="di-datepick" value="@cur" max="@DateMax(cfg.FieldKey)"
                                    onkeydown="return false" onpaste="return false"
+                                   onclick="try { this.showPicker(); } catch (e) {}"
                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                         }
                         else if (cfg.FieldKind == "phone")

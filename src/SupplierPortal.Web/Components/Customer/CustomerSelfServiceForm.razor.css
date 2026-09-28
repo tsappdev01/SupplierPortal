@@ -406,3 +406,39 @@
 .di-sigpad-clear:hover { background: #f1f4f9; }
 .di-sigpad-hint { font-size: 12px; color: #7b8697; margin-top: 6px; }
 @media (max-width: 640px) { .di-decl-actions { flex-wrap: wrap; } .di-decl-actions .di-btn { flex: 1 1 auto; justify-content: center; } }
+
+/* ---- Date fields: whole box acts as a calendar trigger (typing is disabled in markup) ---- */
+.di-field input[type=date].di-datepick { cursor: pointer; }
+.di-field input[type=date].di-datepick::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.75; }
+
+/* ---- Dark-mode readability (mirrors the internal Customer form) ---- */
+[data-theme="dark"] .di-form-page {
+    --navy: var(--di-heading);
+    --text: var(--di-text);
+    --label: var(--di-text-soft);
+    --border: var(--di-border);
+    --bg: var(--di-surface-2);
+}
+[data-theme="dark"] .di-form-sub,
+[data-theme="dark"] .di-section-desc { color: var(--di-text-soft); }
+[data-theme="dark"] .di-section { background: var(--di-surface); }
+[data-theme="dark"] .di-section-header { background: var(--di-surface-2); }
+[data-theme="dark"] .di-section-icon { background: rgba(59, 91, 219, 0.22); }
+[data-theme="dark"] .di-stepper-item { background: var(--di-surface); }
+[data-theme="dark"] .di-stepper-item.active { background: rgba(59, 91, 219, 0.22); }
+[data-theme="dark"] .di-field input[type=text],
+[data-theme="dark"] .di-field input[type=email],
+[data-theme="dark"] .di-field input[type=date],
+[data-theme="dark"] .di-field input[type=number],
+[data-theme="dark"] .di-field textarea,
+[data-theme="dark"] .di-field select {
+    background: var(--di-surface);
+    color: var(--di-text);
+    border-color: var(--di-border);
+}
+[data-theme="dark"] .di-field input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.9); }
+[data-theme="dark"] .di-field input:disabled,
+[data-theme="dark"] .di-field select:disabled,
+[data-theme="dark"] .di-field .di-frozen { background: var(--di-surface-2); color: var(--di-text-soft); }
+[data-theme="dark"] .di-btn-secondary { background: var(--di-surface); color: var(--di-text); border-color: var(--di-border); }
+[data-theme="dark"] .di-progress-bg { stroke: #2b3752; }

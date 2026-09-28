@@ -127,9 +127,11 @@
                                 }
                                 else if (cfg.FieldKind == "date")
                                 {
-                                    @* Calendar-only (no manual typing); past-only fields cap at today. *@
-                                    <input type="date" value="@cur" max="@DateMax(cfg.FieldKey)"
+                                    @* Calendar-only: clicking the field opens the native picker; typing is blocked;
+                                       past-only fields cap at today. *@
+                                    <input type="date" class="di-datepick" value="@cur" max="@DateMax(cfg.FieldKey)"
                                            onkeydown="return false" onpaste="return false"
+                                           onclick="try { this.showPicker(); } catch (e) {}"
                                            @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                                 }
                                 else if (cfg.FieldKind == "phone")
