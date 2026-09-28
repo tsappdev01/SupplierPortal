@@ -1,5 +1,5 @@
 @page "/admin/customers/upload"
-@attribute [Authorize(Policy = "Portal.Customer")]
+@attribute [Authorize(Roles = "Administrator")]
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization

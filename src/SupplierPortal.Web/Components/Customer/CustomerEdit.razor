@@ -356,22 +356,48 @@ else
     private bool busy;
     private bool savedTick;
 
+    private bool dataLoaded;
+
     protected override async Task OnInitializedAsync()
     {
+        // Keep this cheap so the page paints (with the loading spinner) immediately; the heavier reads are
+        // deferred to OnAfterRenderAsync so they run once on the interactive circuit, not again on prerender.
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
-        config = await FieldConfigService.GetAllAsync();
-        tabs = await FieldConfigService.GetTabsAsync();
-        // Resolve the signed-in user's Id only when a tab is actually edit-restricted (for the per-tab lock).
-        if (tabs.Any(t => !string.IsNullOrWhiteSpace(t.EditableByUserIdsCsv)))
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || dataLoaded) return;
+        dataLoaded = true;
+        try
         {
-            currentUserId = (await UserService.GetByIdentifierAsync(currentUser))?.Id;
+            // Load the independent reads concurrently (each uses its own DbContext) instead of sequentially.
+            var tConfig = FieldConfigService.GetAllAsync();
+            var tTabs = FieldConfigService.GetTabsAsync();
+            var tCustomer = CustomerService.GetAsync(Id);
+            var tDocCount = CustomerService.GetDocumentCountAsync(Id);
+            await Task.WhenAll(tConfig, tTabs, tCustomer, tDocCount);
+
+            config = tConfig.Result;
+            tabs = tTabs.Result;
+            customer = tCustomer.Result;
+            docCount = tDocCount.Result;
+            if (customer is not null)
+            {
+                contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+            }
+
+            // Resolve the signed-in user's Id only when a tab is actually edit-restricted (per-tab lock).
+            if (tabs.Any(t => !string.IsNullOrWhiteSpace(t.EditableByUserIdsCsv)))
+            {
+                currentUserId = (await UserService.GetByIdentifierAsync(currentUser))?.Id;
+            }
+            BuildSteps();
         }
-        await LoadAsync();
-        BuildSteps();
-        if (customer is not null)
+        finally
         {
-            docCount = (await DocumentService.GetDocumentsAsync(customer.Id)).Count;
+            StateHasChanged();
         }
     }
 
@@ -385,12 +411,6 @@ else
         }
     }
 
-    private async Task LoadAsync()
-    {
-        customer = await CustomerService.GetAsync(Id);
-        if (customer is null) return;
-        contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
-    }
 
     private void BuildSteps()
     {
@@ -609,7 +629,7 @@ else
     {
         if (customer is not null)
         {
-            docCount = (await DocumentService.GetDocumentsAsync(customer.Id)).Count;
+            docCount = await CustomerService.GetDocumentCountAsync(customer.Id);
         }
         StateHasChanged();
     }

@@ -71,14 +71,17 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4.5" width="19" height="14" rx="2.5" fill="#e3f6fb" stroke="#0aa2c0" stroke-width="1.7"/><path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0aa2c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2"/><path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span>Notify All Customers</span>
     </button>
-    <button type="button" class="di-action-btn is-register" @onclick="RegisterCustomerAsync" title="Register a new customer">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7"/><path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233"/><path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <span>Register Customer</span>
-    </button>
-    <a class="di-action-btn is-upload" href="/admin/customers/upload" title="Bulk-upload customers from Excel">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Upload Customer Data</span>
-    </a>
+    @if (isAdministrator)
+    {
+        <button type="button" class="di-action-btn is-register" @onclick="RegisterCustomerAsync" title="Register a new customer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7"/><path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233"/><path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>Register Customer</span>
+        </button>
+        <a class="di-action-btn is-upload" href="/admin/customers/upload" title="Bulk-upload customers from Excel">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Upload Customer Data</span>
+        </a>
+    }
 </div>
 
 @if (showTemplateDialog)
@@ -225,7 +228,7 @@
     <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage >= TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
 </div>
 
-<div style="overflow-x: auto;">
+<div class="di-supplier-scroll">
     <table class="table table-striped table-sm align-middle">
         <thead>
             <tr>

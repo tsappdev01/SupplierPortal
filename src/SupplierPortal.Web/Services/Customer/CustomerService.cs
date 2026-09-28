@@ -132,11 +132,21 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     public async Task<Customer?> GetAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        // Deliberately do NOT include Documents here: their Content byte[] column would be pulled into memory
+        // on every edit-page open, which is slow. Callers that need documents load them separately, and the
+        // edit page uses GetDocumentCountAsync for the tab badge.
         return await db.Customers
             .Include(c => c.Contact)
-            .Include(c => c.Documents)
             .Include(c => c.BusinessUnit)
             .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
+    /// <summary>Number of attached documents for a customer, without loading any file bytes (for the edit
+    /// page's "Documents (n)" badge).</summary>
+    public async Task<int> GetDocumentCountAsync(int id)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerDocuments.CountAsync(d => d.CustomerId == id);
     }
 
     /// <summary>Creates an empty draft customer (+ empty primary contact) and returns its id, so the BR user
