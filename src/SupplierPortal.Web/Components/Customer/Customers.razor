@@ -12,6 +12,7 @@
 @inject CustomerDocumentService DocumentService
 @inject CustomerFieldConfigService FieldConfigService
 @inject BusinessUnitService BusinessUnitService
+@inject UserService UserService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Nav
 @inject ToastService ToastService
@@ -61,7 +62,7 @@
         <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#c62828" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#ef9a9a" stroke="#c62828" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 15h16M12 21h16M12 27h9" stroke="#ef9a9a" stroke-width="2" stroke-linecap="round"/><rect x="5" y="33" width="34" height="15" rx="3" fill="#c62828"/><text x="22" y="44.5" font-family="Arial" font-size="10.5" font-weight="800" fill="#fff" text-anchor="middle">PDF</text></svg>
         <span>PDF</span>
     </a>
-    <button type="button" class="di-export-btn" @onclick="PrintAsync" title="Print">
+    <button type="button" class="di-export-btn" @onclick="OpenPrintDialog" title="Print">
         <svg width="28" height="30" viewBox="0 0 48 48" fill="none"><path d="M14 6h20v11H14z" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="16" width="34" height="17" rx="3.5" fill="#607d8b"/><rect x="14" y="29" width="20" height="13" rx="1.5" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><path d="M18 34h12M18 38h8" stroke="#455a64" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Print</span>
     </button>
@@ -183,6 +184,27 @@
             }
         </select>
     </div>
+    <div class="col-auto" style="min-width: 150px;">
+        <label class="form-label">Priority</label>
+        <select class="form-select" @bind="priorityFilter" @bind:after="OnFilterChanged">
+            <option value="">All Priorities</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+        </select>
+    </div>
+    <div class="col-auto" style="min-width: 180px;">
+        <label class="form-label">Assigned To</label>
+        <select class="form-select" @bind="assignedFilter" @bind:after="OnFilterChanged">
+            <option value="">All Assignees</option>
+            <option value="unassigned">— Unassigned —</option>
+            @foreach (var u in assignableUsers)
+            {
+                <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+            }
+        </select>
+    </div>
 </div>
 
 <ul class="nav nav-tabs no-print mb-3">
@@ -210,20 +232,22 @@
                 <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
                 <th>Customer Number</th>
                 <th>Customer Name</th>
+                <th>Priority</th>
                 <th>First Name</th>
                 <th>Contact Email</th>
                 <th>Status</th>
+                <th class="no-print">Assigned To</th>
                 <th class="no-print">Actions</th>
             </tr>
         </thead>
         <tbody>
             @if (loading)
             {
-                <tr><td colspan="7" class="text-center text-muted py-4">Loading…</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4">Loading…</td></tr>
             }
             else if (!Paged.Any())
             {
-                <tr><td colspan="7" class="text-center text-muted py-4">No customers found.</td></tr>
+                <tr><td colspan="9" class="text-center text-muted py-4">No customers found.</td></tr>
             }
             else
             {
@@ -234,9 +258,29 @@
                         <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(row.Id)" @onchange="() => ToggleSelected(row.Id)" /></td>
                         <td>@row.Number</td>
                         <td>@row.Name</td>
+                        <td>
+                            <select class="di-inline-select di-prio-@(row.Priority?.ToLowerInvariant() ?? "none")"
+                                    value="@row.Priority" @onchange="e => SetPriorityAsync(row, (string?)e.Value)">
+                                <option value="">—</option>
+                                <option value="P1">P1</option>
+                                <option value="P2">P2</option>
+                                <option value="P3">P3</option>
+                                <option value="P4">P4</option>
+                            </select>
+                        </td>
                         <td>@row.FirstName</td>
                         <td>@row.Email</td>
                         <td><span class="badge @StatusClass(row.Status)">@row.Status</span></td>
+                        <td class="no-print">
+                            <select class="di-inline-select" value="@row.AssignedToUserId"
+                                    @onchange="e => AssignAsync(row, e.Value?.ToString())">
+                                <option value="">— Unassigned —</option>
+                                @foreach (var u in assignableUsers)
+                                {
+                                    <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                                }
+                            </select>
+                        </td>
                         <td class="no-print">
                             <button class="btn btn-sm btn-outline-secondary" title="View attached documents" @onclick="() => ShowDocumentsAsync(row)">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 11 4.5h1.5L9.5 1.5V3zM5 8.5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H5z"/></svg>
@@ -311,6 +355,78 @@
     </div>
 }
 
+@if (showPrintDialog)
+{
+    <div class="di-print-backdrop no-print" @onclick="ClosePrintDialog"></div>
+    <div class="di-print-dialog no-print" role="dialog" aria-modal="true" aria-label="Print options">
+        <div class="di-print-head">
+            <div>
+                <h3 class="di-print-title">Print Customers</h3>
+                <p class="di-print-sub">Filter by Status, Priority and Assigned To, then choose the columns. All <strong>@PrintFiltered.Count()</strong> matching customer(s) will be printed — across every tab, not just this page.</p>
+            </div>
+            <button type="button" class="di-print-x" aria-label="Close" @onclick="ClosePrintDialog">✕</button>
+        </div>
+        <div class="di-print-body">
+            <div class="di-print-filters">
+                <div class="di-print-filter">
+                    <label>Status</label>
+                    <select @bind="printStatusFilter">
+                        <option value="">All Statuses</option>
+                        @foreach (var s in CustomerStatuses.All)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Priority</label>
+                    <select @bind="printPriorityFilter">
+                        <option value="">All Priorities</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Assigned To</label>
+                    <select @bind="printAssignedFilter">
+                        <option value="">All Assignees</option>
+                        <option value="unassigned">— Unassigned —</option>
+                        @foreach (var u in assignableUsers)
+                        {
+                            <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="di-print-toolbar">
+                <span class="di-print-count">@printColumns.Count(c => c.Selected) of @printColumns.Count columns</span>
+                <div class="di-print-toolbar-actions">
+                    <button type="button" class="di-chip-btn" @onclick="() => SetAllPrintCols(true)">Select all</button>
+                    <button type="button" class="di-chip-btn" @onclick="() => SetAllPrintCols(false)">Clear</button>
+                </div>
+            </div>
+            <div class="di-print-cols">
+                @foreach (var col in printColumns)
+                {
+                    <label class="di-print-col @(col.Selected ? "is-on" : "")">
+                        <input type="checkbox" checked="@col.Selected" @onchange="e => { col.Selected = e.Value is true; }" />
+                        <span>@col.Label</span>
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="di-print-actions">
+            <button type="button" class="di-btn2 di-btn2-ghost" @onclick="ClosePrintDialog">Cancel</button>
+            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DoPrintAsync"
+                    disabled="@(!printColumns.Any(c => c.Selected) || !PrintFiltered.Any())">
+                Print @PrintFiltered.Count() row(s)
+            </button>
+        </div>
+    </div>
+}
+
 <style>
     .di-modal-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); z-index: 1080; }
     .di-modal { position: fixed; inset: 24px; z-index: 1081; background: #fff; border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0,0,0,0.35); overflow: hidden; }
@@ -356,6 +472,47 @@
     .di-tmpl-actions .di-btn-primary:hover { background: #2f4bc4; }
     .di-tmpl-actions .di-btn-secondary { background: #fff; color: #1a2233; border: 1px solid #e2e5ea; }
     .di-tmpl-actions .di-btn-secondary:hover { background: #f5f7fc; }
+
+    /* Inline row selects for Priority / Assigned To */
+    .di-inline-select { border: 1px solid #d9e0ec; border-radius: 7px; padding: 3px 6px; font-size: 12.5px; background: #fff; color: #1a2233; max-width: 160px; }
+    .di-inline-select:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px rgba(59,91,219,.12); }
+    .di-prio-p1 { border-color: #dc3545; color: #b02a37; font-weight: 700; }
+    .di-prio-p2 { border-color: #fd7e14; color: #c85e04; font-weight: 700; }
+    .di-prio-p3 { border-color: #0d6efd; color: #0a58ca; font-weight: 600; }
+    .di-prio-p4 { border-color: #6c757d; color: #565e64; }
+
+    /* Advanced Print dialog (mirrors the supplier dialog) */
+    .di-print-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); z-index: 1090; }
+    .di-print-dialog { position: fixed; z-index: 1091; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+    .di-print-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 22px; background: #0b2545; border-radius: 14px 14px 0 0; }
+    .di-print-title { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
+    .di-print-sub { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; line-height: 1.5; }
+    .di-print-sub strong { color: #fff; }
+    .di-print-x { margin-left: auto; flex: none; background: rgba(255,255,255,.14); border: 0; color: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
+    .di-print-x:hover { background: rgba(255,255,255,.28); }
+    .di-print-body { padding: 18px 22px; }
+    .di-print-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
+    .di-print-filter { flex: 1 1 150px; min-width: 140px; }
+    .di-print-filter label { display: block; font-size: 12px; font-weight: 600; color: #46506b; margin-bottom: 5px; }
+    .di-print-filter select { width: 100%; padding: 8px 10px; border: 1.5px solid #d3dae6; border-radius: 9px; font-size: 13.5px; background: #fff; }
+    .di-print-filter select:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47,111,237,.15); }
+    .di-print-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-print-count { font-size: 12.5px; font-weight: 600; color: #46506b; }
+    .di-print-toolbar-actions { display: flex; gap: 6px; }
+    .di-chip-btn { border: 1px solid #d9e0ec; background: #fff; color: #46506b; font-size: 12.5px; font-weight: 600; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+    .di-chip-btn:hover { border-color: #3b5bdb; color: #1e3a8a; }
+    .di-print-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .di-print-col { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border: 1.5px solid #e4e8f0; border-radius: 10px; cursor: pointer; font-size: 13.5px; }
+    .di-print-col:hover { border-color: #b9c6df; }
+    .di-print-col.is-on { border-color: #2f6fed; background: #eef4ff; color: #12315f; font-weight: 600; }
+    .di-print-col input { width: 16px; height: 16px; accent-color: #2f6fed; }
+    .di-print-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px 20px; border-top: 1px solid #eef1f6; }
+    .di-btn2 { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; padding: 9px 18px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; }
+    .di-btn2-ghost { background: #fff; color: #46506b; border-color: #d9e0ec; }
+    .di-btn2-ghost:hover { background: #f5f7fc; }
+    .di-btn2-primary { background: #2f6fed; color: #fff; }
+    .di-btn2-primary:hover { background: #245ad1; }
+    .di-btn2-primary:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 
 @code {
@@ -373,6 +530,9 @@
     private void SelectBu(int id) { buDropdownOpen = false; filterBusinessUnitId = id; OnFilterChanged(); }
     private string? searchName;
     private string statusFilter = "";
+    private string priorityFilter = "";
+    private string assignedFilter = "";      // "", "unassigned", or a user id
+    private List<User> assignableUsers = [];
     private int activeTab;
     private int currentPage = 1;
     private const int PageSize = 25;
@@ -396,8 +556,21 @@
 
     private List<CustomerService.CustomerRow> statusFiltered => buFiltered
         .Where(r => string.IsNullOrEmpty(statusFilter) || r.Status == statusFilter)
+        .Where(r => string.IsNullOrEmpty(priorityFilter) || r.Priority == priorityFilter)
+        .Where(MatchesAssignedFilter)
         .Where(r => string.IsNullOrWhiteSpace(searchName) || r.Name.Contains(searchName!, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(r => PriorityRank(r.Priority)).ThenByDescending(r => r.Updated)
         .ToList();
+
+    private bool MatchesAssignedFilter(CustomerService.CustomerRow r) => assignedFilter switch
+    {
+        "" => true,
+        "unassigned" => r.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => r.AssignedToUserId == uid,
+        _ => true
+    };
+
+    private static int PriorityRank(string? p) => p switch { "P1" => 1, "P2" => 2, "P3" => 3, "P4" => 4, _ => 5 };
 
     private IEnumerable<CustomerService.CustomerRow> TabFiltered => activeTab switch
     {
@@ -430,6 +603,7 @@
         var allBu = await BusinessUnitService.GetAllAsync();
         businessUnits = seesAllBusinessUnits ? allBu : allBu.Where(b => ids.Contains(b.Id)).ToList();
         rows = await CustomerService.GetDashboardAsync(scope);
+        assignableUsers = await UserService.GetCustomerAssignableUsersAsync();
         loading = false;
     }
 
@@ -450,7 +624,148 @@
         Nav.NavigateTo($"/admin/customers/{id}");
     }
 
-    private async Task PrintAsync() => await JS.InvokeVoidAsync("window.print");
+    // ---- inline priority / assignment ----
+    private async Task SetPriorityAsync(CustomerService.CustomerRow row, string? value)
+    {
+        var prio = string.IsNullOrWhiteSpace(value) ? null : value;
+        await CustomerService.SetPriorityAsync(row.Id, prio, currentUser);
+        var idx = rows.FindIndex(r => r.Id == row.Id);
+        if (idx >= 0) { rows[idx] = rows[idx] with { Priority = prio }; }
+    }
+
+    private async Task AssignAsync(CustomerService.CustomerRow row, string? value)
+    {
+        int? uid = int.TryParse(value, out var v) ? v : null;
+        var name = await CustomerService.AssignAsync(row.Id, uid, currentUser);
+        var idx = rows.FindIndex(r => r.Id == row.Id);
+        if (idx >= 0) { rows[idx] = rows[idx] with { AssignedToUserId = uid, AssignedToUserName = name }; }
+        ToastService.ShowSuccess(uid is null ? "Customer unassigned." : $"Assigned to {name}.");
+    }
+
+    // ---- advanced Print dialog ----
+    private bool showPrintDialog;
+    private string printStatusFilter = "";
+    private string printPriorityFilter = "";
+    private string printAssignedFilter = "";
+    private List<PrintColumn> printColumns = [];
+
+    private sealed class PrintColumn
+    {
+        public string Label = "";
+        public Func<CustomerService.CustomerRow, string> Value = _ => "";
+        public bool Selected = true;
+    }
+
+    private void EnsurePrintColumns()
+    {
+        if (printColumns.Count > 0) { return; }
+        printColumns =
+        [
+            new() { Label = "Customer Number", Value = r => r.Number },
+            new() { Label = "Customer Name", Value = r => r.Name },
+            new() { Label = "Priority", Value = r => r.Priority ?? "" },
+            new() { Label = "First Name", Value = r => r.FirstName ?? "" },
+            new() { Label = "Contact Email", Value = r => r.Email ?? "" },
+            new() { Label = "Status", Value = r => r.Status },
+            new() { Label = "Assigned To", Value = r => r.AssignedToUserName ?? "" },
+            new() { Label = "Business Unit", Value = r => businessUnits.FirstOrDefault(b => b.Id == r.BusinessUnitId)?.Name ?? "" },
+        ];
+    }
+
+    // Customers matching the print-dialog filters (all rows the user can see, respecting the current business
+    // unit), sorted like the grid. Independent of the active tab.
+    private IEnumerable<CustomerService.CustomerRow> PrintFiltered => rows
+        .Where(r => filterBusinessUnitId == 0 || r.BusinessUnitId == filterBusinessUnitId)
+        .Where(r => string.IsNullOrEmpty(printStatusFilter) || r.Status == printStatusFilter)
+        .Where(r => string.IsNullOrEmpty(printPriorityFilter) || r.Priority == printPriorityFilter)
+        .Where(MatchesPrintAssignedFilter)
+        .OrderBy(r => PriorityRank(r.Priority)).ThenByDescending(r => r.Updated);
+
+    private bool MatchesPrintAssignedFilter(CustomerService.CustomerRow r) => printAssignedFilter switch
+    {
+        "" => true,
+        "unassigned" => r.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => r.AssignedToUserId == uid,
+        _ => true
+    };
+
+    private string PrintFilterSummary
+    {
+        get
+        {
+            var parts = new List<string> { string.IsNullOrEmpty(printStatusFilter) ? "All statuses" : printStatusFilter };
+            if (!string.IsNullOrEmpty(printPriorityFilter)) { parts.Add(printPriorityFilter); }
+            if (printAssignedFilter == "unassigned") { parts.Add("Unassigned"); }
+            else if (int.TryParse(printAssignedFilter, out var uid))
+            {
+                var u = assignableUsers.FirstOrDefault(x => x.Id == uid);
+                parts.Add(u is null ? "Assigned" : (string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName));
+            }
+            if (filterBusinessUnitId != 0)
+            {
+                parts.Add(businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "Business Unit");
+            }
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private void OpenPrintDialog()
+    {
+        EnsurePrintColumns();
+        printStatusFilter = statusFilter;
+        printPriorityFilter = priorityFilter;
+        printAssignedFilter = assignedFilter;
+        showPrintDialog = true;
+    }
+
+    private void ClosePrintDialog() => showPrintDialog = false;
+    private void SetAllPrintCols(bool on) { foreach (var c in printColumns) { c.Selected = on; } }
+
+    private async Task DoPrintAsync()
+    {
+        var cols = printColumns.Where(c => c.Selected).ToList();
+        var toPrint = PrintFiltered.ToList();
+        if (cols.Count == 0 || toPrint.Count == 0) { return; }
+        var html = BuildPrintHtml(cols, toPrint);
+        showPrintDialog = false;
+        await JS.InvokeVoidAsync("printHtml", html);
+    }
+
+    /// <summary>Builds a standalone print-ready HTML report (chosen columns × every filtered row). Orientation
+    /// and font size adapt to the number of columns. Mirrors the supplier dashboard's print output.</summary>
+    private string BuildPrintHtml(List<PrintColumn> cols, List<CustomerService.CustomerRow> rowsToPrint)
+    {
+        static string Esc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+        var landscape = cols.Count > 5;
+        var fontSize = cols.Count <= 6 ? "11px" : cols.Count <= 9 ? "9.5px" : "8.5px";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Manage Customer</title><style>");
+        sb.Append($"@page{{size:A4 {(landscape ? "landscape" : "portrait")};margin:12mm;}}");
+        sb.Append($"*{{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}body{{font-family:'Segoe UI',Arial,sans-serif;color:#111827;font-size:{fontSize};margin:0;}}");
+        sb.Append(".hd{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #caa04d;padding-bottom:8px;margin-bottom:12px;}");
+        sb.Append(".hd h1{font-size:20px;color:#0b2545;margin:0;}");
+        sb.Append(".hd .meta{font-size:10px;color:#374151;text-align:right;}");
+        sb.Append("table{width:100%;border-collapse:collapse;}");
+        sb.Append("th,td{border:1px solid #b7c2d6;padding:5px 7px;text-align:left;vertical-align:top;word-break:break-word;}");
+        sb.Append("th{background:#e7ecf3;color:#0b2545;font-weight:700;border-bottom:2px solid #0b2545;}");
+        sb.Append("tr:nth-child(even) td{background:#f4f6fb;}");
+        sb.Append("</style></head><body>");
+        sb.Append("<div class=\"hd\"><h1>Manage Customer</h1><div class=\"meta\">");
+        sb.Append($"{Esc(PrintFilterSummary)} &middot; {rowsToPrint.Count} customer(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
+        sb.Append("</div></div>");
+        sb.Append("<table><thead><tr>");
+        foreach (var c in cols) { sb.Append($"<th>{Esc(c.Label)}</th>"); }
+        sb.Append("</tr></thead><tbody>");
+        foreach (var r in rowsToPrint)
+        {
+            sb.Append("<tr>");
+            foreach (var c in cols) { sb.Append($"<td>{Esc(c.Value(r))}</td>"); }
+            sb.Append("</tr>");
+        }
+        sb.Append("</tbody></table></body></html>");
+        return sb.ToString();
+    }
 
     // Attached-documents viewer modal.
     private bool showDocsModal;

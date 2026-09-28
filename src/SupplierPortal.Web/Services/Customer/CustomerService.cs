@@ -196,4 +196,36 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         await db.SaveChangesAsync();
         await audit.LogAsync(actor, AuditAction.Update, "Customer", id, $"Customer status → {status}");
     }
+
+    /// <summary>Sets the customer's work priority (P1..P4, or null to clear) from the dashboard.</summary>
+    public async Task SetPriorityAsync(int id, string? priority, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id);
+        if (customer is null) return;
+        customer.Priority = string.IsNullOrWhiteSpace(priority) ? null : priority;
+        await db.SaveChangesAsync();
+        await audit.LogAsync(actor, AuditAction.Update, "Customer", id, $"Customer priority → {customer.Priority ?? "(none)"}");
+    }
+
+    /// <summary>Assigns the customer to an internal user (owner), or clears it when userId is null. Returns
+    /// the assigned user's display name (or null) so the caller can refresh the row without a full reload.</summary>
+    public async Task<string?> AssignAsync(int id, int? userId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id);
+        if (customer is null) return null;
+        customer.AssignedToUserId = userId;
+        await db.SaveChangesAsync();
+
+        string? name = null;
+        if (userId is int uid)
+        {
+            var u = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == uid);
+            name = u is null ? null : (u.FullName ?? u.Username);
+        }
+        await audit.LogAsync(actor, AuditAction.Update, "Customer", id,
+            userId is null ? "Customer unassigned" : $"Customer assigned to {name}");
+        return name;
+    }
 }

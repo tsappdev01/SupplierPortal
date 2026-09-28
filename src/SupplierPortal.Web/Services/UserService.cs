@@ -65,6 +65,18 @@ public class UserService(
             .ToListAsync();
     }
 
+    /// <summary>Active users who can be assigned a customer: those with Customer portal access, each with
+    /// their Business Units loaded so the caller can scope the picker to the customer's own BU.</summary>
+    public async Task<List<User>> GetCustomerAssignableUsersAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Users
+            .Include(u => u.BusinessUnits)
+            .Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Customer))
+            .OrderBy(u => u.FullName ?? u.Username)
+            .ToListAsync();
+    }
+
     public async Task<User?> GetByIdAsync(int id)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
