@@ -118,9 +118,10 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             tabs = await db.CustomerTabSettings.ToListAsync();
         }
 
+        // Order by the admin-configured Sequence (a single order across both sections, matching the wizard),
+        // with GroupName as a stable tie-breaker.
         return tabs
-            .OrderBy(t => t.Section == "Account" ? 0 : 1)
-            .ThenBy(t => t.Sequence)
+            .OrderBy(t => t.Sequence)
             .ThenBy(t => t.GroupName)
             .ToList();
     }

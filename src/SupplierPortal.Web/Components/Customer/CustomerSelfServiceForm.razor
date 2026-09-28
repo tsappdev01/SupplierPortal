@@ -355,18 +355,20 @@
             .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
             .ToList();
 
-        // Tabs sharing a Title merge into one step (spanning their groups, across sections). Account groups
-        // sort before Contact, then by sequence.
-        static int Rank(SsCustomerTab t) => (t.Section == "Account" ? 0 : 1000) + t.Sequence;
+        // Tabs sharing a Title merge into one step (spanning their groups, across sections). Order is driven
+        // purely by the admin-configured tab Sequence, so a Contact-section tab (e.g. "Personal Data") can be
+        // placed between Account tabs; GroupName / Title break ties when sequences are equal.
+        static int Rank(SsCustomerTab t) => t.Sequence;
         var list = orderedTabs
             .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
             .Select(g => new
             {
                 g.First().Title,
-                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).Select(t => (t.Section, t.GroupName)).ToList(),
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).ThenBy(t => t.GroupName).Select(t => (t.Section, t.GroupName)).ToList(),
                 Order = g.Min(Rank)
             })
             .OrderBy(x => x.Order)
+            .ThenBy(x => x.Title)
             .Select(x => new Step(x.Title, x.Groups, false))
             .ToList();
         list.Add(new Step("Documents", new[] { ("", "Documents") }, false));

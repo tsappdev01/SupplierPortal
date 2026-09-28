@@ -428,8 +428,10 @@ else
         // Tabs come from the admin-editable CustomerTabSetting (order, title, visibility). Tabs that share the
         // same Title MERGE into one wizard step (spanning their groups, across sections), so an admin can merge
         // or split tabs simply by giving them the same or different titles. A tab renders only when visible and
-        // has at least one visible field. Order: Account groups before Contact, then by sequence.
-        static int Rank(CustomerTabSetting t) => (t.Section == "Account" ? 0 : 1000) + t.Sequence;
+        // has at least one visible field. Order is driven purely by the admin-configured tab Sequence, so a
+        // Contact-section tab (e.g. "Personal Data") can be placed between Account tabs; GroupName / Title break
+        // ties when sequences are equal.
+        static int Rank(CustomerTabSetting t) => t.Sequence;
         var visible = tabs.Where(t => t.IsVisible)
             .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
             .ToList();
@@ -438,10 +440,11 @@ else
             .Select(g => new
             {
                 g.First().Title,
-                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).Select(t => (t.Section, t.GroupName)).ToList(),
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).ThenBy(t => t.GroupName).Select(t => (t.Section, t.GroupName)).ToList(),
                 Order = g.Min(Rank)
             })
             .OrderBy(x => x.Order)
+            .ThenBy(x => x.Title)
             .Select(x => new Step(x.Title, x.Groups, false))
             .ToList();
         list.Add(new Step("Review & Save", Array.Empty<(string, string)>(), true));
