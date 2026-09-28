@@ -326,6 +326,7 @@ public static class CustomerLookups
         ("Contact", "BuyingRole") => new[] { "Key decision maker", "Secondary decision maker", "Supporting role", "Does not matter" },
         ("Contact", "ResidentialStatus") => new[] { "Non UAE Resident", "UAE Resident" },
         ("Contact", "Nationality") => CountryNames,
+        ("Contact", "Nationality2") => CountryNames,
         ("Contact", "Country") => CountryNames,
         ("Contact", "IssueCountry") => CountryNames,
         ("Contact", "PassportIssuePlaceCountry") => CountryCodeNames,
