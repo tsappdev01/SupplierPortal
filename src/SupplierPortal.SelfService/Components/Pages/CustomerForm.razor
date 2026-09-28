@@ -1,0 +1,732 @@
+@page "/customer/self-service/{Token}/form"
+@using System.Globalization
+@inject CustomerApiClient Api
+@inject SelfServiceSession Session
+@inject SelfServiceBranding Branding
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Your information — Customer Self-Service</PageTitle>
+
+<div class="di-selfservice-wrap">
+    @if (loading)
+    {
+        <div class="di-ss-card"><h1>Loading…</h1><p class="text-muted">Securely retrieving your information.</p></div>
+    }
+    else if (bootstrap is null)
+    {
+        <div class="di-ss-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">
+                Your verification session is no longer valid. Please use the link from your email
+                again to restart verification.
+            </p>
+        </div>
+    }
+    else if (completed)
+    {
+        <div class="di-ss-card">
+            <h1>Thank You</h1>
+            <p class="text-muted">
+                Your information has been submitted successfully. Our team will review the changes shortly.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="di-form-page">
+            <div class="di-form-topbar">
+                <div class="di-form-headings">
+                    <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(bootstrap.LegalName) ? "Your Information" : bootstrap.LegalName)</h1>
+                    <p class="di-form-sub">Please review and update your information below.</p>
+                </div>
+                <div class="di-progress" title="@ProgressPct% complete">
+                    <svg class="di-progress-ring" viewBox="0 0 36 36">
+                        <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                        <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(CultureInfo.InvariantCulture) 100"></circle>
+                    </svg>
+                    <div class="di-progress-center">
+                        <span class="di-progress-pct">@ProgressPct%</span>
+                        <span class="di-progress-word">Complete</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="di-stepper">
+                @for (var i = 0; i < steps.Count; i++)
+                {
+                    var idx = i;
+                    var reached = idx <= current;
+                    <button type="button"
+                            class="di-stepper-item @(idx == current ? "active" : "") @(reached ? "reached" : "")"
+                            @onclick="() => JumpToAsync(idx)">
+                        <span class="di-stepper-num">@(idx < current ? "✓" : (idx + 1).ToString())</span>
+                        <span class="di-stepper-label">@steps[idx].Title</span>
+                    </button>
+                }
+            </div>
+
+            @if (validationErrors.Count > 0)
+            {
+                <div class="alert alert-danger">
+                    <ul class="mb-0">@foreach (var e in validationErrors) { <li>@e</li> }</ul>
+                </div>
+            }
+
+            @{ var step = steps[current]; }
+
+            @if (step.IsDocuments)
+            {
+                <div class="di-section">
+                    <div class="di-section-header">
+                        <div class="di-section-heading">
+                            <span class="di-section-title">KYC Documents</span>
+                            <span class="di-section-desc">Please upload the required identity &amp; verification documents.</span>
+                        </div>
+                    </div>
+                    <div class="di-section-body" style="grid-template-columns: 1fr;">
+                        @if (uploadingDocument)
+                        {
+                            <div class="alert alert-info">Uploading@(string.IsNullOrEmpty(uploadingFileName) ? "" : $" '{uploadingFileName}'")… please wait.</div>
+                        }
+                        <div class="di-documents-grid">
+                            @foreach (var dt in bootstrap.DocumentTypes)
+                            {
+                                var uploaded = documents.Where(d => d.DocumentType == dt.Name).ToList();
+                                <div class="di-doccard">
+                                    <div class="di-doccard-title">
+                                        @dt.Name
+                                        @if (dt.IsRequired) { <span class="di-req">*</span> }
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(dt.Requirement))
+                                    {
+                                        <div class="di-doccard-req">@dt.Requirement</div>
+                                    }
+                                    @if (uploaded.Count == 0)
+                                    {
+                                        <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var doc in uploaded)
+                                        {
+                                            <div class="di-doccard-file">
+                                                <span class="di-doccard-name" title="@doc.FileName">@doc.FileName</span>
+                                                <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                                <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                            </div>
+                                        }
+                                    }
+                                    <div class="di-doccard-upload">
+                                        <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="docfile-@dt.Sequence">Choose file</label>
+                                        <InputFile id="@($"docfile-{dt.Sequence}")" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png"
+                                                   OnChange="e => UploadDocumentAsync(e, dt.Name)" disabled="@uploadingDocument" />
+                                        <div class="di-doccard-hint">PDF, JPG, PNG · max 10 MB</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (!step.IsReview)
+            {
+                <div class="di-section">
+                    <div class="di-section-header">
+                        <div class="di-section-heading">
+                            <span class="di-section-title">@step.Title</span>
+                        </div>
+                    </div>
+                    <div class="di-section-body">
+                        @{ var lastSub = (string?)null; }
+                        @foreach (var cfg in FieldsFor(step))
+                        {
+                            if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
+                            var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
+                            var editable = !string.Equals(cfg.CustomerControl, "Readonly", StringComparison.OrdinalIgnoreCase);
+                            var cur = Val(cfg);
+                            var sub = Subcategory(cfg.FieldKey);
+                            if (sub is not null && sub != lastSub)
+                            {
+                                lastSub = sub;
+                                <div class="di-subheading">@sub</div>
+                            }
+                            <div class="di-field">
+                                <label>
+                                    @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
+                                    @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                                </label>
+                                @if (!editable)
+                                {
+                                    <input type="text" class="di-frozen" value="@Display(cfg)" disabled />
+                                }
+                                else if (cfg.FieldKind == "date")
+                                {
+                                    <input type="date" class="di-datepick" value="@cur" max="@DateMax(cfg.FieldKey)"
+                                           onkeydown="return false" onpaste="return false"
+                                           onclick="try { this.showPicker(); } catch (e) {}"
+                                           @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                                else if (cfg.FieldKind == "phone")
+                                {
+                                    <SupplierPortal.SelfService.Components.Shared.CustomerPhoneField
+                                        Value="@cur" ValueChanged="v => SetVal(cfg.Section, cfg.FieldKey, v)" />
+                                }
+                                else if (cfg.FieldKind == "yesno")
+                                {
+                                    <div class="di-switch-wrap">
+                                        <button type="button" role="switch" aria-checked="@(cur == "true" ? "true" : "false")"
+                                                class="di-switch @(cur == "true" ? "on" : "") @(cur == "false" ? "off" : "")"
+                                                @onclick='() => SetVal(cfg.Section, cfg.FieldKey, cur == "true" ? "false" : "true")'>
+                                            <span class="di-switch-knob"></span>
+                                        </button>
+                                        <span class="di-switch-text">@(cur == "true" ? "Yes" : cur == "false" ? "No" : "—")</span>
+                                    </div>
+                                }
+                                else if (isCombinedCountry)
+                                {
+                                    <select value="@cur" @onchange="e => OnCountryChange(e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var c in CustomerLookups.Countries)
+                                        {
+                                            <option value="@c.Code" selected="@(c.Code == cur)">@c.Code - @c.Name</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.Countries.Any(c => c.Code == cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else if (cfg.FieldKind == "lookup")
+                                {
+                                    var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                                    <select value="@cur" @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var o in opts)
+                                        {
+                                            <option value="@o" selected="@(o == cur)">@o</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="text" value="@cur"
+                                           maxlength="@MaxLenFor(cfg.FieldKey)"
+                                           inputmode="@(MaxLenFor(cfg.FieldKey) is null ? null : "numeric")"
+                                           @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="di-form-sub mb-3">Review everything captured, then submit.</p>
+                @foreach (var g in steps.Where(s => !s.IsReview && !s.IsDocuments))
+                {
+                    var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(Val(f))).ToList();
+                    <div class="di-section">
+                        <div class="di-section-header">
+                            <div class="di-section-heading"><span class="di-section-title">@g.Title</span></div>
+                            <button type="button" class="di-btn di-btn-secondary di-btn-sm ms-auto" @onclick="() => JumpToAsync(steps.IndexOf(g))">Edit</button>
+                        </div>
+                        <div class="di-section-body">
+                            @if (filled.Count == 0)
+                            {
+                                <div class="di-review-empty">Nothing entered.</div>
+                            }
+                            else
+                            {
+                                @foreach (var f in filled)
+                                {
+                                    <div class="di-review-item">
+                                        <div class="di-review-label">@f.DisplayLabel</div>
+                                        <div class="di-review-value">@Display(f)</div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="di-form-footer">
+                <button type="button" class="di-btn di-btn-secondary" disabled="@(current == 0 || busy)" @onclick="BackAsync">← Back</button>
+                <div class="di-form-footer-right">
+                    @if (savedTick) { <span class="di-saved-tick">Saved ✓</span> }
+                    @if (!steps[current].IsReview)
+                    {
+                        <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="NextAsync">Save &amp; Next →</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="di-btn di-btn-gold" disabled="@busy" @onclick="SubmitAsync">Submit</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (showDeclaration && bootstrap is not null)
+{
+    <div class="di-decl-backdrop">
+        <div class="di-decl" role="dialog" aria-modal="true">
+            <div class="di-decl-head">
+                <h2 class="di-decl-title">Customer Declaration</h2>
+                <div class="di-decl-subtitle">Customer Data Gathering Portal</div>
+            </div>
+            <div class="di-decl-body">
+                <p class="di-decl-section">Declaration (For true and correct information provided):</p>
+                <p>@GeneralDeclaration</p>
+                <p class="di-decl-certify">By signing below, I/We acknowledge and accept the declaration set out above.</p>
+
+                <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
+                <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
+                       placeholder="Type your full name here" />
+
+                <label class="di-decl-siglabel" style="margin-top:14px;">Sign here <span class="di-req">*</span></label>
+                <div class="di-sigpad-wrap">
+                    <canvas id="di-sigpad" @ref="sigCanvas" class="di-sigpad"></canvas>
+                    <button type="button" class="di-sigpad-clear" @onclick="ClearSignatureAsync" title="Clear signature">Clear</button>
+                </div>
+                <div class="di-sigpad-hint">Draw your signature in the box using your mouse (or finger on a touch screen).</div>
+            </div>
+            <div class="di-decl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@busy">Cancel</button>
+                <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmDeclarationAsync"
+                        disabled="@(busy || string.IsNullOrWhiteSpace(declarationSignature))">
+                    Agree &amp; Submit
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-selfservice-wrap { width: 100%; display: flex; justify-content: center; }
+    .di-selfservice-wrap .di-form-page { width: 100%; max-width: 1000px; }
+    .di-ss-card { width: 100%; max-width: 420px; background: #fff; border-radius: 8px; border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 2rem; }
+    .di-documents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .di-doccard { border: 1px solid #e2e5ea; border-radius: 8px; padding: 14px; background: #fff; }
+    .di-doccard-title { font-weight: 700; color: #1a2233; margin-bottom: 4px; }
+    .di-doccard-req { font-size: 12px; color: #7b8697; margin-bottom: 8px; }
+    .di-doccard-empty { color: #97a1b3; font-size: 13px; margin-bottom: 8px; }
+    .di-doccard-file { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+    .di-doccard-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-doccard-view-inline { background: none; border: none; color: #3b5bdb; cursor: pointer; text-decoration: underline; font-size: 13px; }
+    .di-document-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 18px; line-height: 1; }
+    .di-doccard-upload { margin-top: 8px; }
+    .di-doccard-choose { display: inline-block; background: #eef1ff; color: #3b5bdb; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .di-doccard-choose.is-disabled { opacity: 0.6; cursor: default; }
+    .di-doccard-input { display: none; }
+    .di-doccard-hint { font-size: 11px; color: #97a1b3; margin-top: 6px; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private record Step(string Title, IReadOnlyList<(string Section, string Group)> Groups, bool IsReview)
+    {
+        public bool IsDocuments => Groups.Count == 1 && Groups[0].Group == "Documents";
+    }
+
+    private CustomerFormBootstrapDto? bootstrap;
+    private Dictionary<string, string?> account = new();
+    private Dictionary<string, string?> contact = new();
+    private List<CustomerFieldConfigDto> config = [];
+    private List<CustomerTabDto> tabs = [];
+    private List<CustomerDocumentDto> documents = [];
+    private List<Step> steps = [];
+    private int current;
+
+    private string link = "";
+    private string session = "";
+
+    private int ProgressPct => steps.Count == 0
+        ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
+    private readonly List<string> validationErrors = [];
+    private bool busy;
+    private bool savedTick;
+    private bool loading = true;
+    private bool completed;
+    private bool uploadingDocument;
+    private string? uploadingFileName;
+    private bool viewingDocument;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            Session.PopulateFrom((await AuthState).User);
+        }
+        if (!Session.IsActiveFor(Token) || string.IsNullOrEmpty(Session.SessionToken))
+        {
+            loading = false;   // no valid session -> "session expired" card
+            return;
+        }
+
+        link = Token;
+        session = Session.SessionToken!;
+        bootstrap = await Api.GetBootstrapAsync(link, session);
+        if (bootstrap is not null)
+        {
+            config = bootstrap.FieldConfigs;
+            tabs = bootstrap.Tabs;
+            documents = bootstrap.Documents;
+            account = bootstrap.AccountValues ?? new();
+            contact = bootstrap.ContactValues ?? new();
+            Branding.SetLogo(bootstrap.LogoUrl);
+            BuildSteps();
+        }
+        loading = false;
+    }
+
+    private Dictionary<string, string?> Vals(string section) => section == "Account" ? account : contact;
+    private string? Val(CustomerFieldConfigDto c) => Vals(c.Section).TryGetValue(c.FieldKey, out var v) ? v : null;
+    private void SetVal(string section, string key, string? val) { Vals(section)[key] = val; savedTick = false; }
+
+    private string Display(CustomerFieldConfigDto c)
+    {
+        var v = Vals(c.Section).GetValueOrDefault(c.FieldKey);
+        if (string.IsNullOrWhiteSpace(v)) return "—";
+        if (c.FieldKind == "yesno") return v == "true" ? "Yes" : v == "false" ? "No" : "—";
+        if (c.FieldKind == "date" && DateTime.TryParse(v, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+            return d.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+        return v;
+    }
+
+    private void OnCountryChange(string? code)
+    {
+        account["CountryCode"] = code;
+        var name = CustomerLookups.Countries.FirstOrDefault(c => c.Code == code).Name;
+        account["CountryName"] = string.IsNullOrWhiteSpace(code) ? null : name;
+        savedTick = false;
+    }
+
+    private void BuildSteps()
+    {
+        var orderedTabs = (tabs.Count > 0
+                ? tabs.Where(t => t.IsVisible)
+                : config.Where(f => f.IsVisible)
+                    .GroupBy(f => new { f.Section, f.GroupName })
+                    .Select(g => new CustomerTabDto { Section = g.Key.Section, GroupName = g.Key.GroupName, Title = g.Key.GroupName, Sequence = g.Min(x => x.Sequence), IsVisible = true }))
+            .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
+            .ToList();
+
+        static int Rank(CustomerTabDto t) => t.Sequence;
+        var list = orderedTabs
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new
+            {
+                g.First().Title,
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).ThenBy(t => t.GroupName).Select(t => (t.Section, t.GroupName)).ToList(),
+                Order = g.Min(Rank)
+            })
+            .OrderBy(x => x.Order)
+            .ThenBy(x => x.Title)
+            .Select(x => new Step(x.Title, x.Groups, false))
+            .ToList();
+        list.Add(new Step("Documents", new[] { ("", "Documents") }, false));
+        list.Add(new Step("Review & Submit", Array.Empty<(string, string)>(), true));
+        steps = list;
+    }
+
+    private IEnumerable<CustomerFieldConfigDto> FieldsFor(Step step) =>
+        step.Groups.SelectMany(g =>
+            config.Where(f => f.IsVisible && f.Section == g.Section && f.GroupName == g.Group)
+                  .Where(IsConditionallyVisible)
+                  .OrderBy(f => f.Sequence));
+
+    private bool IsConditionallyVisible(CustomerFieldConfigDto cfg)
+    {
+        if (string.IsNullOrWhiteSpace(cfg.ControllingFieldKey)) return true;
+        var cur = Vals(cfg.Section).GetValueOrDefault(cfg.ControllingFieldKey);
+        return string.Equals(cur, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ClearHiddenConditionalFields()
+    {
+        foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
+        {
+            Vals(f.Section)[f.FieldKey] = null;
+        }
+    }
+
+    private static string? Subcategory(string fieldKey) => fieldKey switch
+    {
+        "Passport" or "PassportNumber" or "PassportIssueDate" or "PassportExpiryDate"
+            or "PassportIssueCountryCode" or "PassportIssuePlaceCountry"
+            or "DualPassport" or "DualPassportNumber" or "DualPassportIssueDate" or "DualPassportExpiryDate"
+            => "Passport Information",
+        "VISAExpiryDate" or "VISANumber" => "Visa Information",
+        "TypeOfID" or "CountryGovtIDNumber" or "CountryGovtIDIssueDate" or "CountryGovtIDExpiryDate"
+            or "EmirateID" or "EmirateIDExpiryDate" or "EmiratesIDIssueDate" or "IssueCountry"
+            => "Government / National ID",
+        _ => null
+    };
+
+    private static int? MaxLenFor(string fieldKey) => fieldKey switch
+    {
+        "CustomerBuyerTIN" => 10,
+        "TRNNumber" => 15,
+        _ => null
+    };
+
+    private static string? DateMax(string fieldKey) =>
+        (fieldKey.Contains("Issue", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("EstablishmentDate", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("DateOfBirth", StringComparison.OrdinalIgnoreCase))
+            ? DateTime.Today.ToString("yyyy-MM-dd") : null;
+
+    // ---- Save / navigation ----
+
+    private async Task SaveAsync()
+    {
+        if (bootstrap is null) return;
+        busy = true;
+        ClearHiddenConditionalFields();
+        var result = await Api.SaveAsync(link, session, new SaveCustomerRequest { AccountValues = account, ContactValues = contact });
+        busy = false;
+        savedTick = result.Success;
+    }
+
+    private async Task NextAsync()
+    {
+        await SaveAsync();
+        var problems = Validate(steps[current]);
+        if (problems.Count > 0) { validationErrors.Clear(); validationErrors.AddRange(problems); return; }
+        validationErrors.Clear();
+        if (current < steps.Count - 1) current++;
+    }
+
+    private async Task BackAsync()
+    {
+        await SaveAsync();
+        validationErrors.Clear();
+        if (current > 0) current--;
+    }
+
+    private async Task JumpToAsync(int index)
+    {
+        if (index == current) return;
+        await SaveAsync();
+        validationErrors.Clear();
+        current = Math.Clamp(index, 0, steps.Count - 1);
+    }
+
+    // ---- Validation ----
+
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static bool IsValidEmail(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && EmailRegex.IsMatch(value.Trim());
+
+    private static bool IsDigits(string value, int length)
+    {
+        var d = value.Replace(" ", "").Replace("-", "");
+        return d.Length == length && d.All(char.IsDigit);
+    }
+
+    private List<string> MissingRequired(Step step)
+    {
+        if (step.IsReview) return [];
+        return step.Groups.SelectMany(g => config
+            .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
+            .Where(IsConditionallyVisible)
+            .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
+            .Where(f => string.IsNullOrWhiteSpace(Val(f)))
+            .Select(f => $"{f.DisplayLabel} is required."))
+            .ToList();
+    }
+
+    private List<string> FormatErrors(IEnumerable<CustomerFieldConfigDto> fields)
+    {
+        var errs = new List<string>();
+        foreach (var f in fields)
+        {
+            var val = Val(f);
+            if (string.IsNullOrWhiteSpace(val)) continue;
+            if (f.FieldKey.Contains("Email", StringComparison.OrdinalIgnoreCase) && !IsValidEmail(val))
+                errs.Add($"{f.DisplayLabel} is not a valid email address.");
+            else if (f.FieldKey == "CustomerBuyerTIN" && !IsDigits(val, 10))
+                errs.Add("Customer/Buyer TIN must be exactly 10 digits.");
+            else if (f.FieldKey == "TRNNumber" && !IsDigits(val, 15))
+                errs.Add("TRN Number must be exactly 15 digits.");
+        }
+        return errs;
+    }
+
+    private DateTime? DateVal(string key) =>
+        DateTime.TryParse(account.GetValueOrDefault(key), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
+    private List<string> TradeLicenseDateErrors()
+    {
+        var errs = new List<string>();
+        var issue = DateVal("TradeLicenseIssueDate");
+        var expiry = DateVal("TradeLicenseExpiryDate");
+        var est = DateVal("EstablishmentDate");
+        if (issue is { } i && i.Date > DateTime.Today) errs.Add("Trade License Issue Date cannot be a future date.");
+        if (issue is { } i2 && expiry is { } e && e.Date < i2.Date) errs.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+        if (est is { } es && es.Date > DateTime.Today) errs.Add("Establishment Date cannot be a future date.");
+        if (est is { } es2 && issue is { } i3 && i3.Date < es2.Date) errs.Add("Trade License Issue Date cannot be before the Establishment Date.");
+        return errs;
+    }
+
+    private List<string> DateErrorsForStep(Step step)
+    {
+        if (step.IsReview) return [];
+        var onThisStep = step.Groups.Any(g => g.Section == "Account"
+            && config.Any(f => f.Section == "Account" && f.GroupName == g.Group
+                && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate")));
+        return onThisStep ? TradeLicenseDateErrors() : [];
+    }
+
+    private List<string> Validate(Step step) =>
+        MissingRequired(step).Concat(DateErrorsForStep(step)).Concat(FormatErrors(FieldsFor(step))).ToList();
+
+    // ---- Documents ----
+
+    private async Task UploadDocumentAsync(InputFileChangeEventArgs e, string documentType)
+    {
+        var file = e.File;
+        if (file is null) return;
+        if (file.Size > 10 * 1024 * 1024)
+        {
+            validationErrors.Clear();
+            validationErrors.Add("File exceeds the 10 MB size limit.");
+            return;
+        }
+        uploadingDocument = true;
+        uploadingFileName = file.Name;
+        validationErrors.Clear();
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
+            var result = await Api.UploadDocumentAsync(link, session, documentType, ms, file.Name, file.ContentType);
+            if (result.Success) { documents = result.Documents; }
+            else { validationErrors.Add(result.Error ?? "Upload failed."); }
+        }
+        finally
+        {
+            uploadingDocument = false;
+            uploadingFileName = null;
+        }
+    }
+
+    private async Task ViewDocumentAsync(int documentId)
+    {
+        viewingDocument = true;
+        try
+        {
+            var file = await Api.GetDocumentAsync(link, session, documentId);
+            if (file is { } f) { await JS.InvokeVoidAsync("ssDoc.open", f.Bytes, f.ContentType); }
+        }
+        finally { viewingDocument = false; }
+    }
+
+    private async Task RemoveDocumentAsync(int documentId)
+    {
+        var result = await Api.DeleteDocumentAsync(link, session, documentId);
+        if (result.Success) { documents = result.Documents; }
+    }
+
+    // ---- Submit + declaration ----
+
+    private bool showDeclaration;
+    private string declarationSignature = "";
+    private ElementReference sigCanvas;
+    private bool sigInitialized;
+
+    private string GeneralDeclaration =>
+        "I/We hereby declare that the information and data provided in this form are true, correct, and " +
+        "complete to the best of our knowledge, and are furnished in compliance with the applicable UAE " +
+        "regulatory and e-invoicing requirements issued by the Ministry of Finance / Federal Tax Authority. " +
+        "We undertake to promptly inform Dubai Investments of any changes to the above.";
+
+    private async Task SubmitAsync()
+    {
+        if (bootstrap is null) return;
+        await SaveAsync();
+
+        var problems = new List<string>();
+        problems.AddRange(config.Where(f => f.IsVisible && f.IsRequired).Where(IsConditionallyVisible)
+            .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
+            .Where(f => string.IsNullOrWhiteSpace(Val(f)))
+            .Select(f => $"{f.DisplayLabel} is required."));
+        problems.AddRange(TradeLicenseDateErrors());
+        problems.AddRange(FormatErrors(config.Where(f => f.IsVisible).Where(IsConditionallyVisible)));
+
+        var haveDocs = documents.Select(d => d.DocumentType).ToHashSet();
+        problems.AddRange(bootstrap.DocumentTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name))
+            .Select(t => $"{t.Name} document is required."));
+
+        if (problems.Count > 0) { validationErrors.Clear(); validationErrors.AddRange(problems); return; }
+
+        validationErrors.Clear();
+        showDeclaration = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showDeclaration && !sigInitialized)
+        {
+            sigInitialized = true;
+            try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { }
+        }
+    }
+
+    private void CancelDeclaration() { showDeclaration = false; sigInitialized = false; }
+    private async Task ClearSignatureAsync() { try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { } }
+
+    private async Task ConfirmDeclarationAsync()
+    {
+        if (bootstrap is null) return;
+        if (string.IsNullOrWhiteSpace(declarationSignature))
+        {
+            validationErrors.Clear();
+            validationErrors.Add("Please type your full name as your signature.");
+            return;
+        }
+        string dataUrl = "";
+        try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
+        if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
+        {
+            validationErrors.Clear();
+            validationErrors.Add("Please draw your signature in the box before submitting.");
+            return;
+        }
+        var comma = dataUrl.IndexOf(',');
+        var sigBase64 = comma >= 0 ? dataUrl[(comma + 1)..] : null;
+
+        busy = true;
+        var result = await Api.SubmitAsync(link, session, new SubmitCustomerRequest
+        {
+            Acknowledged = true,
+            SignatureName = declarationSignature.Trim(),
+            SignatureImageBase64 = sigBase64
+        });
+        busy = false;
+        showDeclaration = false;
+        sigInitialized = false;
+
+        if (!result.Success)
+        {
+            validationErrors.Clear();
+            validationErrors.Add(result.Error ?? "Submission failed. Please try again.");
+            return;
+        }
+        completed = true;
+    }
+}

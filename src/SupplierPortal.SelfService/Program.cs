@@ -40,6 +40,7 @@ builder.Services.AddHttpClient("Api", client =>
 });
 builder.Services.AddSingleton<PortalTokenProvider>();
 builder.Services.AddScoped<SupplierApiClient>();
+builder.Services.AddScoped<CustomerApiClient>();
 builder.Services.AddScoped<SelfServiceSession>();
 builder.Services.AddScoped<SelfServiceBranding>();
 builder.Services.AddScoped<ToastService>();
@@ -125,6 +126,7 @@ app.Use(async (ctx, next) =>
     // cacheable so repeat loads and navigations are fast.
     var path = ctx.Request.Path.Value ?? "";
     if (path.StartsWith("/supplier/self-service", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/customer/self-service", StringComparison.OrdinalIgnoreCase)
         || path.StartsWith("/account/", StringComparison.OrdinalIgnoreCase))
     {
         h["Cache-Control"] = "no-store, no-cache, must-revalidate";

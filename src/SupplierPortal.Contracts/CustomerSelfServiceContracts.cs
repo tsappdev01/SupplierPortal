@@ -49,6 +49,15 @@ public class CustomerDocumentDto
     public long FileSizeBytes { get; set; }
 }
 
+/// <summary>A KYC document type the customer may upload (name + requirement note + mandatory flag).</summary>
+public class CustomerDocumentTypeDto
+{
+    public string Name { get; set; } = "";
+    public string? Requirement { get; set; }
+    public bool IsRequired { get; set; }
+    public int Sequence { get; set; }
+}
+
 /// <summary>Everything the customer self-service form needs to render, in one round-trip.</summary>
 public class CustomerFormBootstrapDto
 {
@@ -63,8 +72,8 @@ public class CustomerFormBootstrapDto
     public List<CustomerFieldConfigDto> FieldConfigs { get; set; } = [];
     public List<CustomerTabDto> Tabs { get; set; } = [];
     public List<CustomerDocumentDto> Documents { get; set; } = [];
-    /// <summary>Names of the active document types the customer may upload.</summary>
-    public List<string> DocumentTypes { get; set; } = [];
+    /// <summary>The active document types the customer may upload.</summary>
+    public List<CustomerDocumentTypeDto> DocumentTypes { get; set; } = [];
     /// <summary>Business-unit logo (data URI or hosted URL) for branding the form.</summary>
     public string? LogoUrl { get; set; }
 }

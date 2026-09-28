@@ -287,7 +287,14 @@ public static class CustomerSelfServiceEndpoints
                 IsVisible = t.IsVisible
             }).ToList(),
             Documents = form.Documents.Select(ToDto).ToList(),
-            DocumentTypes = form.DocTypes.Where(t => t.IsActive).OrderBy(t => t.Sequence).Select(t => t.Name).ToList()
+            DocumentTypes = form.DocTypes.Where(t => t.IsActive).OrderBy(t => t.Sequence)
+                .Select(t => new CustomerDocumentTypeDto
+                {
+                    Name = t.Name,
+                    Requirement = t.Requirement,
+                    IsRequired = t.IsRequired,
+                    Sequence = t.Sequence
+                }).ToList()
         };
 
         foreach (var c in form.Config.Where(c => c.Section == "Account"))
