@@ -127,7 +127,10 @@
                                 }
                                 else if (cfg.FieldKind == "date")
                                 {
-                                    <input type="date" value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                    @* Calendar-only (no manual typing); past-only fields cap at today. *@
+                                    <input type="date" value="@cur" max="@DateMax(cfg.FieldKey)"
+                                           onkeydown="return false" onpaste="return false"
+                                           @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                                 }
                                 else if (cfg.FieldKind == "yesno")
                                 {
@@ -437,6 +440,12 @@
             .ToList();
     }
 
+    private static string? DateMax(string fieldKey) =>
+        (fieldKey.Contains("Issue", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("EstablishmentDate", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("DateOfBirth", StringComparison.OrdinalIgnoreCase))
+            ? DateTime.Today.ToString("yyyy-MM-dd") : null;
+
     private List<string> TradeLicenseDateErrors()
     {
         var errs = new List<string>();
@@ -450,13 +459,23 @@
         {
             errs.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
         }
+        if (customer.EstablishmentDate is DateTime est && est.Date > DateTime.Today)
+        {
+            errs.Add("Establishment Date cannot be a future date.");
+        }
+        if (customer.EstablishmentDate is DateTime e2 && customer.TradeLicenseIssueDate is DateTime i2
+            && i2.Date < e2.Date)
+        {
+            errs.Add("Trade License Issue Date cannot be before the Establishment Date.");
+        }
         return errs;
     }
 
     private List<string> DateErrorsForStep(Step step)
     {
         if (step.IsReview || step.Section != "Account") return [];
-        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group && f.FieldKey == "TradeLicenseIssueDate");
+        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group
+            && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate"));
         return onThisStep ? TradeLicenseDateErrors() : [];
     }
 

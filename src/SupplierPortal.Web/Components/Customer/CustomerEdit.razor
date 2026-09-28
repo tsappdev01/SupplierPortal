@@ -159,7 +159,10 @@ else
                         }
                         else if (cfg.FieldKind == "date")
                         {
-                            <input type="date" value="@cur"
+                            @* Calendar-only: block manual typing/paste so the date can only be picked; past-only
+                               fields (issue / establishment / birth) cap at today so a future date can't be chosen. *@
+                            <input type="date" value="@cur" max="@DateMax(cfg.FieldKey)"
+                                   onkeydown="return false" onpaste="return false"
                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                         }
                         else if (cfg.FieldKind == "yesno")
@@ -569,8 +572,16 @@ else
         return errs;
     }
 
-    /// <summary>Trade-license date rules: the issue date can't be in the future and the expiry date can't
-    /// be before the issue date.</summary>
+    /// <summary>Input max for a date field so the browser calendar can't pick an illogical value: issue,
+    /// establishment and birth dates cannot be in the future (capped at today); expiry dates are unbounded.</summary>
+    private static string? DateMax(string fieldKey) =>
+        (fieldKey.Contains("Issue", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("EstablishmentDate", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("DateOfBirth", StringComparison.OrdinalIgnoreCase))
+            ? DateTime.Today.ToString("yyyy-MM-dd") : null;
+
+    /// <summary>Logical date rules: issue and establishment dates can't be in the future, and the trade-license
+    /// expiry date can't be before its issue date.</summary>
     private List<string> TradeLicenseDateErrors()
     {
         var errs = new List<string>();
@@ -584,15 +595,25 @@ else
         {
             errs.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
         }
+        if (customer.EstablishmentDate is DateTime est && est.Date > DateTime.Today)
+        {
+            errs.Add("Establishment Date cannot be a future date.");
+        }
+        if (customer.EstablishmentDate is DateTime e2 && customer.TradeLicenseIssueDate is DateTime i2
+            && i2.Date < e2.Date)
+        {
+            errs.Add("Trade License Issue Date cannot be before the Establishment Date.");
+        }
         return errs;
     }
 
-    /// <summary>Date rules that apply on the step containing the trade-license dates (so the check fires
-    /// as the user leaves that step, not on unrelated steps).</summary>
+    /// <summary>Date rules that apply on the step containing the trade-license / establishment dates (so the
+    /// check fires as the user leaves that step, not on unrelated steps).</summary>
     private List<string> DateErrorsForStep(Step step)
     {
         if (step.IsReview || step.Section != "Account") return [];
-        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group && f.FieldKey == "TradeLicenseIssueDate");
+        var onThisStep = config.Any(f => f.Section == "Account" && f.GroupName == step.Group
+            && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate"));
         return onThisStep ? TradeLicenseDateErrors() : [];
     }
 
