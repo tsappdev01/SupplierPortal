@@ -273,13 +273,12 @@ else
             else
             {
                 <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="() => SaveAsync(false)">Save</button>
-                @if (customer.Status is CustomerStatuses.NotSubmitted or CustomerStatuses.AwaitingCustomerResponse or CustomerStatuses.Returned)
-                {
-                    <button type="button" class="di-btn di-btn-gold" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.ForReview)">Submit for review</button>
-                }
-                @if (customer.Status == CustomerStatuses.ForReview)
+                @if (customer.Status != CustomerStatuses.Complete)
                 {
                     <button type="button" class="di-btn di-btn-success" disabled="@busy" @onclick="() => SaveAndSetStatus(CustomerStatuses.Complete)">Mark completed</button>
+                }
+                else
+                {
                     <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="ReturnToCustomerAsync">Return to customer</button>
                 }
             }

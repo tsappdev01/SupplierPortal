@@ -113,7 +113,8 @@ public class LocalCustomerSelfServiceDataGateway(
                 catch { /* declaration PDF is best-effort */ }
             }
 
-            await customerService.SetStatusAsync(updated.Id, CustomerStatuses.ForReview, Actor);
+            // Like the supplier: a customer submission completes the record directly (no separate review step).
+            await customerService.SetStatusAsync(updated.Id, CustomerStatuses.Complete, Actor);
             await accessTokenService.MarkUsedAsync(access.Id);
             var internalBase = configuration["SelfService:InternalUrl"] ?? "";
             try { await emailService.NotifyRequestorOfSubmissionAsync(updated, access.CreatedBy, internalBase); } catch { }
