@@ -39,7 +39,9 @@ public class CustomerApiClient(
                 new OtpRequestRequest { LinkToken = linkToken, Resend = resend });
             if (!res.IsSuccessStatusCode)
             {
-                return new OtpRequestResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+                var body = await res.Content.ReadAsStringAsync();
+                logger.LogError("Customer RequestOtp failed: HTTP {Status}. Body: {Body}", (int)res.StatusCode, Trim(body, 1000));
+                return new OtpRequestResponse { Success = false, Error = $"The service is temporarily unavailable (HTTP {(int)res.StatusCode}). Please try again." };
             }
             return await res.Content.ReadFromJsonAsync<OtpRequestResponse>()
                    ?? new OtpRequestResponse { Success = false, Error = "Unexpected response from the service." };
@@ -75,7 +77,9 @@ public class CustomerApiClient(
                 new OtpVerifyRequest { LinkToken = linkToken, Code = code });
             if (!res.IsSuccessStatusCode)
             {
-                return new CustomerOtpVerifyResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+                var body = await res.Content.ReadAsStringAsync();
+                logger.LogError("Customer VerifyOtp failed: HTTP {Status}. Body: {Body}", (int)res.StatusCode, Trim(body, 1000));
+                return new CustomerOtpVerifyResponse { Success = false, Error = $"The service is temporarily unavailable (HTTP {(int)res.StatusCode}). Please try again." };
             }
             return await res.Content.ReadFromJsonAsync<CustomerOtpVerifyResponse>()
                    ?? new CustomerOtpVerifyResponse { Success = false, Error = "Unexpected response from the service." };
