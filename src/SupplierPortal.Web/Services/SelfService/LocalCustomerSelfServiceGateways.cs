@@ -130,6 +130,10 @@ public class LocalCustomerSelfServiceDataGateway(
         return access is null ? [] : await documentService.GetDocumentsAsync(access.CustomerId);
     }
 
+    /// <summary>The reserved, system-generated document type — a self-service customer must never be able to
+    /// upload (and thereby forge / overwrite) it.</summary>
+    private const string SignedDeclarationType = "Signed Declaration";
+
     public async Task<SsResult> UploadDocumentAsync(
         string token, string session, string documentType, string fileName, string contentType, byte[] bytes)
     {
@@ -138,6 +142,20 @@ public class LocalCustomerSelfServiceDataGateway(
         {
             return new SsResult(false, "Your session has expired.");
         }
+
+        // Only allow uploads against an active, customer-facing KYC document type. This blocks a crafted
+        // request from forging or overwriting the server-generated "Signed Declaration" (single-slot replace
+        // by type would otherwise let a customer replace the genuine signed PDF).
+        if (string.Equals(documentType, SignedDeclarationType, StringComparison.OrdinalIgnoreCase))
+        {
+            return new SsResult(false, "That document type cannot be uploaded.");
+        }
+        var activeTypes = await documentService.GetTypesAsync();
+        if (!activeTypes.Any(t => string.Equals(t.Name, documentType, StringComparison.OrdinalIgnoreCase)))
+        {
+            return new SsResult(false, "Invalid document type.");
+        }
+
         var (success, error) = await documentService.UploadBytesAsync(
             access.CustomerId, documentType, bytes, fileName, contentType, Actor);
         return new SsResult(success, error);
