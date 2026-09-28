@@ -358,7 +358,29 @@
     }
 
     private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
-        config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group).OrderBy(f => f.Sequence);
+        config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group)
+              .Where(IsConditionallyVisible)
+              .OrderBy(f => f.Sequence);
+
+    /// <summary>A conditional field is shown only while its controlling Yes/No field holds the configured
+    /// value; otherwise it is hidden (and cleared on save). Fields with no rule are always shown.</summary>
+    private bool IsConditionallyVisible(CustomerFieldConfig cfg)
+    {
+        if (string.IsNullOrWhiteSpace(cfg.ControllingFieldKey)) return true;
+        object? entity = cfg.Section == "Account" ? customer : contact;
+        if (entity is null) return true;
+        var current = CustomerFieldAccessor.GetString(entity, cfg.ControllingFieldKey);
+        return string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ClearHiddenConditionalFields()
+    {
+        foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
+        {
+            object? entity = f.Section == "Account" ? customer : contact;
+            if (entity is not null) CustomerFieldAccessor.SetString(entity, f.FieldKey, null);
+        }
+    }
 
     private static string? Subcategory(string fieldKey) => fieldKey switch
     {
@@ -389,6 +411,7 @@
         if (customer is null) return;
         busy = true;
         if (!silent) message = null;
+        ClearHiddenConditionalFields();
         customer.Contact = contact;
         var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: false);
         // Sync the 1:1 contact's database id so a subsequent save updates the same row.
@@ -470,6 +493,7 @@
         var entity = step.Section == "Account" ? (object)customer : contact;
         return config
             .Where(f => f.IsVisible && f.IsRequired && f.Section == step.Section && f.GroupName == step.Group)
+            .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
             .Select(f => f.DisplayLabel)
@@ -535,6 +559,7 @@
         if (customer is null) return;
 
         var missing = config.Where(f => f.IsVisible && f.IsRequired)
+            .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                 f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
@@ -552,7 +577,7 @@
             return;
         }
 
-        var formatErrors = FormatErrors(config.Where(f => f.IsVisible));
+        var formatErrors = FormatErrors(config.Where(f => f.IsVisible).Where(IsConditionallyVisible));
         if (formatErrors.Count > 0)
         {
             ToastService.ShowErrors(formatErrors);
@@ -635,6 +660,7 @@
         sigInitialized = false;
 
         busy = true; message = null;
+        ClearHiddenConditionalFields();
         customer.Contact = contact;
         var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: true);
         busy = false;

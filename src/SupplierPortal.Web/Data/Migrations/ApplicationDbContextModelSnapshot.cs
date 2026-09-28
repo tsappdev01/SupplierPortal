@@ -927,6 +927,14 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ControllingFieldKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ControllingValue")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<string>("CustomerControl")
                         .IsRequired()
                         .HasMaxLength(20)

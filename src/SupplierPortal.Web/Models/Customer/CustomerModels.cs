@@ -283,6 +283,15 @@ public class CustomerFieldConfig
     /// <summary>When true the field is removed from the form entirely (not shown to any role, never required)
     /// but kept so an admin can restore it. Mirrors the supplier field manager's remove/restore.</summary>
     public bool IsRemoved { get; set; }
+
+    /// <summary>Optional conditional rule: the FieldKey of a controlling Yes/No field (in the same section).
+    /// When set, this field is shown (and, if <see cref="IsRequired"/>, required) only while the controlling
+    /// field's value equals <see cref="ControllingValue"/>; otherwise it is hidden and its value cleared.
+    /// Null = always shown (the default).</summary>
+    [MaxLength(100)] public string? ControllingFieldKey { get; set; }
+
+    /// <summary>The controlling field's value that reveals this field: "true" (Yes) or "false" (No).</summary>
+    [MaxLength(40)] public string? ControllingValue { get; set; }
 }
 
 /// <summary>Admin-configurable title, order, visibility and per-user edit restriction for one customer wizard

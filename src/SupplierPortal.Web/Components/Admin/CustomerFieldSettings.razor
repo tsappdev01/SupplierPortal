@@ -136,13 +136,14 @@ else
                                 <th style="width: 140px;">Customer control</th>
                                 <th style="width: 80px;">Visible</th>
                                 <th style="width: 80px;">Required</th>
+                                <th style="width: 200px;">Depends on</th>
                                 <th style="width: 80px;">Remove</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (tabFields.Count == 0)
                             {
-                                <tr><td colspan="8" class="text-muted fst-italic">No fields on this tab.</td></tr>
+                                <tr><td colspan="9" class="text-muted fst-italic">No fields on this tab.</td></tr>
                             }
                             @for (var i = 0; i < tabFields.Count; i++)
                             {
@@ -195,6 +196,23 @@ else
                                                    @onchange="e => f.IsRequired = (bool)e.Value!" />
                                             <span class="di-switch-slider"></span>
                                         </label>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" value="@(f.ControllingFieldKey ?? "")"
+                                                @onchange="e => OnControllingChanged(f, (string?)e.Value)">
+                                            <option value="">— always shown —</option>
+                                            @foreach (var yn in rows.Where(r => !r.IsRemoved && r.Section == section && r.FieldKind == "yesno" && r.FieldKey != f.FieldKey))
+                                            {
+                                                <option value="@yn.FieldKey">@yn.DisplayLabel</option>
+                                            }
+                                        </select>
+                                        @if (!string.IsNullOrWhiteSpace(f.ControllingFieldKey))
+                                        {
+                                            <select class="form-select form-select-sm mt-1" @bind="f.ControllingValue">
+                                                <option value="true">is Yes → show &amp; require</option>
+                                                <option value="false">is No → show &amp; require</option>
+                                            </select>
+                                        }
                                     </td>
                                     <td>
                                         <button class="btn btn-sm btn-outline-danger" title="Remove field from the form"
@@ -291,6 +309,14 @@ else
     {
         f.IsVisible = visible;
         if (!visible) f.IsRequired = false;
+    }
+
+    private void OnControllingChanged(CustomerFieldConfig f, string? controllingKey)
+    {
+        f.ControllingFieldKey = string.IsNullOrWhiteSpace(controllingKey) ? null : controllingKey;
+        // Default the trigger value to Yes when a controlling field is first chosen.
+        f.ControllingValue = f.ControllingFieldKey is null ? null
+            : (string.IsNullOrWhiteSpace(f.ControllingValue) ? "true" : f.ControllingValue);
     }
 
     private void MoveTabUp(string section, int index)

@@ -474,7 +474,29 @@ else
 
     private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
         config.Where(f => f.IsVisible && f.Section == step.Section && f.GroupName == step.Group)
+              .Where(IsConditionallyVisible)
               .OrderBy(f => f.Sequence);
+
+    /// <summary>A conditional field is shown only while its controlling Yes/No field currently holds the
+    /// configured value; otherwise it is hidden (and cleared on save). Fields with no rule are always shown.</summary>
+    private bool IsConditionallyVisible(CustomerFieldConfig cfg)
+    {
+        if (string.IsNullOrWhiteSpace(cfg.ControllingFieldKey)) return true;
+        object? entity = cfg.Section == "Account" ? customer : contact;
+        if (entity is null) return true;
+        var current = CustomerFieldAccessor.GetString(entity, cfg.ControllingFieldKey);
+        return string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Clears the stored value of every conditionally-hidden field so a stale value isn't saved.</summary>
+    private void ClearHiddenConditionalFields()
+    {
+        foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
+        {
+            object? entity = f.Section == "Account" ? customer : contact;
+            if (entity is not null) CustomerFieldAccessor.SetString(entity, f.FieldKey, null);
+        }
+    }
 
     private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
 
@@ -492,6 +514,7 @@ else
         if (customer is null) return;
         busy = true;
         if (!silent) message = null;
+        ClearHiddenConditionalFields();
         customer.Contact = contact;
         var (lockedAcct, lockedCont) = LockedKeys();
         await CustomerService.SaveAsync(customer, currentUser, lockedAcct, lockedCont);
@@ -625,6 +648,7 @@ else
         var entity = step.Section == "Account" ? (object)customer : contact;
         return config
             .Where(f => f.IsVisible && f.IsRequired && f.Section == step.Section && f.GroupName == step.Group)
+            .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(entity, f.FieldKey)))
             .Select(f => f.DisplayLabel)
@@ -670,6 +694,7 @@ else
     {
         if (customer is null) return;
         busy = true; message = null;
+        ClearHiddenConditionalFields();
         customer.Contact = contact;
         var (retAcct, retCont) = LockedKeys();
         await CustomerService.SaveAsync(customer, currentUser, retAcct, retCont);
@@ -698,6 +723,7 @@ else
         if (status == CustomerStatuses.ForReview)
         {
             var missing = config.Where(f => f.IsVisible && f.IsRequired)
+                .Where(IsConditionallyVisible)
                 .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
                 .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                     f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
@@ -713,7 +739,7 @@ else
                 ToastService.ShowErrors(dateErrors);
                 return;
             }
-            var formatErrors = FormatErrors(config.Where(f => f.IsVisible));
+            var formatErrors = FormatErrors(config.Where(f => f.IsVisible).Where(IsConditionallyVisible));
             if (formatErrors.Count > 0)
             {
                 ToastService.ShowErrors(formatErrors);

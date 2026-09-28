@@ -60,6 +60,10 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             row.IsVisible = edit.IsVisible;
             row.IsRequired = edit.IsRequired;
             row.IsRemoved = edit.IsRemoved;
+            // Conditional (depends-on) rule: null out both when no controlling field is chosen.
+            row.ControllingFieldKey = string.IsNullOrWhiteSpace(edit.ControllingFieldKey) ? null : edit.ControllingFieldKey;
+            row.ControllingValue = row.ControllingFieldKey is null ? null
+                : (string.IsNullOrWhiteSpace(edit.ControllingValue) ? "true" : edit.ControllingValue);
             // Moving a field to another tab keeps it in the same Section (enforced by the admin UI).
             if (!string.IsNullOrWhiteSpace(edit.GroupName)) row.GroupName = edit.GroupName;
             row.Sequence = edit.Sequence;
