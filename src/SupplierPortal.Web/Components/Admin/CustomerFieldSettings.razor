@@ -33,19 +33,15 @@
             @* ---------- Tab pills (drag to reorder) ---------- *@
             <div class="di-cfm-tabbar">
                 <div class="di-cfm-pills">
-                    @foreach (var t in AllTabsOrdered())
+                    @* One pill per distinct tab title — mirrors the customer form, where tabs sharing a title
+                       merge into a single wizard step (so no duplicate pills). Use Manage Tabs to rename/reorder. *@
+                    @foreach (var title in DistinctTabTitles())
                     {
-                        var tab = t;
-                        var key = EditorKey(tab);
-                        <div class="di-cfm-pill @(tabFilter == key ? "is-active" : null) @(tab.IsVisible ? null : "is-hidden")"
-                             draggable="true"
-                             @ondragstart="() => OnTabDragStart(tab)"
-                             @ondragover:preventDefault="true"
-                             @ondrop="() => OnTabDrop(tab)"
-                             @onclick="() => ToggleTabFilter(key)"
-                             title="@(tab.Section): @tab.Title — click to filter, drag to reorder">
-                            <span class="di-cfm-pill-grip">⠿</span>
-                            <span>@tab.Title</span>
+                        var t = title;
+                        <div class="di-cfm-pill @(string.Equals(tabFilter, t, StringComparison.OrdinalIgnoreCase) ? "is-active" : null) @(TabTitleVisible(t) ? null : "is-hidden")"
+                             @onclick="() => ToggleTabFilter(t)"
+                             title="Click to filter the fields on this tab">
+                            <span>@t</span>
                         </div>
                     }
                 </div>
@@ -544,8 +540,7 @@
     private string moduleFilter = "";
     private string typeFilter = "";
     private string statusFilter = "";
-    private string? tabFilter;              // Section|GroupName pill filter
-    private string? draggingTabKey;
+    private string? tabFilter;              // tab-title pill filter
     private int page = 1;
     private const int PageSize = 10;
     private CustomerFieldConfig? editing;
@@ -556,8 +551,21 @@
     private List<CustomerTabSetting> TabsForSection(string section) =>
         tabs.Where(t => t.Section == section).OrderBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList();
 
-    private List<CustomerTabSetting> AllTabsOrdered() =>
-        tabs.OrderBy(t => Array.IndexOf(Sections, t.Section)).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList();
+    // Distinct tab titles in the same order the customer form builds its steps (tabs sharing a title merge,
+    // ordered by their minimum Sequence, then title) — so the pills match the wizard exactly, with no duplicates.
+    private List<string> DistinctTabTitles() =>
+        tabs.Where(t => !string.IsNullOrWhiteSpace(t.Title))
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Min(t => t.Sequence)).ThenBy(g => g.Key)
+            .Select(g => g.First().Title.Trim())
+            .ToList();
+
+    // A merged title is "visible" when any of its underlying tabs is visible.
+    private bool TabTitleVisible(string title) =>
+        tabs.Any(t => string.Equals(t.Title?.Trim(), title, StringComparison.OrdinalIgnoreCase) && t.IsVisible);
+
+    private string? TabTitleOf(CustomerFieldConfig r) =>
+        tabs.FirstOrDefault(t => t.Section == r.Section && t.GroupName == r.GroupName)?.Title?.Trim();
 
     // Fields ordered the way the form renders: section, then tab order, then field sequence.
     private List<CustomerFieldConfig> OrderedRows() =>
@@ -580,7 +588,7 @@
             _ => q
         };
         if (!string.IsNullOrWhiteSpace(moduleFilter)) q = q.Where(r => r.Section == moduleFilter);
-        if (!string.IsNullOrWhiteSpace(tabFilter)) q = q.Where(r => $"{r.Section}|{r.GroupName}" == tabFilter);
+        if (!string.IsNullOrWhiteSpace(tabFilter)) q = q.Where(r => string.Equals(TabTitleOf(r), tabFilter, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(typeFilter))
         {
             q = typeFilter == "text"
@@ -610,9 +618,9 @@
     private void GoToPage(int p) => page = p;
     private void OnFilterChanged() => page = 1;
 
-    private void ToggleTabFilter(string key)
+    private void ToggleTabFilter(string title)
     {
-        tabFilter = tabFilter == key ? null : key;
+        tabFilter = string.Equals(tabFilter, title, StringComparison.OrdinalIgnoreCase) ? null : title;
         page = 1;
     }
 
@@ -642,24 +650,6 @@
         var l = Neighbours(f); var i = l.IndexOf(f);
         if (i < 0 || i >= l.Count - 1) return;
         (l[i].Sequence, l[i + 1].Sequence) = (l[i + 1].Sequence, l[i].Sequence);
-    }
-
-    // ---- Tab drag reorder (pills) ----
-    private void OnTabDragStart(CustomerTabSetting t) => draggingTabKey = EditorKey(t);
-    private void OnTabDrop(CustomerTabSetting target)
-    {
-        var key = draggingTabKey;
-        draggingTabKey = null;
-        if (key is null) return;
-        var dragged = tabs.FirstOrDefault(t => EditorKey(t) == key);
-        if (dragged is null || dragged == target || dragged.Section != target.Section) return;
-        var list = TabsForSection(target.Section);
-        list.Remove(dragged);
-        var idx = list.IndexOf(target);
-        if (idx < 0) idx = list.Count;
-        list.Insert(idx, dragged);
-        var seq = 1;
-        foreach (var t in list) t.Sequence = seq++;
     }
 
     // Avatar styling for the Field Details cell — deterministic pastel by field key.
