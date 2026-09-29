@@ -111,7 +111,7 @@ public class CustomerApiClient(
         try
         {
             var http = await AuthedClientAsync(linkToken, sessionToken);
-            var res = await http.PutAsJsonAsync("/api/selfservice/customer/form", req);
+            var res = await http.PostAsJsonAsync("/api/selfservice/customer/form/save", req);
             var body = await res.Content.ReadAsStringAsync();
             if (!res.IsSuccessStatusCode)
             {
@@ -221,7 +221,7 @@ public class CustomerApiClient(
         try
         {
             var http = await AuthedClientAsync(linkToken, sessionToken);
-            var res = await http.DeleteAsync($"/api/selfservice/customer/documents/{documentId}");
+            var res = await http.PostAsync($"/api/selfservice/customer/documents/{documentId}/delete", null);
             if (!res.IsSuccessStatusCode)
             {
                 return new CustomerDocumentUploadResponse { Success = false, Error = "Could not remove the document." };

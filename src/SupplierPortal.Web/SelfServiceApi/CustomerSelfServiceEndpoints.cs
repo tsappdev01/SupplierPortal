@@ -108,7 +108,9 @@ public static class CustomerSelfServiceEndpoints
             return form is null ? Results.Unauthorized() : Results.Ok(await ToBootstrapAsync(form, logoInliner));
         });
 
-        group.MapPut("/form", async (
+        // Save uses POST (not PUT): the DMZ→internal path returns HTTP 405 for PUT/DELETE (App Service / WAF /
+        // reverse-proxy method restriction), which silently dropped per-step saves. POST is not restricted.
+        group.MapPost("/form/save", async (
             HttpContext ctx, SaveCustomerRequest req, ICustomerSelfServiceDataGateway data, ILoggerFactory lf) =>
         {
             var log = lf.CreateLogger("CustomerSelfServiceSave");
@@ -241,7 +243,7 @@ public static class CustomerSelfServiceEndpoints
             return Results.File(bytes, file.ContentType, file.FileName);
         });
 
-        group.MapDelete("/documents/{id:int}", async (int id, HttpContext ctx, ICustomerSelfServiceDataGateway data) =>
+        group.MapPost("/documents/{id:int}/delete", async (int id, HttpContext ctx, ICustomerSelfServiceDataGateway data) =>
         {
             var (link, session) = ReadSession(ctx);
             var result = await data.DeleteDocumentAsync(link, session, id);
