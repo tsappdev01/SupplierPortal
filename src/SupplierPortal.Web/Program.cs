@@ -521,6 +521,7 @@ if (selfServiceApiEnabled)
 {
     SupplierPortal.Web.SelfServiceApi.SelfServiceEndpoints.MapSelfServiceApi(app);
     SupplierPortal.Web.SelfServiceApi.CustomerSelfServiceEndpoints.MapCustomerSelfServiceApi(app);
+    SupplierPortal.Web.SelfServiceApi.LandlordSelfServiceEndpoints.MapLandlordSelfServiceApi(app);
 }
 
 app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService) =>
