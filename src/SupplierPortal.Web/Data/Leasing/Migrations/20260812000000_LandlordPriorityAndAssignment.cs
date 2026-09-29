@@ -17,6 +17,7 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
         {
             migrationBuilder.AddColumn<string>(
                 name: "Priority",
+                schema: "leasing",
                 table: "Landlords",
                 type: "nvarchar(4)",
                 maxLength: 4,
@@ -24,6 +25,7 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
             migrationBuilder.AddColumn<int>(
                 name: "AssignedToUserId",
+                schema: "leasing",
                 table: "Landlords",
                 type: "int",
                 nullable: true);
@@ -32,8 +34,8 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(name: "Priority", table: "Landlords");
-            migrationBuilder.DropColumn(name: "AssignedToUserId", table: "Landlords");
+            migrationBuilder.DropColumn(name: "Priority", schema: "leasing", table: "Landlords");
+            migrationBuilder.DropColumn(name: "AssignedToUserId", schema: "leasing", table: "Landlords");
         }
     }
 }
