@@ -55,6 +55,8 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
         {
             if (!rows.TryGetValue(edit.Id, out var row)) continue;
 
+            // Admin-edited field label (shown on the form). Keep the existing label if cleared.
+            if (!string.IsNullOrWhiteSpace(edit.DisplayLabel)) row.DisplayLabel = edit.DisplayLabel.Trim();
             row.BusinessControl = Normalize(edit.BusinessControl);
             row.CustomerControl = Normalize(edit.CustomerControl);
             row.IsVisible = edit.IsVisible;

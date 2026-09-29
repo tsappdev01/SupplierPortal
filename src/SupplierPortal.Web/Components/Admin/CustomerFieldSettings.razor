@@ -159,10 +159,13 @@ else
                                         </div>
                                     </td>
                                     <td>
-                                        @f.DisplayLabel
-                                        @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis ms-1">LOV</span> }
-                                        else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Date</span> }
-                                        else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Yes/No</span> }
+                                        <div class="d-flex align-items-center gap-1">
+                                            <input class="form-control form-control-sm di-field-label-input" @bind="f.DisplayLabel"
+                                                   placeholder="Field label" title="Edit the label shown on the form" />
+                                            @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis">LOV</span> }
+                                            else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis">Date</span> }
+                                            else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis">Yes/No</span> }
+                                        </div>
                                         <div class="di-field-key">@f.FieldKey</div>
                                     </td>
                                     <td>
@@ -256,6 +259,7 @@ else
 
 <style>
     .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
+    .di-field-label-input { min-width: 180px; max-width: 340px; font-weight: 600; }
     .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
     .di-removed-header { background: #7a1f2b; }
     .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }
