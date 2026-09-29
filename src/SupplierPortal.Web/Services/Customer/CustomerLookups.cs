@@ -285,6 +285,15 @@ public static class CustomerLookups
         ["AU"]="61",["NZ"]="64",["FJ"]="679",["AD"]="376",["MC"]="377",["LI"]="423",["SM"]="378",
     };
 
+    /// <summary>The seven UAE emirates — the City option list shown when the country is the UAE.</summary>
+    public static readonly string[] UaeEmirates =
+    {
+        "Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Quwain", "Ras Al Khaimah", "Fujairah"
+    };
+
+    /// <summary>The country name that switches the City field to the UAE-emirate dropdown.</summary>
+    public const string UaeCountryName = "United Arab Emirates";
+
     /// <summary>Countries that carry a dial code, as (Iso, Dial, Name), UAE first then alphabetical by name —
     /// the option list for the customer phone controls.</summary>
     public static readonly (string Iso, string Dial, string Name)[] PhoneCountries =

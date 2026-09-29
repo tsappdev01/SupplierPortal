@@ -137,6 +137,9 @@
                         {
                             if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
+                            var isContactCity = cfg.Section == "Contact" && cfg.FieldKey == "EmirateCity";
+                            var contactCountryIsUae = isContactCity && string.Equals(
+                                contact.GetValueOrDefault("Country"), CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
                             var editable = !string.Equals(cfg.CustomerControl, "Readonly", StringComparison.OrdinalIgnoreCase);
                             var cur = Val(cfg);
                             var sub = Subcategory(cfg.FieldKey);
@@ -186,6 +189,20 @@
                                             <option value="@c.Code" selected="@(c.Code == cur)">@c.Code - @c.Name</option>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.Countries.Any(c => c.Code == cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else if (isContactCity && contactCountryIsUae)
+                                {
+                                    <select value="@cur" @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var em in CustomerLookups.UaeEmirates)
+                                        {
+                                            <option value="@em" selected="@(em == cur)">@em</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.UaeEmirates.Contains(cur))
                                         {
                                             <option value="@cur" selected>@cur</option>
                                         }
