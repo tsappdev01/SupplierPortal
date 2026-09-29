@@ -157,12 +157,10 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <select class="di-cfm-select" @bind="field.FieldKind" disabled="@field.IsRemoved">
-                                        <option value="text">Text (Editable)</option>
-                                        <option value="lookup">Lookup</option>
-                                        <option value="date">Date</option>
-                                        <option value="yesno">Yes / No</option>
-                                        <option value="phone">Phone</option>
+                                    @* Field type is fixed (read-only) — changing a field's kind would break how the
+                                       form renders it, so it is displayed only. *@
+                                    <select class="di-cfm-select" disabled title="Field type is fixed">
+                                        <option selected>@FieldTypeLabel(field.FieldKind)</option>
                                     </select>
                                 </td>
                                 <td>
@@ -677,6 +675,15 @@
     }
     private static string AvatarBg(string key) => Avatar(key).Bg;
     private static string AvatarFg(string key) => Avatar(key).Fg;
+
+    private static string FieldTypeLabel(string? kind) => kind switch
+    {
+        "lookup" => "Lookup",
+        "date" => "Date",
+        "yesno" => "Yes / No",
+        "phone" => "Phone",
+        _ => "Text (Editable)"
+    };
 
     private void OpenEdit(CustomerFieldConfig f) => editing = f;
     private void CloseEdit() => editing = null;
