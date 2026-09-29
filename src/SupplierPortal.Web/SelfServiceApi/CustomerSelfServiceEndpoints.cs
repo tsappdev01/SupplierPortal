@@ -354,6 +354,23 @@ public static class CustomerSelfServiceEndpoints
             }
         }
 
+        // Configurable min/max character length on editable text fields (defence in depth — the forms check too).
+        foreach (var f in form.Config.Where(f => f.IsVisible && !f.IsRemoved).Where(Visible)
+                     .Where(f => string.IsNullOrEmpty(f.FieldKind) || f.FieldKind == "text"))
+        {
+            var val = CustomerFieldAccessor.GetString(Ent(f), f.FieldKey);
+            if (string.IsNullOrEmpty(val)) { continue; }
+            var len = val.Trim().Length;
+            if (f.MinLength is int min && min > 0 && len < min)
+            {
+                problems.Add($"{f.DisplayLabel} must be at least {min} character{(min == 1 ? "" : "s")}.");
+            }
+            if (f.MaxLength is int max && max > 0 && len > max)
+            {
+                problems.Add($"{f.DisplayLabel} must be at most {max} character{(max == 1 ? "" : "s")}.");
+            }
+        }
+
         // Date logic: an issue date cannot be in the future and an expiry cannot precede its issue date.
         foreach (var (section, issueKey, expiryKey, label) in IssueExpiryPairs)
         {
@@ -433,6 +450,8 @@ public static class CustomerSelfServiceEndpoints
                 FieldKey = c.FieldKey,
                 DisplayLabel = c.DisplayLabel,
                 HelpText = c.HelpText,
+                MinLength = c.MinLength,
+                MaxLength = c.MaxLength,
                 Section = c.Section,
                 GroupName = c.GroupName,
                 Sequence = c.Sequence,

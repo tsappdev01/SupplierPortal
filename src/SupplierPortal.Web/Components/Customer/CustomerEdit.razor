@@ -239,7 +239,7 @@ else
                         else
                         {
                             <input type="text" value="@cur"
-                                   maxlength="@MaxLenFor(cfg.FieldKey)"
+                                   maxlength="@(cfg.MaxLength ?? MaxLenFor(cfg.FieldKey))"
                                    inputmode="@(MaxLenFor(cfg.FieldKey) is null ? null : "numeric")"
                                    @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
                         }
@@ -780,7 +780,23 @@ else
             {
                 errs.Add("TRN Number must be exactly 15 digits.");
             }
+            errs.AddRange(LengthErrors(f, val));
         }
+        return errs;
+    }
+
+    /// <summary>Configurable min/max character-length validation for editable text fields (skips lookup / date /
+    /// yes-no / phone kinds, where a character count is meaningless).</summary>
+    private static List<string> LengthErrors(CustomerFieldConfig f, string? value)
+    {
+        var errs = new List<string>();
+        var isText = string.IsNullOrEmpty(f.FieldKind) || f.FieldKind == "text";
+        if (!isText || string.IsNullOrEmpty(value)) return errs;
+        var len = value.Trim().Length;
+        if (f.MinLength is int min && min > 0 && len < min)
+            errs.Add($"{f.DisplayLabel} must be at least {min} character{(min == 1 ? "" : "s")}.");
+        if (f.MaxLength is int max && max > 0 && len > max)
+            errs.Add($"{f.DisplayLabel} must be at most {max} character{(max == 1 ? "" : "s")}.");
         return errs;
     }
 

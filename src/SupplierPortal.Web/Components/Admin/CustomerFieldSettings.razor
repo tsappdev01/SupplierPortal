@@ -12,263 +12,524 @@
 
 <PageTitle>Customer Field Manager - CST Portal</PageTitle>
 
-<h1>Customer Field Manager</h1>
-<p class="text-muted">
-    Manage the customer form's fields and tabs. Rename or hide a tab, reorder fields within a tab, move a
-    field to another tab, remove it from the form, and set each field's per-role control (Business vs
-    Customer), visibility and required flag. These rules drive both customer forms with no code change.
-</p>
+<div class="di-cfm">
+    <div class="di-cfm-card">
+        <div class="di-cfm-head">
+            <div class="di-cfm-head-icon">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M3 0h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V1a1 1 0 0 1 1-1zm1 3v2h8V3H4zm0 4v2h8V7H4zm0 4v2h5v-2H4z"/></svg>
+            </div>
+            <div>
+                <h1 class="di-cfm-title">Customer Field Manager</h1>
+                <p class="di-cfm-sub">Configure and manage customer portal fields, set validation rules and control field behavior.</p>
+            </div>
+        </div>
 
-@if (savedMessage is not null)
-{
-    <div class="alert alert-success">@savedMessage</div>
-}
+        @if (rows.Count == 0)
+        {
+            <p class="text-muted p-3"><em>Loading…</em></p>
+        }
+        else
+        {
+            @* ---------- Tab pills (drag to reorder) ---------- *@
+            <div class="di-cfm-tabbar">
+                <div class="di-cfm-pills">
+                    @foreach (var t in AllTabsOrdered())
+                    {
+                        var tab = t;
+                        var key = EditorKey(tab);
+                        <div class="di-cfm-pill @(tabFilter == key ? "is-active" : null) @(tab.IsVisible ? null : "is-hidden")"
+                             draggable="true"
+                             @ondragstart="() => OnTabDragStart(tab)"
+                             @ondragover:preventDefault="true"
+                             @ondrop="() => OnTabDrop(tab)"
+                             @onclick="() => ToggleTabFilter(key)"
+                             title="@(tab.Section): @tab.Title — click to filter, drag to reorder">
+                            <span class="di-cfm-pill-grip">⠿</span>
+                            <span>@tab.Title</span>
+                        </div>
+                    }
+                </div>
+                <button class="di-cfm-reorder-hint" @onclick="() => showTabs = true" title="Rename, hide or set who can edit tabs">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a.5.5 0 0 1 .5.5V2h-1V.5A.5.5 0 0 1 8 0zM3 5.5A.5.5 0 0 1 3.5 5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 5.5zM3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/></svg>
+                    Manage Tabs
+                </button>
+            </div>
 
-@if (rows.Count == 0)
-{
-    <p><em>Loading…</em></p>
-}
-else
-{
-    <div class="d-flex align-items-center gap-3 mb-3">
-        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
-            @(saving ? "Saving…" : "Save changes")
-        </button>
-        <span class="text-muted">@rows.Count(r => !r.IsRemoved) active field(s) · @rows.Count(r => r.IsRemoved) removed</span>
-    </div>
+            @* ---------- Toolbar ---------- *@
+            <div class="di-cfm-toolbar">
+                <div class="di-cfm-search">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                    <input type="text" placeholder="Search fields (name or description)…" @bind="searchText" @bind:event="oninput" @bind:after="OnFilterChanged" />
+                </div>
+                <div class="di-cfm-filter">
+                    <label>Module</label>
+                    <select @bind="moduleFilter" @bind:after="OnFilterChanged">
+                        <option value="">All Modules</option>
+                        <option value="Account">Account (Company)</option>
+                        <option value="Contact">Contact (Individual)</option>
+                    </select>
+                </div>
+                <div class="di-cfm-filter">
+                    <label>Field Type</label>
+                    <select @bind="typeFilter" @bind:after="OnFilterChanged">
+                        <option value="">All Types</option>
+                        <option value="text">Text (Editable)</option>
+                        <option value="lookup">Lookup (LOV)</option>
+                        <option value="date">Date</option>
+                        <option value="yesno">Yes / No</option>
+                    </select>
+                </div>
+                <div class="di-cfm-filter">
+                    <label>Status</label>
+                    <select @bind="statusFilter" @bind:after="OnFilterChanged">
+                        <option value="">All</option>
+                        <option value="active">Active</option>
+                        <option value="removed">Removed</option>
+                    </select>
+                </div>
+                <div class="di-cfm-toolbar-actions">
+                    <button class="di-cfm-btn di-cfm-btn-primary" @onclick="SaveAsync" disabled="@saving">
+                        @(saving ? "Saving…" : "Save Changes")
+                    </button>
+                </div>
+            </div>
 
-    @* ---------- Wizard Tabs ---------- *@
-    <div class="di-field-settings-section mb-3">
-        <div class="di-field-settings-header">Wizard Tabs</div>
-        <div class="p-3">
-            <p class="text-muted mb-2" style="font-size: 13px;">
-                Rename or hide the customer form's tabs and set their order. A hidden tab is skipped by the
-                form. <strong>Editable by</strong> restricts who may <em>change</em> a tab on the internal
-                customer form — leave it as <em>Anyone</em> for no restriction; when you pick users, every
-                other internal user can view the tab but its fields are read-only for them. This does not
-                affect the customer self-service portal.
-            </p>
-            @foreach (var section in Sections)
+            @if (savedMessage is not null)
             {
-                <div class="fw-semibold mt-2 mb-1">@(section == "Account" ? "Account (Company)" : "Contact (Individual)")</div>
-                <table class="table table-sm align-middle mb-2">
+                <div class="di-cfm-saved">@savedMessage</div>
+            }
+
+            <div class="di-cfm-tablewrap">
+                @{ var filtered = FilteredRows(); var paged = Paged(filtered); }
+                <table class="di-cfm-table">
                     <thead>
                         <tr>
-                            <th style="width: 90px;">Order</th>
-                            <th>Tab title</th>
-                            <th style="width: 100px;">Visible</th>
-                            <th style="width: 300px;">Editable by</th>
+                            <th style="width: 84px;">Order</th>
+                            <th style="min-width: 240px;">Field Details</th>
+                            <th style="width: 78px;" class="text-center">Move</th>
+                            <th style="width: 140px;">Field Type</th>
+                            <th style="width: 168px;">Validation Rule</th>
+                            <th style="width: 92px;" class="text-center">Status</th>
+                            <th style="width: 84px;" class="text-center">Required</th>
+                            <th style="width: 78px;" class="text-center">Visible</th>
+                            <th style="width: 172px;">Depends On</th>
+                            <th style="width: 150px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @{ var secTabs = TabsForSection(section); }
-                        @for (var i = 0; i < secTabs.Count; i++)
+                        @if (paged.Count == 0)
                         {
-                            var tab = secTabs[i];
-                            var index = i;
-                            var editors = EditorsFor(tab);
-                            <tr>
+                            <tr><td colspan="10" class="di-cfm-empty">No fields match the current filters.</td></tr>
+                        }
+                        @foreach (var f in paged)
+                        {
+                            var field = f;
+                            var isText = string.IsNullOrEmpty(field.FieldKind) || field.FieldKind == "text";
+                            <tr class="@(field.IsRemoved ? "di-cfm-row-removed" : null)">
                                 <td>
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <button class="btn btn-outline-secondary" title="Move up" disabled="@(index == 0)"
-                                                @onclick="() => MoveTabUp(section, index)">↑</button>
-                                        <button class="btn btn-outline-secondary" title="Move down" disabled="@(index == secTabs.Count - 1)"
-                                                @onclick="() => MoveTabDown(section, index)">↓</button>
+                                    <div class="di-cfm-order">
+                                        <span class="di-cfm-grip">⠿</span>
+                                        <span class="di-cfm-order-num">@OrderOf(field)</span>
                                     </div>
                                 </td>
                                 <td>
-                                    <input class="form-control form-control-sm" @bind="tab.Title" maxlength="150" />
-                                    <div class="di-field-key">@tab.GroupName</div>
+                                    <div class="di-cfm-fd">
+                                        <span class="di-cfm-avatar" style="background:@AvatarBg(field.FieldKey); color:@AvatarFg(field.FieldKey);">Aa</span>
+                                        <div class="di-cfm-fd-text">
+                                            <div class="di-cfm-fd-name">
+                                                @field.DisplayLabel
+                                                @if (field.IsRequired) { <span class="di-cfm-star">*</span> }
+                                                @if (field.FieldKind == "lookup") { <span class="di-cfm-tag">LOV</span> }
+                                            </div>
+                                            <div class="di-cfm-fd-desc">@field.FieldKey</div>
+                                            <div class="di-cfm-fd-desc">@(string.IsNullOrWhiteSpace(field.HelpText) ? "Short description (shown as a tooltip)" : field.HelpText)</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <div class="di-cfm-move">
+                                        <button title="Move up" disabled="@(field.IsRemoved || !CanMoveUp(field))" @onclick="() => MoveFieldUp(field)">
+                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l5 6H3z"/></svg>
+                                        </button>
+                                        <button title="Move down" disabled="@(field.IsRemoved || !CanMoveDown(field))" @onclick="() => MoveFieldDown(field)">
+                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 6h10z"/></svg>
+                                        </button>
+                                    </div>
                                 </td>
                                 <td>
+                                    <select class="di-cfm-select" @bind="field.FieldKind" disabled="@field.IsRemoved">
+                                        <option value="text">Text (Editable)</option>
+                                        <option value="lookup">Lookup</option>
+                                        <option value="date">Date</option>
+                                        <option value="yesno">Yes / No</option>
+                                        <option value="phone">Phone</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    @if (isText)
+                                    {
+                                        <div class="di-cfm-vr">
+                                            <span>Min</span>
+                                            <input type="number" min="0" class="di-cfm-vr-input" @bind="field.MinLength" placeholder="—" disabled="@field.IsRemoved" />
+                                            <span>Max</span>
+                                            <input type="number" min="0" class="di-cfm-vr-input" @bind="field.MaxLength" placeholder="—" disabled="@field.IsRemoved" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <input type="text" class="di-cfm-select" value="N/A" disabled />
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    @if (field.IsRemoved)
+                                    {
+                                        <span class="di-cfm-status di-cfm-status-removed">Removed</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="di-cfm-status di-cfm-status-active">Active</span>
+                                    }
+                                </td>
+                                <td class="text-center">
                                     <label class="di-switch">
-                                        <input type="checkbox" checked="@tab.IsVisible" @onchange="e => tab.IsVisible = (bool)e.Value!" />
+                                        <input type="checkbox" checked="@field.IsRequired" disabled="@(field.IsRemoved || !field.IsVisible)"
+                                               @onchange="e => field.IsRequired = (bool)e.Value!" />
+                                        <span class="di-switch-slider"></span>
+                                    </label>
+                                </td>
+                                <td class="text-center">
+                                    <label class="di-switch">
+                                        <input type="checkbox" checked="@field.IsVisible" disabled="@field.IsRemoved"
+                                               @onchange="e => OnVisibleChanged(field, (bool)e.Value!)" />
                                         <span class="di-switch-slider"></span>
                                     </label>
                                 </td>
                                 <td>
-                                    @if (editableUsers.Count == 0)
+                                    <select class="di-cfm-select" value="@(field.ControllingFieldKey ?? "")" disabled="@field.IsRemoved"
+                                            @onchange="e => OnControllingChanged(field, (string?)e.Value)">
+                                        <option value="">— always shown —</option>
+                                        @foreach (var yn in rows.Where(r => !r.IsRemoved && r.Section == field.Section && r.FieldKind == "yesno" && r.FieldKey != field.FieldKey))
+                                        {
+                                            <option value="@yn.FieldKey">@yn.DisplayLabel</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrWhiteSpace(field.ControllingFieldKey))
                                     {
-                                        <span class="text-muted fst-italic">No Customer-portal users</span>
+                                        <select class="di-cfm-select mt-1" @bind="field.ControllingValue">
+                                            <option value="true">is Yes → show</option>
+                                            <option value="false">is No → show</option>
+                                        </select>
                                     }
-                                    else
-                                    {
-                                        <div class="di-editors-summary">@(editors.Count == 0 ? "Anyone (no restriction)" : $"{editors.Count} user(s) only")</div>
-                                        <div class="di-editors-list">
-                                            @foreach (var u in editableUsers)
-                                            {
-                                                <label class="di-editor-item">
-                                                    <input type="checkbox" checked="@editors.Contains(u.Id)"
-                                                           @onchange="e => ToggleEditor(tab, u.Id, (bool)e.Value!)" />
-                                                    <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
-                                                </label>
-                                            }
-                                        </div>
-                                    }
+                                </td>
+                                <td>
+                                    <div class="di-cfm-actions">
+                                        <button class="di-cfm-act di-cfm-act-edit" @onclick="() => OpenEdit(field)">
+                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5z"/></svg>
+                                            Edit
+                                        </button>
+                                        @if (field.IsRemoved)
+                                        {
+                                            <button class="di-cfm-act di-cfm-act-restore" @onclick="() => field.IsRemoved = false">Restore</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="di-cfm-act di-cfm-act-remove" @onclick="() => field.IsRemoved = true">
+                                                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                                                Remove
+                                            </button>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
-            }
+            </div>
+
+            <div class="di-cfm-footer">
+                <span class="di-cfm-count">Showing @paged.Count of @filtered.Count fields</span>
+                @if (PageCount(filtered) > 1)
+                {
+                    <div class="di-cfm-pager">
+                        <button class="di-cfm-page" disabled="@(page <= 1)" @onclick="() => GoToPage(page - 1)">‹</button>
+                        @for (var p = 1; p <= PageCount(filtered); p++)
+                        {
+                            var pageNo = p;
+                            <button class="di-cfm-page @(pageNo == page ? "is-active" : null)" @onclick="() => GoToPage(pageNo)">@pageNo</button>
+                        }
+                        <button class="di-cfm-page" disabled="@(page >= PageCount(filtered))" @onclick="() => GoToPage(page + 1)">›</button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@* ---------- Edit field modal ---------- *@
+@if (editing is not null)
+{
+    <div class="di-cfm-backdrop" @onclick="CloseEdit">
+        <div class="di-cfm-modal" @onclick:stopPropagation="true">
+            <div class="di-cfm-modal-head">
+                <span>Edit Field</span>
+                <button type="button" class="di-cfm-modal-close" @onclick="CloseEdit" aria-label="Close">&times;</button>
+            </div>
+            <div class="di-cfm-modal-body">
+                <div class="di-cfm-fld">
+                    <label>Field Key</label>
+                    <input type="text" value="@editing.FieldKey" disabled />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Field Label</label>
+                    <input type="text" @bind="editing.DisplayLabel" maxlength="200" placeholder="Label shown on the form" />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Description <span class="di-cfm-fld-hint">(shown as a tooltip on the form when not blank)</span></label>
+                    <textarea rows="2" @bind="editing.HelpText" maxlength="500" placeholder="Short description"></textarea>
+                </div>
+                <div class="di-cfm-fld-row">
+                    <div class="di-cfm-fld">
+                        <label>Business Control</label>
+                        <select @bind="editing.BusinessControl">
+                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
+                        </select>
+                    </div>
+                    <div class="di-cfm-fld">
+                        <label>Customer Control</label>
+                        <select @bind="editing.CustomerControl">
+                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
+                        </select>
+                    </div>
+                </div>
+                @{ var editIsText = string.IsNullOrEmpty(editing.FieldKind) || editing.FieldKind == "text"; }
+                @if (editIsText)
+                {
+                    <div class="di-cfm-fld-row">
+                        <div class="di-cfm-fld">
+                            <label>Minimum Length</label>
+                            <input type="number" min="0" @bind="editing.MinLength" placeholder="No minimum" />
+                        </div>
+                        <div class="di-cfm-fld">
+                            <label>Maximum Length</label>
+                            <input type="number" min="0" @bind="editing.MaxLength" placeholder="No maximum" />
+                        </div>
+                    </div>
+                    <p class="di-cfm-fld-note">Leave blank for no limit. The customer portal validates entered text against these limits and shows a message when the length is out of range.</p>
+                }
+            </div>
+            <div class="di-cfm-modal-foot">
+                <button class="di-cfm-btn di-cfm-btn-ghost" @onclick="CloseEdit">Cancel</button>
+                <button class="di-cfm-btn di-cfm-btn-primary" @onclick="CloseEdit">Done</button>
+            </div>
         </div>
     </div>
+}
 
-    @* ---------- Fields, grouped by tab ---------- *@
-    @foreach (var section in Sections)
-    {
-        foreach (var tab in TabsForSection(section))
-        {
-            var tabFields = FieldsForTab(section, tab.GroupName);
-            <div class="di-field-settings-section mb-3">
-                <div class="di-field-settings-header">
-                    @(section == "Account" ? "Account" : "Contact") · @tab.Title
-                    <span class="di-tab-count">@tabFields.Count field(s)</span>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
+@* ---------- Manage tabs modal ---------- *@
+@if (showTabs)
+{
+    <div class="di-cfm-backdrop" @onclick="() => showTabs = false">
+        <div class="di-cfm-modal di-cfm-modal-wide" @onclick:stopPropagation="true">
+            <div class="di-cfm-modal-head">
+                <span>Manage Tabs</span>
+                <button type="button" class="di-cfm-modal-close" @onclick="() => showTabs = false" aria-label="Close">&times;</button>
+            </div>
+            <div class="di-cfm-modal-body">
+                <p class="di-cfm-fld-note">
+                    Rename or hide the customer form's tabs and set their order (you can also drag the tab pills to
+                    reorder). <strong>Editable by</strong> restricts who may change a tab on the internal form
+                    (leave as <em>Anyone</em> for no restriction).
+                </p>
+                @foreach (var section in Sections)
+                {
+                    <div class="di-cfm-tabsec">@(section == "Account" ? "Account (Company)" : "Contact (Individual)")</div>
+                    <table class="di-cfm-table di-cfm-table-tight">
                         <thead>
                             <tr>
-                                <th style="width: 90px;">Order</th>
-                                <th>Field</th>
-                                <th style="width: 160px;">Move to tab</th>
-                                <th style="width: 140px;">Business control</th>
-                                <th style="width: 140px;">Customer control</th>
-                                <th style="width: 80px;">Visible</th>
-                                <th style="width: 80px;">Required</th>
-                                <th style="width: 200px;">Depends on</th>
-                                <th style="width: 80px;">Remove</th>
+                                <th style="width: 74px;">Order</th>
+                                <th>Tab Title</th>
+                                <th style="width: 84px;" class="text-center">Visible</th>
+                                <th style="width: 260px;">Editable by</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @if (tabFields.Count == 0)
+                            @{ var secTabs = TabsForSection(section); }
+                            @for (var i = 0; i < secTabs.Count; i++)
                             {
-                                <tr><td colspan="9" class="text-muted fst-italic">No fields on this tab.</td></tr>
-                            }
-                            @for (var i = 0; i < tabFields.Count; i++)
-                            {
-                                var f = tabFields[i];
+                                var tab = secTabs[i];
                                 var index = i;
+                                var editors = EditorsFor(tab);
                                 <tr>
                                     <td>
-                                        <div class="btn-group btn-group-sm" role="group">
-                                            <button class="btn btn-outline-secondary" title="Move up" disabled="@(index == 0)"
-                                                    @onclick="() => MoveFieldUp(section, tab.GroupName, index)">↑</button>
-                                            <button class="btn btn-outline-secondary" title="Move down" disabled="@(index == tabFields.Count - 1)"
-                                                    @onclick="() => MoveFieldDown(section, tab.GroupName, index)">↓</button>
+                                        <div class="di-cfm-move">
+                                            <button title="Move up" disabled="@(index == 0)" @onclick="() => MoveTabUp(section, index)">
+                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l5 6H3z"/></svg>
+                                            </button>
+                                            <button title="Move down" disabled="@(index == secTabs.Count - 1)" @onclick="() => MoveTabDown(section, index)">
+                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 6h10z"/></svg>
+                                            </button>
                                         </div>
                                     </td>
                                     <td>
-                                        <div class="d-flex align-items-center gap-1">
-                                            <input class="form-control form-control-sm di-field-label-input" @bind="f.DisplayLabel"
-                                                   placeholder="Field label" title="Edit the label shown on the form" />
-                                            @if (f.FieldKind == "lookup") { <span class="badge bg-info-subtle text-info-emphasis">LOV</span> }
-                                            else if (f.FieldKind == "date") { <span class="badge bg-secondary-subtle text-secondary-emphasis">Date</span> }
-                                            else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis">Yes/No</span> }
-                                        </div>
-                                        <div class="di-field-key">@f.FieldKey</div>
-                                        <input class="form-control form-control-sm di-field-help-input mt-1" @bind="f.HelpText"
-                                               placeholder="Short description (shown as a tooltip)" title="Optional help shown as a tooltip on the form" />
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" value="@f.GroupName"
-                                                @onchange="e => MoveFieldToTab(f, (string?)e.Value)">
-                                            @foreach (var t in TabsForSection(section))
-                                            {
-                                                <option value="@t.GroupName" selected="@(t.GroupName == f.GroupName)">@t.Title</option>
-                                            }
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" @bind="f.BusinessControl">
-                                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select class="form-select form-select-sm" @bind="f.CustomerControl">
-                                            @foreach (var c in CustomerFieldControls.All) { <option value="@c">@c</option> }
-                                        </select>
+                                        <input class="di-cfm-select" @bind="tab.Title" maxlength="150" />
+                                        <div class="di-cfm-fd-desc">@tab.GroupName</div>
                                     </td>
                                     <td class="text-center">
                                         <label class="di-switch">
-                                            <input type="checkbox" checked="@f.IsVisible" @onchange="e => OnVisibleChanged(f, (bool)e.Value!)" />
-                                            <span class="di-switch-slider"></span>
-                                        </label>
-                                    </td>
-                                    <td class="text-center">
-                                        <label class="di-switch">
-                                            <input type="checkbox" checked="@f.IsRequired" disabled="@(!f.IsVisible)"
-                                                   @onchange="e => f.IsRequired = (bool)e.Value!" />
+                                            <input type="checkbox" checked="@tab.IsVisible" @onchange="e => tab.IsVisible = (bool)e.Value!" />
                                             <span class="di-switch-slider"></span>
                                         </label>
                                     </td>
                                     <td>
-                                        <select class="form-select form-select-sm" value="@(f.ControllingFieldKey ?? "")"
-                                                @onchange="e => OnControllingChanged(f, (string?)e.Value)">
-                                            <option value="">— always shown —</option>
-                                            @foreach (var yn in rows.Where(r => !r.IsRemoved && r.Section == section && r.FieldKind == "yesno" && r.FieldKey != f.FieldKey))
-                                            {
-                                                <option value="@yn.FieldKey">@yn.DisplayLabel</option>
-                                            }
-                                        </select>
-                                        @if (!string.IsNullOrWhiteSpace(f.ControllingFieldKey))
+                                        @if (editableUsers.Count == 0)
                                         {
-                                            <select class="form-select form-select-sm mt-1" @bind="f.ControllingValue">
-                                                <option value="true">is Yes → show &amp; require</option>
-                                                <option value="false">is No → show &amp; require</option>
-                                            </select>
+                                            <span class="text-muted fst-italic">No Customer-portal users</span>
                                         }
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-danger" title="Remove field from the form"
-                                                @onclick="() => f.IsRemoved = true">Remove</button>
+                                        else
+                                        {
+                                            <div class="di-cfm-fd-desc mb-1">@(editors.Count == 0 ? "Anyone (no restriction)" : $"{editors.Count} user(s) only")</div>
+                                            <div class="di-cfm-editors">
+                                                @foreach (var u in editableUsers)
+                                                {
+                                                    <label class="di-cfm-editor">
+                                                        <input type="checkbox" checked="@editors.Contains(u.Id)"
+                                                               @onchange="e => ToggleEditor(tab, u.Id, (bool)e.Value!)" />
+                                                        <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                        }
                                     </td>
                                 </tr>
                             }
                         </tbody>
                     </table>
-                </div>
+                }
             </div>
-        }
-    }
-
-    @if (rows.Any(r => r.IsRemoved))
-    {
-        <div class="di-field-settings-section mb-3">
-            <div class="di-field-settings-header di-removed-header">Removed Fields</div>
-            <table class="table table-sm align-middle mb-0">
-                <thead>
-                    <tr><th>Field</th><th style="width: 220px;">Originally on tab</th><th style="width: 120px;">Restore</th></tr>
-                </thead>
-                <tbody>
-                    @foreach (var f in rows.Where(r => r.IsRemoved).OrderBy(r => r.Section).ThenBy(r => r.DisplayLabel))
-                    {
-                        <tr>
-                            <td>@f.DisplayLabel<div class="di-field-key">@f.FieldKey</div></td>
-                            <td>@f.Section · @f.GroupName</td>
-                            <td><button class="btn btn-sm btn-outline-success" @onclick="() => f.IsRemoved = false">Restore</button></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+            <div class="di-cfm-modal-foot">
+                <button class="di-cfm-btn di-cfm-btn-primary" @onclick="() => showTabs = false">Done</button>
+            </div>
         </div>
-    }
-
-    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">
-        @(saving ? "Saving…" : "Save changes")
-    </button>
+    </div>
 }
 
 <style>
-    .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
-    .di-field-label-input { min-width: 180px; max-width: 340px; font-weight: 600; }
-    .di-field-help-input { min-width: 180px; max-width: 420px; font-size: 0.78rem; }
-    .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
-    .di-removed-header { background: #7a1f2b; }
-    .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }
-    .di-editors-list { max-height: 108px; overflow-y: auto; border: 1px solid #e2e5ea; border-radius: 6px; padding: 4px 8px; background: #fff; }
-    .di-editor-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; cursor: pointer; }
-    .di-editor-item input { width: 15px; height: 15px; accent-color: #2f6fed; }
+    .di-cfm { --navy: #16244a; --blue: #2f6fed; --border: #e4e8f0; --label: #55627a; }
+    .di-cfm-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 3px rgba(16,24,40,.06); overflow: hidden; }
+    .di-cfm-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+    .di-cfm-head-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: #eaf0fe; color: var(--blue); flex-shrink: 0; }
+    .di-cfm-title { margin: 0; font-size: 19px; font-weight: 800; color: var(--navy); }
+    .di-cfm-sub { margin: 2px 0 0; font-size: 13px; color: var(--label); }
+
+    .di-cfm-tabbar { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .di-cfm-pills { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+    .di-cfm-pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 8px; background: #f1f4fa; color: var(--navy); font-size: 13.5px; font-weight: 600; cursor: pointer; border: 1px solid transparent; user-select: none; }
+    .di-cfm-pill:hover { background: #e7ecf7; }
+    .di-cfm-pill.is-active { background: var(--blue); color: #fff; }
+    .di-cfm-pill.is-hidden { opacity: .5; text-decoration: line-through; }
+    .di-cfm-pill-grip { opacity: .55; cursor: grab; font-size: 12px; }
+    .di-cfm-reorder-hint { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px solid var(--border); color: var(--label); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+    .di-cfm-reorder-hint:hover { background: #f5f7fc; color: var(--navy); }
+
+    .di-cfm-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+    .di-cfm-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+    .di-cfm-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9aa4b8; }
+    .di-cfm-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #fff; color: #1a2233; }
+    .di-cfm-filter { display: flex; flex-direction: column; gap: 4px; }
+    .di-cfm-filter label { font-size: 11px; font-weight: 700; color: var(--label); text-transform: uppercase; letter-spacing: .03em; }
+    .di-cfm-filter select { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #fff; color: #1a2233; min-width: 150px; }
+    .di-cfm-toolbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
+    .di-cfm-btn { padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+    .di-cfm-btn-primary { background: var(--blue); color: #fff; }
+    .di-cfm-btn-primary:hover { background: #2560d8; }
+    .di-cfm-btn-primary:disabled { opacity: .6; cursor: default; }
+    .di-cfm-btn-ghost { background: #fff; border-color: var(--border); color: var(--navy); }
+    .di-cfm-btn-ghost:hover { background: #f5f7fc; }
+    .di-cfm-saved { margin: 12px 22px 0; padding: 10px 14px; border-radius: 8px; background: #e8f6ee; color: #1c7a41; font-size: 13.5px; font-weight: 600; }
+
+    .di-cfm-tablewrap { overflow-x: auto; padding: 6px 10px; }
+    .di-cfm-table { width: 100%; border-collapse: collapse; min-width: 1180px; }
+    .di-cfm-table thead th { text-align: left; font-size: 11.5px; font-weight: 700; color: var(--label); text-transform: uppercase; letter-spacing: .03em; padding: 12px; background: #f7f9fc; border-bottom: 1px solid var(--border); }
+    .di-cfm-table tbody td { padding: 12px; border-bottom: 1px solid #eef1f6; vertical-align: middle; }
+    .di-cfm-table tbody tr:hover { background: #fafbfe; }
+    .di-cfm-row-removed { opacity: .55; }
+    .di-cfm-empty { text-align: center; color: #97a1b3; font-style: italic; padding: 26px 0; }
+
+    .di-cfm-order { display: flex; align-items: center; gap: 8px; }
+    .di-cfm-grip { color: #b7c0d0; cursor: grab; font-size: 13px; }
+    .di-cfm-order-num { font-weight: 700; color: var(--navy); }
+    .di-cfm-move { display: inline-flex; gap: 4px; justify-content: center; }
+    .di-cfm-move button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #64708a; cursor: pointer; padding: 0; }
+    .di-cfm-move button:hover:not(:disabled) { background: #eef2fb; color: var(--blue); }
+    .di-cfm-move button:disabled { opacity: .4; cursor: default; }
+
+    .di-cfm-fd { display: flex; align-items: flex-start; gap: 10px; }
+    .di-cfm-avatar { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+    .di-cfm-fd-name { font-weight: 700; color: var(--navy); font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .di-cfm-star { color: #e0383e; }
+    .di-cfm-fd-desc { font-size: 12px; color: #8a93a6; margin-top: 1px; }
+    .di-cfm-tag { font-size: 10px; font-weight: 700; color: #b06a00; background: #fff2dc; border-radius: 4px; padding: 1px 6px; letter-spacing: .02em; }
+
+    .di-cfm-select { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; background: #fff; color: #1a2233; }
+    .di-cfm-select:disabled { background: #f4f5f8; color: #9aa4b8; }
+    .di-cfm-vr { display: flex; align-items: center; gap: 5px; }
+    .di-cfm-vr span { font-size: 11.5px; color: var(--label); font-weight: 600; }
+    .di-cfm-vr-input { width: 52px; padding: 6px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: #fff; color: #1a2233; }
+    .di-cfm-vr-input:disabled { background: #f4f5f8; }
+
+    .di-cfm-status { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .di-cfm-status-active { background: #e4f7ec; color: #128a4a; }
+    .di-cfm-status-removed { background: #fdecec; color: #c0392b; }
+
+    /* Blue toggles for this page (override the global red/green switch). */
+    .di-cfm .di-switch-slider { background-color: #cbd5e1; }
+    .di-cfm .di-switch input:checked + .di-switch-slider { background-color: var(--blue); }
+
+    .di-cfm-actions { display: flex; gap: 6px; }
+    .di-cfm-act { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: #fff; }
+    .di-cfm-act-edit { color: var(--blue); border-color: #cfe0ff; background: #f2f7ff; }
+    .di-cfm-act-edit:hover { background: #e6f0ff; }
+    .di-cfm-act-remove { color: #d23b42; border-color: #f6cdd0; background: #fdf4f5; }
+    .di-cfm-act-remove:hover { background: #fbe7e9; }
+    .di-cfm-act-restore { color: #1c7a41; border-color: #bfe5cd; background: #f1faf4; }
+
+    .di-cfm-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .di-cfm-count { font-size: 13px; color: var(--label); }
+    .di-cfm-pager { display: flex; gap: 6px; }
+    .di-cfm-page { min-width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--navy); font-weight: 600; cursor: pointer; }
+    .di-cfm-page.is-active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .di-cfm-page:disabled { opacity: .45; cursor: default; }
+
+    .di-cfm-backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 16px; }
+    .di-cfm-modal { background: #fff; border-radius: 12px; width: 100%; max-width: 560px; box-shadow: 0 16px 48px rgba(0,0,0,.28); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column; }
+    .di-cfm-modal-wide { max-width: 820px; }
+    .di-cfm-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 800; color: var(--navy); font-size: 16px; }
+    .di-cfm-modal-close { background: none; border: none; font-size: 24px; line-height: 1; color: #6b7280; cursor: pointer; }
+    .di-cfm-modal-body { padding: 18px 20px; overflow-y: auto; }
+    .di-cfm-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
+    .di-cfm-fld { margin-bottom: 14px; }
+    .di-cfm-fld-row { display: flex; gap: 14px; }
+    .di-cfm-fld-row .di-cfm-fld { flex: 1; }
+    .di-cfm-fld label { display: block; font-size: 12.5px; font-weight: 700; color: var(--label); margin-bottom: 5px; }
+    .di-cfm-fld-hint { font-weight: 400; color: #9aa4b8; }
+    .di-cfm-fld input, .di-cfm-fld textarea, .di-cfm-fld select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; color: #1a2233; background: #fff; }
+    .di-cfm-fld input:disabled { background: #f4f5f8; color: #8a93a6; }
+    .di-cfm-fld-note { font-size: 12.5px; color: #7b8697; margin: 4px 0 0; }
+    .di-cfm-tabsec { font-weight: 700; color: var(--navy); margin: 14px 0 6px; }
+    .di-cfm-table-tight tbody td { padding: 8px; }
+    .di-cfm-editors { max-height: 100px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
+    .di-cfm-editor { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 2px 0; cursor: pointer; }
+    .di-cfm-editor input { width: 15px; height: 15px; accent-color: var(--blue); }
+
+    [data-theme="dark"] .di-cfm-card { background: #1a2236; border-color: #2b3550; }
+    [data-theme="dark"] .di-cfm-title, [data-theme="dark"] .di-cfm-fd-name, [data-theme="dark"] .di-cfm-order-num { color: #e7ecf5; }
+    [data-theme="dark"] .di-cfm-table thead th, [data-theme="dark"] .di-cfm-toolbar, [data-theme="dark"] .di-cfm-tabbar { background: #202a42; }
+    [data-theme="dark"] .di-cfm-search input, [data-theme="dark"] .di-cfm-filter select, [data-theme="dark"] .di-cfm-select,
+    [data-theme="dark"] .di-cfm-vr-input, [data-theme="dark"] .di-cfm-fld input, [data-theme="dark"] .di-cfm-fld textarea,
+    [data-theme="dark"] .di-cfm-fld select { background: #131a2b; color: #e7ecf5; border-color: #2b3550; }
+    [data-theme="dark"] .di-cfm-table tbody td { border-color: #232d46; }
+    [data-theme="dark"] .di-cfm-modal { background: #1a2236; }
+    [data-theme="dark"] .di-cfm-pill { background: #202a42; color: #cdd6ea; }
 </style>
 
 @code {
@@ -280,14 +541,145 @@ else
     private string? savedMessage;
     private bool saving;
 
+    // Filters + paging + modals
+    private string searchText = "";
+    private string moduleFilter = "";
+    private string typeFilter = "";
+    private string statusFilter = "";
+    private string? tabFilter;              // Section|GroupName pill filter
+    private string? draggingTabKey;
+    private int page = 1;
+    private const int PageSize = 10;
+    private CustomerFieldConfig? editing;
+    private bool showTabs;
+
     private static readonly string[] Sections = ["Account", "Contact"];
 
     private List<CustomerTabSetting> TabsForSection(string section) =>
         tabs.Where(t => t.Section == section).OrderBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList();
 
-    private List<CustomerFieldConfig> FieldsForTab(string section, string group) =>
-        rows.Where(r => !r.IsRemoved && r.Section == section && r.GroupName == group)
-            .OrderBy(r => r.Sequence).ToList();
+    private List<CustomerTabSetting> AllTabsOrdered() =>
+        tabs.OrderBy(t => Array.IndexOf(Sections, t.Section)).ThenBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList();
+
+    // Fields ordered the way the form renders: section, then tab order, then field sequence.
+    private List<CustomerFieldConfig> OrderedRows() =>
+        rows.OrderBy(r => Array.IndexOf(Sections, r.Section))
+            .ThenBy(r => TabSeq(r.Section, r.GroupName))
+            .ThenBy(r => r.Sequence)
+            .ToList();
+
+    private int TabSeq(string section, string group) =>
+        tabs.FirstOrDefault(t => t.Section == section && t.GroupName == group)?.Sequence ?? 999;
+
+    private List<CustomerFieldConfig> FilteredRows()
+    {
+        IEnumerable<CustomerFieldConfig> q = OrderedRows();
+
+        q = statusFilter switch
+        {
+            "active" => q.Where(r => !r.IsRemoved),
+            "removed" => q.Where(r => r.IsRemoved),
+            _ => q
+        };
+        if (!string.IsNullOrWhiteSpace(moduleFilter)) q = q.Where(r => r.Section == moduleFilter);
+        if (!string.IsNullOrWhiteSpace(tabFilter)) q = q.Where(r => $"{r.Section}|{r.GroupName}" == tabFilter);
+        if (!string.IsNullOrWhiteSpace(typeFilter))
+        {
+            q = typeFilter == "text"
+                ? q.Where(r => string.IsNullOrEmpty(r.FieldKind) || r.FieldKind == "text")
+                : q.Where(r => r.FieldKind == typeFilter);
+        }
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var s = searchText.Trim();
+            q = q.Where(r =>
+                (r.DisplayLabel?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.FieldKey?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (r.HelpText?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+        return q.ToList();
+    }
+
+    private int PageCount(List<CustomerFieldConfig> filtered) => Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
+
+    private List<CustomerFieldConfig> Paged(List<CustomerFieldConfig> filtered)
+    {
+        if (page > PageCount(filtered)) page = PageCount(filtered);
+        if (page < 1) page = 1;
+        return filtered.Skip((page - 1) * PageSize).Take(PageSize).ToList();
+    }
+
+    private void GoToPage(int p) => page = p;
+    private void OnFilterChanged() => page = 1;
+
+    private void ToggleTabFilter(string key)
+    {
+        tabFilter = tabFilter == key ? null : key;
+        page = 1;
+    }
+
+    // Running order number across the (section, tab) grouping — matches the form's field order.
+    private int OrderOf(CustomerFieldConfig f)
+    {
+        var list = OrderedRows().Where(r => !r.IsRemoved).ToList();
+        var idx = list.IndexOf(f);
+        return idx < 0 ? 0 : idx + 1;
+    }
+
+    private List<CustomerFieldConfig> Neighbours(CustomerFieldConfig f) =>
+        rows.Where(r => !r.IsRemoved && r.Section == f.Section && r.GroupName == f.GroupName).OrderBy(r => r.Sequence).ToList();
+
+    private bool CanMoveUp(CustomerFieldConfig f) { var l = Neighbours(f); return l.IndexOf(f) > 0; }
+    private bool CanMoveDown(CustomerFieldConfig f) { var l = Neighbours(f); var i = l.IndexOf(f); return i >= 0 && i < l.Count - 1; }
+
+    private void MoveFieldUp(CustomerFieldConfig f)
+    {
+        var l = Neighbours(f); var i = l.IndexOf(f);
+        if (i <= 0) return;
+        (l[i].Sequence, l[i - 1].Sequence) = (l[i - 1].Sequence, l[i].Sequence);
+    }
+
+    private void MoveFieldDown(CustomerFieldConfig f)
+    {
+        var l = Neighbours(f); var i = l.IndexOf(f);
+        if (i < 0 || i >= l.Count - 1) return;
+        (l[i].Sequence, l[i + 1].Sequence) = (l[i + 1].Sequence, l[i].Sequence);
+    }
+
+    // ---- Tab drag reorder (pills) ----
+    private void OnTabDragStart(CustomerTabSetting t) => draggingTabKey = EditorKey(t);
+    private void OnTabDrop(CustomerTabSetting target)
+    {
+        var key = draggingTabKey;
+        draggingTabKey = null;
+        if (key is null) return;
+        var dragged = tabs.FirstOrDefault(t => EditorKey(t) == key);
+        if (dragged is null || dragged == target || dragged.Section != target.Section) return;
+        var list = TabsForSection(target.Section);
+        list.Remove(dragged);
+        var idx = list.IndexOf(target);
+        if (idx < 0) idx = list.Count;
+        list.Insert(idx, dragged);
+        var seq = 1;
+        foreach (var t in list) t.Sequence = seq++;
+    }
+
+    // Avatar styling for the Field Details cell — deterministic pastel by field key.
+    private static readonly (string Bg, string Fg)[] AvatarPalette =
+    {
+        ("#eaf0fe", "#2f6fed"), ("#e9f7ef", "#1c9e5b"), ("#fdeef0", "#d23b6b"), ("#fff2dc", "#b06a00"),
+        ("#eef0fe", "#5a52d6"), ("#e6f7fb", "#0a8ea6"), ("#f3ecfd", "#7b3fe4"), ("#fdeee6", "#d2621f"),
+    };
+    private static (string Bg, string Fg) Avatar(string key)
+    {
+        var h = 0; foreach (var c in key ?? "") h = (h * 31 + c) & 0x7fffffff;
+        return AvatarPalette[h % AvatarPalette.Length];
+    }
+    private static string AvatarBg(string key) => Avatar(key).Bg;
+    private static string AvatarFg(string key) => Avatar(key).Fg;
+
+    private void OpenEdit(CustomerFieldConfig f) => editing = f;
+    private void CloseEdit() => editing = null;
 
     private static string EditorKey(CustomerTabSetting t) => $"{t.Section}|{t.GroupName}";
     private HashSet<int> EditorsFor(CustomerTabSetting t) =>
@@ -321,7 +713,6 @@ else
     private void OnControllingChanged(CustomerFieldConfig f, string? controllingKey)
     {
         f.ControllingFieldKey = string.IsNullOrWhiteSpace(controllingKey) ? null : controllingKey;
-        // Default the trigger value to Yes when a controlling field is first chosen.
         f.ControllingValue = f.ControllingFieldKey is null ? null
             : (string.IsNullOrWhiteSpace(f.ControllingValue) ? "true" : f.ControllingValue);
     }
@@ -340,32 +731,7 @@ else
         (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
     }
 
-    private void MoveFieldUp(string section, string group, int index)
-    {
-        var list = FieldsForTab(section, group);
-        if (index <= 0) return;
-        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
-    }
-
-    private void MoveFieldDown(string section, string group, int index)
-    {
-        var list = FieldsForTab(section, group);
-        if (index >= list.Count - 1) return;
-        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
-    }
-
-    // Move a field to another tab within the same section (placed at the end of the destination tab).
-    private void MoveFieldToTab(CustomerFieldConfig f, string? newGroup)
-    {
-        if (string.IsNullOrWhiteSpace(newGroup) || newGroup == f.GroupName) return;
-        var maxSeq = rows.Where(r => !r.IsRemoved && r.Section == f.Section && r.GroupName == newGroup && r != f)
-            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
-        f.GroupName = newGroup;
-        f.Sequence = maxSeq + 1;
-    }
-
-    // Renumber field sequences per (section, group) and tab sequences per section to contiguous 1..n so
-    // up/down swaps stay unambiguous after each render.
+    // Renumber field sequences per (section, group) and tab sequences per section to contiguous 1..n.
     private void NormalizeSequences()
     {
         foreach (var section in Sections)

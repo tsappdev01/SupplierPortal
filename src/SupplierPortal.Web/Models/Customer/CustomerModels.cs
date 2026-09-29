@@ -298,6 +298,14 @@ public class CustomerFieldConfig
     /// icon next to the field label.</summary>
     [MaxLength(500)] public string? HelpText { get; set; }
 
+    /// <summary>Optional minimum number of characters for an editable text field (null = no minimum). Enforced
+    /// on the customer forms with a Toast; ignored for non-text kinds (lookup / date / yes-no / phone).</summary>
+    public int? MinLength { get; set; }
+
+    /// <summary>Optional maximum number of characters for an editable text field (null = no maximum, capped by
+    /// the underlying column). Enforced on the customer forms and as the input's maxlength.</summary>
+    public int? MaxLength { get; set; }
+
     /// <summary>"Account" (the Customer entity) or "Contact" (the CustomerContact entity).</summary>
     [MaxLength(20)] public string Section { get; set; } = "Account";
 

@@ -59,6 +59,14 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             if (!string.IsNullOrWhiteSpace(edit.DisplayLabel)) row.DisplayLabel = edit.DisplayLabel.Trim();
             // Optional help text — shown as a tooltip on the form when not blank.
             row.HelpText = string.IsNullOrWhiteSpace(edit.HelpText) ? null : edit.HelpText.Trim();
+            // Optional per-field character-length limits (negatives coerced away; min must not exceed max).
+            var min = edit.MinLength is > 0 ? edit.MinLength : null;
+            var max = edit.MaxLength is > 0 ? edit.MaxLength : null;
+            if (min is int mn && max is int mx && mn > mx) { min = max; }
+            row.MinLength = min;
+            row.MaxLength = max;
+            // Field kind (text / lookup / date / yesno / phone) — admin may switch a field's type.
+            if (!string.IsNullOrWhiteSpace(edit.FieldKind)) row.FieldKind = edit.FieldKind.Trim();
             row.BusinessControl = Normalize(edit.BusinessControl);
             row.CustomerControl = Normalize(edit.CustomerControl);
             row.IsVisible = edit.IsVisible;

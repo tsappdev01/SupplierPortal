@@ -16,6 +16,9 @@ public class CustomerFieldConfigDto
     public string DisplayLabel { get; set; } = "";
     /// <summary>Optional short help shown as a tooltip on the form when not blank.</summary>
     public string? HelpText { get; set; }
+    /// <summary>Optional min/max character length for an editable text field (null = no limit).</summary>
+    public int? MinLength { get; set; }
+    public int? MaxLength { get; set; }
     /// <summary>"Account" or "Contact".</summary>
     public string Section { get; set; } = "";
     public string GroupName { get; set; } = "";
