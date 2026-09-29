@@ -429,7 +429,7 @@
 .di-help-icon { display: inline-block; margin-left: 5px; color: #8a94a6; cursor: help; font-size: 13px; font-style: normal; vertical-align: baseline; }
 
 /* ---- VAT Group entities (repeatable table shown when VAT Structure = "VAT Group") ---- */
-.di-vatgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3e8f0); }
+.di-vatgroup { grid-column: 1 / -1; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3e8f0); }
 .di-vatgroup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
 .di-vatgroup-title { font-weight: 700; font-size: 15px; color: var(--navy, #16244a); }
 .di-vatgroup-note { font-size: 13px; color: #7b8697; margin: 0 0 10px; }
@@ -446,3 +446,14 @@
 .di-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #6b7280; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
 .di-icon-btn:hover { background: #fff; }
 .di-icon-btn-danger:hover { color: #c0392b; border-color: #f0c4be; background: #fdf3f2; }
+
+/* ---- Field help: clickable info icon + popup ---- */
+.di-help-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 5px; padding: 0; width: 18px; height: 18px; border: none; background: none; color: #8a94a6; cursor: pointer; font-size: 14px; font-style: normal; line-height: 1; vertical-align: middle; }
+.di-help-icon:hover { color: var(--blue, #3b5bdb); }
+.di-help-backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 16px; }
+.di-help-modal { background: #fff; border-radius: 10px; max-width: 440px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); overflow: hidden; }
+.di-help-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border, #e3e8f0); background: #f5f7fc; }
+.di-help-modal-title { font-weight: 700; color: var(--navy, #16244a); font-size: 15px; }
+.di-help-modal-close { background: none; border: none; font-size: 24px; line-height: 1; color: #6b7280; cursor: pointer; padding: 0 4px; }
+.di-help-modal-close:hover { color: #c0392b; }
+.di-help-modal-body { padding: 18px; color: #333; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }

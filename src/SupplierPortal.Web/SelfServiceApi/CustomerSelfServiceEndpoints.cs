@@ -364,6 +364,29 @@ public static class CustomerSelfServiceEndpoints
             if (iss is { } i2 && exp is { } e && e.Date < i2.Date) { problems.Add($"{label} Expiry Date cannot be before the {label} Issue Date."); }
         }
 
+        // VAT Group: when VAT Structure = "VAT Group", require at least one entity with every column filled.
+        if (string.Equals(customer.VATStructure, "VAT Group", StringComparison.OrdinalIgnoreCase))
+        {
+            if (customer.VatGroupEntities.Count == 0)
+            {
+                problems.Add("VAT Group: add at least one entity.");
+            }
+            else
+            {
+                var i = 1;
+                foreach (var e in customer.VatGroupEntities.OrderBy(x => x.SortOrder))
+                {
+                    if (string.IsNullOrWhiteSpace(e.BusinessLegalName) || string.IsNullOrWhiteSpace(e.Address)
+                        || string.IsNullOrWhiteSpace(e.EInvoicingWave) || string.IsNullOrWhiteSpace(e.TrnNumber)
+                        || string.IsNullOrWhiteSpace(e.TinNumber) || string.IsNullOrWhiteSpace(e.BusinessLocationType))
+                    {
+                        problems.Add($"VAT Group row {i}: all columns are required.");
+                    }
+                    i++;
+                }
+            }
+        }
+
         var have = form.Documents.Select(d => d.DocumentType).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var t in form.DocTypes.Where(t => t.IsActive && t.IsRequired))
         {

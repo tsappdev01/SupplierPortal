@@ -154,7 +154,7 @@
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequired) { <span class="di-req">*</span> }
-                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <span class="di-help-icon" title="@cfg.HelpText" aria-label="@cfg.HelpText">&#9432;</span> }
+                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <button type="button" class="di-help-icon" @onclick='() => ShowHelp(isCombinedCountry ? "Country" : cfg.DisplayLabel, cfg.HelpText)' aria-label="Show help">&#9432;</button> }
                                 </label>
                                 @if (!editable)
                                 {
@@ -255,12 +255,12 @@
                                     <table class="di-vatgroup-table">
                                         <thead>
                                             <tr>
-                                                <th>Business Legal Name</th>
-                                                <th>Address</th>
-                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2)</th>
-                                                <th>TRN Number</th>
-                                                <th>TIN Number</th>
-                                                <th>Bus. Location Type<br />(Mainland/Free Zone)</th>
+                                                <th>Business Legal Name <span class="di-req">*</span></th>
+                                                <th>Address <span class="di-req">*</span></th>
+                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2) <span class="di-req">*</span></th>
+                                                <th>TRN Number <span class="di-req">*</span></th>
+                                                <th>TIN Number <span class="di-req">*</span></th>
+                                                <th>Bus. Location Type<br />(Mainland/Free Zone) <span class="di-req">*</span></th>
                                                 <th></th>
                                             </tr>
                                         </thead>
@@ -384,6 +384,19 @@
         </div>
     }
 </div>
+
+@if (helpText is not null)
+{
+    <div class="di-help-backdrop" @onclick="CloseHelp">
+        <div class="di-help-modal" @onclick:stopPropagation="true">
+            <div class="di-help-modal-head">
+                <span class="di-help-modal-title">@helpTitle</span>
+                <button type="button" class="di-help-modal-close" @onclick="CloseHelp" aria-label="Close">&times;</button>
+            </div>
+            <div class="di-help-modal-body">@helpText</div>
+        </div>
+    </div>
+}
 
 @if (showDeclaration && bootstrap is not null)
 {
@@ -520,6 +533,12 @@
         vatGroupEntities.Remove(entity);
         savedTick = false;
     }
+
+    // ---- Field help popup ----
+    private string? helpTitle;
+    private string? helpText;
+    private void ShowHelp(string title, string? text) { helpTitle = title; helpText = text; }
+    private void CloseHelp() { helpText = null; helpTitle = null; }
 
     private string Display(CustomerFieldConfigDto c)
     {
@@ -727,8 +746,39 @@
         return onThisStep ? TradeLicenseDateErrors() : [];
     }
 
-    private List<string> Validate(Step step) =>
-        MissingRequired(step).Concat(DateErrorsForStep(step)).Concat(FormatErrors(FieldsFor(step))).ToList();
+    private List<string> Validate(Step step)
+    {
+        var problems = MissingRequired(step).Concat(DateErrorsForStep(step)).Concat(FormatErrors(FieldsFor(step))).ToList();
+        if (FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
+        {
+            problems.AddRange(VatGroupErrors());
+        }
+        return problems;
+    }
+
+    /// <summary>When VAT Structure = "VAT Group": at least one entity and every column of every row is required.</summary>
+    private List<string> VatGroupErrors()
+    {
+        var errs = new List<string>();
+        if (!IsVatGroupSelected) return errs;
+        if (vatGroupEntities.Count == 0)
+        {
+            errs.Add("VAT Group: add at least one entity.");
+            return errs;
+        }
+        var i = 1;
+        foreach (var e in vatGroupEntities.OrderBy(x => x.SortOrder))
+        {
+            if (string.IsNullOrWhiteSpace(e.BusinessLegalName) || string.IsNullOrWhiteSpace(e.Address)
+                || string.IsNullOrWhiteSpace(e.EInvoicingWave) || string.IsNullOrWhiteSpace(e.TrnNumber)
+                || string.IsNullOrWhiteSpace(e.TinNumber) || string.IsNullOrWhiteSpace(e.BusinessLocationType))
+            {
+                errs.Add($"VAT Group row {i}: all columns are required.");
+            }
+            i++;
+        }
+        return errs;
+    }
 
     // ---- Documents ----
 
@@ -802,6 +852,7 @@
             .Select(f => $"{f.DisplayLabel} is required."));
         problems.AddRange(TradeLicenseDateErrors());
         problems.AddRange(FormatErrors(config.Where(f => f.IsVisible).Where(IsConditionallyVisible)));
+        problems.AddRange(VatGroupErrors());
 
         var haveDocs = documents.Select(d => d.DocumentType).ToHashSet();
         problems.AddRange(bootstrap.DocumentTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name))

@@ -125,7 +125,7 @@
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequired) { <span class="di-req">*</span> }
-                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <span class="di-help-icon" title="@cfg.HelpText" aria-label="@cfg.HelpText">&#9432;</span> }
+                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <button type="button" class="di-help-icon" @onclick='() => ShowHelp(isCombinedCountry ? "Country" : cfg.DisplayLabel, cfg.HelpText)' aria-label="Show help">&#9432;</button> }
                                 </label>
                                 @if (!editable)
                                 {
@@ -228,12 +228,12 @@
                                     <table class="di-vatgroup-table">
                                         <thead>
                                             <tr>
-                                                <th>Business Legal Name</th>
-                                                <th>Address</th>
-                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2)</th>
-                                                <th>TRN Number</th>
-                                                <th>TIN Number</th>
-                                                <th>Bus. Location Type<br />(Mainland/Free Zone)</th>
+                                                <th>Business Legal Name <span class="di-req">*</span></th>
+                                                <th>Address <span class="di-req">*</span></th>
+                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2) <span class="di-req">*</span></th>
+                                                <th>TRN Number <span class="di-req">*</span></th>
+                                                <th>TIN Number <span class="di-req">*</span></th>
+                                                <th>Bus. Location Type<br />(Mainland/Free Zone) <span class="di-req">*</span></th>
                                                 <th></th>
                                             </tr>
                                         </thead>
@@ -358,6 +358,19 @@
         </div>
     }
 </div>
+
+@if (helpText is not null)
+{
+    <div class="di-help-backdrop" @onclick="CloseHelp">
+        <div class="di-help-modal" @onclick:stopPropagation="true">
+            <div class="di-help-modal-head">
+                <span class="di-help-modal-title">@helpTitle</span>
+                <button type="button" class="di-help-modal-close" @onclick="CloseHelp" aria-label="Close">&times;</button>
+            </div>
+            <div class="di-help-modal-body">@helpText</div>
+        </div>
+    </div>
+}
 
 @if (showDeclaration && customer is not null)
 {
@@ -553,6 +566,36 @@
 
     private void RemoveVatGroupEntity(CustomerVatGroupEntity entity) => customer?.VatGroupEntities.Remove(entity);
 
+    /// <summary>When VAT Structure = "VAT Group": at least one entity and every column of every row is required.</summary>
+    private List<string> VatGroupErrors()
+    {
+        var errs = new List<string>();
+        if (customer is null || !IsVatGroupSelected) return errs;
+        if (customer.VatGroupEntities.Count == 0)
+        {
+            errs.Add("VAT Group: add at least one entity.");
+            return errs;
+        }
+        var i = 1;
+        foreach (var e in customer.VatGroupEntities.OrderBy(x => x.SortOrder))
+        {
+            if (string.IsNullOrWhiteSpace(e.BusinessLegalName) || string.IsNullOrWhiteSpace(e.Address)
+                || string.IsNullOrWhiteSpace(e.EInvoicingWave) || string.IsNullOrWhiteSpace(e.TrnNumber)
+                || string.IsNullOrWhiteSpace(e.TinNumber) || string.IsNullOrWhiteSpace(e.BusinessLocationType))
+            {
+                errs.Add($"VAT Group row {i}: all columns are required.");
+            }
+            i++;
+        }
+        return errs;
+    }
+
+    // ---- Field help popup ----
+    private string? helpTitle;
+    private string? helpText;
+    private void ShowHelp(string title, string? text) { helpTitle = title; helpText = text; }
+    private void CloseHelp() { helpText = null; helpTitle = null; }
+
     private void OnDocsChanged() => StateHasChanged();
 
     private void OnCountryChange(object entity, string? code)
@@ -585,6 +628,10 @@
         var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
             .Concat(DateErrorsForStep(steps[current]))
             .Concat(FormatErrors(FieldsFor(steps[current]))).ToList();
+        if (FieldsFor(steps[current]).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
+        {
+            problems.AddRange(VatGroupErrors());
+        }
         if (problems.Count > 0)
         {
             ToastService.ShowErrors(problems);
@@ -721,9 +768,10 @@
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                 f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
             .Select(f => f.DisplayLabel).ToList();
-        if (missing.Count > 0)
+        var vatGroupErrors = VatGroupErrors();
+        if (missing.Count > 0 || vatGroupErrors.Count > 0)
         {
-            ToastService.ShowErrors(missing.Select(m => $"{m} is required."));
+            ToastService.ShowErrors(missing.Select(m => $"{m} is required.").Concat(vatGroupErrors));
             return;
         }
 
