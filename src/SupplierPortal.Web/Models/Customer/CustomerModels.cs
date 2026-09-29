@@ -8,16 +8,15 @@ public static class CustomerStatuses
 {
     public const string NotSubmitted = "Not Submitted";
     public const string AwaitingCustomerResponse = "Awaiting Customer Response";
+    public const string ForReview = "For Review";
     public const string Complete = "Completed";
 
-    // Retired statuses — kept as constants only so legacy records / status-colour switches still resolve.
-    // They are intentionally NOT in All, so they no longer appear in filters, tiles or the workflow.
-    public const string ForReview = "For Review";
+    // Retired status — kept as a constant only so legacy records / status-colour switches still resolve.
     public const string Returned = "Returned";
 
-    /// <summary>The active customer workflow statuses: Not Submitted → Awaiting Customer Response → Completed
-    /// (mirrors the supplier — a customer submission goes straight to Completed).</summary>
-    public static readonly string[] All = [NotSubmitted, AwaitingCustomerResponse, Complete];
+    /// <summary>The active customer workflow statuses: Not Submitted → Awaiting Customer Response →
+    /// For Review (customer submitted, initiator notified) → Completed (reviewed and finalised).</summary>
+    public static readonly string[] All = [NotSubmitted, AwaitingCustomerResponse, ForReview, Complete];
 }
 
 /// <summary>A customer account (the company/organisation being onboarded). Field set generated from the CST

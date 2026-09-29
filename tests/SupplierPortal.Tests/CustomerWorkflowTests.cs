@@ -10,17 +10,20 @@ namespace SupplierPortal.Tests;
 public class CustomerWorkflowTests
 {
     [Fact]
-    public void Active_statuses_are_exactly_the_three_step_workflow()
+    public void Active_statuses_are_the_expected_workflow()
     {
         Assert.Equal(
-            new[] { CustomerStatuses.NotSubmitted, CustomerStatuses.AwaitingCustomerResponse, CustomerStatuses.Complete },
+            new[]
+            {
+                CustomerStatuses.NotSubmitted, CustomerStatuses.AwaitingCustomerResponse,
+                CustomerStatuses.ForReview, CustomerStatuses.Complete
+            },
             CustomerStatuses.All);
     }
 
     [Fact]
-    public void Retired_statuses_are_not_in_the_active_set()
+    public void Returned_status_is_retired()
     {
-        Assert.DoesNotContain(CustomerStatuses.ForReview, CustomerStatuses.All);
         Assert.DoesNotContain(CustomerStatuses.Returned, CustomerStatuses.All);
     }
 

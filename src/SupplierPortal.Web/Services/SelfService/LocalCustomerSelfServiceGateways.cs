@@ -117,8 +117,9 @@ public class LocalCustomerSelfServiceDataGateway(
                 catch { /* declaration PDF is best-effort */ }
             }
 
-            // Like the supplier: a customer submission completes the record directly (no separate review step).
-            await customerService.SetStatusAsync(updated.Id, CustomerStatuses.Complete, Actor);
+            // A customer submission goes to "For Review": the initiator is notified to review the details, then
+            // an internal user completes the record (status → Completed) after reviewing.
+            await customerService.SetStatusAsync(updated.Id, CustomerStatuses.ForReview, Actor);
             await accessTokenService.MarkUsedAsync(access.Id);
             var internalBase = configuration["SelfService:InternalUrl"] ?? "";
             try { await emailService.NotifyRequestorOfSubmissionAsync(updated, access.CreatedBy, internalBase); } catch { }
