@@ -24,6 +24,8 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
     public DbSet<LandlordEvent> LandlordEvents => Set<LandlordEvent>();
     public DbSet<LandlordAccessToken> LandlordAccessTokens => Set<LandlordAccessToken>();
     public DbSet<MaintainTenantUaePassEmail> MaintainTenantUaePassEmails => Set<MaintainTenantUaePassEmail>();
+    public DbSet<LandlordFieldConfig> LandlordFieldConfigs => Set<LandlordFieldConfig>();
+    public DbSet<LandlordTabSetting> LandlordTabSettings => Set<LandlordTabSetting>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -108,6 +110,18 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
             e.ToTable("LandlordAccessTokens", Schema);
             e.HasIndex(x => x.TokenHash);
             e.HasOne(x => x.Landlord!).WithMany().HasForeignKey(x => x.LandlordId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<LandlordFieldConfig>(e =>
+        {
+            e.ToTable("LandlordFieldConfigs", Schema);
+            e.HasIndex(x => new { x.Section, x.FieldKey }).IsUnique();
+        });
+
+        b.Entity<LandlordTabSetting>(e =>
+        {
+            e.ToTable("LandlordTabSettings", Schema);
+            e.HasIndex(x => new { x.Section, x.GroupName }).IsUnique();
         });
     }
 }
