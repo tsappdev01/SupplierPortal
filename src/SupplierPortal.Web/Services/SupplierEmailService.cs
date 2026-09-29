@@ -108,7 +108,8 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";
 
-        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body);
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {
             return (false, error);
@@ -176,7 +177,8 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Update Submitted - {supplier.SupplierName}";
 
-        var (ok, _) = await emailDispatcher.SendHtmlAsync(recipient!, subject, body);
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(supplier.BusinessUnitId);
+        var (ok, _) = await emailDispatcher.SendHtmlAsync(recipient!, subject, body, fromEmail: fromEmail, fromName: brand);
         if (ok)
         {
             // Best-effort: the supplier's submission has already been saved successfully by this point, so a
@@ -232,7 +234,8 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Registration Completed — {supplierName}";
 
-        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body);
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {
             return (false, error);

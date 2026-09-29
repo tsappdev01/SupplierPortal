@@ -115,7 +115,7 @@ public class CustomerAccessTokenService(
 
         var brand = System.Net.WebUtility.HtmlEncode(
             await branding.GetBusinessUnitNameAsync(token.Customer!.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
-        var brandLine = $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
+        var brandLine = $"<div style=\"color:#0b2545;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
         var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Customer.BusinessUnitId);
         var brandBlock = string.IsNullOrWhiteSpace(logo)
             ? brandLine
@@ -126,7 +126,8 @@ public class CustomerAccessTokenService(
             .Replace("{OTP Code}", code)
             .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
 
-        var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body);
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(token.Customer.BusinessUnitId);
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {
             return (false, error);

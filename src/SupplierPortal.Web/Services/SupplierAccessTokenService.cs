@@ -160,8 +160,9 @@ public class SupplierAccessTokenService(
                 .Replace("{Supplier Name}", System.Net.WebUtility.HtmlEncode(token.Supplier.SupplierName))
                 .Replace("{OTP Code}", code)
                 .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
+            var fromEmail = await branding.GetBusinessUnitEmailAsync(token.Supplier.BusinessUnitId);
             var (ok, error) = await emailDispatcher.SendHtmlAsync(
-                token.Supplier.ContactEmail ?? "", "Your Verification Code", body);
+                token.Supplier.ContactEmail ?? "", "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
             if (!ok)
             {
                 return (false, error, null);

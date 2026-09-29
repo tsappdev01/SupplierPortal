@@ -20,7 +20,7 @@ public class CustomerEmailService(
     {
         var safeName = System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(name) ? EmailBrandingService.DefaultBrandName : name);
         return string.IsNullOrWhiteSpace(logoSrc)
-            ? $"<div style=\"color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{safeName}</div>"
+            ? $"<div style=\"color:#0b2545;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{safeName}</div>"
             : $"<img src=\"{logoSrc}\" alt=\"{safeName}\" style=\"max-height:48px;max-width:220px;display:block\" />";
     }
 
@@ -82,7 +82,8 @@ public class CustomerEmailService(
 
         var subject = $"Customer Information Update - {customerName}";
 
-        var (sent, sendError) = await emailDispatcher.SendHtmlAsync(email, subject, body);
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var (sent, sendError) = await emailDispatcher.SendHtmlAsync(email, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!sent)
         {
             return (false, sendError);
@@ -122,7 +123,7 @@ public class CustomerEmailService(
         var safeName = System.Net.WebUtility.HtmlEncode(customer.LegalName ?? "Customer");
         var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
   <div style=""max-width:560px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
-    <div style=""background:#0b2545;padding:18px 24px"">{BrandBlock(logo, brand)}</div>
+    <div style=""background:#ffffff;padding:18px 24px;border-bottom:1px solid #e2e5ea"">{BrandBlock(logo, brand)}</div>
     <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
       <p style=""margin:0 0 12px"">{safeName} has submitted their information for review.</p>
       <p style=""margin:0 0 12px""><a href=""{link}"">Open the customer record</a> to review and complete it.</p>
@@ -131,8 +132,9 @@ public class CustomerEmailService(
 </div>";
 
         // Best-effort: the submission is already saved, so a failed courtesy email must not surface.
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(customer.BusinessUnitId);
         var (sent, _) = await emailDispatcher.SendHtmlAsync(
-            requestor.Email!, $"Customer Update Submitted - {customer.LegalName}", body);
+            requestor.Email!, $"Customer Update Submitted - {customer.LegalName}", body, fromEmail: fromEmail, fromName: brand);
         if (sent)
         {
             await auditService.LogAsync(
@@ -155,7 +157,7 @@ public class CustomerEmailService(
         var safeName = System.Net.WebUtility.HtmlEncode(customerName);
         var body = $@"<div style=""font-family:Segoe UI,Arial,sans-serif;background:#f4f6f9;padding:24px"">
   <div style=""max-width:560px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e5ea"">
-    <div style=""background:#0b2545;padding:18px 24px"">{BrandBlock(logo, brand)}</div>
+    <div style=""background:#ffffff;padding:18px 24px;border-bottom:1px solid #e2e5ea"">{BrandBlock(logo, brand)}</div>
     <div style=""padding:24px;color:#2f3a4c;font-size:14.5px;line-height:1.6"">
       <h2 style=""margin:0 0 12px;color:#0b2545;font-size:19px"">Thank you, {safeName}</h2>
       <p style=""margin:0 0 12px"">Your customer registration has been <strong>reviewed and completed</strong>.
@@ -165,8 +167,9 @@ public class CustomerEmailService(
   </div>
 </div>";
 
+        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
         var (sent, sendError) = await emailDispatcher.SendHtmlAsync(
-            email, $"Customer Registration Completed — {customerName}", body);
+            email, $"Customer Registration Completed — {customerName}", body, fromEmail: fromEmail, fromName: brand);
         if (!sent)
         {
             return (false, sendError);
