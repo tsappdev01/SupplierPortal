@@ -960,6 +960,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<string>("HelpText")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<bool>("IsRemoved")
                         .HasColumnType("bit");
 

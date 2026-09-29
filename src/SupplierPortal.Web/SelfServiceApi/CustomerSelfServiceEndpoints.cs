@@ -378,6 +378,7 @@ public static class CustomerSelfServiceEndpoints
             {
                 FieldKey = c.FieldKey,
                 DisplayLabel = c.DisplayLabel,
+                HelpText = c.HelpText,
                 Section = c.Section,
                 GroupName = c.GroupName,
                 Sequence = c.Sequence,

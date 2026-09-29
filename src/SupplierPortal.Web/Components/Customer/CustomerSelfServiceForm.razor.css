@@ -442,3 +442,5 @@
 [data-theme="dark"] .di-field .di-frozen { background: var(--di-surface-2); color: var(--di-text-soft); }
 [data-theme="dark"] .di-btn-secondary { background: var(--di-surface); color: var(--di-text); border-color: var(--di-border); }
 [data-theme="dark"] .di-progress-bg { stroke: #2b3752; }
+
+.di-help-icon { display: inline-block; margin-left: 5px; color: #8a94a6; cursor: help; font-size: 13px; font-style: normal; vertical-align: baseline; }

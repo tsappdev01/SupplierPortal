@@ -261,6 +261,10 @@ public class CustomerFieldConfig
 
     [Required, MaxLength(200)] public string DisplayLabel { get; set; } = string.Empty;
 
+    /// <summary>Optional short help/description. When not blank it is shown on the form as an info (ℹ) tooltip
+    /// icon next to the field label.</summary>
+    [MaxLength(500)] public string? HelpText { get; set; }
+
     /// <summary>"Account" (the Customer entity) or "Contact" (the CustomerContact entity).</summary>
     [MaxLength(20)] public string Section { get; set; } = "Account";
 

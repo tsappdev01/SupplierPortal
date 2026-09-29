@@ -137,9 +137,11 @@
                         {
                             if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
-                            var isContactCity = cfg.Section == "Contact" && cfg.FieldKey == "EmirateCity";
-                            var contactCountryIsUae = isContactCity && string.Equals(
-                                contact.GetValueOrDefault("Country"), CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
+                            var isCity = cfg.FieldKey == "EmirateCity";
+                            var cityCountryIsUae = isCity && string.Equals(
+                                cfg.Section == "Account" ? account.GetValueOrDefault("CountryName")
+                                                         : contact.GetValueOrDefault("Country"),
+                                CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
                             var editable = !string.Equals(cfg.CustomerControl, "Readonly", StringComparison.OrdinalIgnoreCase);
                             var cur = Val(cfg);
                             var sub = Subcategory(cfg.FieldKey);
@@ -152,6 +154,7 @@
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <span class="di-help-icon" title="@cfg.HelpText" aria-label="@cfg.HelpText">&#9432;</span> }
                                 </label>
                                 @if (!editable)
                                 {
@@ -194,7 +197,7 @@
                                         }
                                     </select>
                                 }
-                                else if (isContactCity && contactCountryIsUae)
+                                else if (isCity && cityCountryIsUae)
                                 {
                                     <select value="@cur" @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())">
                                         <option value="">— Select —</option>

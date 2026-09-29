@@ -57,6 +57,8 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
 
             // Admin-edited field label (shown on the form). Keep the existing label if cleared.
             if (!string.IsNullOrWhiteSpace(edit.DisplayLabel)) row.DisplayLabel = edit.DisplayLabel.Trim();
+            // Optional help text — shown as a tooltip on the form when not blank.
+            row.HelpText = string.IsNullOrWhiteSpace(edit.HelpText) ? null : edit.HelpText.Trim();
             row.BusinessControl = Normalize(edit.BusinessControl);
             row.CustomerControl = Normalize(edit.CustomerControl);
             row.IsVisible = edit.IsVisible;

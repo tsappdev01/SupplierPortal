@@ -139,10 +139,13 @@ else
                     if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
                     var target = cfg.Section == "Account" ? (object)customer : contact;
                     var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
-                    // Contact "City": a UAE-emirate dropdown when the contact's country is the UAE, else free text.
-                    var isContactCity = cfg.Section == "Contact" && cfg.FieldKey == "EmirateCity";
-                    var contactCountryIsUae = isContactCity && string.Equals(
-                        CustomerFieldAccessor.GetString(contact, "Country"), CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
+                    // "City" (EmirateCity, either section): a UAE-emirate dropdown when the relevant country is
+                    // the UAE (Account uses CountryName, Contact uses Country), else a free-text box.
+                    var isCity = cfg.FieldKey == "EmirateCity";
+                    var cityCountryIsUae = isCity && string.Equals(
+                        cfg.Section == "Account" ? CustomerFieldAccessor.GetString(customer, "CountryName")
+                                                 : CustomerFieldAccessor.GetString(contact, "Country"),
+                        CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
                     var editable = tabEditable && !string.Equals(cfg.BusinessControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
                     var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
                     var sub = Subcategory(cfg.FieldKey);
@@ -155,6 +158,7 @@ else
                         <label>
                             @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                             @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                            @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <span class="di-help-icon" title="@cfg.HelpText" aria-label="@cfg.HelpText">&#9432;</span> }
                         </label>
                         @if (!editable)
                         {
@@ -202,7 +206,7 @@ else
                                 }
                             </select>
                         }
-                        else if (isContactCity && contactCountryIsUae)
+                        else if (isCity && cityCountryIsUae)
                         {
                             <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
                                 <option value="">— Select —</option>

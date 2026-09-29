@@ -167,6 +167,8 @@ else
                                             else if (f.FieldKind == "yesno") { <span class="badge bg-secondary-subtle text-secondary-emphasis">Yes/No</span> }
                                         </div>
                                         <div class="di-field-key">@f.FieldKey</div>
+                                        <input class="form-control form-control-sm di-field-help-input mt-1" @bind="f.HelpText"
+                                               placeholder="Short description (shown as a tooltip)" title="Optional help shown as a tooltip on the form" />
                                     </td>
                                     <td>
                                         <select class="form-select form-select-sm" value="@f.GroupName"
@@ -260,6 +262,7 @@ else
 <style>
     .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
     .di-field-label-input { min-width: 180px; max-width: 340px; font-weight: 600; }
+    .di-field-help-input { min-width: 180px; max-width: 420px; font-size: 0.78rem; }
     .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
     .di-removed-header { background: #7a1f2b; }
     .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }

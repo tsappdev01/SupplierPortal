@@ -14,6 +14,8 @@ public class CustomerFieldConfigDto
 {
     public string FieldKey { get; set; } = "";
     public string DisplayLabel { get; set; } = "";
+    /// <summary>Optional short help shown as a tooltip on the form when not blank.</summary>
+    public string? HelpText { get; set; }
     /// <summary>"Account" or "Contact".</summary>
     public string Section { get; set; } = "";
     public string GroupName { get; set; } = "";
