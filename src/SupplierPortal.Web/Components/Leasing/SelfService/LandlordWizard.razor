@@ -9,6 +9,7 @@
 @using SupplierPortal.Web.Services.Leasing
 @inject LandlordAccessTokenService AccessTokenService
 @inject LandlordService LandlordService
+@inject LandlordFieldConfigService FieldConfig
 @inject LandlordDocumentService DocumentService
 @inject ToastService ToastService
 @inject LoadingService Loading
@@ -423,6 +424,7 @@
     .di-llw .up.uploading{border-style:solid;border-color:var(--gold,#c8a24a);background:#fbf6ea}
     .di-llw .di-up-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(168,132,47,.35);border-top-color:#a8842f;border-radius:50%;animation:di-up-spin .7s linear infinite;vertical-align:-2px;margin-right:6px}
     @@keyframes di-up-spin{to{transform:rotate(360deg)}}
+    .di-llw .di-llw-help{color:#8a94a6;cursor:help;margin-left:4px;font-size:13px;font-style:normal}
     .di-llw .di-up-bar{height:4px;border-radius:3px;background:#eee3c7;overflow:hidden;margin-top:6px}
     .di-llw .di-up-bar-fill{height:100%;width:40%;border-radius:3px;background:#a8842f;animation:di-up-slide 1.1s ease-in-out infinite}
     @@keyframes di-up-slide{0%{margin-left:-40%}100%{margin-left:100%}}
@@ -601,6 +603,7 @@
                 return;
             }
 
+            contactConfig = (await FieldConfig.GetAllAsync()).Where(f => f.Section == "Contact").ToList();
             landlord = await LandlordService.GetForSelfServiceAsync(accessToken.LandlordId);
             if (landlord is not null)
             {
@@ -652,6 +655,25 @@
         t.EmiratesIdName = c.EmiratesIdName; t.EmiratesIdExpiry = c.EmiratesIdExpiry;
     }
 
+    // ---- Config-driven field metadata (from the Landlord Field Manager, Section = "Contact") ----
+    private List<LandlordFieldConfig> contactConfig = [];
+    private LandlordFieldConfig? FCfg(string key) => contactConfig.FirstOrDefault(f => f.FieldKey == key && !f.IsRemoved);
+    private bool FVisible(string key) { var c = FCfg(key); return c is null || c.IsVisible; }
+    private bool FRequired(string key, bool dflt) { var c = FCfg(key); return c is null ? dflt : c.IsVisible && c.IsRequired; }
+    private string FLabel(string key, string dflt) { var c = FCfg(key); return string.IsNullOrWhiteSpace(c?.DisplayLabel) ? dflt : c!.DisplayLabel; }
+    private string? FHelp(string key) => FCfg(key)?.HelpText;
+    private int? FMax(string key) { var c = FCfg(key); return c?.MaxLength is > 0 ? c.MaxLength : null; }
+    private int? FMin(string key) { var c = FCfg(key); return c?.MinLength is > 0 ? c.MinLength : null; }
+
+    private RenderFragment Help(string key) => __builder =>
+    {
+        var h = FHelp(key);
+        if (!string.IsNullOrWhiteSpace(h))
+        {
+            <span class="di-llw-help" title="@h" aria-label="@h">&#9432;</span>
+        }
+    };
+
     private RenderFragment ContactFields(ContactInput c, bool isPrimary) => __builder =>
     {
         var locked = isPrimary && uaePassLocked;
@@ -660,16 +682,28 @@
             <div class="uaep-note">✔ Verified by UAE Pass — name, email and mobile are taken from your UAE Pass account and cannot be changed.</div>
         }
         <div class="grid2">
-            <div class="field" style="margin-bottom:0"><label class="lbl">Full name @MarkReq()</label><input type="text" placeholder="As on the Emirates ID" readonly="@locked" @bind="c.FullName" /></div>
-            <div class="field" style="margin-bottom:0"><label class="lbl">Designation</label><input type="text" @bind="c.Designation" /></div>
-            <div class="field" style="margin-bottom:0">
-                <label class="lbl">Mobile number @MarkReq()</label><input type="text" placeholder="+971 5X XXX XXXX" readonly="@locked" @bind="c.Mobile" />
-                <div class="hint">@(locked ? "From your UAE Pass account." : "UAE mobile, must match the UAE Pass account.")</div>
-            </div>
-            <div class="field" style="margin-bottom:0">
-                <label class="lbl">Email address @MarkReq()</label><input type="text" placeholder="name@company.ae" readonly="@locked" @bind="c.Email" />
-                <div class="hint">@(locked ? "From your UAE Pass account." : "Must match the UAE Pass account.")</div>
-            </div>
+            @if (FVisible("FullName"))
+            {
+                <div class="field" style="margin-bottom:0"><label class="lbl">@FLabel("FullName", "Full name") @(FRequired("FullName", true) ? MarkReq() : null)@Help("FullName")</label><input type="text" placeholder="As on the Emirates ID" maxlength="@FMax("FullName")" readonly="@locked" @bind="c.FullName" /></div>
+            }
+            @if (FVisible("Designation"))
+            {
+                <div class="field" style="margin-bottom:0"><label class="lbl">@FLabel("Designation", "Designation") @(FRequired("Designation", false) ? MarkReq() : null)@Help("Designation")</label><input type="text" maxlength="@FMax("Designation")" @bind="c.Designation" /></div>
+            }
+            @if (FVisible("Mobile"))
+            {
+                <div class="field" style="margin-bottom:0">
+                    <label class="lbl">@FLabel("Mobile", "Mobile number") @(FRequired("Mobile", true) ? MarkReq() : null)@Help("Mobile")</label><input type="text" placeholder="+971 5X XXX XXXX" readonly="@locked" @bind="c.Mobile" />
+                    <div class="hint">@(locked ? "From your UAE Pass account." : "UAE mobile, must match the UAE Pass account.")</div>
+                </div>
+            }
+            @if (FVisible("Email"))
+            {
+                <div class="field" style="margin-bottom:0">
+                    <label class="lbl">@FLabel("Email", "Email address") @(FRequired("Email", true) ? MarkReq() : null)@Help("Email")</label><input type="text" placeholder="name@company.ae" maxlength="@FMax("Email")" readonly="@locked" @bind="c.Email" />
+                    <div class="hint">@(locked ? "From your UAE Pass account." : "Must match the UAE Pass account.")</div>
+                </div>
+            }
             <div class="field" style="margin-bottom:0"><label class="lbl">Contact type</label>
                 <select @bind="c.ContactType">@foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }</select>
             </div>
@@ -919,11 +953,41 @@
     private void Back() { error = null; if (step > 0) step--; }
 
     /// <summary>Validates a contact's name / email / UAE mobile. Returns an error message or null.</summary>
-    private static string? ValidateContact(ContactInput c, string who)
+    /// <summary>Contact validation driven by the Landlord Field Manager config (visibility, required, min/max),
+    /// falling back to the built-in rules (name/email/mobile required, valid formats) when no config exists.
+    /// A field hidden by config is not validated; a field made required by config must be filled.</summary>
+    private string? ContactErrors(ContactInput c, string who)
     {
-        if (string.IsNullOrWhiteSpace(c.FullName)) return $"{who}: full name is required.";
-        if (!ContactValidation.IsValidEmail(c.Email)) return $"{who}: a valid email address is required (it must match the UAE Pass account).";
-        if (!ContactValidation.IsValidUaeMobile(c.Mobile)) return $"{who}: a valid UAE mobile number is required (e.g. +9715XXXXXXXX).";
+        if (FVisible("FullName"))
+        {
+            if (FRequired("FullName", true) && string.IsNullOrWhiteSpace(c.FullName)) return $"{who}: {FLabel("FullName", "full name")} is required.";
+            var le = LenErr(who, "FullName", "Full name", c.FullName); if (le is not null) return le;
+        }
+        if (FVisible("Designation"))
+        {
+            if (FRequired("Designation", false) && string.IsNullOrWhiteSpace(c.Designation)) return $"{who}: {FLabel("Designation", "designation")} is required.";
+            var le = LenErr(who, "Designation", "Designation", c.Designation); if (le is not null) return le;
+        }
+        if (FVisible("Mobile"))
+        {
+            if (FRequired("Mobile", true) && string.IsNullOrWhiteSpace(c.Mobile)) return $"{who}: a valid UAE mobile number is required.";
+            if (!string.IsNullOrWhiteSpace(c.Mobile) && !ContactValidation.IsValidUaeMobile(c.Mobile)) return $"{who}: a valid UAE mobile number is required (e.g. +9715XXXXXXXX).";
+        }
+        if (FVisible("Email"))
+        {
+            if (FRequired("Email", true) && string.IsNullOrWhiteSpace(c.Email)) return $"{who}: a valid email address is required.";
+            if (!string.IsNullOrWhiteSpace(c.Email) && !ContactValidation.IsValidEmail(c.Email)) return $"{who}: a valid email address is required (it must match the UAE Pass account).";
+            var le = LenErr(who, "Email", "Email", c.Email); if (le is not null) return le;
+        }
+        return null;
+    }
+
+    private string? LenErr(string who, string key, string label, string? val)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return null;
+        var len = val.Trim().Length;
+        if (FMin(key) is int mn && len < mn) return $"{who}: {FLabel(key, label)} must be at least {mn} character{(mn == 1 ? "" : "s")}.";
+        if (FMax(key) is int mx && len > mx) return $"{who}: {FLabel(key, label)} must be at most {mx} character{(mx == 1 ? "" : "s")}.";
         return null;
     }
 
@@ -932,14 +996,14 @@
         error = null;
         if (step == 0)
         {
-            error = ValidateContact(primary, "Primary contact");
+            error = ContactErrors(primary, "Primary contact");
             if (error is not null) return;
         }
         if (step == 1)
         {
             for (var i = 0; i < secondaries.Count; i++)
             {
-                error = ValidateContact(secondaries[i], $"Secondary contact {i + 1}");
+                error = ContactErrors(secondaries[i], $"Secondary contact {i + 1}");
                 if (error is not null) return;
             }
         }
@@ -1118,11 +1182,11 @@
 
     private string? ValidateForSubmit()
     {
-        var pc = ValidateContact(primary, "Primary contact");
+        var pc = ContactErrors(primary, "Primary contact");
         if (pc is not null) return pc;
         for (var i = 0; i < secondaries.Count; i++)
         {
-            var sc = ValidateContact(secondaries[i], $"Secondary contact {i + 1}");
+            var sc = ContactErrors(secondaries[i], $"Secondary contact {i + 1}");
             if (sc is not null) return sc;
         }
         // Additional signatories, when named, need a valid email.

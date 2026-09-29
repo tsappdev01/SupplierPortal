@@ -9,6 +9,7 @@
 @using SupplierPortal.Web.Services
 @using SupplierPortal.Web.Services.Leasing
 @inject LandlordService LandlordService
+@inject SupplierPortal.Web.Services.Leasing.LandlordFieldConfigService FieldConfig
 @inject LandlordDocumentService DocumentService
 @inject BusinessUnitService BusinessUnitService
 @inject UserService UserService
@@ -244,18 +245,18 @@ else
                                     }
                                 </div>
                                 <div class="row g-2">
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Full name" @bind="c.FullName" /></div>
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Designation" @bind="c.Designation" /></div>
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Email" @bind="c.Email" /></div>
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Mobile" @bind="c.Mobile" /></div>
+                                    @if (FVisible("FullName")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("FullName","Full name")" maxlength="@FMax("FullName")" @bind="c.FullName" /></div> }
+                                    @if (FVisible("Designation")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Designation","Designation")" maxlength="@FMax("Designation")" @bind="c.Designation" /></div> }
+                                    @if (FVisible("Email")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Email","Email")" maxlength="@FMax("Email")" @bind="c.Email" /></div> }
+                                    @if (FVisible("Mobile")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Mobile","Mobile")" @bind="c.Mobile" /></div> }
                                     <div class="col-md-6">
                                         <select class="form-select form-select-sm" @bind="c.ContactType">
                                             @foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }
                                         </select>
                                     </div>
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Emirates ID" @bind="c.EmiratesId" /></div>
-                                    <div class="col-md-6"><input class="form-control form-control-sm" placeholder="Name on Emirates ID" @bind="c.EmiratesIdName" /></div>
-                                    <div class="col-md-6"><label class="form-label form-label-sm small mb-0 text-muted">Emirates ID expiry</label><input type="date" class="form-control form-control-sm" @bind="c.EmiratesIdExpiry" /></div>
+                                    @if (FVisible("EmiratesId")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("EmiratesId","Emirates ID")" @bind="c.EmiratesId" /></div> }
+                                    @if (FVisible("EmiratesIdName")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("EmiratesIdName","Name on Emirates ID")" @bind="c.EmiratesIdName" /></div> }
+                                    @if (FVisible("EmiratesIdExpiry")) { <div class="col-md-6"><label class="form-label form-label-sm small mb-0 text-muted">@FLabel("EmiratesIdExpiry","Emirates ID expiry")</label><input type="date" class="form-control form-control-sm" @bind="c.EmiratesIdExpiry" /></div> }
                                 </div>
                             </div>
                         }
@@ -576,10 +577,18 @@ else
     private bool bcUploading;
     private bool signatureBusy;
 
+    // ---- Config-driven contact field metadata (Landlord Field Manager, Section = "Contact") ----
+    private List<SupplierPortal.Web.Models.Leasing.LandlordFieldConfig> contactConfig = [];
+    private SupplierPortal.Web.Models.Leasing.LandlordFieldConfig? FCfg(string key) => contactConfig.FirstOrDefault(f => f.FieldKey == key && !f.IsRemoved);
+    private bool FVisible(string key) { var c = FCfg(key); return c is null || c.IsVisible; }
+    private string FLabel(string key, string dflt) { var c = FCfg(key); return string.IsNullOrWhiteSpace(c?.DisplayLabel) ? dflt : c!.DisplayLabel; }
+    private int? FMax(string key) { var c = FCfg(key); return c?.MaxLength is > 0 ? c.MaxLength : null; }
+
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
+        contactConfig = (await FieldConfig.GetAllAsync()).Where(f => f.Section == "Contact").ToList();
         await LoadAsync();
 
         // Opening a submitted registration starts the review (FRD "Review Started").
