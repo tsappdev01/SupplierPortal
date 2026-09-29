@@ -41,6 +41,20 @@ public class CustomerTabDto
     public bool IsVisible { get; set; } = true;
 }
 
+/// <summary>One entity in the customer's VAT group (shown on the Business &amp; Organization tab when VAT
+/// Structure = "VAT Group"). Wave / location-type travel as plain strings (LOV-driven).</summary>
+public class CustomerVatGroupEntityDto
+{
+    public int Id { get; set; }
+    public string? BusinessLegalName { get; set; }
+    public string? Address { get; set; }
+    public string? EInvoicingWave { get; set; }
+    public string? TrnNumber { get; set; }
+    public string? TinNumber { get; set; }
+    public string? BusinessLocationType { get; set; }
+    public int SortOrder { get; set; }
+}
+
 public class CustomerDocumentDto
 {
     public int Id { get; set; }
@@ -73,6 +87,8 @@ public class CustomerFormBootstrapDto
     public Dictionary<string, string?> ContactValues { get; set; } = new();
     public List<CustomerFieldConfigDto> FieldConfigs { get; set; } = [];
     public List<CustomerTabDto> Tabs { get; set; } = [];
+    /// <summary>The customer's VAT-group entities (only relevant when VAT Structure = "VAT Group").</summary>
+    public List<CustomerVatGroupEntityDto> VatGroupEntities { get; set; } = [];
     public List<CustomerDocumentDto> Documents { get; set; } = [];
     /// <summary>The active document types the customer may upload.</summary>
     public List<CustomerDocumentTypeDto> DocumentTypes { get; set; } = [];
@@ -84,6 +100,8 @@ public class SaveCustomerRequest
 {
     public Dictionary<string, string?> AccountValues { get; set; } = new();
     public Dictionary<string, string?> ContactValues { get; set; } = new();
+    /// <summary>The VAT-group entities to persist (used only when VAT Structure = "VAT Group").</summary>
+    public List<CustomerVatGroupEntityDto> VatGroupEntities { get; set; } = [];
 }
 
 public class SaveCustomerResponse

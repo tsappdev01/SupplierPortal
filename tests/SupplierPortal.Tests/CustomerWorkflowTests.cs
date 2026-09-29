@@ -84,4 +84,19 @@ public class CustomerWorkflowTests
         Assert.Equal("Nayyar", contact.FirstName);
         Assert.Equal("Khan", contact.LastName);
     }
+
+    [Fact]
+    public void Vat_group_grid_lovs_are_the_expected_values()
+    {
+        Assert.Equal(new[] { "Wave 1", "Wave 2" }, CustomerLookups.EInvoicingWaves);
+        Assert.Equal(new[] { "Mainland", "Free Zone" }, CustomerLookups.BusinessLocationTypes);
+    }
+
+    [Fact]
+    public void Vat_group_entities_default_to_an_empty_collection()
+    {
+        // The grid binds directly to Customer.VatGroupEntities; it must never be null on a fresh record.
+        Assert.NotNull(new Customer().VatGroupEntities);
+        Assert.Empty(new Customer().VatGroupEntities);
+    }
 }

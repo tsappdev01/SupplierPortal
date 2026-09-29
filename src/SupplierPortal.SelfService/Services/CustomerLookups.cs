@@ -294,6 +294,12 @@ public static class CustomerLookups
     /// <summary>The country name that switches the City field to the UAE-emirate dropdown.</summary>
     public const string UaeCountryName = "United Arab Emirates";
 
+    /// <summary>E-Invoicing Wave applicability options for the VAT Group entities grid (Wave 1 / Wave 2).</summary>
+    public static readonly string[] EInvoicingWaves = { "Wave 1", "Wave 2" };
+
+    /// <summary>Business Location Type options for the VAT Group entities grid (Mainland / Free Zone).</summary>
+    public static readonly string[] BusinessLocationTypes = { "Mainland", "Free Zone" };
+
     /// <summary>Countries that carry a dial code, as (Iso, Dial, Name), UAE first then alphabetical by name —
     /// the option list for the customer phone controls.</summary>
     public static readonly (string Iso, string Dial, string Name)[] PhoneCountries =

@@ -1789,6 +1789,51 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierVatGroupEntities");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BusinessLegalName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("BusinessLocationType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EInvoicingWave")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TinNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TrnNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("CustomerVatGroupEntities");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.Property<int>("Id")
@@ -2734,6 +2779,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Customer.Customer", "Customer")
+                        .WithMany("VatGroupEntities")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
@@ -2865,6 +2921,8 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Contact");
 
                     b.Navigation("Documents");
+
+                    b.Navigation("VatGroupEntities");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Supplier", b =>

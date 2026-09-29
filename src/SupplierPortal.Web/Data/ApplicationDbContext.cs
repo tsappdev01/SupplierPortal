@@ -36,6 +36,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<CustomerFieldConfig> CustomerFieldConfigs => Set<CustomerFieldConfig>();
     public DbSet<CustomerTabSetting> CustomerTabSettings => Set<CustomerTabSetting>();
     public DbSet<CustomerAccessToken> CustomerAccessTokens => Set<CustomerAccessToken>();
+    public DbSet<CustomerVatGroupEntity> CustomerVatGroupEntities => Set<CustomerVatGroupEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,14 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasMany(c => c.Documents)
             .WithOne(d => d.Customer!)
             .HasForeignKey(d => d.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // VAT group entities: cascade-delete with the customer (mirrors the supplier). Wave / location-type
+        // are stored as plain string columns (LOV-driven), so there is no lookup FK to restrict.
+        modelBuilder.Entity<CustomerVatGroupEntity>()
+            .HasOne(e => e.Customer)
+            .WithMany(c => c.VatGroupEntities)
+            .HasForeignKey(e => e.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<User>()

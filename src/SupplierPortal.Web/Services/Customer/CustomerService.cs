@@ -141,6 +141,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         return await db.Customers
             .Include(c => c.Contact)
             .Include(c => c.BusinessUnit)
+            .Include(c => c.VatGroupEntities.OrderBy(e => e.SortOrder))
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
@@ -182,7 +183,10 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         IReadOnlySet<string>? readOnlyAccountKeys = null, IReadOnlySet<string>? readOnlyContactKeys = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        var customer = await db.Customers.Include(c => c.Contact).FirstOrDefaultAsync(c => c.Id == edited.Id);
+        var customer = await db.Customers
+            .Include(c => c.Contact)
+            .Include(c => c.VatGroupEntities)
+            .FirstOrDefaultAsync(c => c.Id == edited.Id);
         if (customer is null) return false;
 
         // Capture the current (DB) values of any read-only fields before the copy so they can be restored.
@@ -207,6 +211,43 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
         // Restore any read-only (locked-tab) fields so they can't be changed by this save.
         Restore(customer, acctOriginals);
         Restore(customer.Contact, contactOriginals);
+
+        // Reconcile the VAT-group child rows: replace the stored set with what the form submitted (kept in
+        // edited.VatGroupEntities). When VAT Structure is not "VAT Group" the block is hidden, so the group is
+        // cleared — mirroring how the conditional "Number of Entities" field is cleared. Skip reconciliation only
+        // when VAT Structure itself is on a locked (read-only) tab, so a locked Business tab can't be wiped.
+        var vatStructureLocked = readOnlyAccountKeys?.Contains(nameof(Customer.VATStructure)) == true;
+        if (!vatStructureLocked)
+        {
+            var isVatGroup = string.Equals(customer.VATStructure, "VAT Group", StringComparison.OrdinalIgnoreCase);
+            db.CustomerVatGroupEntities.RemoveRange(customer.VatGroupEntities);
+            customer.VatGroupEntities.Clear();
+            if (isVatGroup)
+            {
+                var order = 0;
+                foreach (var e in edited.VatGroupEntities ?? [])
+                {
+                    // Skip fully-blank rows so an empty "Add Row" doesn't persist noise.
+                    if (string.IsNullOrWhiteSpace(e.BusinessLegalName) && string.IsNullOrWhiteSpace(e.Address)
+                        && string.IsNullOrWhiteSpace(e.EInvoicingWave) && string.IsNullOrWhiteSpace(e.TrnNumber)
+                        && string.IsNullOrWhiteSpace(e.TinNumber) && string.IsNullOrWhiteSpace(e.BusinessLocationType))
+                    {
+                        continue;
+                    }
+                    customer.VatGroupEntities.Add(new CustomerVatGroupEntity
+                    {
+                        CustomerId = customer.Id,
+                        BusinessLegalName = e.BusinessLegalName,
+                        Address = e.Address,
+                        EInvoicingWave = e.EInvoicingWave,
+                        TrnNumber = e.TrnNumber,
+                        TinNumber = e.TinNumber,
+                        BusinessLocationType = e.BusinessLocationType,
+                        SortOrder = order++
+                    });
+                }
+            }
+        }
 
         customer.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();

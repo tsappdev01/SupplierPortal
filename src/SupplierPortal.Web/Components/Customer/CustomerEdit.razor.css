@@ -427,3 +427,22 @@
 [data-theme="dark"] .di-progress-bg { stroke: #2b3752; }
 
 .di-help-icon { display: inline-block; margin-left: 5px; color: #8a94a6; cursor: help; font-size: 13px; font-style: normal; vertical-align: baseline; }
+
+/* ---- VAT Group entities (repeatable table shown when VAT Structure = "VAT Group") ---- */
+.di-vatgroup { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3e8f0); }
+.di-vatgroup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.di-vatgroup-title { font-weight: 700; font-size: 15px; color: var(--navy, #16244a); }
+.di-vatgroup-note { font-size: 13px; color: #7b8697; margin: 0 0 10px; }
+.di-vatgroup-scroll { overflow-x: auto; }
+.di-vatgroup-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.di-vatgroup-table th { text-align: left; font-size: 12.5px; font-weight: 700; color: var(--label, #55627a); background: #f5f7fc; padding: 8px 10px; border-bottom: 1px solid var(--border, #e3e8f0); white-space: nowrap; }
+.di-vatgroup-table td { padding: 6px 8px; vertical-align: top; }
+.di-vatgroup-table input, .di-vatgroup-table select { width: 100%; max-width: 100%; min-width: 0; color: #000; padding: 8px 10px; border: 1px solid var(--border, #e3e8f0); border-radius: 6px; font-family: inherit; font-size: 14px; background: #fff; }
+.di-vatgroup-table input:focus, .di-vatgroup-table select:focus { outline: none; border-color: var(--blue, #3b5bdb); box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15); }
+.di-vatgroup-empty { font-size: 13px; color: #97a1b3; padding: 10px 0; }
+.di-add-contact { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 16px; border: 1px dashed var(--navy, #16244a); border-radius: 6px; background: #fff; color: var(--navy, #16244a); font-weight: 600; font-size: 13px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.di-add-contact:hover { background: var(--navy, #16244a); color: #fff; }
+.di-add-contact svg { flex-shrink: 0; }
+.di-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #6b7280; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.di-icon-btn:hover { background: #fff; }
+.di-icon-btn-danger:hover { color: #c0392b; border-color: #f0c4be; background: #fdf3f2; }

@@ -126,6 +126,7 @@ public static class CustomerSelfServiceEndpoints
                 form.Customer.Id, req.AccountValues.Count, req.ContactValues.Count,
                 req.AccountValues.GetValueOrDefault("CommercialName"), req.AccountValues.GetValueOrDefault("NumberOfEntities"));
             ApplyValues(form, req.AccountValues, req.ContactValues);
+            ApplyVatGroup(form.Customer, req.VatGroupEntities);
             var result = await data.SaveAsync(link, session, form.Customer, complete: false);
             log.LogInformation(
                 "Customer save OUT: success={S}, error='{E}', persisted.CommercialName='{CN}', persisted.NumberOfEntities='{NE}'",
@@ -286,6 +287,36 @@ public static class CustomerSelfServiceEndpoints
         customer.Contact = contactEntity;
     }
 
+    /// <summary>Replaces the customer's in-memory VAT-group entity list from the incoming DTOs. Persistence
+    /// (and clearing when VAT Structure is not "VAT Group") is handled by <c>CustomerService.SaveAsync</c>.</summary>
+    private static void ApplyVatGroup(Customer customer, List<CustomerVatGroupEntityDto>? entities)
+    {
+        customer.VatGroupEntities = (entities ?? [])
+            .Select((e, i) => new CustomerVatGroupEntity
+            {
+                CustomerId = customer.Id,
+                BusinessLegalName = e.BusinessLegalName,
+                Address = e.Address,
+                EInvoicingWave = e.EInvoicingWave,
+                TrnNumber = e.TrnNumber,
+                TinNumber = e.TinNumber,
+                BusinessLocationType = e.BusinessLocationType,
+                SortOrder = i
+            }).ToList();
+    }
+
+    private static CustomerVatGroupEntityDto ToVatDto(CustomerVatGroupEntity e) => new()
+    {
+        Id = e.Id,
+        BusinessLegalName = e.BusinessLegalName,
+        Address = e.Address,
+        EInvoicingWave = e.EInvoicingWave,
+        TrnNumber = e.TrnNumber,
+        TinNumber = e.TinNumber,
+        BusinessLocationType = e.BusinessLocationType,
+        SortOrder = e.SortOrder
+    };
+
     /// <summary>The declaration wording recorded against a completed submission (mirrors the DMZ form text).</summary>
     private const string DeclarationText =
         "Customer Declaration\n\nCustomer Data Gathering Portal\n\n" +
@@ -397,6 +428,7 @@ public static class CustomerSelfServiceEndpoints
                 Sequence = t.Sequence,
                 IsVisible = t.IsVisible
             }).ToList(),
+            VatGroupEntities = customer.VatGroupEntities.OrderBy(e => e.SortOrder).Select(ToVatDto).ToList(),
             Documents = form.Documents.Select(ToDto).ToList(),
             DocumentTypes = form.DocTypes.Where(t => t.IsActive).OrderBy(t => t.Sequence)
                 .Select(t => new CustomerDocumentTypeDto

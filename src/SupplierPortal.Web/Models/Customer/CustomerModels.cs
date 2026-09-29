@@ -137,6 +137,39 @@ public class Customer
     // ---- relationships ----
     public CustomerContact? Contact { get; set; }
     public List<CustomerDocument> Documents { get; set; } = [];
+
+    /// <summary>The entities registered under the customer's VAT Group. Captured on the Business &amp;
+    /// Organization tab only when VAT Structure is "VAT Group" (mirrors the supplier). Empty otherwise.</summary>
+    public List<CustomerVatGroupEntity> VatGroupEntities { get; set; } = [];
+}
+
+/// <summary>One legal entity within a customer's VAT group. Captured on the Business &amp; Organization tab
+/// when the customer's VAT Structure is "VAT Group" — the customer lists every entity covered by the group's
+/// single TRN. Mirrors <see cref="SupplierPortal.Web.Models.SupplierVatGroupEntity"/>, but the wave and
+/// location-type are stored as plain strings (the customer portal is string/LOV-driven, not LookupValue-based).</summary>
+public class CustomerVatGroupEntity
+{
+    public int Id { get; set; }
+
+    public int CustomerId { get; set; }
+    public Customer? Customer { get; set; }
+
+    [MaxLength(300)] public string? BusinessLegalName { get; set; }
+
+    [MaxLength(500)] public string? Address { get; set; }
+
+    /// <summary>E-Invoicing Wave applicability (Wave 1 / Wave 2).</summary>
+    [MaxLength(100)] public string? EInvoicingWave { get; set; }
+
+    [MaxLength(100)] public string? TrnNumber { get; set; }
+
+    [MaxLength(100)] public string? TinNumber { get; set; }
+
+    /// <summary>Business Location Type (Mainland / Free Zone).</summary>
+    [MaxLength(100)] public string? BusinessLocationType { get; set; }
+
+    /// <summary>Preserves the row order the entities were entered in.</summary>
+    public int SortOrder { get; set; }
 }
 
 /// <summary>The customer's single primary contact (individual). Field set generated from the CST onboarding

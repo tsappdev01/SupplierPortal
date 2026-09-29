@@ -245,6 +245,77 @@ else
                         }
                     </div>
                 }
+                @{
+                    var stepHasVatStructure = FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure");
+                }
+                @if (stepHasVatStructure && IsVatGroupSelected)
+                {
+                    <div class="di-field di-full di-vatgroup">
+                        <div class="di-vatgroup-head">
+                            <span class="di-vatgroup-title">VAT Group</span>
+                            @if (tabEditable)
+                            {
+                                <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
+                                    <span>Add Row</span>
+                                </button>
+                            }
+                        </div>
+                        <p class="di-vatgroup-note">
+                            Please list all entities registered under your VAT Group that are conducting business with our company.
+                        </p>
+                        <div class="di-vatgroup-scroll">
+                            <table class="di-vatgroup-table">
+                                <thead>
+                                    <tr>
+                                        <th>Business Legal Name</th>
+                                        <th>Address</th>
+                                        <th>E-Invoicing Wave<br />(Wave 1/Wave 2)</th>
+                                        <th>TRN Number</th>
+                                        <th>TIN Number</th>
+                                        <th>Bus. Location Type<br />(Mainland/Free Zone)</th>
+                                        @if (tabEditable) { <th></th> }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (customer.VatGroupEntities.Count == 0)
+                                    {
+                                        <tr><td colspan="7" class="di-vatgroup-empty">No entities added yet. Click "Add Row" to list a VAT group entity.</td></tr>
+                                    }
+                                    @foreach (var entity in customer.VatGroupEntities)
+                                    {
+                                        <tr>
+                                            <td><input type="text" @bind="entity.BusinessLegalName" disabled="@(!tabEditable)" /></td>
+                                            <td><input type="text" @bind="entity.Address" disabled="@(!tabEditable)" /></td>
+                                            <td>
+                                                <select @bind="entity.EInvoicingWave" disabled="@(!tabEditable)">
+                                                    <option value="">Select</option>
+                                                    @foreach (var w in CustomerLookups.EInvoicingWaves) { <option value="@w">@w</option> }
+                                                </select>
+                                            </td>
+                                            <td><input type="text" @bind="entity.TrnNumber" disabled="@(!tabEditable)" /></td>
+                                            <td><input type="text" @bind="entity.TinNumber" disabled="@(!tabEditable)" /></td>
+                                            <td>
+                                                <select @bind="entity.BusinessLocationType" disabled="@(!tabEditable)">
+                                                    <option value="">Select</option>
+                                                    @foreach (var l in CustomerLookups.BusinessLocationTypes) { <option value="@l">@l</option> }
+                                                </select>
+                                            </td>
+                                            @if (tabEditable)
+                                            {
+                                                <td>
+                                                    <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove entity" @onclick="() => RemoveVatGroupEntity(entity)">
+                                                        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                                    </button>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     }
@@ -278,6 +349,39 @@ else
                             </div>
                         }
                     }
+                </div>
+            </div>
+        }
+        @if (IsVatGroupSelected && customer.VatGroupEntities.Count > 0)
+        {
+            <div class="di-section">
+                <div class="di-section-header">
+                    <div class="di-section-heading"><span class="di-section-title">VAT Group</span></div>
+                </div>
+                <div class="di-section-body">
+                    <div class="di-vatgroup-scroll">
+                        <table class="di-vatgroup-table">
+                            <thead>
+                                <tr>
+                                    <th>Business Legal Name</th><th>Address</th><th>E-Invoicing Wave</th>
+                                    <th>TRN Number</th><th>TIN Number</th><th>Bus. Location Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var e in customer.VatGroupEntities.OrderBy(x => x.SortOrder))
+                                {
+                                    <tr>
+                                        <td>@(string.IsNullOrWhiteSpace(e.BusinessLegalName) ? "—" : e.BusinessLegalName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(e.Address) ? "—" : e.Address)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(e.EInvoicingWave) ? "—" : e.EInvoicingWave)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(e.TrnNumber) ? "—" : e.TrnNumber)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(e.TinNumber) ? "—" : e.TinNumber)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(e.BusinessLocationType) ? "—" : e.BusinessLocationType)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         }
@@ -545,6 +649,22 @@ else
     }
 
     private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
+
+    /// <summary>True when the account's VAT Structure is "VAT Group" — the trigger for the VAT-group entities grid.</summary>
+    private bool IsVatGroupSelected =>
+        customer is not null && string.Equals(customer.VATStructure, "VAT Group", StringComparison.OrdinalIgnoreCase);
+
+    private void AddVatGroupEntity()
+    {
+        if (customer is null) return;
+        customer.VatGroupEntities.Add(new CustomerVatGroupEntity
+        {
+            CustomerId = customer.Id,
+            SortOrder = customer.VatGroupEntities.Count
+        });
+    }
+
+    private void RemoveVatGroupEntity(CustomerVatGroupEntity entity) => customer?.VatGroupEntities.Remove(entity);
 
     /// <summary>Combined Country dropdown: stores the selected code in CountryCode and the matching
     /// country name in CountryName, so the two underlying fields stay in sync from one control.</summary>
