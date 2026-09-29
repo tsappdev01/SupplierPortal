@@ -21,6 +21,9 @@
 
 <PageTitle>Landlord Registration</PageTitle>
 
+<SupplierPortal.Web.Components.Shared.BlockingOverlay Visible="blocking"
+    Title="Submitting your registration…" Message="Please do not close or refresh this page." />
+
 <div class="di-llw">
     @if (loading)
     {
@@ -1162,14 +1165,18 @@
             return;
         }
 
-        saving = true;
+        saving = true; blocking = true;
+        StateHasChanged();
         var (ok, err, reason) = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: true, ActorLabel, accessToken.Id, null, Nav.BaseUri);
-        if (!ok) { error = err; saving = false; return; }
+        if (!ok) { error = err; saving = false; blocking = false; return; }
         await AccessTokenService.MarkUsedAsync(accessToken.Id);
         reference = reason;
         submitted = true;
+        saving = false; blocking = false;
         ToastService.ShowSuccess("Registration submitted for review.");
     }
+
+    private bool blocking;
 
     private static string DocLabel(LandlordDocumentType t) => t switch
     {
