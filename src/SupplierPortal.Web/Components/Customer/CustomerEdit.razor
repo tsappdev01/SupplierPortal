@@ -17,6 +17,9 @@
 
 <PageTitle>Customer - CST Portal</PageTitle>
 
+<SupplierPortal.Web.Components.Shared.BlockingOverlay Visible="blocking"
+    Title="@blockingTitle" Message="Please wait — do not close this page." />
+
 @if (customer is null)
 {
     <LoadingIndicator Message="Loading customer…" />
@@ -505,6 +508,8 @@ else
     private string? message;
     private bool isError;
     private bool busy;
+    private bool blocking;
+    private string blockingTitle = "Processing…";
     private bool savedTick;
 
     private bool dataLoaded;
@@ -924,7 +929,8 @@ else
     private async Task ReturnToCustomerAsync()
     {
         if (customer is null) return;
-        busy = true; message = null;
+        busy = true; blocking = true; blockingTitle = "Sending the update link…"; message = null;
+        StateHasChanged();
         ClearHiddenConditionalFields();
         customer.Contact = contact;
         var (retAcct, retCont) = LockedKeys();
@@ -932,7 +938,7 @@ else
         var (ok, err) = await CustomerEmailService.NotifyCustomerAsync(
             customer.Id, customer.LegalName ?? "Customer",
             CustomerAccessTokenService.EmailFor(customer), currentUser, Nav.BaseUri);
-        busy = false;
+        busy = false; blocking = false;
         if (ok)
         {
             customer.Status = CustomerStatuses.AwaitingCustomerResponse;
@@ -985,13 +991,15 @@ else
                 return;
             }
         }
-        busy = true; message = null;
+        busy = true; blocking = true; message = null;
+        blockingTitle = status == CustomerStatuses.Complete ? "Completing the record…" : "Saving…";
+        StateHasChanged();
         customer.Contact = contact;
         var (setAcct, setCont) = LockedKeys();
         await CustomerService.SaveAsync(customer, currentUser, setAcct, setCont);
         await CustomerService.SetStatusAsync(customer.Id, status, currentUser);
         customer.Status = status;
-        busy = false; isError = false;
+        isError = false;
         message = $"Saved and moved to “{status}”.";
 
         // On completion, expire the self-service link so it can no longer be opened, and send the
@@ -1005,6 +1013,7 @@ else
             if (ok) ToastService.ShowSuccess("Completion thank-you email sent to the customer.");
             else ToastService.ShowError(err ?? "Could not send the completion email.");
         }
+        busy = false; blocking = false;
     }
 
     /// <summary>Formats a stored UTC timestamp in the server's local time zone.</summary>

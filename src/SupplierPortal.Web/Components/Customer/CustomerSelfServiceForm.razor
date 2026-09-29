@@ -11,6 +11,9 @@
 
 <PageTitle>Customer Information - Customer Portal</PageTitle>
 
+<SupplierPortal.Web.Components.Shared.BlockingOverlay Visible="blocking"
+    Title="Submitting your information…" Message="Please do not close or refresh this page." />
+
 <div class="di-selfservice-wrap">
     @if (loading)
     {
@@ -853,6 +856,8 @@
     private void CancelDeclaration() { showDeclaration = false; sigInitialized = false; }
     private async Task ClearSignatureAsync() { try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { } }
 
+    private bool blocking;
+
     private async Task ConfirmDeclarationAsync()
     {
         if (customer is null) return;
@@ -879,11 +884,12 @@
         showDeclaration = false;
         sigInitialized = false;
 
-        busy = true; message = null;
+        busy = true; blocking = true; message = null;
+        StateHasChanged();
         ClearHiddenConditionalFields();
         customer.Contact = contact;
         var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: true);
-        busy = false;
+        busy = false; blocking = false;
         if (!result.Success)
         {
             ToastService.ShowError(result.Error ?? "Submission failed. Please try again.");

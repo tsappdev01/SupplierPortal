@@ -5,6 +5,7 @@
 @inject CustomerDocumentService DocumentService
 @inject ToastService ToastService
 @inject IJSRuntime JS
+@implements IDisposable
 
 @* KYC document checklist: one card per master document type, with upload + view/download/remove.
    Required types are flagged; the parent wizard blocks submit until they are uploaded. *@
@@ -33,7 +34,24 @@
                 <div class="di-doc-hint">@type.Requirement</div>
             }
 
-            @if (doc is not null)
+            @if (busyType == type.Name)
+            {
+                @* Linear progress bar for the file transfer (upload = determinate %; download = indeterminate). *@
+                <div class="di-doc-progress">
+                    <div class="di-doc-progress-top">
+                        <span>@(busyIsDownload ? "Downloading…" : "Uploading…")</span>
+                        @if (upTotal > 0) { <span>@UpPct%</span> }
+                    </div>
+                    <div class="di-doc-bar @(busyIsDownload && upTotal == 0 ? "is-indeterminate" : null)">
+                        <div class="di-doc-bar-fill" style="width:@(busyIsDownload && upTotal == 0 ? 100 : UpPct)%"></div>
+                    </div>
+                    @if (upTotal > 0)
+                    {
+                        <div class="di-doc-progress-sub">@FmtMB(upRead) of @FmtMB(upTotal)</div>
+                    }
+                </div>
+            }
+            else if (doc is not null)
             {
                 <div class="di-doc-file">
                     <span class="di-doc-file-name" title="@doc.FileName">@doc.FileName</span>
@@ -86,6 +104,13 @@
     .di-doc-choose:hover { background: #2f4bc4; }
     .di-doc-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
     .di-doc-empty { font-size: 13px; color: #97a1b3; font-style: italic; }
+    .di-doc-progress { display: flex; flex-direction: column; gap: 5px; }
+    .di-doc-progress-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: #3b5bdb; }
+    .di-doc-progress-sub { font-size: 11.5px; color: #7b8697; }
+    .di-doc-bar { height: 8px; background: #e8edf6; border-radius: 999px; overflow: hidden; }
+    .di-doc-bar-fill { height: 100%; background: #3b5bdb; border-radius: 999px; transition: width .15s ease; }
+    .di-doc-bar.is-indeterminate .di-doc-bar-fill { width: 40% !important; animation: di-doc-indeterminate 1.1s ease-in-out infinite; }
+    @@keyframes di-doc-indeterminate { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
 </style>
 
 @code {
@@ -127,24 +152,76 @@
         await OnChanged.InvokeAsync();
     }
 
+    // ---- Transfer progress (linear bar) ----
+    private const long MaxUploadBytes = 20 * 1024 * 1024;
+    private string? busyType;            // the document type currently uploading/downloading
+    private bool busyIsDownload;
+    private long upRead;
+    private long upTotal;
+    private int UpPct => upTotal > 0 ? (int)Math.Min(100, upRead * 100 / upTotal) : 0;
+    private static string FmtMB(long bytes) => $"{bytes / 1024d / 1024d:0.0} MB";
+
     private async Task UploadAsync(string documentType, InputFileChangeEventArgs e)
     {
+        var file = e.File;
+        if (file.Size > MaxUploadBytes)
+        {
+            ToastService.ShowError("File exceeds the 20 MB size limit.");
+            return;
+        }
+
+        // Read the file browser→server in chunks so the customer sees real upload progress (the slow hop on
+        // their connection). Standard: Linear Progress Bar for a file upload with a known size.
+        byte[] bytes;
+        busyType = documentType;
+        busyIsDownload = false;
+        upTotal = file.Size;
+        upRead = 0;
+        StateHasChanged();
+        try
+        {
+            using var ms = new MemoryStream();
+            await using var stream = file.OpenReadStream(maxAllowedSize: MaxUploadBytes);
+            var buffer = new byte[64 * 1024];
+            var lastReport = 0L;
+            int read;
+            while ((read = await stream.ReadAsync(buffer)) > 0)
+            {
+                await ms.WriteAsync(buffer.AsMemory(0, read));
+                upRead += read;
+                if (upRead - lastReport >= 128 * 1024 || upRead >= upTotal)
+                {
+                    lastReport = upRead;
+                    StateHasChanged();
+                    await Task.Delay(1);   // let the circuit flush the bar to the browser
+                }
+            }
+            bytes = ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            busyType = null;
+            ToastService.ShowError($"Upload failed: {ex.Message}");
+            return;
+        }
+
         bool ok;
         string? err;
         if (ViaGateway)
         {
-            using var ms = new MemoryStream();
-            await e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024).CopyToAsync(ms);
             var r = await SsGateway!.UploadDocumentAsync(
-                SsToken ?? "", SsSession ?? "", documentType, e.File.Name, e.File.ContentType, ms.ToArray());
+                SsToken ?? "", SsSession ?? "", documentType, file.Name, file.ContentType, bytes);
             ok = r.Success;
             err = r.Error;
         }
         else
         {
-            (ok, err) = await DocumentService.UploadAsync(CustomerId, documentType, e.File, CurrentUser);
+            (ok, err) = await DocumentService.UploadBytesAsync(
+                CustomerId, documentType, bytes, file.Name,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType, CurrentUser);
         }
 
+        busyType = null;
         if (ok)
         {
             ToastService.ShowSuccess($"{documentType} uploaded.");
@@ -191,21 +268,80 @@
         }
     }
 
+    private DotNetObjectReference<CustomerDocuments>? dlRef;
+
     private async Task DownloadAsync(CustomerDocument doc)
     {
         if (SelfService)
         {
-            var (bytes, contentType, fileName) = await LoadFileAsync(doc.Id);
-            if (bytes is not null)
+            // Self-service fetches the file through the data gateway (no cookie session) and returns it whole,
+            // so a byte-accurate percentage isn't available — show an indeterminate linear bar while it loads.
+            busyType = doc.DocumentType;
+            busyIsDownload = true;
+            upRead = 0;
+            upTotal = 0;
+            StateHasChanged();
+            try
             {
-                await JS.InvokeVoidAsync("ssDoc.download", fileName, contentType, Convert.ToBase64String(bytes));
+                var (bytes, contentType, fileName) = await LoadFileAsync(doc.Id);
+                if (bytes is not null)
+                {
+                    await JS.InvokeVoidAsync("ssDoc.download", fileName, contentType, Convert.ToBase64String(bytes));
+                }
+                else
+                {
+                    ToastService.ShowError("Could not load the document.");
+                }
+            }
+            finally
+            {
+                busyType = null;
+                StateHasChanged();
             }
         }
         else
         {
-            await JS.InvokeVoidAsync("open", $"/customers/documents/{doc.Id}?download=1", "_self");
+            // Internal: the endpoint is cookie-authorized and sends Content-Length, so stream it with a real
+            // determinate linear progress bar (Standard: Linear Progress Bar for a file download).
+            busyType = doc.DocumentType;
+            busyIsDownload = true;
+            upRead = 0;
+            upTotal = 0;
+            dlRef ??= DotNetObjectReference.Create(this);
+            StateHasChanged();
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/documents/{doc.Id}?download=1", doc.FileName, dlRef);
         }
     }
+
+    [JSInvokable]
+    public Task OnDownloadProgress(int percent, long received, long total)
+    {
+        upTotal = total;
+        upRead = received;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadComplete(string fileName)
+    {
+        busyType = null;
+        ToastService.ShowSuccess($"Downloaded {fileName}");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadError(string message)
+    {
+        busyType = null;
+        ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() => dlRef?.Dispose();
 
     private async Task<(byte[]? Bytes, string ContentType, string FileName)> LoadFileAsync(int documentId)
     {
