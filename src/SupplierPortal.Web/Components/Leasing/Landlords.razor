@@ -34,9 +34,30 @@
     }
 </div>
 
-@if (items.Count == 0)
+@* Search + priority / assigned-to filters (dashboard parity) *@
+<div class="di-ll-toolbar mb-3">
+    <div class="di-ll-search">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+        <input type="text" placeholder="Search company, property, email or reference…" @bind="searchText" @bind:event="oninput" @bind:after="() => page = 1" />
+    </div>
+    <select class="form-select form-select-sm di-ll-filter" @bind="priorityFilter" @bind:after="() => page = 1">
+        <option value="">All priorities</option>
+        @foreach (var p in Priorities) { <option value="@p">@p</option> }
+    </select>
+    <select class="form-select form-select-sm di-ll-filter" @bind="assignedFilter" @bind:after="() => page = 1">
+        <option value="">All owners</option>
+        <option value="unassigned">Unassigned</option>
+        @foreach (var u in assignableUsers) { <option value="@u.Id">@u.Name</option> }
+    </select>
+    @if (HasActiveFilters)
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">Clear</button>
+    }
+</div>
+
+@if (Filtered.Count == 0)
 {
-    <div class="alert alert-light border">No registrations@(statusFilter is null ? "" : " for the selected filter") yet.</div>
+    <div class="alert alert-light border">No registrations@(statusFilter is null && !HasActiveFilters ? "" : " match the current filters") yet.</div>
 }
 else
 {
@@ -48,6 +69,8 @@ else
                 <th>Type</th>
                 <th>Email</th>
                 <th>Status</th>
+                <th>Priority</th>
+                <th>Assigned To</th>
                 <th>Reference</th>
                 <th>Updated</th>
                 <th class="text-end">Actions</th>
@@ -72,6 +95,20 @@ else
                     <td>@l.Type</td>
                     <td>@l.Email</td>
                     <td><span class="badge @StatusClass(l.Status)">@Label(l.Status)</span></td>
+                    <td @onclick:stopPropagation="true">
+                        <select class="form-select form-select-sm di-ll-inline" value="@(l.Priority ?? "")"
+                                @onchange="e => SetPriorityAsync(l.Id, (string?)e.Value)">
+                            <option value="">—</option>
+                            @foreach (var p in Priorities) { <option value="@p" selected="@(p == l.Priority)">@p</option> }
+                        </select>
+                    </td>
+                    <td @onclick:stopPropagation="true">
+                        <select class="form-select form-select-sm di-ll-inline" value="@(l.AssignedToUserId?.ToString() ?? "")"
+                                @onchange="e => AssignAsync(l.Id, (string?)e.Value)">
+                            <option value="">Unassigned</option>
+                            @foreach (var u in assignableUsers) { <option value="@u.Id" selected="@(u.Id == l.AssignedToUserId)">@u.Name</option> }
+                        </select>
+                    </td>
                     <td>@(l.Reference ?? "—")</td>
                     <td>@l.UpdatedAt.ToLocalTime().ToString("g")</td>
                     <td class="text-end text-nowrap" @onclick:stopPropagation="true">
@@ -101,6 +138,8 @@ else
                             <td></td>
                             <td></td>
                             <td><span class="badge @StatusClass(v.Status)">@Label(v.Status)</span></td>
+                            <td></td>
+                            <td></td>
                             <td class="text-muted small">@(v.Reference ?? "—")</td>
                             <td class="text-muted small">@v.UpdatedAt.ToLocalTime().ToString("g")</td>
                             <td class="text-end"><a class="small" href="/admin/landlords/@v.Id" @onclick:stopPropagation="true">View</a></td>
@@ -111,7 +150,7 @@ else
         </tbody>
     </table>
     <div class="d-flex justify-content-between align-items-center">
-        <span class="small text-muted">Showing @(items.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, items.Count) of @items.Count</span>
+        <span class="small text-muted">Showing @(Filtered.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, Filtered.Count) of @Filtered.Count</span>
         @if (TotalPages > 1)
         {
             <nav>
@@ -141,6 +180,12 @@ else
     .di-verchip svg.di-rot { transform: rotate(180deg); }
     .di-histrow { background: #fafbfc; }
     .di-histrow:hover { background: #f1f4f8; }
+    .di-ll-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .di-ll-search { position: relative; flex: 1 1 280px; min-width: 220px; }
+    .di-ll-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #9aa4b8; }
+    .di-ll-search input { width: 100%; padding: 7px 12px 7px 33px; border: 1px solid var(--bs-border-color); border-radius: 8px; font-size: 14px; }
+    .di-ll-filter { width: auto; min-width: 150px; }
+    .di-ll-inline { min-width: 96px; }
 </style>
 
 @code {
@@ -166,10 +211,61 @@ else
         new("Approved", [LandlordStatus.RegistrationComplete], "#15803d"),
     ];
 
+    // ---- Search + priority/assigned filters ----
+    private string searchText = "";
+    private string priorityFilter = "";
+    private string assignedFilter = "";
+    private List<(int Id, string Name)> assignableUsers = [];
+    private static readonly string[] Priorities = ["P1", "P2", "P3", "P4"];
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchText)
+        || !string.IsNullOrWhiteSpace(priorityFilter) || !string.IsNullOrWhiteSpace(assignedFilter);
+
+    private List<LandlordListItem> Filtered
+    {
+        get
+        {
+            IEnumerable<LandlordListItem> q = items;
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var s = searchText.Trim();
+                q = q.Where(i =>
+                    (i.DisplayName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.PropertyCode?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.Reference?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+            if (!string.IsNullOrWhiteSpace(priorityFilter)) q = q.Where(i => i.Priority == priorityFilter);
+            if (assignedFilter == "unassigned") q = q.Where(i => i.AssignedToUserId is null);
+            else if (int.TryParse(assignedFilter, out var uid)) q = q.Where(i => i.AssignedToUserId == uid);
+            return q.ToList();
+        }
+    }
+
+    private void ClearFilters() { searchText = ""; priorityFilter = ""; assignedFilter = ""; page = 1; }
+
+    private async Task SetPriorityAsync(int id, string? priority)
+    {
+        await LandlordService.SetPriorityAsync(id, priority, currentUser);
+        var idx = items.FindIndex(i => i.Id == id);
+        if (idx >= 0) items[idx] = items[idx] with { Priority = string.IsNullOrWhiteSpace(priority) ? null : priority };
+    }
+
+    private async Task AssignAsync(int id, string? userIdText)
+    {
+        int? userId = int.TryParse(userIdText, out var u) ? u : null;
+        await LandlordService.AssignAsync(id, userId, currentUser);
+        var idx = items.FindIndex(i => i.Id == id);
+        if (idx >= 0)
+        {
+            var name = userId is int uid ? assignableUsers.FirstOrDefault(x => x.Id == uid).Name : null;
+            items[idx] = items[idx] with { AssignedToUserId = userId, AssignedToUserName = name };
+        }
+    }
+
     private const int PageSize = 50;
     private int page = 1;
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(items.Count / (double)PageSize));
-    private IEnumerable<LandlordListItem> PageItems => items.Skip((page - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(Filtered.Count / (double)PageSize));
+    private IEnumerable<LandlordListItem> PageItems => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
     private IEnumerable<int> PageWindow
     {
         get
@@ -186,6 +282,7 @@ else
     {
         var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         currentUser = state.User.Identity?.Name ?? "unknown";
+        assignableUsers = await LandlordService.GetAssignableUsersAsync();
         await LoadAsync();
     }
 

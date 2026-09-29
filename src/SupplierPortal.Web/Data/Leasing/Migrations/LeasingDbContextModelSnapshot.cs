@@ -30,6 +30,9 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AssignedToUserId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Building")
                         .HasMaxLength(250)
                         .HasColumnType("nvarchar(250)");
@@ -48,6 +51,10 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                     b.Property<string>("CompanyName")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Priority")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");

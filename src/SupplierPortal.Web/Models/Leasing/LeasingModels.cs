@@ -144,6 +144,13 @@ public class Landlord
     /// <summary>Reference issued on first submission, e.g. <c>DIP-LR-2026-104882</c>.</summary>
     [MaxLength(30)] public string? Reference { get; set; }
 
+    /// <summary>Work priority (P1..P4) for the dashboard, mirroring the customer/supplier workflow. Null = unset.</summary>
+    [MaxLength(4)] public string? Priority { get; set; }
+
+    /// <summary>The internal user this registration is assigned to (owner). A User id from ApplicationDbContext;
+    /// stored as a plain int (Landlord lives in a separate LeasingDbContext, so there is no navigation/FK).</summary>
+    public int? AssignedToUserId { get; set; }
+
     [MaxLength(100)] public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     [MaxLength(100)] public string? UpdatedBy { get; set; }

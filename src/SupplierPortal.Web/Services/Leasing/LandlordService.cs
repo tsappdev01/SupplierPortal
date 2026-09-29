@@ -51,8 +51,11 @@ public class LandlordService(
 
         var all = await q.Select(l => new RegRow(
                 l.Id, l.CompanyName, l.PropertyCode, l.Type, l.Status, l.BusinessUnitId,
-                l.Email, l.Reference, l.LinkActive, l.UpdatedAt ?? l.CreatedAt))
+                l.Email, l.Reference, l.LinkActive, l.UpdatedAt ?? l.CreatedAt, l.Priority, l.AssignedToUserId))
             .ToListAsync();
+
+        // Resolve assigned-user display names (Users live in ApplicationDbContext, so join in memory).
+        var userNames = (await users.GetAllAsync()).ToDictionary(u => u.Id, u => u.FullName ?? u.Username);
 
         // One row per property = the latest registration; earlier registrations become versioned history.
         var items = new List<LandlordListItem>();
@@ -67,7 +70,8 @@ public class LandlordService(
             items.Add(new LandlordListItem(
                 current.Id, current.CompanyName ?? current.PropertyCode, current.PropertyCode, current.Type,
                 current.Status, current.BusinessUnitId, current.Email, current.Reference, current.LinkActive,
-                current.UpdatedAt, chain.Count, older));
+                current.UpdatedAt, chain.Count, older, current.Priority, current.AssignedToUserId,
+                current.AssignedToUserId is int uid ? userNames.GetValueOrDefault(uid) : null));
         }
 
         IEnumerable<LandlordListItem> result = items;
@@ -75,8 +79,39 @@ public class LandlordService(
         return result.OrderByDescending(i => i.UpdatedAt).ToList();
     }
 
+    /// <summary>Internal users who may be assigned a landlord registration (active + Landlord portal access).</summary>
+    public async Task<List<(int Id, string Name)>> GetAssignableUsersAsync()
+    {
+        var all = await users.GetAllAsync();
+        return all.Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Landlord))
+            .OrderBy(u => u.FullName ?? u.Username)
+            .Select(u => (u.Id, u.FullName ?? u.Username))
+            .ToList();
+    }
+
+    /// <summary>Sets the registration's work priority (P1..P4, or null to clear).</summary>
+    public async Task SetPriorityAsync(int landlordId, string? priority, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return;
+        l.Priority = string.IsNullOrWhiteSpace(priority) ? null : priority;
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Assigns the registration to an internal user (owner), or clears it when userId is null.</summary>
+    public async Task AssignAsync(int landlordId, int? userId, string actor)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var l = await db.Landlords.FirstOrDefaultAsync(x => x.Id == landlordId);
+        if (l is null) return;
+        l.AssignedToUserId = userId;
+        await db.SaveChangesAsync();
+    }
+
     private record RegRow(int Id, string? CompanyName, string PropertyCode, LandlordType Type, LandlordStatus Status,
-        int BusinessUnitId, string Email, string? Reference, bool LinkActive, DateTime UpdatedAt);
+        int BusinessUnitId, string Email, string? Reference, bool LinkActive, DateTime UpdatedAt,
+        string? Priority, int? AssignedToUserId);
 
     public async Task<Landlord?> GetByIdAsync(int id)
     {
@@ -1042,7 +1077,8 @@ public class LandlordService(
 
 public record LandlordListItem(
     int Id, string DisplayName, string PropertyCode, LandlordType Type, LandlordStatus Status, int BusinessUnitId,
-    string Email, string? Reference, bool LinkActive, DateTime UpdatedAt, int VersionCount, List<LandlordVersionInfo> Older);
+    string Email, string? Reference, bool LinkActive, DateTime UpdatedAt, int VersionCount, List<LandlordVersionInfo> Older,
+    string? Priority = null, int? AssignedToUserId = null, string? AssignedToUserName = null);
 
 /// <summary>A prior registration for the same property, retained as history.</summary>
 public record LandlordVersionInfo(int Id, LandlordStatus Status, string? Reference, DateTime UpdatedAt, int Version);
