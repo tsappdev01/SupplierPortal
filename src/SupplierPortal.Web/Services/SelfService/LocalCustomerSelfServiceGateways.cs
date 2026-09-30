@@ -21,7 +21,8 @@ public class LocalCustomerSelfServiceAccessGateway(
         var email = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Customer);
         var valid = t.ExpiresAt >= DateTime.UtcNow;
         var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
-        return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email);
+        var maskedRecipient = t.Customer is null ? null : SupplierAccessTokenService.MaskEmail(CustomerAccessTokenService.EmailFor(t.Customer));
+        return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email, maskedRecipient);
     }
 
     public async Task<(bool Success, string? Error)> SendOtpAsync(string token)

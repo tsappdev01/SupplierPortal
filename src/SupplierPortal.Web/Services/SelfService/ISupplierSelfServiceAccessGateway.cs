@@ -8,7 +8,8 @@ public record SsLinkInfo(
     int? BusinessUnitId,
     string? LogoSrc,
     bool NeedsFreshOtp,
-    string? BusinessUnitEmail = null);
+    string? BusinessUnitEmail = null,
+    string? MaskedRecipient = null);
 
 /// <summary>Gateway for the supplier self-service access flow (link resolve + OTP + session). The Internal
 /// implementation calls the domain services directly; the DMZ implementation (added in a later stage)
