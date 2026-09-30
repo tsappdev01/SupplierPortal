@@ -1,0 +1,52 @@
+@* 6. Button Loading State — Save / Submit / Approve / Pay. Shows a spinner
+   and busy label while an action runs, and is disabled throughout so the
+   user cannot trigger the same transaction twice. *@
+
+<button @attributes="Extra"
+        type="@Type"
+        class="di-load-btn di-load-btn-@Variant @Class"
+        disabled="@(Busy || Disabled)"
+        @onclick="OnClick">
+    @if (Busy)
+    {
+        <span class="di-spinner di-spinner-sm" aria-hidden="true"></span>
+        <span>@(BusyText ?? Text)</span>
+    }
+    else
+    {
+        @if (ChildContent is not null) { @ChildContent }
+        else { <span>@Text</span> }
+    }
+</button>
+
+@code {
+    /// <summary>When true the button shows a spinner + BusyText and is disabled.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Normal label.</summary>
+    [Parameter] public string Text { get; set; } = "Submit";
+
+    /// <summary>Label shown while Busy (defaults to Text).</summary>
+    [Parameter] public string? BusyText { get; set; }
+
+    /// <summary>Visual style: "primary", "secondary", "success" or "danger".</summary>
+    [Parameter] public string Variant { get; set; } = "primary";
+
+    /// <summary>HTML button type: "button" or "submit".</summary>
+    [Parameter] public string Type { get; set; } = "button";
+
+    /// <summary>Disable the button independently of Busy.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Click handler (skip for a pure type="submit" button inside an EditForm).</summary>
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Optional custom content in place of Text (non-busy state).</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Extra CSS classes.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Any additional HTML attributes (title, style, data-*, …).</summary>
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Extra { get; set; }
+}

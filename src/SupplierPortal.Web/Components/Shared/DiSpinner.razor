@@ -1,0 +1,34 @@
+@* 1. Spinner / Loader — short operations of unknown duration.
+   Inline (default) renders just the spinner; set Block="true" for the
+   centred "Processing…" panel with a caption and sub-text. *@
+
+@if (Block)
+{
+    <div class="di-spinner-block">
+        <span class="di-spinner di-spinner-@Size" role="status" aria-live="polite"></span>
+        @if (!string.IsNullOrWhiteSpace(Title)) { <span class="di-spinner-title">@Title</span> }
+        @if (!string.IsNullOrWhiteSpace(Sub)) { <span class="di-spinner-sub">@Sub</span> }
+    </div>
+}
+else
+{
+    <span class="di-spinner di-spinner-@Size @Class" role="status" aria-live="polite"
+          title="@Title" aria-label="@(string.IsNullOrWhiteSpace(Title) ? "Loading" : Title)"></span>
+}
+
+@code {
+    /// <summary>Spinner size: "sm", "md" or "lg".</summary>
+    [Parameter] public string Size { get; set; } = "md";
+
+    /// <summary>Render the centred panel with a caption instead of a bare spinner.</summary>
+    [Parameter] public bool Block { get; set; }
+
+    /// <summary>Caption (Block) or tooltip/aria-label (inline).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Secondary line shown under the caption in Block mode.</summary>
+    [Parameter] public string? Sub { get; set; }
+
+    /// <summary>Extra CSS classes for the inline spinner.</summary>
+    [Parameter] public string? Class { get; set; }
+}

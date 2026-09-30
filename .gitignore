@@ -1,0 +1,8 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+# Local secrets / overrides
+appsettings.Local.json
+# User-specific
+*.user
+.vs/

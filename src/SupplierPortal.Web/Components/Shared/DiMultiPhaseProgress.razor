@@ -1,0 +1,40 @@
+@* 10. Multi-Phase Progress — complex/long-running workflow with several
+   stages, each with its own status and note (e.g. a supplier application:
+   Submitted → Verification → Approval → Signing → Activation). *@
+
+<div class="di-phases @Class">
+    @foreach (var phase in Phases)
+    {
+        <div class="di-phase-row di-phase-@phase.State.ToString().ToLowerInvariant()">
+            <span class="di-phase-badge" aria-hidden="true">
+                @if (phase.State == DiPhaseState.Active)
+                {
+                    <span class="di-spinner di-spinner-sm"></span>
+                }
+                else if (phase.State == DiPhaseState.Done)
+                {
+                    <span>&#10003;</span>
+                }
+                else
+                {
+                    <span>&#9679;</span>
+                }
+            </span>
+            <span class="di-phase-main">
+                <span class="di-phase-name">@phase.Name</span>
+            </span>
+            @if (!string.IsNullOrWhiteSpace(phase.Meta))
+            {
+                <span class="di-phase-meta">@phase.Meta</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Ordered phases with their state and optional note.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<DiPhase> Phases { get; set; } = [];
+
+    /// <summary>Extra CSS classes on the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+}

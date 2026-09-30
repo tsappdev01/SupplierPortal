@@ -1,0 +1,25 @@
+@* 7. Overlay / Blocking Loader — disables the whole screen during a
+   critical operation. Rendered once in MainLayout and driven by
+   LoadingService (LoadingService.Show / Hide / RunAsync). *@
+@implements IDisposable
+@using SupplierPortal.Web.Services
+@inject LoadingService LoadingService
+
+@if (LoadingService.IsVisible)
+{
+    <div class="di-overlay-backdrop" role="alertdialog" aria-busy="true" aria-live="assertive">
+        <div class="di-overlay-card">
+            <span class="di-spinner di-spinner-lg"></span>
+            @if (!string.IsNullOrWhiteSpace(LoadingService.Title)) { <div class="di-overlay-title">@LoadingService.Title</div> }
+            @if (!string.IsNullOrWhiteSpace(LoadingService.Sub)) { <div class="di-overlay-sub">@LoadingService.Sub</div> }
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => LoadingService.OnChange += Handle;
+
+    private void Handle() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => LoadingService.OnChange -= Handle;
+}

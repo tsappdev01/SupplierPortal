@@ -1,0 +1,102 @@
+@implements IDisposable
+@using SupplierPortal.Web.Services
+@inject ToastService ToastService
+
+<div class="di-toast-stack">
+    @foreach (var toast in ToastService.Toasts)
+    {
+        <div class="di-toast di-toast-@toast.Level.ToString().ToLowerInvariant()">
+            <span class="di-toast-text">@toast.Text</span>
+            <button type="button" class="di-toast-dismiss" @onclick="() => ToastService.Dismiss(toast.Id)">&times;</button>
+        </div>
+    }
+</div>
+
+<style>
+    .di-toast-stack {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-width: 380px;
+    }
+
+    .di-toast {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.7rem 0.9rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+        font-size: 0.85rem;
+        color: #fff;
+        animation: di-toast-in 0.15s ease-out;
+    }
+
+    .di-toast-success { background: #1e7e34; }
+    .di-toast-error { background: #c0392b; }
+    .di-toast-warning { background: #b5892f; color: #1a2233; }
+    .di-toast-info { background: #1a2233; }
+
+    .di-toast-text {
+        flex: 1;
+        line-height: 1.4;
+    }
+
+    .di-toast-dismiss {
+        background: none;
+        border: none;
+        color: inherit;
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.8;
+    }
+
+    .di-toast-dismiss:hover {
+        opacity: 1;
+    }
+
+    @@keyframes di-toast-in {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+@code {
+    private readonly HashSet<Guid> autoTimersStarted = [];
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnChange += HandleChange;
+    }
+
+    private void HandleChange()
+    {
+        foreach (var toast in ToastService.Toasts)
+        {
+            if ((toast.Level is ToastLevel.Success or ToastLevel.Info) && autoTimersStarted.Add(toast.Id))
+            {
+                var id = toast.Id;
+                _ = AutoDismissAsync(id);
+            }
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AutoDismissAsync(Guid id)
+    {
+        await Task.Delay(5000);
+        await InvokeAsync(() => ToastService.Dismiss(id));
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnChange -= HandleChange;
+    }
+}

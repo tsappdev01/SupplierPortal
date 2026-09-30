@@ -1,0 +1,258 @@
+/* ============================================================================
+   Progress / Loading Indicator Standard
+   Shared styles for the DiSpinner, DiCircularProgress, DiLinearProgress,
+   DiIndeterminateProgress, DiSkeleton, DiLoadingButton, DiBlockingOverlay,
+   DiStepper, DiStatus and DiMultiPhaseProgress components.
+
+   These are GLOBAL (not component-scoped) so a single indicator looks the
+   same everywhere it is used. Palette mirrors the SupplierForm design tokens.
+   ============================================================================ */
+:root {
+    --di-blue: #3b5bdb;
+    --di-blue-dark: #2f49b0;
+    --di-navy: #1a2233;
+    --di-text: #3a4457;
+    --di-muted: #6b7688;
+    --di-border: #e2e5ea;
+    --di-track: #e9edf3;
+    --di-success: #1e7e34;
+    --di-warning: #b5892f;
+    --di-danger: #c0392b;
+    --di-info: #1a2233;
+}
+
+/* ---- 1. Spinner / Loader ------------------------------------------------- */
+.di-spinner {
+    display: inline-block;
+    border-radius: 50%;
+    border-style: solid;
+    border-color: var(--di-track);
+    border-top-color: var(--di-blue);
+    animation: di-spin 0.7s linear infinite;
+    vertical-align: middle;
+}
+.di-spinner-sm { width: 1em; height: 1em; border-width: 2px; }
+.di-spinner-md { width: 2.25rem; height: 2.25rem; border-width: 3px; }
+.di-spinner-lg { width: 3.25rem; height: 3.25rem; border-width: 4px; }
+.di-spinner-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1.25rem;
+    color: var(--di-muted);
+}
+.di-spinner-block .di-spinner-title { color: var(--di-navy); font-weight: 600; }
+.di-spinner-block .di-spinner-sub { font-size: 0.85rem; }
+
+@keyframes di-spin { to { transform: rotate(360deg); } }
+
+/* ---- 2. Circular Progress ------------------------------------------------ */
+.di-circular {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+}
+.di-circular-track { stroke: var(--di-track); }
+.di-circular-fill {
+    stroke: var(--di-blue);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.3s ease;
+}
+.di-circular-label {
+    font-weight: 700;
+    fill: var(--di-navy);
+    text-anchor: middle;
+    dominant-baseline: central;
+}
+.di-circular-caption { color: var(--di-navy); font-weight: 600; }
+.di-circular-sub { color: var(--di-muted); font-size: 0.82rem; }
+
+/* ---- 3. Linear Progress Bar (determinate) -------------------------------- */
+.di-linear { width: 100%; }
+.di-linear-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+}
+.di-linear-title { color: var(--di-navy); font-weight: 600; }
+.di-linear-pct { color: var(--di-muted); font-variant-numeric: tabular-nums; }
+.di-linear-track {
+    height: 0.55rem;
+    background: var(--di-track);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.di-linear-fill {
+    height: 100%;
+    background: var(--di-blue);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+.di-linear-detail { margin-top: 0.3rem; font-size: 0.8rem; color: var(--di-muted); }
+
+/* ---- 4. Indeterminate Progress Bar --------------------------------------- */
+.di-indeterminate-title { margin-bottom: 0.3rem; font-size: 0.9rem; color: var(--di-navy); font-weight: 600; }
+.di-indeterminate-track {
+    position: relative;
+    height: 0.55rem;
+    background: var(--di-track);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.di-indeterminate-track::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 40%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--di-blue), var(--di-blue-dark));
+    animation: di-indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes di-indeterminate {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+}
+
+/* ---- 5. Skeleton Loader -------------------------------------------------- */
+.di-skeleton {
+    background: linear-gradient(90deg, #eef1f5 25%, #e2e7ee 37%, #eef1f5 63%);
+    background-size: 400% 100%;
+    animation: di-shimmer 1.4s ease infinite;
+    border-radius: 6px;
+}
+.di-skeleton-line { height: 0.8rem; margin-bottom: 0.6rem; }
+.di-skeleton-circle { border-radius: 50%; }
+.di-skeleton-block { height: 4.5rem; }
+@keyframes di-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+/* ---- 6. Button Loading State --------------------------------------------- */
+.di-load-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+.di-load-btn:disabled { cursor: not-allowed; opacity: 0.75; }
+.di-load-btn-primary { background: var(--di-blue); color: #fff; }
+.di-load-btn-primary:hover:not(:disabled) { background: var(--di-blue-dark); }
+.di-load-btn-secondary { background: #fff; color: var(--di-navy); border-color: var(--di-border); }
+.di-load-btn-success { background: var(--di-success); color: #fff; }
+.di-load-btn-danger { background: var(--di-danger); color: #fff; }
+.di-load-btn .di-spinner { border-top-color: currentColor; border-color: rgba(255,255,255,0.4); border-top-color:#fff; }
+.di-load-btn-secondary .di-spinner { border-color: var(--di-track); border-top-color: var(--di-blue); }
+
+/* ---- 7. Overlay / Blocking Loader ---------------------------------------- */
+.di-overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    background: rgba(26, 34, 51, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(1px);
+    animation: di-fade-in 0.15s ease-out;
+}
+.di-overlay-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.75rem 2.25rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    max-width: 340px;
+    text-align: center;
+}
+.di-overlay-title { color: var(--di-navy); font-weight: 700; }
+.di-overlay-sub { color: var(--di-muted); font-size: 0.85rem; }
+@keyframes di-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- 8. Stepper / Workflow Progress -------------------------------------- */
+.di-stepper { display: flex; align-items: flex-start; width: 100%; }
+.di-stepper-step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+.di-stepper-node {
+    width: 2rem; height: 2rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700;
+    background: #fff; color: var(--di-muted);
+    border: 2px solid var(--di-border);
+    z-index: 1;
+}
+.di-stepper-step.is-done .di-stepper-node { background: var(--di-success); border-color: var(--di-success); color: #fff; }
+.di-stepper-step.is-current .di-stepper-node { background: var(--di-blue); border-color: var(--di-blue); color: #fff; box-shadow: 0 0 0 4px rgba(59,91,219,0.15); }
+.di-stepper-label { margin-top: 0.4rem; font-size: 0.78rem; text-align: center; color: var(--di-muted); }
+.di-stepper-step.is-done .di-stepper-label,
+.di-stepper-step.is-current .di-stepper-label { color: var(--di-navy); font-weight: 600; }
+.di-stepper-connector {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--di-border);
+    z-index: 0;
+}
+.di-stepper-step.is-done .di-stepper-connector { background: var(--di-success); }
+.di-stepper-step:last-child .di-stepper-connector { display: none; }
+.di-stepper-current-note {
+    margin-top: 1rem;
+    background: var(--di-track);
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+    color: var(--di-navy);
+}
+
+/* ---- 9. Status with Icon ------------------------------------------------- */
+.di-status { display: inline-flex; align-items: center; gap: 0.5rem; }
+.di-status-badge {
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; flex: none;
+}
+.di-status-text { display: flex; flex-direction: column; line-height: 1.25; }
+.di-status-title { font-weight: 600; color: var(--di-navy); }
+.di-status-sub { font-size: 0.8rem; color: var(--di-muted); }
+.di-status-processing .di-status-badge { background: #e8edfb; color: var(--di-blue); }
+.di-status-pending    .di-status-badge { background: #fbf1dc; color: var(--di-warning); }
+.di-status-completed  .di-status-badge { background: #e2f2e7; color: var(--di-success); }
+.di-status-failed     .di-status-badge { background: #fbe4e1; color: var(--di-danger); }
+.di-status-paused     .di-status-badge { background: #eceff3; color: var(--di-muted); }
+.di-status-retrying   .di-status-badge { background: #efe6fa; color: #7a3fc4; }
+.di-status-processing .di-status-badge .di-spinner { border-color: #c9d5f6; border-top-color: var(--di-blue); }
+
+/* ---- 10. Multi-Phase Progress -------------------------------------------- */
+.di-phases { border: 1px solid var(--di-border); border-radius: 10px; padding: 0.5rem 0.9rem; background: #fff; }
+.di-phase-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0; }
+.di-phase-row + .di-phase-row { border-top: 1px solid var(--di-track); }
+.di-phase-badge {
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; flex: none;
+    background: var(--di-track); color: var(--di-muted);
+}
+.di-phase-done .di-phase-badge { background: var(--di-success); color: #fff; }
+.di-phase-active .di-phase-badge { background: var(--di-blue); color: #fff; }
+.di-phase-main { flex: 1; }
+.di-phase-name { font-weight: 600; color: var(--di-navy); }
+.di-phase-active .di-phase-name { color: var(--di-blue); }
+.di-phase-meta { font-size: 0.8rem; color: var(--di-muted); white-space: nowrap; }

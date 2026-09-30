@@ -1,0 +1,15 @@
+@* 4. Indeterminate Progress Bar — long-running operation whose completion
+   percentage cannot be calculated (API calls, DB operations, imports). *@
+
+<div class="@Class">
+    @if (!string.IsNullOrWhiteSpace(Title)) { <div class="di-indeterminate-title">@Title</div> }
+    <div class="di-indeterminate-track" role="progressbar" aria-label="@(Title ?? "Processing")"></div>
+</div>
+
+@code {
+    /// <summary>Heading above the bar (e.g. "Processing your request…").</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Extra CSS classes on the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+}

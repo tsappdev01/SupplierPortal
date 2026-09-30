@@ -1,0 +1,105 @@
+@page "/supplier/self-service/{Token}/form"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierAccessTokenService AccessTokenService
+@inject SupplierService SupplierService
+@inject SupplierEmailService SupplierEmailService
+@inject ToastService ToastService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Supplier Information - Supplier Portal</PageTitle>
+
+<div class="di-self-service-wrap">
+    @if (loading)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (supplier is null)
+    {
+        <div class="di-self-service-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">
+                Your verification session is no longer valid. Please use the link from your email
+                again to restart verification.
+            </p>
+        </div>
+    }
+    else if (completed)
+    {
+        <div class="di-self-service-card">
+            <h1>Thank You</h1>
+            <p class="text-muted">
+                Your supplier information has been submitted successfully. Our team will review the
+                changes shortly.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="di-self-service-form">
+            <p class="text-muted mb-3">
+                Please review and update your supplier information below. Only fields belonging to
+                <strong>@supplier.SupplierName</strong> are shown.
+            </p>
+            <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="@actorLabel"
+                          AccessTokenId="accessToken!.Id" OnComplete="HandleCompleteAsync" />
+        </div>
+    }
+</div>
+
+<style>
+    .di-self-service-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        padding: 2rem;
+    }
+
+    .di-self-service-form {
+        width: 100%;
+        max-width: 960px;
+    }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private SupplierAccessToken? accessToken;
+    private Supplier? supplier;
+    private string actorLabel = "Supplier Self-Service";
+    private bool loading = true;
+    private bool completed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SessionToken))
+        {
+            accessToken = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+        }
+
+        if (accessToken is not null)
+        {
+            supplier = await SupplierService.GetByIdAsync(accessToken.SupplierId);
+            actorLabel = $"Supplier Self-Service ({supplier?.ContactEmail})";
+        }
+
+        loading = false;
+    }
+
+    private async Task HandleCompleteAsync(Supplier updated)
+    {
+        if (accessToken is not null)
+        {
+            await AccessTokenService.MarkUsedAsync(accessToken.Id);
+            await SupplierEmailService.NotifyRequestorOfSubmissionAsync(updated, accessToken.CreatedBy, NavigationManager.BaseUri);
+        }
+        completed = true;
+        ToastService.ShowSuccess("Your supplier information has been submitted.");
+    }
+}

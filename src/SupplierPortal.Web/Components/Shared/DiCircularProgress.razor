@@ -1,0 +1,52 @@
+@* 2. Circular Progress — shows actual percentage completion (e.g. file
+   upload / document processing). Pure SVG so it needs no JS. *@
+
+<div class="di-circular">
+    <svg width="@Diameter" height="@Diameter" viewBox="0 0 @Diameter @Diameter"
+         role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Clamped">
+        <circle class="di-circular-track" cx="@C" cy="@C" r="@R"
+                fill="none" stroke-width="@Thickness" />
+        <circle class="di-circular-fill" cx="@C" cy="@C" r="@R"
+                fill="none" stroke-width="@Thickness"
+                transform="rotate(-90 @C @C)"
+                stroke-dasharray="@Circumference.ToString(Ci)"
+                stroke-dashoffset="@Offset.ToString(Ci)" />
+        @if (ShowLabel)
+        {
+            <text class="di-circular-label" x="@C" y="@C" font-size="@LabelSize">@Clamped%</text>
+        }
+    </svg>
+    @if (!string.IsNullOrWhiteSpace(Caption)) { <span class="di-circular-caption">@Caption</span> }
+    @if (!string.IsNullOrWhiteSpace(Sub)) { <span class="di-circular-sub">@Sub</span> }
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Ci = System.Globalization.CultureInfo.InvariantCulture;
+
+    /// <summary>Completion percentage (0–100).</summary>
+    [Parameter] public double Value { get; set; }
+
+    /// <summary>Outer diameter in pixels.</summary>
+    [Parameter] public int Diameter { get; set; } = 110;
+
+    /// <summary>Ring thickness in pixels.</summary>
+    [Parameter] public int Thickness { get; set; } = 10;
+
+    /// <summary>Show the "NN%" label in the centre.</summary>
+    [Parameter] public bool ShowLabel { get; set; } = true;
+
+    /// <summary>Bold caption under the ring (e.g. "Uploading Document…").</summary>
+    [Parameter] public string? Caption { get; set; }
+
+    /// <summary>Muted sub-line (e.g. "65% complete").</summary>
+    [Parameter] public string? Sub { get; set; }
+
+    private int Clamped => (int)Math.Round(Math.Clamp(Value, 0, 100));
+    private double Center => Diameter / 2.0;
+    private double Radius => Center - Thickness / 2.0;
+    private string C => Center.ToString(Ci);
+    private string R => Radius.ToString(Ci);
+    private double Circumference => 2 * Math.PI * Radius;
+    private double Offset => Circumference * (1 - Clamped / 100.0);
+    private int LabelSize => (int)(Diameter * 0.2);
+}

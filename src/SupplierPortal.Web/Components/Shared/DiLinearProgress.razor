@@ -1,0 +1,35 @@
+@* 3. Linear Progress Bar — determinate. Use when the percentage is known
+   (uploads, downloads, import with a known row count). *@
+
+<div class="di-linear @Class">
+    @if (!string.IsNullOrWhiteSpace(Title) || ShowPercent)
+    {
+        <div class="di-linear-head">
+            <span class="di-linear-title">@Title</span>
+            @if (ShowPercent) { <span class="di-linear-pct">@Clamped%</span> }
+        </div>
+    }
+    <div class="di-linear-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Clamped">
+        <div class="di-linear-fill" style="width:@Clamped%"></div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(Detail)) { <div class="di-linear-detail">@Detail</div> }
+</div>
+
+@code {
+    /// <summary>Completion percentage (0–100).</summary>
+    [Parameter] public double Value { get; set; }
+
+    /// <summary>Heading above the bar (e.g. "Uploading file…").</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Small text under the bar (e.g. "5.6 MB of 8 MB").</summary>
+    [Parameter] public string? Detail { get; set; }
+
+    /// <summary>Show the "NN%" figure on the right of the heading row.</summary>
+    [Parameter] public bool ShowPercent { get; set; } = true;
+
+    /// <summary>Extra CSS classes on the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private int Clamped => (int)Math.Round(Math.Clamp(Value, 0, 100));
+}

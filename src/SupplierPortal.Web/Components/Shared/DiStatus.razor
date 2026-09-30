@@ -1,0 +1,51 @@
+@* 9. Status with Icon — quick visual indication of the current state
+   (Processing / Pending / Completed / Failed / Paused / Retrying). *@
+
+<div class="di-status di-status-@Kind.ToString().ToLowerInvariant()">
+    <span class="di-status-badge" aria-hidden="true">
+        @if (Kind == DiStatusKind.Processing)
+        {
+            <span class="di-spinner di-spinner-sm"></span>
+        }
+        else
+        {
+            @((MarkupString)Glyph)
+        }
+    </span>
+    <span class="di-status-text">
+        <span class="di-status-title">@(Title ?? DefaultTitle)</span>
+        @if (!string.IsNullOrWhiteSpace(Sub)) { <span class="di-status-sub">@Sub</span> }
+    </span>
+</div>
+
+@code {
+    /// <summary>Which state to show.</summary>
+    [Parameter, EditorRequired] public DiStatusKind Kind { get; set; }
+
+    /// <summary>Override the default title text.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Secondary line under the title.</summary>
+    [Parameter] public string? Sub { get; set; }
+
+    private string DefaultTitle => Kind switch
+    {
+        DiStatusKind.Processing => "Processing",
+        DiStatusKind.Pending => "Pending",
+        DiStatusKind.Completed => "Completed",
+        DiStatusKind.Failed => "Failed",
+        DiStatusKind.Paused => "Paused",
+        DiStatusKind.Retrying => "Retrying",
+        _ => Kind.ToString(),
+    };
+
+    private string Glyph => Kind switch
+    {
+        DiStatusKind.Pending => "&#8987;",     // hourglass
+        DiStatusKind.Completed => "&#10003;",  // check
+        DiStatusKind.Failed => "&#10007;",     // cross
+        DiStatusKind.Paused => "&#10073;&#10073;", // pause bars
+        DiStatusKind.Retrying => "&#8635;",    // circular arrow
+        _ => "",
+    };
+}

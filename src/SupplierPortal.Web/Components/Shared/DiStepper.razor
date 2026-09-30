@@ -1,0 +1,35 @@
+@* 8. Stepper / Workflow Progress — current stage in a multi-step process
+   (application flow, approval, onboarding). Pass the ordered step labels
+   and the zero-based index of the current step. *@
+
+<div>
+    <div class="di-stepper">
+        @for (var i = 0; i < Steps.Count; i++)
+        {
+            var state = i < Current ? "is-done" : i == Current ? "is-current" : "";
+            <div class="di-stepper-step @state">
+                <div class="di-stepper-connector"></div>
+                <div class="di-stepper-node">
+                    @if (i < Current) { <span aria-hidden="true">&#10003;</span> }
+                    else { @(i + 1) }
+                </div>
+                <div class="di-stepper-label">@Steps[i]</div>
+            </div>
+        }
+    </div>
+    @if (ShowCurrentNote && Current >= 0 && Current < Steps.Count)
+    {
+        <div class="di-stepper-current-note"><strong>Current step:</strong> @Steps[Current]</div>
+    }
+</div>
+
+@code {
+    /// <summary>Ordered step labels.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> Steps { get; set; } = [];
+
+    /// <summary>Zero-based index of the current (in-progress) step.</summary>
+    [Parameter] public int Current { get; set; }
+
+    /// <summary>Show the "Current step: …" note under the stepper.</summary>
+    [Parameter] public bool ShowCurrentNote { get; set; } = true;
+}

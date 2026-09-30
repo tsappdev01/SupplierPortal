@@ -1,0 +1,150 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Services
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="top-row ps-3 di-sidebar-brand">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <img src="/images/di-logo.png" alt="Dubai Investments" class="di-brand-logo" />
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        @if (isAuthenticated)
+        {
+            <div class="di-profile-card">
+                @if (hasPhoto)
+                {
+                    <img src="/users/@userId/photo" alt="" class="di-profile-photo" />
+                }
+                else
+                {
+                    <span class="di-profile-photo di-profile-initials">@GetInitials(fullName)</span>
+                }
+                <div class="di-profile-text">
+                    <span class="di-profile-name">@fullName</span>
+                    @if (designation is not null)
+                    {
+                        <span class="di-profile-designation">@designation</span>
+                    }
+                </div>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    Home
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="supplier/dashboard">
+                    Manage Supplier
+                </NavLink>
+            </div>
+
+            @if (isAdministrator)
+            {
+                <div class="nav-item px-3">
+                    <button type="button" class="nav-link di-group-toggle" @onclick="ToggleSetup">
+                        <span>Settings</span>
+                        <svg class="di-chevron @(setupExpanded ? "di-chevron-open" : "")" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.646 6.146a.5.5 0 0 1 .708 0L8 8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708Z" />
+                        </svg>
+                    </button>
+                </div>
+                @if (setupExpanded)
+                {
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/business-units">
+                            Business Unit
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/users">
+                            Manage Users
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/supplier-fields">
+                            Supplier Fields
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/audit-log">
+                            Audit Log
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/ui-components">
+                            UI Components
+                        </NavLink>
+                    </div>
+                }
+            }
+
+            <div class="di-nav-spacer"></div>
+            <div class="di-nav-logout">
+                <form method="post" action="/account/logout">
+                    <button type="submit" class="di-logout-btn" title="Logout (@fullName)">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2Z" />
+                            <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3Z" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="account/login">
+                    Login
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool isAuthenticated;
+    private bool isAdministrator;
+    private int userId;
+    private string fullName = "";
+    private string? designation;
+    private bool hasPhoto;
+    private bool setupExpanded = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = state.User.Identity?.IsAuthenticated ?? false;
+
+        if (isAuthenticated)
+        {
+            isAdministrator = state.User.IsAdministrator();
+            userId = state.User.GetUserId();
+            fullName = state.User.GetFullName();
+            designation = state.User.GetDesignation();
+            hasPhoto = state.User.HasPhoto();
+        }
+
+        setupExpanded = NavigationManager.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ToggleSetup()
+    {
+        setupExpanded = !setupExpanded;
+    }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2 ? name[..2].ToUpperInvariant() : name.ToUpperInvariant();
+    }
+}

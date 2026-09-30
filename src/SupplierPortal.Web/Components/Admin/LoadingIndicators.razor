@@ -1,0 +1,162 @@
+@page "/admin/ui-components"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Components.Shared
+@using SupplierPortal.Web.Services
+@inject LoadingService LoadingService
+
+<PageTitle>Loading Indicators - Supplier Portal</PageTitle>
+
+<h1>Progress / Loading Indicators</h1>
+<p class="text-muted" style="max-width:820px">
+    The standard component set for communicating system activity. Pick the indicator that matches the
+    <strong>nature, duration and measurability</strong> of the operation — never a single indicator for everything.
+    All components live in <code>Components/Shared</code> and are styled by <code>wwwroot/di-progress.css</code>.
+</p>
+
+<div class="di-ref-grid">
+
+    <section class="di-ref-card">
+        <h3>1 · Spinner / Loader</h3>
+        <p class="di-ref-use">Short operation, unknown duration — Save, Submit, API call, Login.</p>
+        <DiSpinner Block="true" Title="Processing…" Sub="Please wait while we complete your request." />
+        <code class="di-ref-code">&lt;DiSpinner Block="true" Title="Processing…" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>2 · Circular Progress</h3>
+        <p class="di-ref-use">Known percentage — file upload, document processing.</p>
+        <DiCircularProgress Value="@pct" Caption="Uploading Document…" Sub="@($"{(int)pct}% complete")" />
+        <code class="di-ref-code">&lt;DiCircularProgress Value="65" Caption="Uploading…" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>3 · Linear Progress Bar</h3>
+        <p class="di-ref-use">Known percentage — upload, download, import with a row count.</p>
+        <DiLinearProgress Value="@pct" Title="Uploading file…" Detail="@($"{pct/100.0*8:0.0} MB of 8 MB")" />
+        <code class="di-ref-code">&lt;DiLinearProgress Value="70" Title="Uploading file…" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>4 · Indeterminate Progress</h3>
+        <p class="di-ref-use">Long op, unknown % — API calls, DB operations, imports.</p>
+        <DiIndeterminateProgress Title="Processing your request…" />
+        <code class="di-ref-code">&lt;DiIndeterminateProgress Title="Processing…" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>5 · Skeleton Loader</h3>
+        <p class="di-ref-use">Loading page/content — listings, dashboards, reports.</p>
+        <DiSkeleton Variant="card" Columns="4" />
+        <code class="di-ref-code">&lt;DiSkeleton Variant="card" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>6 · Button Loading State</h3>
+        <p class="di-ref-use">Save / Submit / Approve / Pay — prevents duplicate clicks.</p>
+        <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+            <DiLoadingButton Variant="primary" Text="Submit" BusyText="Submitting…" Busy="@btnBusy" OnClick="DemoButtonAsync" />
+            <DiLoadingButton Variant="success" Text="Submitted" Disabled="true" />
+        </div>
+        <code class="di-ref-code">&lt;DiLoadingButton Busy="@@saving" BusyText="Submitting…" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>7 · Overlay / Blocking Loader</h3>
+        <p class="di-ref-use">Critical op — payment, contract generation, submission.</p>
+        <DiLoadingButton Variant="secondary" Text="Show overlay (2s)" OnClick="DemoOverlayAsync" />
+        <code class="di-ref-code">await LoadingService.RunAsync(work, "Processing…");</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>8 · Stepper / Workflow</h3>
+        <p class="di-ref-use">Multi-step process — application flow, approval, onboarding.</p>
+        <DiStepper Steps="@(new[] {"Draft","Submitted","Under Review","Approval","Activation"})" Current="2" />
+        <code class="di-ref-code">&lt;DiStepper Steps="steps" Current="2" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>9 · Status with Icon</h3>
+        <p class="di-ref-use">Current state — Processing / Pending / Completed / Failed / Paused / Retrying.</p>
+        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+            <DiStatus Kind="DiStatusKind.Processing" Sub="Your request is being processed…" />
+            <DiStatus Kind="DiStatusKind.Completed" Sub="Action completed successfully." />
+            <DiStatus Kind="DiStatusKind.Failed" Sub="Something went wrong. Please try again." />
+            <DiStatus Kind="DiStatusKind.Retrying" Sub="Attempting again in 10 seconds." />
+        </div>
+        <code class="di-ref-code">&lt;DiStatus Kind="DiStatusKind.Completed" /&gt;</code>
+    </section>
+
+    <section class="di-ref-card">
+        <h3>10 · Multi-Phase Progress</h3>
+        <p class="di-ref-use">Complex workflow with details — application, compliance checks.</p>
+        <DiMultiPhaseProgress Phases="@phases" />
+        <code class="di-ref-code">&lt;DiMultiPhaseProgress Phases="phases" /&gt;</code>
+    </section>
+
+</div>
+
+<h2 style="margin-top:2rem">Selection rules</h2>
+<table class="table table-sm" style="max-width:900px">
+    <thead><tr><th>Scenario</th><th>Indicator</th></tr></thead>
+    <tbody>
+        <tr><td>Short operation, unknown duration</td><td>Spinner / Loader</td></tr>
+        <tr><td>Known percentage completion</td><td>Linear Progress Bar</td></tr>
+        <tr><td>File upload / download</td><td>Linear or Circular Progress</td></tr>
+        <tr><td>Long op, unknown completion %</td><td>Indeterminate Progress Bar</td></tr>
+        <tr><td>Loading page / content / data</td><td>Skeleton Loader</td></tr>
+        <tr><td>Save / Submit / Approve / Pay</td><td>Button Loading State</td></tr>
+        <tr><td>Critical or blocking operation</td><td>Overlay / Blocking Loader</td></tr>
+        <tr><td>Multi-step business process</td><td>Stepper / Workflow Progress</td></tr>
+        <tr><td>Processing / Pending / Completed / Failed</td><td>Status Icon with Label</td></tr>
+        <tr><td>Complex or long-running workflow</td><td>Multi-Phase Progress</td></tr>
+    </tbody>
+</table>
+
+<style>
+    .di-ref-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:1rem; margin-top:1rem; }
+    .di-ref-card { border:1px solid #e2e5ea; border-radius:10px; padding:1rem 1.1rem; background:#fff; }
+    .di-ref-card h3 { font-size:1rem; margin:0 0 0.25rem; color:#1a2233; }
+    .di-ref-use { font-size:0.82rem; color:#6b7688; margin:0 0 0.9rem; }
+    .di-ref-code { display:block; margin-top:0.9rem; font-size:0.75rem; color:#46618f; background:#f4f6f9; padding:0.4rem 0.55rem; border-radius:5px; overflow-x:auto; }
+</style>
+
+@code {
+    private double pct = 15;
+    private bool btnBusy;
+    private System.Threading.Timer? timer;
+
+    private readonly List<DiPhase> phases =
+    [
+        new("Application Submitted", DiPhaseState.Done, "10 Sep 2026, 10:24 AM"),
+        new("Document Verification", DiPhaseState.Done, "10 Sep 2026, 02:15 PM"),
+        new("Approval in Progress", DiPhaseState.Active, "Currently with Legal Team"),
+        new("Contract Signing", DiPhaseState.Pending, "Pending"),
+        new("Activation", DiPhaseState.Pending, "Pending"),
+    ];
+
+    protected override void OnInitialized()
+    {
+        // Animate the determinate demos so the page reads as "live".
+        timer = new System.Threading.Timer(_ =>
+        {
+            pct += 5;
+            if (pct > 100) pct = 5;
+            InvokeAsync(StateHasChanged);
+        }, null, 900, 900);
+    }
+
+    private async Task DemoButtonAsync()
+    {
+        btnBusy = true;
+        try { await Task.Delay(2000); }
+        finally { btnBusy = false; }
+    }
+
+    private Task DemoOverlayAsync()
+        => LoadingService.RunAsync(() => Task.Delay(2000), "Processing…", "Please do not close this page.");
+
+    public void Dispose() => timer?.Dispose();
+}

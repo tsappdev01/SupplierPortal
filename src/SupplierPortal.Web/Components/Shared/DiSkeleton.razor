@@ -1,0 +1,67 @@
+@* 5. Skeleton Loader — shows the structure of the page while data loads
+   (listing pages, dashboards, reports). *@
+
+@if (Variant == "list")
+{
+    <div class="@Class">
+        @for (var i = 0; i < Rows; i++)
+        {
+            <div class="di-skeleton di-skeleton-line" style="width:@LineWidth(i)"></div>
+        }
+    </div>
+}
+else if (Variant == "card")
+{
+    <div class="@Class">
+        <div style="display:flex; gap:1rem; align-items:center; margin-bottom:1rem;">
+            <div class="di-skeleton di-skeleton-circle" style="width:3rem; height:3rem; flex:none;"></div>
+            <div style="flex:1;">
+                <div class="di-skeleton di-skeleton-line" style="width:45%;"></div>
+                <div class="di-skeleton di-skeleton-line" style="width:70%; margin-bottom:0;"></div>
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(@Columns, 1fr); gap:1rem;">
+            @for (var i = 0; i < Columns; i++)
+            {
+                <div class="di-skeleton di-skeleton-block"></div>
+            }
+        </div>
+    </div>
+}
+else @* "table" *@
+{
+    <div class="@Class">
+        @for (var r = 0; r < Rows; r++)
+        {
+            <div style="display:grid; grid-template-columns:repeat(@Columns, 1fr); gap:1rem; margin-bottom:0.7rem;">
+                @for (var c = 0; c < Columns; c++)
+                {
+                    <div class="di-skeleton di-skeleton-line" style="margin-bottom:0;"></div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>"list", "card" or "table".</summary>
+    [Parameter] public string Variant { get; set; } = "list";
+
+    /// <summary>Number of skeleton rows.</summary>
+    [Parameter] public int Rows { get; set; } = 4;
+
+    /// <summary>Columns for "table"/"card" variants.</summary>
+    [Parameter] public int Columns { get; set; } = 4;
+
+    /// <summary>Extra CSS classes on the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    // Vary list-line widths so the placeholder reads as real content.
+    private static string LineWidth(int i) => (i % 4) switch
+    {
+        0 => "92%",
+        1 => "78%",
+        2 => "85%",
+        _ => "60%",
+    };
+}

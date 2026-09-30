@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+
+<div class="public-layout">
+    <div class="public-header">
+        <img src="/images/di-logo.png" alt="Dubai Investments" class="public-brand-logo" />
+    </div>
+    <div class="public-content">
+        @Body
+    </div>
+</div>
+
+<ToastContainer @rendermode="InteractiveServer" />
+
+<style>
+    .public-layout {
+        min-height: 100vh;
+        background-color: #f4f6f9;
+    }
+
+    .public-header {
+        background-color: #1a2233;
+        padding: 0.9rem 1.5rem;
+    }
+
+    .public-brand-logo {
+        height: 2.5rem;
+        width: auto;
+        border-radius: 4px;
+    }
+
+    .public-content {
+        display: flex;
+        justify-content: center;
+        padding: 2.5rem 1rem;
+    }
+</style>
