@@ -74,28 +74,29 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                 unique: true);
 
             // ---- Seed the landlord field catalog (primary contact + company) ----
-            var cols = new[]
-            {
-                "FieldKey", "DisplayLabel", "Section", "GroupName", "Sequence", "FieldKind",
-                "BusinessControl", "LandlordControl", "IsVisible", "IsRequired", "IsRemoved"
-            };
-            object[] Row(string key, string label, string section, string group, int seq, string kind, bool required) =>
-                new object[] { key, label, section, group, seq, kind, "Editable", "Editable", true, required, false };
-
+            // NB: a rectangular object[,] is required here — a jagged object[][] binds to the single-row
+            // InsertData overload and throws a values/columns count mismatch at startup. Column order below
+            // must match the `columns` array exactly:
+            // FieldKey, DisplayLabel, Section, GroupName, Sequence, FieldKind, BusinessControl, LandlordControl,
+            // IsVisible, IsRequired, IsRemoved.
             migrationBuilder.InsertData(
                 schema: "leasing",
                 table: "LandlordFieldConfigs",
-                columns: cols,
-                values: new[]
+                columns: new[]
                 {
-                    Row("FullName", "Full Name", "Contact", "Primary Contact", 1, "text", true),
-                    Row("Designation", "Designation", "Contact", "Primary Contact", 2, "text", false),
-                    Row("Mobile", "Mobile Number", "Contact", "Primary Contact", 3, "phone", true),
-                    Row("Email", "Email", "Contact", "Primary Contact", 4, "text", true),
-                    Row("EmiratesId", "Emirates ID", "Contact", "Primary Contact", 5, "text", false),
-                    Row("EmiratesIdName", "Name (as per Emirates ID)", "Contact", "Primary Contact", 6, "text", false),
-                    Row("EmiratesIdExpiry", "Emirates ID Expiry", "Contact", "Primary Contact", 7, "date", false),
-                    Row("CompanyName", "Company Name", "Landlord", "Company", 1, "text", false),
+                    "FieldKey", "DisplayLabel", "Section", "GroupName", "Sequence", "FieldKind",
+                    "BusinessControl", "LandlordControl", "IsVisible", "IsRequired", "IsRemoved"
+                },
+                values: new object[,]
+                {
+                    { "FullName", "Full Name", "Contact", "Primary Contact", 1, "text", "Editable", "Editable", true, true, false },
+                    { "Designation", "Designation", "Contact", "Primary Contact", 2, "text", "Editable", "Editable", true, false, false },
+                    { "Mobile", "Mobile Number", "Contact", "Primary Contact", 3, "phone", "Editable", "Editable", true, true, false },
+                    { "Email", "Email", "Contact", "Primary Contact", 4, "text", "Editable", "Editable", true, true, false },
+                    { "EmiratesId", "Emirates ID", "Contact", "Primary Contact", 5, "text", "Editable", "Editable", true, false, false },
+                    { "EmiratesIdName", "Name (as per Emirates ID)", "Contact", "Primary Contact", 6, "text", "Editable", "Editable", true, false, false },
+                    { "EmiratesIdExpiry", "Emirates ID Expiry", "Contact", "Primary Contact", 7, "date", "Editable", "Editable", true, false, false },
+                    { "CompanyName", "Company Name", "Landlord", "Company", 1, "text", "Editable", "Editable", true, false, false },
                 });
 
             migrationBuilder.InsertData(
