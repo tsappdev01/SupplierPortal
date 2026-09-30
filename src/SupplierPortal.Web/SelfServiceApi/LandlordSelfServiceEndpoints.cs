@@ -66,7 +66,7 @@ public static class LandlordSelfServiceEndpoints
             {
                 Success = t is not null,
                 BusinessUnitName = buId is int b1 ? await branding.GetBusinessUnitNameAsync(b1) : null,
-                BusinessUnitEmail = buId is int b2 ? await branding.GetBusinessUnitEmailAsync(b2) : null,
+                BusinessUnitEmail = buId is int b2 ? await branding.GetPortalSenderEmailAsync(b2, Models.PortalType.Landlord) : null,
                 LogoUrl = buId is int b3 ? await branding.GetBusinessUnitLogoSrcAsync(b3) : null
             });
         }).RequireRateLimiting("otp");

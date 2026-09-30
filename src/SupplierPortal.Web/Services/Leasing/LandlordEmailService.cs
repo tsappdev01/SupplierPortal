@@ -196,12 +196,13 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
             <div style=""font-size:14px;color:#20262D"">{E(text)}</div></td></tr></table>";
 
     /// <summary>Sends through the shared dispatcher (Graph → SMTP → Database Mail). The email is sent from the
-    /// record's Business Unit email address (its configured sender) with the BU brand as the display name; when no
-    /// BU email is configured the dispatcher's default sender is used. Best-effort — a failure is logged, not thrown.</summary>
+    /// Business Unit's Landlord-portal sender address (falling back to the BU's generic email) with the BU brand as
+    /// the display name; when neither is configured the dispatcher's default sender is used. Best-effort — a failure
+    /// is logged, not thrown.</summary>
     private async Task SendAsync(string toEmail, string subject, string body, int? businessUnitId = null, string? actorUsername = null)
     {
         if (string.IsNullOrWhiteSpace(toEmail)) { logger.LogWarning("Landlord email skipped: no recipient address."); return; }
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Landlord);
         var fromName = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var (ok, error) = await emailDispatcher.SendHtmlAsync(toEmail, subject, body, fromEmail: fromEmail, fromName: fromName);
         if (ok)

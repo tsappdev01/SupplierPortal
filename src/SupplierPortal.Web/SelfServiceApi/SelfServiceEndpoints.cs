@@ -91,7 +91,7 @@ public static class SelfServiceEndpoints
             {
                 Success = true,
                 BusinessUnitName = await branding.GetBusinessUnitNameAsync(buId),
-                BusinessUnitEmail = await branding.GetBusinessUnitEmailAsync(buId),
+                BusinessUnitEmail = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Supplier),
                 LogoUrl = await logoInliner.InlineIfUrlAsync(await branding.GetBusinessUnitLogoSrcAsync(buId))
             });
         })

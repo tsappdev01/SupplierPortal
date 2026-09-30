@@ -21,6 +21,17 @@ public enum PortalAccess
     Customer = 8
 }
 
+/// <summary>A single business portal, used to resolve the portal-specific sender e-mail for a Business Unit
+/// (EmailBrandingService.GetPortalSenderEmailAsync). Unlike the <see cref="PortalAccess"/> bit-flags (which
+/// grant access), this names exactly one portal for sender resolution.</summary>
+public enum PortalType
+{
+    Supplier = 1,
+    Customer = 2,
+    Landlord = 3,
+    Broker = 4
+}
+
 /// <summary>How a user's credentials are verified at login. Local = password hash in this database
 /// (used by the seeded break-glass admin); ActiveDirectory = validated against on-prem AD via LDAP.</summary>
 public enum AuthSource

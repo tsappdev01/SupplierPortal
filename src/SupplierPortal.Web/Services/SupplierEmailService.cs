@@ -108,7 +108,7 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Supplier);
         var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {
@@ -177,7 +177,7 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Update Submitted - {supplier.SupplierName}";
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(supplier.BusinessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(supplier.BusinessUnitId, Models.PortalType.Supplier);
         var (ok, _) = await emailDispatcher.SendHtmlAsync(recipient!, subject, body, fromEmail: fromEmail, fromName: brand);
         if (ok)
         {
@@ -234,7 +234,7 @@ public class SupplierEmailService(
 
         var subject = $"Supplier Registration Completed — {supplierName}";
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Supplier);
         var (ok, error) = await emailDispatcher.SendHtmlAsync(contactEmail, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {

@@ -8,6 +8,13 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
+/// <summary>The four portal-specific sender e-mail addresses for a Business Unit (BU + Portal level). A
+/// null/blank entry falls back to the unit's generic <see cref="BusinessUnit.Email"/> at send time.</summary>
+public sealed record PortalSenderEmails(string? Supplier, string? Customer, string? Landlord, string? Broker)
+{
+    public static readonly PortalSenderEmails Empty = new(null, null, null, null);
+}
+
 public class BusinessUnitService(
     IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache,
     SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
@@ -49,9 +56,13 @@ public class BusinessUnitService(
         }))!;
     }
 
+    /// <summary>Trims a sender e-mail entry to null when blank so unset portal addresses fall back to the
+    /// generic BU email at send time.</summary>
+    private static string? CleanEmail(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     public async Task<(bool Success, string? Error)> AddAsync(
         string name, string? code, string? domain, string? email, string? logoUrl, byte[]? logo, string? logoContentType,
-        byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
+        byte[]? thumbnail, string? thumbnailContentType, string actorUsername, PortalSenderEmails? portalEmails = null)
     {
         name = name.Trim();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -77,6 +88,10 @@ public class BusinessUnitService(
             Code = finalCode,
             Domain = NormalizeDomain(domain),
             Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim(),
+            SupplierSenderEmail = CleanEmail((portalEmails ?? PortalSenderEmails.Empty).Supplier),
+            CustomerSenderEmail = CleanEmail((portalEmails ?? PortalSenderEmails.Empty).Customer),
+            LandlordSenderEmail = CleanEmail((portalEmails ?? PortalSenderEmails.Empty).Landlord),
+            BrokerSenderEmail = CleanEmail((portalEmails ?? PortalSenderEmails.Empty).Broker),
             LogoUrl = NormalizeUrl(logoUrl),
             Logo = logoBytes,
             LogoContentType = logoContentType,
@@ -102,7 +117,7 @@ public class BusinessUnitService(
 
     public async Task<(bool Success, string? Error)> UpdateAsync(
         int id, string name, string code, string? domain, string? email, string? logoUrl, byte[]? logo, string? logoContentType,
-        byte[]? thumbnail, string? thumbnailContentType, string actorUsername)
+        byte[]? thumbnail, string? thumbnailContentType, string actorUsername, PortalSenderEmails? portalEmails = null)
     {
         name = name.Trim();
         code = code.Trim().ToUpperInvariant();
@@ -128,6 +143,13 @@ public class BusinessUnitService(
         businessUnit.Code = code;
         businessUnit.Domain = NormalizeDomain(domain);
         businessUnit.Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+        if (portalEmails is not null)
+        {
+            businessUnit.SupplierSenderEmail = CleanEmail(portalEmails.Supplier);
+            businessUnit.CustomerSenderEmail = CleanEmail(portalEmails.Customer);
+            businessUnit.LandlordSenderEmail = CleanEmail(portalEmails.Landlord);
+            businessUnit.BrokerSenderEmail = CleanEmail(portalEmails.Broker);
+        }
         businessUnit.LogoUrl = NormalizeUrl(logoUrl);
         // Logo and thumbnail are independent uploads: each is replaced only when a new file is supplied.
         if (logo is not null)

@@ -107,6 +107,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BrokerSenderEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -115,11 +119,19 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CustomerSenderEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("Domain")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("LandlordSenderEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
@@ -142,6 +154,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SupplierSenderEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<byte[]>("Thumbnail")
                         .HasColumnType("varbinary(max)");

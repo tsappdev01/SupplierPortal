@@ -19,7 +19,7 @@ public class LocalSupplierSelfServiceAccessGateway(
 
         var buId = t.Supplier?.BusinessUnitId;
         var logo = buId is null ? null : await branding.GetBusinessUnitUploadedLogoSrcAsync(buId);
-        var email = await branding.GetBusinessUnitEmailAsync(buId);
+        var email = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Supplier);
         var valid = t.ExpiresAt >= DateTime.UtcNow;
         var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
         return new SsLinkInfo(valid, t.Supplier?.SupplierName, buId, logo, needsFresh, email);

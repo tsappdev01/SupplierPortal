@@ -68,7 +68,7 @@ public static class CustomerSelfServiceEndpoints
             {
                 Success = true,
                 BusinessUnitName = await branding.GetBusinessUnitNameAsync(buId),
-                BusinessUnitEmail = await branding.GetBusinessUnitEmailAsync(buId),
+                BusinessUnitEmail = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Customer),
                 LogoUrl = await logoInliner.InlineIfUrlAsync(await branding.GetBusinessUnitUploadedLogoSrcAsync(buId))
             });
         })

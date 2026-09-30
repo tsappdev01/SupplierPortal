@@ -31,10 +31,38 @@
         <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. supplier.dipark.com" />
     </div>
     <div class="mb-3">
-        <label class="form-label">Email Address <span class="text-muted small">(contact / reply-to for this unit's communications)</span></label>
+        <label class="form-label">Email Address <span class="text-muted small">(default sender / reply-to for this unit's communications)</span></label>
         <InputText type="email" class="form-control" @bind-Value="Input.Email" placeholder="e.g. supplier.support@dipark.com" />
         <ValidationMessage For="() => Input.Email" class="text-danger" />
     </div>
+
+    <fieldset class="mb-3" style="border:1px solid #dee2e6; border-radius:8px; padding:12px 14px;">
+        <legend class="form-label" style="font-size:0.95rem; font-weight:600; float:none; width:auto; margin-bottom:4px;">
+            Portal sender email addresses
+        </legend>
+        <div class="form-text mb-2">A dedicated sender for each portal's system emails. When left blank, the
+            Email Address above is used.</div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Supplier Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.SupplierSenderEmail" placeholder="e.g. purchase@dipark.com" />
+            <ValidationMessage For="() => Input.SupplierSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Customer Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.CustomerSenderEmail" placeholder="e.g. businessrelation@dipark.com" />
+            <ValidationMessage For="() => Input.CustomerSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Landlord Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.LandlordSenderEmail" placeholder="e.g. tenantrelation@dipark.com" />
+            <ValidationMessage For="() => Input.LandlordSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-0">
+            <label class="form-label mb-1">Broker Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.BrokerSenderEmail" placeholder="e.g. broker@dipark.com" />
+            <ValidationMessage For="() => Input.BrokerSenderEmail" class="text-danger" />
+        </div>
+    </fieldset>
     <div class="mb-3">
         <label class="form-label">Logo URL <span class="text-muted small">(used in emails &amp; external links)</span></label>
         <InputText class="form-control" @bind-Value="Input.LogoUrl" placeholder="e.g. https://cdn.dipark.com/logo.png" />
@@ -111,7 +139,8 @@
     private async Task SaveAsync()
     {
         var (success, error) = await Loading.RunAsync(
-            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, Input.Email, Input.LogoUrl, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser));
+            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, Input.Email, Input.LogoUrl, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser,
+                new PortalSenderEmails(Input.SupplierSenderEmail, Input.CustomerSenderEmail, Input.LandlordSenderEmail, Input.BrokerSenderEmail)));
         if (!success)
         {
             errorMessage = error;
@@ -133,6 +162,22 @@
         [System.ComponentModel.DataAnnotations.MaxLength(256)]
         [System.ComponentModel.DataAnnotations.EmailAddress]
         public string? Email { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? SupplierSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? CustomerSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? LandlordSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? BrokerSenderEmail { get; set; }
 
         [System.ComponentModel.DataAnnotations.MaxLength(500)]
         public string? LogoUrl { get; set; }

@@ -18,7 +18,7 @@ public class LocalCustomerSelfServiceAccessGateway(
         }
         var buId = t.Customer?.BusinessUnitId;
         var logo = await branding.GetBusinessUnitUploadedLogoSrcAsync(buId);
-        var email = await branding.GetBusinessUnitEmailAsync(buId);
+        var email = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Customer);
         var valid = t.ExpiresAt >= DateTime.UtcNow;
         var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
         return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email);

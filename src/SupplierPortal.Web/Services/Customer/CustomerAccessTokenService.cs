@@ -126,7 +126,7 @@ public class CustomerAccessTokenService(
             .Replace("{OTP Code}", code)
             .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(token.Customer.BusinessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(token.Customer.BusinessUnitId, Models.PortalType.Customer);
         var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {

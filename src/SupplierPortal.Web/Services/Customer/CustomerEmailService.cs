@@ -82,7 +82,7 @@ public class CustomerEmailService(
 
         var subject = $"Customer Information Update - {customerName}";
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Customer);
         var (sent, sendError) = await emailDispatcher.SendHtmlAsync(email, subject, body, fromEmail: fromEmail, fromName: brand);
         if (!sent)
         {
@@ -132,7 +132,7 @@ public class CustomerEmailService(
 </div>";
 
         // Best-effort: the submission is already saved, so a failed courtesy email must not surface.
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(customer.BusinessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(customer.BusinessUnitId, Models.PortalType.Customer);
         var (sent, _) = await emailDispatcher.SendHtmlAsync(
             requestor.Email!, $"Customer Update Submitted - {customer.LegalName}", body, fromEmail: fromEmail, fromName: brand);
         if (sent)
@@ -167,7 +167,7 @@ public class CustomerEmailService(
   </div>
 </div>";
 
-        var fromEmail = await branding.GetBusinessUnitEmailAsync(businessUnitId);
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Customer);
         var (sent, sendError) = await emailDispatcher.SendHtmlAsync(
             email, $"Customer Registration Completed — {customerName}", body, fromEmail: fromEmail, fromName: brand);
         if (!sent)

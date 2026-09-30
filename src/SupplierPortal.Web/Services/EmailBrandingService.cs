@@ -76,6 +76,47 @@ public class EmailBrandingService(
         return await db.BusinessUnits.AsNoTracking().Where(b => b.Id == id).Select(b => b.Email).FirstOrDefaultAsync();
     }
 
+    /// <summary>The sender e-mail for a specific portal's communications from a Business Unit: the portal-specific
+    /// address (Supplier / Customer / Landlord / Broker) when configured, otherwise the generic Business Unit
+    /// <see cref="Models.BusinessUnit.Email"/> (the previous behaviour), otherwise null (the dispatcher then uses
+    /// the global default sender). This is how each portal is given its own "from" address at the BU + Portal
+    /// level, e.g. purchase@dipark.com for Supplier and businessrelation@dipark.com for Customer.</summary>
+    public async Task<string?> GetPortalSenderEmailAsync(int? businessUnitId, Models.PortalType portal)
+    {
+        if (businessUnitId is not int id)
+        {
+            return null;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var bu = await db.BusinessUnits.AsNoTracking()
+            .Where(b => b.Id == id)
+            .Select(b => new
+            {
+                b.Email, b.SupplierSenderEmail, b.CustomerSenderEmail, b.LandlordSenderEmail, b.BrokerSenderEmail
+            })
+            .FirstOrDefaultAsync();
+        if (bu is null)
+        {
+            return null;
+        }
+
+        var portalSpecific = portal switch
+        {
+            Models.PortalType.Supplier => bu.SupplierSenderEmail,
+            Models.PortalType.Customer => bu.CustomerSenderEmail,
+            Models.PortalType.Landlord => bu.LandlordSenderEmail,
+            Models.PortalType.Broker => bu.BrokerSenderEmail,
+            _ => null
+        };
+
+        if (!string.IsNullOrWhiteSpace(portalSpecific))
+        {
+            return portalSpecific.Trim();
+        }
+        return string.IsNullOrWhiteSpace(bu.Email) ? null : bu.Email.Trim();
+    }
+
     /// <summary>The logo <c>src</c> for the PUBLIC self-service pages. Here the uploaded Business Unit logo
     /// (the "Logo (full-size)" shown on Edit Business Unit) takes precedence, so the self-service header shows
     /// the same logo as the business unit; the hosted <see cref="Models.BusinessUnit.LogoUrl"/> is used only

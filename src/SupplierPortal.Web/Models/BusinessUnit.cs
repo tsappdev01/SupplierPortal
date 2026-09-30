@@ -20,9 +20,32 @@ public class BusinessUnit
     public string? Domain { get; set; }
 
     /// <summary>Contact / sender e-mail address for this business unit (e.g. the reply-to shown on
-    /// communications for the unit). Optional.</summary>
+    /// communications for the unit). Acts as the default sender when a portal-specific address below is not
+    /// set. Optional.</summary>
     [MaxLength(256), EmailAddress]
     public string? Email { get; set; }
+
+    // Portal-specific sender addresses (BU + Portal level). When set, system-generated emails originating
+    // from that portal are sent from this address instead of the generic <see cref="Email"/>; when blank the
+    // generic Email (then the global default sender) is used. This lets each business function be clearly
+    // identified — e.g. purchase@dipark.com (Supplier), businessrelation@dipark.com (Customer),
+    // tenantrelation@dipark.com (Landlord), broker@dipark.com (Broker).
+
+    /// <summary>Sender e-mail for the Supplier portal's communications. Falls back to <see cref="Email"/>.</summary>
+    [MaxLength(256), EmailAddress]
+    public string? SupplierSenderEmail { get; set; }
+
+    /// <summary>Sender e-mail for the Customer portal's communications. Falls back to <see cref="Email"/>.</summary>
+    [MaxLength(256), EmailAddress]
+    public string? CustomerSenderEmail { get; set; }
+
+    /// <summary>Sender e-mail for the Landlord portal's communications. Falls back to <see cref="Email"/>.</summary>
+    [MaxLength(256), EmailAddress]
+    public string? LandlordSenderEmail { get; set; }
+
+    /// <summary>Sender e-mail for the Broker portal's communications. Falls back to <see cref="Email"/>.</summary>
+    [MaxLength(256), EmailAddress]
+    public string? BrokerSenderEmail { get; set; }
 
     /// <summary>Absolute URL of the unit's logo hosted on a public server, e.g.
     /// "https://cdn.dipark.com/logo.png". When set it is used as the brand image in emails and other
