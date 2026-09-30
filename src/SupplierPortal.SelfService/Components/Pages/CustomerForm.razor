@@ -154,6 +154,9 @@
                         @foreach (var cfg in FieldsFor(step))
                         {
                             if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
+                            // VAT-group legal names is a flat import/export-only column; the VAT Group grid
+                            // captures this data on the form, so don't render it as a standalone field.
+                            if (cfg.Section == "Account" && cfg.FieldKey == "VatGroupLegalNames") { continue; }
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                             var isCity = cfg.FieldKey == "EmirateCity";
                             var cityCountryIsUae = isCity && string.Equals(

@@ -41,7 +41,7 @@ public class CustomerExportService
             ws.Cell(row, col++).Value = cust.CustomerId ?? $"#{cust.Id}";
             ws.Cell(row, col++).Value = cust.Status;
             foreach (var f in account)
-                ws.Cell(row, col++).Value = Display(cust, f.FieldKey);
+                ws.Cell(row, col++).Value = f.FieldKey == VatGroupLegalNamesKey ? VatGroupLegalNames(cust) : Display(cust, f.FieldKey);
             var contactEntity = (object?)cust.Contact ?? new CustomerContact();
             foreach (var f in contact)
                 ws.Cell(row, col++).Value = Display(contactEntity, f.FieldKey);
@@ -97,7 +97,9 @@ public class CustomerExportService
             ws.Cell(row, 2).Value = cust.CustomerId ?? string.Empty;
             // Raw values (not the "—"/Yes/No display form) so a populated template re-imports cleanly.
             for (var i = 0; i < account.Count; i++)
-                ws.Cell(row, accountFirstCol + i).Value = CustomerFieldAccessor.GetString(cust, account[i].FieldKey) ?? string.Empty;
+                ws.Cell(row, accountFirstCol + i).Value = account[i].FieldKey == VatGroupLegalNamesKey
+                    ? VatGroupLegalNames(cust)
+                    : CustomerFieldAccessor.GetString(cust, account[i].FieldKey) ?? string.Empty;
 
             ws.Cell(row, contactFirstCol - 2).Value = cust.BaanRef ?? string.Empty;
             ws.Cell(row, contactFirstCol - 1).Value = cust.CustomerId ?? string.Empty;
@@ -187,4 +189,15 @@ public class CustomerExportService
         config.Where(f => f.Section == section && (includeHidden || f.IsVisible))
               .OrderBy(f => f.Sequence)
               .ToList();
+
+    /// <summary>Synthetic Account template column (sheet col 11): it has no scalar property — the value is the
+    /// VAT-group entities' legal names joined into one cell (the interactive form uses the VAT Group grid).</summary>
+    public const string VatGroupLegalNamesKey = "VatGroupLegalNames";
+
+    /// <summary>The VAT-group entities' legal names, in order, joined for the single flat template cell.</summary>
+    public static string VatGroupLegalNames(Customer cust) =>
+        string.Join("; ", cust.VatGroupEntities
+            .OrderBy(e => e.SortOrder)
+            .Select(e => e.BusinessLegalName)
+            .Where(n => !string.IsNullOrWhiteSpace(n)));
 }

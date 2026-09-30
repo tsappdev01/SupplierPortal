@@ -94,6 +94,7 @@ public class Customer
     [MaxLength(300)] public string? TradeLicenseNumber { get; set; }  // Trade License Number
     [MaxLength(300)] public string? LicensingAuthorityName { get; set; }  // Licensing Authority Name
     [MaxLength(300)] public string? AuthorityCode { get; set; }  // Authority Code
+    [MaxLength(100)] public string? BusinessLocationType { get; set; }  // Business Location Type (Mainland / Free Zone) — sheet col 26
     [MaxLength(300)] public string? TradeLicenseIssuingBody { get; set; }  // Trade License Issuing Body
     public DateTime? TradeLicenseIssueDate { get; set; }  // Trade License Issue Date
     public DateTime? TradeLicenseExpiryDate { get; set; }  // Trade License Expiry Date

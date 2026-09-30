@@ -38,7 +38,7 @@ public class CustomerImportService(
         var lastRow = ws.LastRowUsed()?.RowNumber() ?? 1;
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        var existing = (await db.Customers.Include(c => c.Contact)
+        var existing = (await db.Customers.Include(c => c.Contact).Include(c => c.VatGroupEntities)
                 .Where(c => c.CustomerId != null)
                 .ToListAsync())
             .GroupBy(c => c.CustomerId!)
@@ -80,8 +80,30 @@ public class CustomerImportService(
                 customer.CustomerId = Trim(uniqueNo);
                 if (businessUnitId is int bu) customer.BusinessUnitId = bu;
 
+                string? vatGroupCell = null;
                 for (var i = 0; i < accountKeys.Count; i++)
-                    CustomerFieldAccessor.SetString(customer, accountKeys[i], Cell(row, accountFirstCol + i));
+                {
+                    var value = Cell(row, accountFirstCol + i);
+                    // The VAT-group legal-names column is synthetic (no scalar property): capture it and apply
+                    // it to the child grid after the scalar fields are set.
+                    if (accountKeys[i] == CustomerExportService.VatGroupLegalNamesKey) { vatGroupCell = value; continue; }
+                    CustomerFieldAccessor.SetString(customer, accountKeys[i], value);
+                }
+                // Only rebuild the VAT-group grid when the flat cell has content, so a blank column on re-upload
+                // never wipes the richer grid captured on the form.
+                if (!string.IsNullOrWhiteSpace(vatGroupCell))
+                {
+                    if (!isNew && customer.VatGroupEntities.Count > 0)
+                        db.CustomerVatGroupEntities.RemoveRange(customer.VatGroupEntities);
+                    customer.VatGroupEntities.Clear();
+                    var order = 0;
+                    foreach (var name in SplitVatGroupNames(vatGroupCell))
+                        customer.VatGroupEntities.Add(new CustomerVatGroupEntity
+                        {
+                            BusinessLegalName = name.Length > 300 ? name[..300] : name,
+                            SortOrder = order++
+                        });
+                }
 
                 customer.Contact ??= new CustomerContact();
                 for (var i = 0; i < contactKeys.Count; i++)
@@ -134,4 +156,8 @@ public class CustomerImportService(
     }
 
     private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    /// <summary>Splits the flat VAT-group legal-names cell (';' or newline separated) into distinct names.</summary>
+    private static IEnumerable<string> SplitVatGroupNames(string raw) =>
+        raw.Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

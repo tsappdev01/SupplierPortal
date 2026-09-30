@@ -357,6 +357,7 @@ public static class CustomerLookups
         ("Account", "CountrySubdivision") => Emirates,
         ("Account", "IncorporationCountry") => CountryCodeNames,
         ("Account", "LicensingAuthorityName") => LicensingAuthorities,
+        ("Account", "BusinessLocationType") => BusinessLocationTypes,
         ("Account", "TradeLicenseIssuingBody") => new[] { "Mainland", "Free Zone" },
         ("Account", "Owner1Nationality") => CountryNames,
         ("Account", "Owner2Nationality") => CountryNames,

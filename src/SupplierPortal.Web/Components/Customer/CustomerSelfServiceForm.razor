@@ -109,6 +109,9 @@
                         {
                             var cfg = f;
                             if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
+                            // VAT-group legal names is a flat import/export-only column; the VAT Group grid
+                            // captures this data on the form, so don't render it as a standalone field.
+                            if (cfg.Section == "Account" && cfg.FieldKey == "VatGroupLegalNames") { continue; }
                             var target = cfg.Section == "Account" ? (object)customer : contact;
                             var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
                             var isCity = cfg.FieldKey == "EmirateCity";
@@ -714,7 +717,7 @@
         return step.Groups.SelectMany(g => config
             .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
             .Where(IsConditionallyVisible)
-            .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
+            .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                 f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
             .Select(f => f.DisplayLabel))
@@ -782,7 +785,7 @@
 
         var missing = config.Where(f => f.IsVisible && f.IsRequired)
             .Where(IsConditionallyVisible)
-            .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
+            .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
                 f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
             .Select(f => f.DisplayLabel).ToList();

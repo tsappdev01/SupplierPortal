@@ -225,6 +225,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("BusinessLocationType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int?>("BusinessUnitId")
                         .HasColumnType("int");
 
