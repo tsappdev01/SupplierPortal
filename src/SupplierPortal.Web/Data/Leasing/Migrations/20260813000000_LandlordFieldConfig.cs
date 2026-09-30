@@ -74,40 +74,30 @@ namespace SupplierPortal.Web.Data.Leasing.Migrations
                 unique: true);
 
             // ---- Seed the landlord field catalog (primary contact + company) ----
-            // NB: a rectangular object[,] is required here — a jagged object[][] binds to the single-row
-            // InsertData overload and throws a values/columns count mismatch at startup. Column order below
-            // must match the `columns` array exactly:
-            // FieldKey, DisplayLabel, Section, GroupName, Sequence, FieldKind, BusinessControl, LandlordControl,
-            // IsVisible, IsRequired, IsRemoved.
-            migrationBuilder.InsertData(
-                schema: "leasing",
-                table: "LandlordFieldConfigs",
-                columns: new[]
-                {
-                    "FieldKey", "DisplayLabel", "Section", "GroupName", "Sequence", "FieldKind",
-                    "BusinessControl", "LandlordControl", "IsVisible", "IsRequired", "IsRemoved"
-                },
-                values: new object[,]
-                {
-                    { "FullName", "Full Name", "Contact", "Primary Contact", 1, "text", "Editable", "Editable", true, true, false },
-                    { "Designation", "Designation", "Contact", "Primary Contact", 2, "text", "Editable", "Editable", true, false, false },
-                    { "Mobile", "Mobile Number", "Contact", "Primary Contact", 3, "phone", "Editable", "Editable", true, true, false },
-                    { "Email", "Email", "Contact", "Primary Contact", 4, "text", "Editable", "Editable", true, true, false },
-                    { "EmiratesId", "Emirates ID", "Contact", "Primary Contact", 5, "text", "Editable", "Editable", true, false, false },
-                    { "EmiratesIdName", "Name (as per Emirates ID)", "Contact", "Primary Contact", 6, "text", "Editable", "Editable", true, false, false },
-                    { "EmiratesIdExpiry", "Emirates ID Expiry", "Contact", "Primary Contact", 7, "date", "Editable", "Editable", true, false, false },
-                    { "CompanyName", "Company Name", "Landlord", "Company", 1, "text", "Editable", "Editable", true, false, false },
-                });
+            // Seed with raw SQL (the repo convention for seeding). InsertData is avoided on purpose: these are
+            // hand-written migrations with no per-migration TargetModel (no .Designer.cs), so EF cannot resolve
+            // the data operation's column types from the model and throws "no entity type mapped to the table
+            // 'leasing.LandlordFieldConfigs'" at startup. Raw SQL needs no model. Nullable columns (HelpText,
+            // MinLength, MaxLength, ControllingFieldKey, ControllingValue, EditableByUserIdsCsv) are omitted.
+            migrationBuilder.Sql(@"
+INSERT INTO [leasing].[LandlordFieldConfigs]
+    ([FieldKey],[DisplayLabel],[Section],[GroupName],[Sequence],[FieldKind],[BusinessControl],[LandlordControl],[IsVisible],[IsRequired],[IsRemoved])
+VALUES
+    ('FullName','Full Name','Contact','Primary Contact',1,'text','Editable','Editable',1,1,0),
+    ('Designation','Designation','Contact','Primary Contact',2,'text','Editable','Editable',1,0,0),
+    ('Mobile','Mobile Number','Contact','Primary Contact',3,'phone','Editable','Editable',1,1,0),
+    ('Email','Email','Contact','Primary Contact',4,'text','Editable','Editable',1,1,0),
+    ('EmiratesId','Emirates ID','Contact','Primary Contact',5,'text','Editable','Editable',1,0,0),
+    ('EmiratesIdName','Name (as per Emirates ID)','Contact','Primary Contact',6,'text','Editable','Editable',1,0,0),
+    ('EmiratesIdExpiry','Emirates ID Expiry','Contact','Primary Contact',7,'date','Editable','Editable',1,0,0),
+    ('CompanyName','Company Name','Landlord','Company',1,'text','Editable','Editable',1,0,0);");
 
-            migrationBuilder.InsertData(
-                schema: "leasing",
-                table: "LandlordTabSettings",
-                columns: new[] { "Section", "GroupName", "Title", "Sequence", "IsVisible" },
-                values: new object[,]
-                {
-                    { "Contact", "Primary Contact", "Primary Contact", 1, true },
-                    { "Landlord", "Company", "Company", 2, true },
-                });
+            migrationBuilder.Sql(@"
+INSERT INTO [leasing].[LandlordTabSettings]
+    ([Section],[GroupName],[Title],[Sequence],[IsVisible])
+VALUES
+    ('Contact','Primary Contact','Primary Contact',1,1),
+    ('Landlord','Company','Company',2,1);");
         }
 
         /// <inheritdoc />
