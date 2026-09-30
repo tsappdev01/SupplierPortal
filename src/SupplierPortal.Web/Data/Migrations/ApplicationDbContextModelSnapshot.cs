@@ -312,6 +312,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
+                    b.Property<string>("ErpBillToAccount")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTime?>("EstablishmentDate")
                         .HasColumnType("datetime2");
 
@@ -404,6 +408,14 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("POBox2")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("PartyId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PartyNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("PaymentTerms")
                         .HasMaxLength(300)

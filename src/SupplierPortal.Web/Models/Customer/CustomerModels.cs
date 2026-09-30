@@ -134,6 +134,10 @@ public class Customer
     [MaxLength(300)] public string? Owner2PassportIssuePlaceCountry { get; set; }  // Owner 2 - Passport Issue Place/Country
     [MaxLength(300)] public string? Owner2SharePercentage { get; set; }  // Owner 2 – Share Percentage
     [MaxLength(300)] public string? PaymentTerms { get; set; }  // Payment Terms [LOV]
+    // ERP / Oracle Fusion identifiers (populated from the ERP; part of the import/export template).
+    [MaxLength(100)] public string? PartyId { get; set; }  // Party ID
+    [MaxLength(100)] public string? PartyNumber { get; set; }  // Party Number
+    [MaxLength(100)] public string? ErpBillToAccount { get; set; }  // ERP Bill To Account
 
     // ---- relationships ----
     public CustomerContact? Contact { get; set; }
