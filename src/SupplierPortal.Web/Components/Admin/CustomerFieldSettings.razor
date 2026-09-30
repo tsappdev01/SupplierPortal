@@ -347,30 +347,37 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @{ var secTabs = TabsForSection(section); }
-                            @for (var i = 0; i < secTabs.Count; i++)
+                            @* One row per DISTINCT tab title (tabs that share a title merge into a single
+                               wizard step / pill), so the Manage Tabs list matches the pills exactly — no
+                               duplicate "Business & Organization" rows. Editing title / visibility / order /
+                               editors applies to every group under that title. *@
+                            @{ var titleGroups = TitleGroupsForSection(section); }
+                            @for (var i = 0; i < titleGroups.Count; i++)
                             {
-                                var tab = secTabs[i];
+                                var grp = titleGroups[i];
                                 var index = i;
-                                var editors = EditorsFor(tab);
+                                var geditors = GroupEditors(grp);
                                 <tr>
                                     <td>
                                         <div class="di-cfm-move">
-                                            <button title="Move up" disabled="@(index == 0)" @onclick="() => MoveTabUp(section, index)">
+                                            <button title="Move up" disabled="@(index == 0)" @onclick="() => MoveTitleGroupUp(section, index)">
                                                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l5 6H3z"/></svg>
                                             </button>
-                                            <button title="Move down" disabled="@(index == secTabs.Count - 1)" @onclick="() => MoveTabDown(section, index)">
+                                            <button title="Move down" disabled="@(index == titleGroups.Count - 1)" @onclick="() => MoveTitleGroupDown(section, index)">
                                                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 6h10z"/></svg>
                                             </button>
                                         </div>
                                     </td>
                                     <td>
-                                        <input class="di-cfm-select" @bind="tab.Title" maxlength="150" />
-                                        <div class="di-cfm-fd-desc">@tab.GroupName</div>
+                                        <input class="di-cfm-select" value="@grp[0].Title" @onchange="e => RenameTitleGroup(grp, e.Value?.ToString() ?? string.Empty)" maxlength="150" />
+                                        @if (grp.Count > 1)
+                                        {
+                                            <div class="di-cfm-fd-desc">@string.Join(" · ", grp.Select(t => t.GroupName))</div>
+                                        }
                                     </td>
                                     <td class="text-center">
                                         <label class="di-switch">
-                                            <input type="checkbox" checked="@tab.IsVisible" @onchange="e => tab.IsVisible = (bool)e.Value!" />
+                                            <input type="checkbox" checked="@GroupVisible(grp)" @onchange="e => SetGroupVisible(grp, (bool)e.Value!)" />
                                             <span class="di-switch-slider"></span>
                                         </label>
                                     </td>
@@ -381,13 +388,13 @@
                                         }
                                         else
                                         {
-                                            <div class="di-cfm-fd-desc mb-1">@(editors.Count == 0 ? "Anyone (no restriction)" : $"{editors.Count} user(s) only")</div>
+                                            <div class="di-cfm-fd-desc mb-1">@(geditors.Count == 0 ? "Anyone (no restriction)" : $"{geditors.Count} user(s) only")</div>
                                             <div class="di-cfm-editors">
                                                 @foreach (var u in editableUsers)
                                                 {
                                                     <label class="di-cfm-editor">
-                                                        <input type="checkbox" checked="@editors.Contains(u.Id)"
-                                                               @onchange="e => ToggleEditor(tab, u.Id, (bool)e.Value!)" />
+                                                        <input type="checkbox" checked="@geditors.Contains(u.Id)"
+                                                               @onchange="e => ToggleGroupEditor(grp, u.Id, (bool)e.Value!)" />
                                                         <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
                                                     </label>
                                                 }
@@ -714,18 +721,63 @@
             : (string.IsNullOrWhiteSpace(f.ControllingValue) ? "true" : f.ControllingValue);
     }
 
-    private void MoveTabUp(string section, int index)
+    // ---- Title-group tab management (one modal row per distinct title, spanning its groups) ----
+
+    // Tabs in a section grouped by title (merged like the pills/wizard), ordered by their minimum sequence.
+    private List<List<CustomerTabSetting>> TitleGroupsForSection(string section) =>
+        tabs.Where(t => t.Section == section)
+            .GroupBy(t => (t.Title ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Min(t => t.Sequence))
+            .Select(g => g.OrderBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList())
+            .ToList();
+
+    private void MoveTitleGroupUp(string section, int index)
     {
-        var list = TabsForSection(section);
-        if (index <= 0) return;
-        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
+        var groups = TitleGroupsForSection(section);
+        if (index <= 0 || index >= groups.Count) return;
+        (groups[index], groups[index - 1]) = (groups[index - 1], groups[index]);
+        ApplyTitleGroupOrder(groups);
     }
 
-    private void MoveTabDown(string section, int index)
+    private void MoveTitleGroupDown(string section, int index)
     {
-        var list = TabsForSection(section);
-        if (index >= list.Count - 1) return;
-        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
+        var groups = TitleGroupsForSection(section);
+        if (index < 0 || index >= groups.Count - 1) return;
+        (groups[index], groups[index + 1]) = (groups[index + 1], groups[index]);
+        ApplyTitleGroupOrder(groups);
+    }
+
+    // Reassign contiguous sequences in the new group order so each title-group stays together and moves as one.
+    private static void ApplyTitleGroupOrder(List<List<CustomerTabSetting>> ordered)
+    {
+        var seq = 1;
+        foreach (var grp in ordered)
+            foreach (var t in grp)
+                t.Sequence = seq++;
+    }
+
+    // Rename every tab under a title (they share one wizard step / pill).
+    private static void RenameTitleGroup(List<CustomerTabSetting> group, string newTitle)
+    {
+        foreach (var t in group) t.Title = newTitle;
+    }
+
+    private static bool GroupVisible(List<CustomerTabSetting> group) => group.Any(t => t.IsVisible);
+    private static void SetGroupVisible(List<CustomerTabSetting> group, bool visible)
+    {
+        foreach (var t in group) t.IsVisible = visible;
+    }
+
+    // Editors that apply to the whole title (union across its groups); toggling sets/clears across all of them.
+    private HashSet<int> GroupEditors(List<CustomerTabSetting> group)
+    {
+        var union = new HashSet<int>();
+        foreach (var t in group) union.UnionWith(EditorsFor(t));
+        return union;
+    }
+    private void ToggleGroupEditor(List<CustomerTabSetting> group, int userId, bool on)
+    {
+        foreach (var t in group) ToggleEditor(t, userId, on);
     }
 
     // Renumber field sequences per (section, group) and tab sequences per section to contiguous 1..n.
