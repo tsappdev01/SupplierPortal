@@ -106,12 +106,6 @@ public class CustomerAccessTokenService(
         var body = await File.ReadAllTextAsync(templatePath);
 
         var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
-        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
-        token.OtpGeneratedAt = DateTime.UtcNow;
-        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
-        token.OtpAttemptCount = 0;
-        token.OtpSendCount++;
-        await db.SaveChangesAsync();
 
         var brand = System.Net.WebUtility.HtmlEncode(
             await branding.GetBusinessUnitNameAsync(token.Customer!.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
@@ -126,12 +120,22 @@ public class CustomerAccessTokenService(
             .Replace("{OTP Code}", code)
             .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
 
+        // Send FIRST; only record the code as "sent" (and count it against the send cap) once delivery actually
+        // succeeds. Persisting before the send would make a FAILED send look successful — the verify page's
+        // auto-send would then not retry and the error would be hidden, so the customer never receives a code.
         var fromEmail = await branding.GetPortalSenderEmailAsync(token.Customer.BusinessUnitId, Models.PortalType.Customer);
         var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
         if (!ok)
         {
-            return (false, error);
+            return (false, error ?? "We couldn't send the verification code. Please try again in a moment.");
         }
+
+        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
+        token.OtpGeneratedAt = DateTime.UtcNow;
+        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
+        token.OtpAttemptCount = 0;
+        token.OtpSendCount++;
+        await db.SaveChangesAsync();
 
         return (true, null);
     }
