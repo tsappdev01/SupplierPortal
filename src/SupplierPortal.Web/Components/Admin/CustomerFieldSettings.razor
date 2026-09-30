@@ -334,78 +334,77 @@
                     reorder). <strong>Editable by</strong> restricts who may change a tab on the internal form
                     (leave as <em>Anyone</em> for no restriction).
                 </p>
-                @foreach (var section in Sections)
-                {
-                    <div class="di-cfm-tabsec">@(section == "Account" ? "Account (Company)" : "Contact (Individual)")</div>
-                    <table class="di-cfm-table di-cfm-table-tight">
-                        <thead>
+                @* A SINGLE unified list across both sections, in the exact order the wizard renders its steps.
+                   One row per distinct tab title (tabs sharing a title merge into one step / pill). Move up/down
+                   freely — a tab can cross the Company/Individual boundary, so e.g. an Individual tab can sit
+                   between Company tabs and vice versa. The Section column shows which entity a tab's fields
+                   belong to. *@
+                <table class="di-cfm-table di-cfm-table-tight">
+                    <thead>
+                        <tr>
+                            <th style="width: 74px;">Order</th>
+                            <th>Tab Title</th>
+                            <th style="width: 130px;">Section</th>
+                            <th style="width: 84px;" class="text-center">Visible</th>
+                            <th style="width: 240px;">Editable by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{ var titleGroups = AllTitleGroups(); }
+                        @for (var i = 0; i < titleGroups.Count; i++)
+                        {
+                            var grp = titleGroups[i];
+                            var index = i;
+                            var geditors = GroupEditors(grp);
                             <tr>
-                                <th style="width: 74px;">Order</th>
-                                <th>Tab Title</th>
-                                <th style="width: 84px;" class="text-center">Visible</th>
-                                <th style="width: 260px;">Editable by</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @* One row per DISTINCT tab title (tabs that share a title merge into a single
-                               wizard step / pill), so the Manage Tabs list matches the pills exactly — no
-                               duplicate "Business & Organization" rows. Editing title / visibility / order /
-                               editors applies to every group under that title. *@
-                            @{ var titleGroups = TitleGroupsForSection(section); }
-                            @for (var i = 0; i < titleGroups.Count; i++)
-                            {
-                                var grp = titleGroups[i];
-                                var index = i;
-                                var geditors = GroupEditors(grp);
-                                <tr>
-                                    <td>
-                                        <div class="di-cfm-move">
-                                            <button title="Move up" disabled="@(index == 0)" @onclick="() => MoveTitleGroupUp(section, index)">
-                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l5 6H3z"/></svg>
-                                            </button>
-                                            <button title="Move down" disabled="@(index == titleGroups.Count - 1)" @onclick="() => MoveTitleGroupDown(section, index)">
-                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 6h10z"/></svg>
-                                            </button>
+                                <td>
+                                    <div class="di-cfm-move">
+                                        <button title="Move up" disabled="@(index == 0)" @onclick="() => MoveTitleGroupUp(index)">
+                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l5 6H3z"/></svg>
+                                        </button>
+                                        <button title="Move down" disabled="@(index == titleGroups.Count - 1)" @onclick="() => MoveTitleGroupDown(index)">
+                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12L3 6h10z"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input class="di-cfm-select" value="@grp[0].Title" @onchange="e => RenameTitleGroup(grp, e.Value?.ToString() ?? string.Empty)" maxlength="150" />
+                                    @if (grp.Count > 1)
+                                    {
+                                        <div class="di-cfm-fd-desc">@string.Join(" · ", grp.Select(t => t.GroupName))</div>
+                                    }
+                                </td>
+                                <td><span class="di-cfm-fd-desc">@GroupSectionLabel(grp)</span></td>
+                                <td class="text-center">
+                                    <label class="di-switch">
+                                        <input type="checkbox" checked="@GroupVisible(grp)" @onchange="e => SetGroupVisible(grp, (bool)e.Value!)" />
+                                        <span class="di-switch-slider"></span>
+                                    </label>
+                                </td>
+                                <td>
+                                    @if (editableUsers.Count == 0)
+                                    {
+                                        <span class="text-muted fst-italic">No Customer-portal users</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="di-cfm-fd-desc mb-1">@(geditors.Count == 0 ? "Anyone (no restriction)" : $"{geditors.Count} user(s) only")</div>
+                                        <div class="di-cfm-editors">
+                                            @foreach (var u in editableUsers)
+                                            {
+                                                <label class="di-cfm-editor">
+                                                    <input type="checkbox" checked="@geditors.Contains(u.Id)"
+                                                           @onchange="e => ToggleGroupEditor(grp, u.Id, (bool)e.Value!)" />
+                                                    <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                                                </label>
+                                            }
                                         </div>
-                                    </td>
-                                    <td>
-                                        <input class="di-cfm-select" value="@grp[0].Title" @onchange="e => RenameTitleGroup(grp, e.Value?.ToString() ?? string.Empty)" maxlength="150" />
-                                        @if (grp.Count > 1)
-                                        {
-                                            <div class="di-cfm-fd-desc">@string.Join(" · ", grp.Select(t => t.GroupName))</div>
-                                        }
-                                    </td>
-                                    <td class="text-center">
-                                        <label class="di-switch">
-                                            <input type="checkbox" checked="@GroupVisible(grp)" @onchange="e => SetGroupVisible(grp, (bool)e.Value!)" />
-                                            <span class="di-switch-slider"></span>
-                                        </label>
-                                    </td>
-                                    <td>
-                                        @if (editableUsers.Count == 0)
-                                        {
-                                            <span class="text-muted fst-italic">No Customer-portal users</span>
-                                        }
-                                        else
-                                        {
-                                            <div class="di-cfm-fd-desc mb-1">@(geditors.Count == 0 ? "Anyone (no restriction)" : $"{geditors.Count} user(s) only")</div>
-                                            <div class="di-cfm-editors">
-                                                @foreach (var u in editableUsers)
-                                                {
-                                                    <label class="di-cfm-editor">
-                                                        <input type="checkbox" checked="@geditors.Contains(u.Id)"
-                                                               @onchange="e => ToggleGroupEditor(grp, u.Id, (bool)e.Value!)" />
-                                                        <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
-                                                    </label>
-                                                }
-                                            </div>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
             <div class="di-cfm-modal-foot">
                 <button class="di-cfm-btn di-cfm-btn-primary" @onclick="() => showTabs = false">Done</button>
@@ -574,10 +573,9 @@
     private string? TabTitleOf(CustomerFieldConfig r) =>
         tabs.FirstOrDefault(t => t.Section == r.Section && t.GroupName == r.GroupName)?.Title?.Trim();
 
-    // Fields ordered the way the form renders: section, then tab order, then field sequence.
+    // Fields ordered the way the form renders: by the unified (global) tab order, then field sequence.
     private List<CustomerFieldConfig> OrderedRows() =>
-        rows.OrderBy(r => Array.IndexOf(Sections, r.Section))
-            .ThenBy(r => TabSeq(r.Section, r.GroupName))
+        rows.OrderBy(r => TabSeq(r.Section, r.GroupName))
             .ThenBy(r => r.Sequence)
             .ToList();
 
@@ -721,27 +719,31 @@
             : (string.IsNullOrWhiteSpace(f.ControllingValue) ? "true" : f.ControllingValue);
     }
 
-    // ---- Title-group tab management (one modal row per distinct title, spanning its groups) ----
+    // ---- Title-group tab management (one modal row per distinct title, unified across both sections) ----
 
-    // Tabs in a section grouped by title (merged like the pills/wizard), ordered by their minimum sequence.
-    private List<List<CustomerTabSetting>> TitleGroupsForSection(string section) =>
-        tabs.Where(t => t.Section == section)
-            .GroupBy(t => (t.Title ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+    // ALL tabs grouped by title (merged like the pills/wizard), in one order across both sections by their
+    // minimum sequence — so a Company tab and an Individual tab can be interleaved freely.
+    private List<List<CustomerTabSetting>> AllTitleGroups() =>
+        tabs.GroupBy(t => (t.Title ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => g.Min(t => t.Sequence))
             .Select(g => g.OrderBy(t => t.Sequence).ThenBy(t => t.GroupName).ToList())
             .ToList();
 
-    private void MoveTitleGroupUp(string section, int index)
+    // The section(s) a merged tab draws its fields from, shown as a badge.
+    private static string GroupSectionLabel(List<CustomerTabSetting> group) =>
+        string.Join(", ", group.Select(t => t.Section == "Account" ? "Company" : "Individual").Distinct());
+
+    private void MoveTitleGroupUp(int index)
     {
-        var groups = TitleGroupsForSection(section);
+        var groups = AllTitleGroups();
         if (index <= 0 || index >= groups.Count) return;
         (groups[index], groups[index - 1]) = (groups[index - 1], groups[index]);
         ApplyTitleGroupOrder(groups);
     }
 
-    private void MoveTitleGroupDown(string section, int index)
+    private void MoveTitleGroupDown(int index)
     {
-        var groups = TitleGroupsForSection(section);
+        var groups = AllTitleGroups();
         if (index < 0 || index >= groups.Count - 1) return;
         (groups[index], groups[index + 1]) = (groups[index + 1], groups[index]);
         ApplyTitleGroupOrder(groups);
@@ -780,22 +782,20 @@
         foreach (var t in group) ToggleEditor(t, userId, on);
     }
 
-    // Renumber field sequences per (section, group) and tab sequences per section to contiguous 1..n.
+    // Renumber tab sequences GLOBALLY (one order across both sections, so a tab can cross the Company/Individual
+    // boundary) and field sequences per (section, group), to contiguous 1..n.
     private void NormalizeSequences()
     {
-        foreach (var section in Sections)
-        {
-            var seq = 1;
-            foreach (var t in tabs.Where(t => t.Section == section).OrderBy(t => t.Sequence).ThenBy(t => t.GroupName))
-                t.Sequence = seq++;
+        var tseq = 1;
+        foreach (var t in tabs.OrderBy(t => t.Sequence).ThenBy(t => t.GroupName))
+            t.Sequence = tseq++;
 
-            foreach (var t in tabs.Where(t => t.Section == section))
-            {
-                var fseq = 1;
-                foreach (var f in rows.Where(r => !r.IsRemoved && r.Section == section && r.GroupName == t.GroupName)
-                             .OrderBy(r => r.Sequence))
-                    f.Sequence = fseq++;
-            }
+        foreach (var t in tabs)
+        {
+            var fseq = 1;
+            foreach (var f in rows.Where(r => !r.IsRemoved && r.Section == t.Section && r.GroupName == t.GroupName)
+                         .OrderBy(r => r.Sequence))
+                f.Sequence = fseq++;
         }
     }
 
