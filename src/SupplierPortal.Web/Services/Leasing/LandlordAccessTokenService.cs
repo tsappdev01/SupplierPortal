@@ -74,12 +74,6 @@ public class LandlordAccessTokenService(
             return (false, "Too many verification code requests for this link. Please contact us for assistance.", null);
 
         var code = RandomNumberGenerator.GetInt32(0, 10000).ToString("D4");
-        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
-        token.OtpGeneratedAt = DateTime.UtcNow;
-        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
-        token.OtpAttemptCount = 0;
-        token.OtpSendCount++;
-        await db.SaveChangesAsync();
 
         var who = System.Net.WebUtility.HtmlEncode(token.Landlord.CompanyName ?? token.Landlord.PropertyCode);
         var brand = System.Net.WebUtility.HtmlEncode(await branding.GetBusinessUnitNameAsync(token.Landlord.BusinessUnitId)
@@ -116,6 +110,16 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
         {
             return (false, $"Database Mail send failed: {ex.Message}", null);
         }
+
+        // Delivery succeeded — only now record the code as "sent" and count it against the send cap. Persisting
+        // before the send would make a failed send look successful (blocking the retry and hiding the error).
+        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
+        token.OtpGeneratedAt = DateTime.UtcNow;
+        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
+        token.OtpAttemptCount = 0;
+        token.OtpSendCount++;
+        await db.SaveChangesAsync();
+
         return (true, null, null);
     }
 

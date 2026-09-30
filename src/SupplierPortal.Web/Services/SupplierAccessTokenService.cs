@@ -132,17 +132,11 @@ public class SupplierAccessTokenService(
         }
 
         var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
-        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
-        token.OtpGeneratedAt = DateTime.UtcNow;
-        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
-        token.OtpAttemptCount = 0;
-        token.OtpSendCount++;
 
-        // Persist the OTP state before attempting delivery: if the send fails (transient mail
-        // outage), the code the supplier will retry with via "Resend" is still consistent, rather
-        // than silently discarding a hashed code no email ever carried.
-        await db.SaveChangesAsync();
-
+        // Send FIRST; only record the code as "sent" (and count it against the send cap) once delivery
+        // succeeds. Persisting before the send would make a FAILED send look successful — the verify page's
+        // idempotent auto-send would then reuse the undelivered code and never retry, the error would be
+        // hidden, and a send would be burned from the cap, so the supplier never receives a code.
         if (sendEmail)
         {
             var brand = System.Net.WebUtility.HtmlEncode(
@@ -165,9 +159,16 @@ public class SupplierAccessTokenService(
                 token.Supplier.ContactEmail ?? "", "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
             if (!ok)
             {
-                return (false, error, null);
+                return (false, error ?? "We couldn't send the verification code. Please try again in a moment.", null);
             }
         }
+
+        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
+        token.OtpGeneratedAt = DateTime.UtcNow;
+        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
+        token.OtpAttemptCount = 0;
+        token.OtpSendCount++;
+        await db.SaveChangesAsync();
 
         return (true, null, code);
     }
