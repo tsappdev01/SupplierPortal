@@ -61,10 +61,12 @@ public class CustomerExportService
     /// is non-empty the rows are pre-filled, otherwise a single blank example row is written.</summary>
     public byte[] ExportUploadTemplate(IReadOnlyList<Customer> customers, IReadOnlyList<CustomerFieldConfig> config)
     {
-        // Visible fields only, so the template's columns match the wizard and the importer (which reads
-        // the same visible set positionally) exactly.
-        var account = FieldsFor(config, "Account", includeHidden: false);
-        var contact = FieldsFor(config, "Contact", includeHidden: false);
+        // ALL non-removed fields (not just the visible ones), so the template carries every column for the
+        // Oracle Fusion data exchange. Visibility governs only the interactive form; the importer reads the
+        // same all-non-removed set positionally, so the two stay aligned. (`config` is GetAllAsync, which
+        // already excludes admin-removed fields — remove a field in the Field Manager to drop its column.)
+        var account = FieldsFor(config, "Account", includeHidden: true);
+        var contact = FieldsFor(config, "Contact", includeHidden: true);
 
         using var wb = new XLWorkbook();
         var ws = wb.AddWorksheet("Customer Data Template");
