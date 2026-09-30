@@ -330,9 +330,10 @@
             </div>
             <div class="di-cfm-modal-body">
                 <p class="di-cfm-fld-note">
-                    Rename or hide the customer form's tabs and set their order (you can also drag the tab pills to
-                    reorder). <strong>Editable by</strong> restricts who may change a tab on the internal form
-                    (leave as <em>Anyone</em> for no restriction).
+                    Rename or hide the customer form's tabs and set their order with the <strong>▲ ▼</strong>
+                    arrows (a tab can move across the Company / Individual boundary). <strong>Editable by</strong>
+                    restricts who may change a tab on the internal form (leave as <em>Anyone</em> for no
+                    restriction). Click <strong>Save Tabs</strong> to apply the order to the customer form.
                 </p>
                 @* A SINGLE unified list across both sections, in the exact order the wizard renders its steps.
                    One row per distinct tab title (tabs sharing a title merge into one step / pill). Move up/down
@@ -407,7 +408,10 @@
                 </table>
             </div>
             <div class="di-cfm-modal-foot">
-                <button class="di-cfm-btn di-cfm-btn-primary" @onclick="() => showTabs = false">Done</button>
+                <button class="di-cfm-btn" @onclick="() => showTabs = false" disabled="@savingTabs">Cancel</button>
+                <button class="di-cfm-btn di-cfm-btn-primary" @onclick="SaveTabsAndCloseAsync" disabled="@savingTabs">
+                    @(savingTabs ? "Saving…" : "Save Tabs")
+                </button>
             </div>
         </div>
     </div>
@@ -551,6 +555,7 @@
     private const int PageSize = 10;
     private CustomerFieldConfig? editing;
     private bool showTabs;
+    private bool savingTabs;
 
     private static readonly string[] Sections = ["Account", "Contact"];
 
@@ -797,6 +802,25 @@
                          .OrderBy(r => r.Sequence))
                 f.Sequence = fseq++;
         }
+    }
+
+    // Persist ONLY the tab layout (order / title / visibility / editors) from the modal, so a reorder takes
+    // effect on the customer form immediately — without needing the separate main "Save Changes" button.
+    private async Task SaveTabsAndCloseAsync()
+    {
+        savingTabs = true;
+        // Renumber tabs into one clean global order so the shuffle persists exactly as shown.
+        var tseq = 1;
+        foreach (var t in tabs.OrderBy(t => t.Sequence).ThenBy(t => t.GroupName)) t.Sequence = tseq++;
+
+        var tabLayouts = tabs.Select(t => new CustomerFieldConfigService.CustomerTabLayout(
+            t.Section, t.GroupName, t.Title, t.Sequence, t.IsVisible,
+            EditorsFor(t).Count == 0 ? null : string.Join(",", EditorsFor(t)))).ToList();
+        await FieldConfigService.SaveTabsAsync(tabLayouts, currentUser);
+
+        savingTabs = false;
+        showTabs = false;
+        savedMessage = "Tab order saved — it now applies to the customer form.";
     }
 
     private async Task SaveAsync()
