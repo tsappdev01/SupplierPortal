@@ -48,7 +48,9 @@ public class SupplierApiClient(
             var res = await http.PostAsJsonAsync("/api/selfservice/otp/request", new OtpRequestRequest { LinkToken = linkToken, Resend = resend });
             if (!res.IsSuccessStatusCode)
             {
-                return new OtpRequestResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+                logger.LogError("Supplier RequestOtp failed: HTTP {Status}. Body: {Body}",
+                    (int)res.StatusCode, await res.Content.ReadAsStringAsync());
+                return new OtpRequestResponse { Success = false, Error = $"The service is temporarily unavailable (HTTP {(int)res.StatusCode}). Please try again." };
             }
             return await res.Content.ReadFromJsonAsync<OtpRequestResponse>() ?? Fail();
         }
