@@ -111,7 +111,10 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
                 FirstName = c.Contact != null ? c.Contact.FirstName : null,
                 MiddleName = c.Contact != null ? c.Contact.MiddleName : null,
                 LastName = c.Contact != null ? c.Contact.LastName : null,
-                Email = c.Contact != null ? c.Contact.Email : null,
+                // The recipient for notifications/OTP is the Primary Email (Contact & Address), falling back to
+                // the Personal Data contact email only when it is blank.
+                c.PrimaryEmail,
+                ContactEmail = c.Contact != null ? c.Contact.Email : null,
                 c.Status,
                 Updated = c.UpdatedAt ?? c.CreatedAt,
                 c.BusinessUnitId,
@@ -128,7 +131,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             string.IsNullOrWhiteSpace(r.Number) ? $"#{r.Id}" : r.Number!,
             string.IsNullOrWhiteSpace(r.LegalName) ? (r.CommercialName ?? "(unnamed draft)") : r.LegalName!,
             string.Join(" ", new[] { r.FirstName, r.MiddleName, r.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))),
-            r.Email, r.Status, r.Updated, r.BusinessUnitId,
+            string.IsNullOrWhiteSpace(r.PrimaryEmail) ? r.ContactEmail : r.PrimaryEmail, r.Status, r.Updated, r.BusinessUnitId,
             r.Priority, r.AssignedToUserId, r.AssignedToUserName)).ToList();
     }
 

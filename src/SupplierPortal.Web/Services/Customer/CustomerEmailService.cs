@@ -40,10 +40,10 @@ public class CustomerEmailService(
                 return (false, "Customer not found.");
             }
             businessUnitId = c.BusinessUnitId;
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                email = CustomerAccessTokenService.EmailFor(c);
-            }
+            // Always send to the customer's Primary Email (Contact & Address), falling back to the Personal
+            // Data contact email only when the Primary Email is blank. This ignores any caller-passed address
+            // so the notification lands on the same mailbox as the OTP verification code.
+            email = CustomerAccessTokenService.EmailFor(c);
         }
 
         if (string.IsNullOrWhiteSpace(email))
