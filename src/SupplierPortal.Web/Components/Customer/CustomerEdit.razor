@@ -228,17 +228,33 @@ else
                         }
                         else if (cfg.FieldKind == "lookup")
                         {
-                            var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                            var coded = CustomerLookups.CodedOptions(cfg.Section, cfg.FieldKey);
                             <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
                                 <option value="">— Select —</option>
-                                @foreach (var o in opts)
+                                @if (coded is not null)
                                 {
-                                    <option value="@o" selected="@(o == cur)">@o</option>
+                                    @* Coded lookup: the dropdown shows the Name, the stored value is the Code. *@
+                                    @foreach (var o in coded)
+                                    {
+                                        <option value="@o.Value" selected="@(string.Equals(o.Value, cur, StringComparison.OrdinalIgnoreCase))">@o.Text</option>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(cur) && !coded.Any(o => string.Equals(o.Value, cur, StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        <option value="@cur" selected>@CustomerLookups.CodedDisplay(cfg.Section, cfg.FieldKey, cur)</option>
+                                    }
                                 }
-                                @* Preserve any previously-stored value that is not in the current list. *@
-                                @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                else
                                 {
-                                    <option value="@cur" selected>@cur</option>
+                                    var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                                    @foreach (var o in opts)
+                                    {
+                                        <option value="@o" selected="@(o == cur)">@o</option>
+                                    }
+                                    @* Preserve any previously-stored value that is not in the current list. *@
+                                    @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                    {
+                                        <option value="@cur" selected>@cur</option>
+                                    }
                                 }
                             </select>
                         }

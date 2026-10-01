@@ -311,9 +311,38 @@ public static class CustomerLookups
     /// <summary>Combined "Code - Name" options, e.g. "AE - United Arab Emirates".</summary>
     private static readonly string[] CountryCodeNames = Countries.Select(c => $"{c.Code} - {c.Name}").ToArray();
 
-    /// <summary>UAE emirates — the Country Subdivision list.</summary>
+    /// <summary>UAE emirates — the Country Subdivision list (display names only; used elsewhere, e.g. Emirate/City).</summary>
     private static readonly string[] Emirates =
         { "Abu Dhabi", "Dubai", "Sharjah", "Umm Al Quwain", "Fujairah", "Ajman", "Ras Al Khaimah" };
+
+    /// <summary>Country Subdivision as (code → name): the dropdown shows the Name, the stored / exported value is
+    /// the Code (AUH, DXB, …).</summary>
+    public static readonly (string Code, string Name)[] CountrySubdivisions =
+    {
+        ("AUH", "Abu Dhabi"), ("DXB", "Dubai"), ("SHJ", "Sharjah"), ("UAQ", "Umm Al Quwain"),
+        ("FUJ", "Fujairah"), ("AJM", "Ajman"), ("RAK", "Ras Al Khaimah"),
+    };
+    private static readonly string[] CountrySubdivisionCodes = CountrySubdivisions.Select(c => c.Code).ToArray();
+
+    /// <summary>Coded options (value = code, text = display name) for lookups that store a code but show a name.
+    /// Null when the field is a plain value == text lookup.</summary>
+    public static IReadOnlyList<(string Value, string Text)>? CodedOptions(string section, string fieldKey) =>
+        (section, fieldKey) switch
+        {
+            ("Account", "CountrySubdivision") => CountrySubdivisions.Select(c => (c.Code, c.Name)).ToList(),
+            _ => null
+        };
+
+    /// <summary>Maps a stored coded value to its display name; falls back to the raw value for a legacy / unknown
+    /// value or a non-coded field.</summary>
+    public static string CodedDisplay(string section, string fieldKey, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+        var coded = CodedOptions(section, fieldKey);
+        if (coded is null) return value;
+        var hit = coded.FirstOrDefault(o => string.Equals(o.Value, value, StringComparison.OrdinalIgnoreCase));
+        return hit.Value is null ? value : hit.Text;
+    }
 
     /// <summary>UAE trade-license issuing authorities (economic departments + free zones), from the workbook.</summary>
     private static readonly string[] LicensingAuthorities =
@@ -354,7 +383,7 @@ public static class CustomerLookups
         ("Account", "CustomerType") => new[] { "NON-PMS", "PMS" },
         ("Account", "CountryCode") => CountryCodes,
         ("Account", "CountryName") => CountryNames,
-        ("Account", "CountrySubdivision") => Emirates,
+        ("Account", "CountrySubdivision") => CountrySubdivisionCodes,
         ("Account", "IncorporationCountry") => CountryCodeNames,
         ("Account", "LicensingAuthorityName") => LicensingAuthorities,
         ("Account", "BusinessLocationType") => BusinessLocationTypes,
@@ -373,6 +402,7 @@ public static class CustomerLookups
         ("Contact", "Nationality2") => CountryNames,
         ("Contact", "Country") => CountryNames,
         ("Contact", "IssueCountry") => CountryNames,
+        ("Contact", "PassportIssueCountryCode") => CountryCodes,
         ("Contact", "PassportIssuePlaceCountry") => CountryCodeNames,
         ("Contact", "TypeOfCustomer") => new[] { "Normal", "VIP" },
 
