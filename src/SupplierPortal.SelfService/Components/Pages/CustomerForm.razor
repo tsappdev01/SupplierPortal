@@ -102,7 +102,7 @@
                             </div>
                         }
                         <div class="di-documents-grid">
-                            @foreach (var dt in bootstrap.DocumentTypes)
+                            @foreach (var dt in bootstrap.DocumentTypes.Where(DocApplies))
                             {
                                 var uploaded = documents.Where(d => d.DocumentType == dt.Name).ToList();
                                 <div class="di-doccard">
@@ -632,6 +632,16 @@
         return string.Equals(cur, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Whether a document type currently applies (its conditional "Depends On" rule is satisfied). The
+    /// controlling field may be in either section, so its section is resolved from the field config.</summary>
+    private bool DocApplies(CustomerDocumentTypeDto dt)
+    {
+        if (string.IsNullOrWhiteSpace(dt.ControllingFieldKey)) return true;
+        var section = config.FirstOrDefault(f => f.FieldKey == dt.ControllingFieldKey)?.Section ?? "Account";
+        var cur = Vals(section).GetValueOrDefault(dt.ControllingFieldKey);
+        return string.Equals(cur, dt.ControllingValue, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void ClearHiddenConditionalFields()
     {
         foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
@@ -926,7 +936,7 @@
         problems.AddRange(VatGroupErrors());
 
         var haveDocs = documents.Select(d => d.DocumentType).ToHashSet();
-        problems.AddRange(bootstrap.DocumentTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name))
+        problems.AddRange(bootstrap.DocumentTypes.Where(t => t.IsRequired && DocApplies(t) && !haveDocs.Contains(t.Name))
             .Select(t => $"{t.Name} document is required."));
 
         if (problems.Count > 0) { Toast.ShowErrors(problems); return; }

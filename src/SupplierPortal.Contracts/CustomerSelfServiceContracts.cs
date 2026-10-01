@@ -75,6 +75,10 @@ public class CustomerDocumentTypeDto
     public string? Requirement { get; set; }
     public bool IsRequired { get; set; }
     public int Sequence { get; set; }
+    /// <summary>Optional conditional rule: this document applies (and, if required, is mandatory) only while the
+    /// controlling customer field equals <see cref="ControllingValue"/>. Null = always applies.</summary>
+    public string? ControllingFieldKey { get; set; }
+    public string? ControllingValue { get; set; }
 }
 
 /// <summary>Everything the customer self-service form needs to render, in one round-trip.</summary>

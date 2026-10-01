@@ -10,7 +10,7 @@
 @* KYC document checklist: one card per master document type, with upload + view/download/remove.
    Required types are flagged; the parent wizard blocks submit until they are uploaded. *@
 <div class="di-docs-grid">
-    @foreach (var type in types)
+    @foreach (var type in types.Where(t => IsApplicable is null || IsApplicable(t)))
     {
         var doc = documents.FirstOrDefault(d => d.DocumentType == type.Name);
         var inputId = $"cust-doc-{type.Id}";
@@ -132,6 +132,11 @@
     /// <summary>Master document types. When supplied (from the self-service form bundle) they are used as-is so the
     /// component does not hit the database on the DMZ; otherwise they are loaded via the document service.</summary>
     [Parameter] public List<CustomerDocumentType>? Types { get; set; }
+
+    /// <summary>Optional predicate deciding whether a document type currently applies to this customer (its
+    /// conditional "Depends On" rule is satisfied). Non-applicable types are hidden from the checklist. The
+    /// parent supplies it because the controlling values live on the customer/contact it owns. Null = show all.</summary>
+    [Parameter] public Func<CustomerDocumentType, bool>? IsApplicable { get; set; }
 
     private bool ViaGateway => SsGateway is not null;
 

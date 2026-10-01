@@ -90,7 +90,7 @@
                     </div>
                     <div class="di-section-body" style="grid-template-columns: 1fr;">
                         <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser"
-                                           Types="docTypes"
+                                           Types="docTypes" IsApplicable="DocApplies"
                                            SsGateway="DataGateway" SsToken="@activeToken" SsSession="@activeSession" OnChanged="OnDocsChanged" />
                     </div>
                 </div>
@@ -532,6 +532,11 @@
         return string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Whether a document type currently applies (its conditional "Depends On" rule is satisfied) —
+    /// drives which cards show on the KYC checklist for the customer.</summary>
+    private bool DocApplies(CustomerDocumentType t) =>
+        customer is not null && CustomerDocRules.Applies(t, customer, contact, config);
+
     private void ClearHiddenConditionalFields()
     {
         foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
@@ -811,7 +816,8 @@
         }
 
         var haveDocs = (await DataGateway.ListDocumentsAsync(activeToken, activeSession)).Select(d => d.DocumentType).ToHashSet();
-        var missingDocs = docTypes.Where(t => t.IsRequired && !haveDocs.Contains(t.Name)).Select(t => t.Name).ToList();
+        var missingDocs = docTypes.Where(t => CustomerDocRules.RequiredNow(t, customer, contact, config) && !haveDocs.Contains(t.Name))
+            .Select(t => t.Name).ToList();
         if (missingDocs.Count > 0)
         {
             ToastService.ShowErrors(missingDocs.Select(d => $"{d} document is required."));

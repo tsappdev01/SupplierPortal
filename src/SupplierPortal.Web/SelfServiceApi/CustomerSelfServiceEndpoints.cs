@@ -479,7 +479,9 @@ public static class CustomerSelfServiceEndpoints
                     Name = t.Name,
                     Requirement = t.Requirement,
                     IsRequired = t.IsRequired,
-                    Sequence = t.Sequence
+                    Sequence = t.Sequence,
+                    ControllingFieldKey = t.ControllingFieldKey,
+                    ControllingValue = t.ControllingValue
                 }).ToList()
         };
 

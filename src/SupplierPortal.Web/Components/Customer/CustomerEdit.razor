@@ -108,7 +108,7 @@ else
                 </div>
             </div>
             <div class="di-section-body" style="grid-template-columns: 1fr;">
-                <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" />
+                <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" IsApplicable="DocApplies" />
             </div>
         </div>
     }
@@ -422,7 +422,7 @@ else
 <div style="display:@(activeTab == Tab.Documents ? "block" : "none")">
     <h2 class="h5 mb-1">KYC Documents</h2>
     <p class="text-muted">Upload and review the customer's identity &amp; verification documents.</p>
-    <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" />
+    <CustomerDocuments CustomerId="customer.Id" CurrentUser="@currentUser" OnChanged="OnDocsChanged" IsApplicable="DocApplies" />
 </div>
 
 <div style="display:@(activeTab == Tab.EmailHistory ? "block" : "none")">
@@ -984,14 +984,21 @@ else
         StateHasChanged();
     }
 
-    /// <summary>Required KYC document types that have not been uploaded for this customer.</summary>
+    /// <summary>Required KYC document types that have not been uploaded for this customer — honouring each
+    /// type's optional conditional rule (a document is only mandatory when its "Depends On" field matches).</summary>
     private async Task<List<string>> MissingRequiredDocsAsync()
     {
         if (customer is null) return [];
         var docTypes = await DocumentService.GetTypesAsync();
         var have = (await DocumentService.GetDocumentsAsync(customer.Id)).Select(d => d.DocumentType).ToHashSet();
-        return docTypes.Where(t => t.IsRequired && !have.Contains(t.Name)).Select(t => t.Name).ToList();
+        return docTypes.Where(t => CustomerDocRules.RequiredNow(t, customer, contact, config) && !have.Contains(t.Name))
+            .Select(t => t.Name).ToList();
     }
+
+    /// <summary>Whether a document type currently applies (its conditional rule is satisfied) — drives which
+    /// cards show on the KYC checklist.</summary>
+    private bool DocApplies(CustomerDocumentType t) =>
+        customer is not null && CustomerDocRules.Applies(t, customer, contact, config);
 
     // ---- Return-to-customer send confirmation ----
     private bool confirmReturn;

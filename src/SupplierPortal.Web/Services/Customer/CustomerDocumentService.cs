@@ -62,16 +62,23 @@ public class CustomerDocumentService(
                 row.IsRequired = edit.IsRequired;
                 row.Sequence = edit.Sequence;
                 row.IsActive = edit.IsActive;
+                row.ControllingFieldKey = string.IsNullOrWhiteSpace(edit.ControllingFieldKey) ? null : edit.ControllingFieldKey;
+                row.ControllingValue = row.ControllingFieldKey is null ? null
+                    : (string.IsNullOrWhiteSpace(edit.ControllingValue) ? "true" : edit.ControllingValue);
             }
             else if (edit.Id == 0)
             {
+                var ctrlKey = string.IsNullOrWhiteSpace(edit.ControllingFieldKey) ? null : edit.ControllingFieldKey;
                 db.CustomerDocumentTypes.Add(new CustomerDocumentType
                 {
                     Name = edit.Name.Trim(),
                     Requirement = string.IsNullOrWhiteSpace(edit.Requirement) ? null : edit.Requirement.Trim(),
                     IsRequired = edit.IsRequired,
                     Sequence = edit.Sequence,
-                    IsActive = edit.IsActive
+                    IsActive = edit.IsActive,
+                    ControllingFieldKey = ctrlKey,
+                    ControllingValue = ctrlKey is null ? null
+                        : (string.IsNullOrWhiteSpace(edit.ControllingValue) ? "true" : edit.ControllingValue)
                 });
             }
         }
