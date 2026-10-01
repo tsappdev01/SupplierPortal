@@ -763,11 +763,11 @@
     };
 
     /// <summary>The document requirements for a contact, derived from the agreement type (landlord) and the
-    /// contact's role. Owner = <see cref="ContactType.Owner"/>; any other role is treated as "Other".
-    /// Individual+Owner → Emirates ID mandatory; Individual+Other → MOA/POA mandatory, Emirates ID optional;
-    /// Company+Owner → Trade Licence mandatory, Emirates ID optional; Company+Other → MOA/POA mandatory,
-    /// Emirates ID optional. Whenever an Emirates ID is provided (mandatory or optional) its details are
-    /// captured (and auto-read).</summary>
+    /// contact's role. Owner = <see cref="ContactType.Owner"/>; any other role is treated as "Other". The
+    /// Emirates ID is mandatory in every case (and its details are always captured / auto-read); the second
+    /// mandatory document depends on the combination:
+    /// Individual+Owner → Emirates ID; Individual+Other → MOA/POA + Emirates ID;
+    /// Company+Owner → Trade Licence + Emirates ID; Company+Other → MOA/POA + Emirates ID.</summary>
     private sealed record DocReq(LandlordDocumentType Type, bool Required, bool IsEid);
 
     private List<DocReq> DocsFor(ContactInput c)
@@ -776,10 +776,10 @@
         if (landlord!.Type == LandlordType.Individual)
             return isOwner
                 ? new() { new(LandlordDocumentType.EmiratesId, true, true) }
-                : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, false, true) };
+                : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, true, true) };
         return isOwner
-            ? new() { new(LandlordDocumentType.TradeLicense, true, false), new(LandlordDocumentType.EmiratesId, false, true) }
-            : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, false, true) };
+            ? new() { new(LandlordDocumentType.TradeLicense, true, false), new(LandlordDocumentType.EmiratesId, true, true) }
+            : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, true, true) };
     }
 
     private static string CKey(ContactInput c) => (c.Email ?? "").Trim().ToLowerInvariant();
