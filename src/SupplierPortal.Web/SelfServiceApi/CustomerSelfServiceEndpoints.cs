@@ -43,11 +43,13 @@ public static class CustomerSelfServiceEndpoints
             var logo = await logoInliner.InlineIfUrlAsync(
                 await branding.GetBusinessUnitUploadedLogoSrcAsync(t.Customer?.BusinessUnitId));
 
+            // The token's stamped Recipient is authoritative (correct even if the DMZ didn't forward ?r=).
+            var maskKey = !string.IsNullOrWhiteSpace(t.Recipient) ? t.Recipient : req.R;
             return Results.Ok(new OtpRequestResponse
             {
                 Success = success,
                 Error = error,
-                MaskedEmail = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, req.R),
+                MaskedEmail = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, maskKey),
                 ExpiresInMinutes = 10,
                 LogoUrl = logo
             });

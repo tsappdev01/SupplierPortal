@@ -929,6 +929,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<DateTime?>("OtpVerifiedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Recipient")
+                        .HasMaxLength(1)
+                        .HasColumnType("nvarchar(1)");
+
                     b.Property<DateTime?>("SessionExpiresAt")
                         .HasColumnType("datetime2");
 

@@ -21,8 +21,10 @@ public class LocalCustomerSelfServiceAccessGateway(
         var email = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Customer);
         var valid = t.ExpiresAt >= DateTime.UtcNow;
         var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
-        // Mask the SAME address the code will be sent to — the recipient the link was opened from (p/c).
-        var maskedRecipient = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, recipientKey);
+        // Mask the SAME address the code will be sent to. The token's stamped Recipient is authoritative (so it
+        // is correct even if the DMZ app didn't forward the ?r= tag); fall back to the query key.
+        var key = !string.IsNullOrWhiteSpace(t.Recipient) ? t.Recipient : recipientKey;
+        var maskedRecipient = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, key);
         return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email, maskedRecipient);
     }
 
@@ -123,6 +125,9 @@ public class LocalCustomerSelfServiceDataGateway(
             // an internal user completes the record (status → Completed) after reviewing.
             await customerService.SetStatusAsync(updated.Id, CustomerStatuses.ForReview, Actor);
             await accessTokenService.MarkUsedAsync(access.Id);
+            // Each recipient now holds their own link token, so completing via one must also invalidate the
+            // sibling link(s) — otherwise the other address could still reopen and resubmit the record.
+            await accessTokenService.ExpireTokensForCustomerAsync(access.CustomerId);
             var internalBase = configuration["SelfService:InternalUrl"] ?? "";
             try { await emailService.NotifyRequestorOfSubmissionAsync(updated, access.CreatedBy, internalBase); } catch { }
         }

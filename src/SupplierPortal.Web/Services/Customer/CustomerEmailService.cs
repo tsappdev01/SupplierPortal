@@ -57,8 +57,6 @@ public class CustomerEmailService(
             return (false, $"Email template not found at wwwroot/{TemplateRelativePath}.");
         }
 
-        var rawToken = await accessTokenService.CreateTokenAsync(customerId, actorUsername);
-
         // Customers are external, so the link must point at the public self-service host. Precedence: the
         // business unit's own Domain (each unit can have its own DMZ host), then the global
         // SelfService:PortalUrl, then the caller's base URL. A bare host is turned into an https:// URL.
@@ -70,7 +68,7 @@ public class CustomerEmailService(
                 .Select(b => b.Domain).FirstOrDefaultAsync();
         }
         var linkBase = SupplierEmailService.SelfServiceLinkBase(buDomain, configuration["SelfService:PortalUrl"], baseUrl);
-        var linkRoot = $"{linkBase.TrimEnd('/')}/customer/self-service/{rawToken}";
+        var linkPrefix = $"{linkBase.TrimEnd('/')}/customer/self-service";
 
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var logo = await branding.GetBusinessUnitLogoSrcAsync(businessUnitId) ?? await branding.GetLogoSrcAsync(actorUsername, businessUnitId);
@@ -81,14 +79,16 @@ public class CustomerEmailService(
         var subject = $"Customer Information Update - {customerName}";
 
         var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Customer);
-        // Each recipient (Primary + contact) gets a link TAGGED with which address it was sent to (?r=p / ?r=c),
-        // so when they open it the verification code is delivered back to that same inbox — not to both. Send
+        // Each recipient (Primary + contact) gets its OWN link token, stamped server-side with which address it
+        // was sent to ("p"/"c"). When that link is opened the verification code is routed back to the same inbox
+        // — decided from the token itself, so it works even if the DMZ app doesn't forward the ?r= tag. Send
         // per-address so each provider gets a single clean recipient; success when at least one copy is delivered.
         var anySent = false;
         string? lastError = null;
         foreach (var (key, to) in recipientLinks)
         {
-            var link = $"{linkRoot}?r={key}";
+            var rawToken = await accessTokenService.CreateTokenAsync(customerId, actorUsername, recipient: key);
+            var link = $"{linkPrefix}/{rawToken}?r={key}";
             var body = template
                 .Replace("{CompanyLogo}", brandBlock)
                 .Replace("{Customer Name}", safeCustomerName)

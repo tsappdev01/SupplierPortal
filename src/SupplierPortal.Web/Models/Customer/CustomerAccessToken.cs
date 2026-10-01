@@ -25,6 +25,14 @@ public class CustomerAccessToken
     public bool IsAdminTest { get; set; }
     public DateTime? UsedAt { get; set; }
 
+    /// <summary>Which of the customer's two notification addresses this link was emailed to, so the OTP is
+    /// routed back to the same inbox that opened the link — "p" = account Primary Email (Contact &amp; Address),
+    /// "c" = contact Email (Personal Data). Null for an admin test link (or a legacy single-link send), which
+    /// falls back to delivering the code to every address on file. Decided server-side at send time, so routing
+    /// does not depend on the DMZ app forwarding a query-string tag.</summary>
+    [MaxLength(1)]
+    public string? Recipient { get; set; }
+
     [MaxLength(256)]
     public string? OtpCodeHash { get; set; }
 

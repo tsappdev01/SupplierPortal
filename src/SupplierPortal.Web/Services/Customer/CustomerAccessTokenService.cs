@@ -87,7 +87,7 @@ public class CustomerAccessTokenService(
         return SupplierAccessTokenService.MaskEmail(list.Count > 0 ? list[0] : EmailFor(c));
     }
 
-    public async Task<string> CreateTokenAsync(int customerId, string createdBy, bool isAdminTest = false)
+    public async Task<string> CreateTokenAsync(int customerId, string createdBy, bool isAdminTest = false, string? recipient = null)
     {
         var raw = GenerateRawToken();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -98,7 +98,8 @@ public class CustomerAccessTokenService(
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.Add(LinkValidity),
             CreatedBy = createdBy,
-            IsAdminTest = isAdminTest
+            IsAdminTest = isAdminTest,
+            Recipient = recipient
         });
         await db.SaveChangesAsync();
         return raw;
@@ -149,7 +150,10 @@ public class CustomerAccessTokenService(
         {
             return (false, "Link not found.");
         }
-        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer, recipientKey);
+        // The token's own Recipient (stamped at send time) is authoritative, so routing works even if the DMZ
+        // app did not forward the link's ?r= tag. Fall back to the caller-supplied key, then to all recipients.
+        var key = !string.IsNullOrWhiteSpace(token.Recipient) ? token.Recipient : recipientKey;
+        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer, key);
         if (recipients.Count == 0)
         {
             return (false, "This customer has no email address on file.");
