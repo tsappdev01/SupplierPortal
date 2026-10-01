@@ -55,6 +55,20 @@
     }
 </div>
 
+@* Bulk email bar — appears once one or more landlords are selected (tick the checkboxes, or the header
+   checkbox to select every eligible row matching the current filters), then send the invite to all in one click. *@
+@if (selected.Count > 0)
+{
+    <div class="di-ll-bulkbar mb-3">
+        <span class="di-ll-bulkbar-count"><strong>@selected.Count</strong> landlord(s) selected</span>
+        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="BulkEmailAsync">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg>
+            @(bulkSending ? $"Sending… ({bulkDone}/{bulkTotal})" : "Email selected landlords")
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="() => selected.Clear()">Clear selection</button>
+    </div>
+}
+
 @if (Filtered.Count == 0)
 {
     <div class="alert alert-light border">No registrations@(statusFilter is null && !HasActiveFilters ? "" : " match the current filters") yet.</div>
@@ -64,6 +78,10 @@ else
     <table class="table table-striped align-middle">
         <thead>
             <tr>
+                <th style="width:34px;" @onclick:stopPropagation="true">
+                    <input type="checkbox" class="form-check-input" title="Select all eligible (matching the current filters)"
+                           checked="@AllEligibleSelected" @onchange="e => ToggleSelectAll((bool)e.Value!)" />
+                </th>
                 <th>Company / Property</th>
                 <th>Property Code</th>
                 <th>Type</th>
@@ -80,6 +98,11 @@ else
             @foreach (var l in PageItems)
             {
                 <tr style="cursor:pointer;" @onclick="() => Open(l.Id)">
+                    <td @onclick:stopPropagation="true">
+                        <input type="checkbox" class="form-check-input" disabled="@(!l.LinkActive)"
+                               title="@(l.LinkActive ? "Select for bulk email" : "No active invite link to email")"
+                               checked="@selected.Contains(l.Id)" @onchange="e => ToggleSelect(l.Id, (bool)e.Value!)" />
+                    </td>
                     <td>
                         @l.DisplayName
                         @if (l.VersionCount > 1)
@@ -133,6 +156,7 @@ else
                     @foreach (var v in l.Older)
                     {
                         <tr class="di-histrow" @onclick="() => Open(v.Id)" style="cursor:pointer;">
+                            <td></td>
                             <td class="ps-4"><span class="text-muted small">↳ version @v.Version</span></td>
                             <td class="text-muted small">@l.PropertyCode</td>
                             <td></td>
@@ -186,6 +210,8 @@ else
     .di-ll-search input { width: 100%; padding: 7px 12px 7px 33px; border: 1px solid var(--bs-border-color); border-radius: 8px; font-size: 14px; }
     .di-ll-filter { width: auto; min-width: 150px; }
     .di-ll-inline { min-width: 96px; }
+    .di-ll-bulkbar { display: flex; align-items: center; gap: 12px; background: #eef4ff; border: 1px solid #c7dbff; border-radius: 8px; padding: 8px 14px; }
+    .di-ll-bulkbar-count { color: #1a2233; font-size: 14px; }
 </style>
 
 @code {
@@ -195,6 +221,45 @@ else
     private string currentUser = "unknown";
     private int? sending;
     private readonly HashSet<int> expanded = new();
+
+    // ---- Bulk email ----
+    private readonly HashSet<int> selected = new();
+    private bool bulkSending;
+    private int bulkDone, bulkTotal;
+
+    // Only rows with an active invite link can be emailed (matches the per-row Email button's gating).
+    private IEnumerable<LandlordListItem> EligibleFiltered => Filtered.Where(i => i.LinkActive);
+    private bool AllEligibleSelected => EligibleFiltered.Any() && EligibleFiltered.All(i => selected.Contains(i.Id));
+
+    private void ToggleSelect(int id, bool on) { if (on) selected.Add(id); else selected.Remove(id); }
+
+    private void ToggleSelectAll(bool on)
+    {
+        if (on) { foreach (var i in EligibleFiltered) selected.Add(i.Id); }
+        else { foreach (var i in EligibleFiltered.ToList()) selected.Remove(i.Id); }
+    }
+
+    private async Task BulkEmailAsync()
+    {
+        // Snapshot the still-eligible selected ids so a filter/data change mid-send can't affect the batch.
+        var ids = items.Where(i => selected.Contains(i.Id) && i.LinkActive).Select(i => i.Id).ToList();
+        if (ids.Count == 0) { Toast.ShowError("None of the selected landlords have an active invite link to email."); return; }
+
+        bulkSending = true; bulkDone = 0; bulkTotal = ids.Count;
+        int ok = 0, fail = 0;
+        foreach (var id in ids)
+        {
+            var (sent, _, _) = await LandlordService.InviteAsync(id, currentUser, Nav.BaseUri);
+            if (sent) ok++; else fail++;
+            bulkDone++;
+            StateHasChanged();
+        }
+        bulkSending = false;
+        selected.Clear();
+        if (fail == 0) Toast.ShowSuccess($"Invitation email sent to {ok} landlord(s).");
+        else Toast.ShowError($"Sent {ok} of {ids.Count}; {fail} failed. Retry the failed ones individually.");
+        await LoadAsync();
+    }
 
     private void ToggleHistory(int id) { if (!expanded.Add(id)) expanded.Remove(id); }
 
