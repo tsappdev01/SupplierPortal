@@ -90,7 +90,16 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
     /// <summary>A lightweight row for the Manage Customer dashboard (mirrors the supplier list columns).</summary>
     public record CustomerRow(int Id, string Number, string Name, string? FullName, string? Email,
         string Status, DateTime Updated, int? BusinessUnitId,
-        string? Priority, int? AssignedToUserId, string? AssignedToUserName);
+        string? Priority, int? AssignedToUserId, string? AssignedToUserName,
+        string? PrimaryEmail = null, string? ContactEmail = null)
+    {
+        /// <summary>Every distinct address a notification is delivered to (Primary Email + contact Email).</summary>
+        public IReadOnlyList<string> Recipients =>
+            new[] { PrimaryEmail, ContactEmail }
+                .Select(e => e?.Trim())
+                .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e!)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
     /// <summary>All customers the user may see (BU-scoped), projected for the dashboard grid + KPI tiles.</summary>
     public async Task<List<CustomerRow>> GetDashboardAsync(List<int> scopeBusinessUnitIds)
@@ -132,7 +141,7 @@ public class CustomerService(IDbContextFactory<ApplicationDbContext> dbFactory, 
             string.IsNullOrWhiteSpace(r.LegalName) ? (r.CommercialName ?? "(unnamed draft)") : r.LegalName!,
             string.Join(" ", new[] { r.FirstName, r.MiddleName, r.LastName }.Where(p => !string.IsNullOrWhiteSpace(p))),
             string.IsNullOrWhiteSpace(r.PrimaryEmail) ? r.ContactEmail : r.PrimaryEmail, r.Status, r.Updated, r.BusinessUnitId,
-            r.Priority, r.AssignedToUserId, r.AssignedToUserName)).ToList();
+            r.Priority, r.AssignedToUserId, r.AssignedToUserName, r.PrimaryEmail, r.ContactEmail)).ToList();
     }
 
     public async Task<Customer?> GetAsync(int id)

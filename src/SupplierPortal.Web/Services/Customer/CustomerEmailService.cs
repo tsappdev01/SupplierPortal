@@ -29,8 +29,11 @@ public class CustomerEmailService(
     public async Task<(bool Success, string? Error)> NotifyCustomerAsync(
         int customerId, string customerName, string? email, string actorUsername, string baseUrl)
     {
-        // Resolve the recipient (Primary Email, else the contact's Email) and the branding business unit.
+        // Resolve BOTH recipients (the Primary Email on Contact & Address AND the contact's Email on Personal
+        // Data) and the branding business unit. The caller-passed address is ignored so delivery always matches
+        // the record.
         int? businessUnitId;
+        IReadOnlyList<string> recipients;
         await using (var lookupDb = await dbFactory.CreateDbContextAsync())
         {
             var c = await lookupDb.Customers.AsNoTracking().Include(x => x.Contact)
@@ -40,13 +43,10 @@ public class CustomerEmailService(
                 return (false, "Customer not found.");
             }
             businessUnitId = c.BusinessUnitId;
-            // Always send to the customer's Primary Email (Contact & Address), falling back to the Personal
-            // Data contact email only when the Primary Email is blank. This ignores any caller-passed address
-            // so the notification lands on the same mailbox as the OTP verification code.
-            email = CustomerAccessTokenService.EmailFor(c);
+            recipients = CustomerAccessTokenService.RecipientsFor(c);
         }
 
-        if (string.IsNullOrWhiteSpace(email))
+        if (recipients.Count == 0)
         {
             return (false, "This customer has no email address on file.");
         }
@@ -83,15 +83,23 @@ public class CustomerEmailService(
         var subject = $"Customer Information Update - {customerName}";
 
         var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Customer);
-        var (sent, sendError) = await emailDispatcher.SendHtmlAsync(email, subject, body, fromEmail: fromEmail, fromName: brand);
-        if (!sent)
+        // Deliver the same link to every recipient (Primary + contact). Send per-address so each provider gets a
+        // single clean recipient; the notification succeeds when at least one copy is delivered.
+        var anySent = false;
+        string? lastError = null;
+        foreach (var to in recipients)
         {
-            return (false, sendError);
+            var (ok, err) = await emailDispatcher.SendHtmlAsync(to, subject, body, fromEmail: fromEmail, fromName: brand);
+            if (ok) anySent = true; else lastError = err;
+        }
+        if (!anySent)
+        {
+            return (false, lastError);
         }
 
         await auditService.LogAsync(
             actorUsername, AuditAction.Notify, "Customer", customerId,
-            $"Sent update notification email to {email}");
+            $"Sent update notification email to {string.Join(", ", recipients)}");
 
         // Move the record to "Awaiting Customer Response".
         await using (var statusDb = await dbFactory.CreateDbContextAsync())

@@ -243,9 +243,12 @@
                 <div class="di-confirm-avatar">@CustInitials(confirmSendRow.Name)</div>
                 <div class="di-confirm-who">
                     <span class="di-confirm-name">@confirmSendRow.Name</span>
-                    @if (!string.IsNullOrWhiteSpace(confirmSendRow.Email))
+                    @if (confirmSendRow.Recipients.Count > 0)
                     {
-                        <span class="di-confirm-email">@ConfirmMailIcon @confirmSendRow.Email</span>
+                        @foreach (var rcp in confirmSendRow.Recipients)
+                        {
+                            <span class="di-confirm-email">@ConfirmMailIcon @rcp</span>
+                        }
                     }
                     else
                     {

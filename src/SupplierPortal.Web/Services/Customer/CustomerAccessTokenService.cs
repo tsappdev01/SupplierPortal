@@ -24,9 +24,21 @@ public class CustomerAccessTokenService(
 
     private static readonly User HasherContext = new();
 
-    /// <summary>The email to reach the customer on: the account Primary Email, else the contact's Email.</summary>
+    /// <summary>The email to reach the customer on: the account Primary Email, else the contact's Email.
+    /// Used for the masked-recipient hint; delivery goes to every address from <see cref="RecipientsFor"/>.</summary>
     public static string? EmailFor(Customer c) =>
         !string.IsNullOrWhiteSpace(c.PrimaryEmail) ? c.PrimaryEmail : c.Contact?.Email;
+
+    /// <summary>Every distinct address to deliver customer emails to: the account Primary Email (Contact &amp;
+    /// Address) and the contact's Email (Personal Data). Blanks dropped, de-duplicated case-insensitively so a
+    /// customer whose two emails match only receives one copy.</summary>
+    public static IReadOnlyList<string> RecipientsFor(Customer c) =>
+        new[] { c.PrimaryEmail, c.Contact?.Email }
+            .Select(e => e?.Trim())
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     public async Task<string> CreateTokenAsync(int customerId, string createdBy, bool isAdminTest = false)
     {
@@ -88,8 +100,8 @@ public class CustomerAccessTokenService(
         {
             return (false, "Link not found.");
         }
-        var email = token.Customer is null ? null : EmailFor(token.Customer);
-        if (string.IsNullOrWhiteSpace(email))
+        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer);
+        if (recipients.Count == 0)
         {
             return (false, "This customer has no email address on file.");
         }
@@ -124,8 +136,16 @@ public class CustomerAccessTokenService(
         // succeeds. Persisting before the send would make a FAILED send look successful — the verify page's
         // auto-send would then not retry and the error would be hidden, so the customer never receives a code.
         var fromEmail = await branding.GetPortalSenderEmailAsync(token.Customer.BusinessUnitId, Models.PortalType.Customer);
-        var (ok, error) = await emailDispatcher.SendHtmlAsync(email, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
-        if (!ok)
+        // Send the code to every recipient (Primary + contact), one clean address per send; success when at
+        // least one copy is delivered.
+        var anySent = false;
+        string? error = null;
+        foreach (var to in recipients)
+        {
+            var (ok, err) = await emailDispatcher.SendHtmlAsync(to, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
+            if (ok) anySent = true; else error = err;
+        }
+        if (!anySent)
         {
             return (false, error ?? "We couldn't send the verification code. Please try again in a moment.");
         }
