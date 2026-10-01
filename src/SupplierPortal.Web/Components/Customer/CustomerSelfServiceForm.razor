@@ -127,7 +127,7 @@
                                 lastSub = sub;
                                 <div class="di-subheading">@sub</div>
                             }
-                            <div class="di-field">
+                            <div class="di-field @(IsInvalidField(cfg) ? "di-field-invalid" : "")">
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequiredForCustomer) { <span class="di-req">*</span> }
@@ -636,20 +636,32 @@
     private async Task NextAsync()
     {
         await SaveAsync(true);
-        var problems = MissingRequired(steps[current]).Select(m => $"{m} is required.")
-            .Concat(DateErrorsForStep(steps[current]))
-            .Concat(FormatErrors(FieldsFor(steps[current]))).ToList();
-        if (FieldsFor(steps[current]).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
+        if (!ValidateStep(steps[current])) return;
+        if (current < steps.Count - 1) current++;
+        message = null;
+    }
+
+    /// <summary>Validates one tab: flags the missing mandatory fields (for inline highlight), and toasts the
+    /// missing / format / date / VAT-group problems. Returns true when the tab is complete.</summary>
+    private bool ValidateStep(Step step)
+    {
+        var missing = MissingRequiredConfigs(step);
+        invalidKeys.Clear();
+        foreach (var f in missing) invalidKeys.Add(f.FieldKey);
+
+        var problems = missing.Select(m => $"{m.DisplayLabel} is required.")
+            .Concat(DateErrorsForStep(step))
+            .Concat(FormatErrors(FieldsFor(step))).ToList();
+        if (FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
         {
             problems.AddRange(VatGroupErrors());
         }
         if (problems.Count > 0)
         {
             ToastService.ShowErrors(problems);
-            return;
+            return false;
         }
-        if (current < steps.Count - 1) current++;
-        message = null;
+        return true;
     }
 
     // Stricter than DataAnnotations' EmailAddressAttribute (which accepts "a@b" with no domain dot):
@@ -716,7 +728,11 @@
         return errs;
     }
 
-    private List<string> MissingRequired(Step step)
+    private List<string> MissingRequired(Step step) =>
+        MissingRequiredConfigs(step).Select(f => f.DisplayLabel).ToList();
+
+    /// <summary>The visible, conditionally-shown, required-for-customer fields on a step that are still empty.</summary>
+    private List<CustomerFieldConfig> MissingRequiredConfigs(Step step)
     {
         if (step.IsReview || customer is null) return [];
         return step.Groups.SelectMany(g => config
@@ -724,10 +740,24 @@
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
-                f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
-            .Select(f => f.DisplayLabel))
+                f.Section == "Account" ? (object)customer : contact, f.FieldKey))))
             .ToList();
     }
+
+    // Field keys flagged by the last tab-level validation; used to inline-highlight the offending fields. A
+    // highlight clears automatically once the field is filled (StillMissing re-checked on each render).
+    private readonly HashSet<string> invalidKeys = new();
+
+    private bool FieldStillMissing(CustomerFieldConfig cfg)
+    {
+        if (customer is null) return false;
+        if (!cfg.IsVisible || !cfg.IsRequiredForCustomer || !IsConditionallyVisible(cfg)) return false;
+        if (cfg.Section == "Account" && (cfg.FieldKey == "CountryName" || cfg.FieldKey == "VatGroupLegalNames")) return false;
+        return string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+            cfg.Section == "Account" ? (object)customer : contact, cfg.FieldKey));
+    }
+
+    private bool IsInvalidField(CustomerFieldConfig cfg) => invalidKeys.Contains(cfg.FieldKey) && FieldStillMissing(cfg);
 
     private static string? DateMax(string fieldKey) =>
         (fieldKey.Contains("Issue", StringComparison.OrdinalIgnoreCase)
@@ -772,6 +802,7 @@
     private async Task BackAsync()
     {
         await SaveAsync(true);
+        invalidKeys.Clear();
         if (current > 0) current--;
         message = null;
     }
@@ -780,6 +811,10 @@
     {
         if (index == current) return;
         await SaveAsync(true);
+        // Leaving the current tab forward enforces that tab's validation (so errors surface tab-by-tab rather
+        // than all at once on Review). Jumping backward is always allowed.
+        if (index > current && !ValidateStep(steps[current])) return;
+        invalidKeys.Clear();
         current = Math.Clamp(index, 0, steps.Count - 1);
         message = null;
     }

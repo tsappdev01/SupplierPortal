@@ -171,7 +171,7 @@
                                 lastSub = sub;
                                 <div class="di-subheading">@sub</div>
                             }
-                            <div class="di-field">
+                            <div class="di-field @(IsInvalidField(cfg) ? "di-field-invalid" : "")">
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequired) { <span class="di-req">*</span> }
@@ -710,6 +710,7 @@
     private async Task BackAsync()
     {
         await SaveAsync();
+        invalidKeys.Clear();
         if (current > 0) current--;
     }
 
@@ -717,6 +718,14 @@
     {
         if (index == current) return;
         await SaveAsync();
+        // Leaving the current tab forward enforces that tab's validation (errors surface tab-by-tab rather
+        // than all at once on Review). Jumping backward is always allowed.
+        if (index > current)
+        {
+            var problems = Validate(steps[current]);
+            if (problems.Count > 0) { Toast.ShowErrors(problems); return; }
+        }
+        invalidKeys.Clear();
         current = Math.Clamp(index, 0, steps.Count - 1);
     }
 
@@ -735,17 +744,31 @@
         return d.Length == length && d.All(char.IsDigit);
     }
 
-    private List<string> MissingRequired(Step step)
+    private List<string> MissingRequired(Step step) =>
+        MissingRequiredConfigs(step).Select(f => $"{f.DisplayLabel} is required.").ToList();
+
+    private List<CustomerFieldConfigDto> MissingRequiredConfigs(Step step)
     {
         if (step.IsReview) return [];
         return step.Groups.SelectMany(g => config
             .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && f.FieldKey == "CountryName"))
-            .Where(f => string.IsNullOrWhiteSpace(Val(f)))
-            .Select(f => $"{f.DisplayLabel} is required."))
+            .Where(f => string.IsNullOrWhiteSpace(Val(f))))
             .ToList();
     }
+
+    // Field keys flagged by the last tab-level validation, for inline highlighting (cleared once filled).
+    private readonly HashSet<string> invalidKeys = new();
+
+    private bool FieldStillMissing(CustomerFieldConfigDto cfg)
+    {
+        if (!cfg.IsVisible || !cfg.IsRequired || !IsConditionallyVisible(cfg)) return false;
+        if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") return false;
+        return string.IsNullOrWhiteSpace(Val(cfg));
+    }
+
+    private bool IsInvalidField(CustomerFieldConfigDto cfg) => invalidKeys.Contains(cfg.FieldKey) && FieldStillMissing(cfg);
 
     private List<string> FormatErrors(IEnumerable<CustomerFieldConfigDto> fields)
     {
@@ -806,7 +829,12 @@
 
     private List<string> Validate(Step step)
     {
-        var problems = MissingRequired(step).Concat(DateErrorsForStep(step)).Concat(FormatErrors(FieldsFor(step))).ToList();
+        var missing = MissingRequiredConfigs(step);
+        invalidKeys.Clear();
+        foreach (var f in missing) invalidKeys.Add(f.FieldKey);
+
+        var problems = missing.Select(f => $"{f.DisplayLabel} is required.")
+            .Concat(DateErrorsForStep(step)).Concat(FormatErrors(FieldsFor(step))).ToList();
         if (FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
         {
             problems.AddRange(VatGroupErrors());

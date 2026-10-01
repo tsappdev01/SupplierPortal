@@ -201,6 +201,20 @@
 
 .di-req { color: var(--required); margin-left: 2px; }
 
+/* Inline highlight for a mandatory field flagged by tab-level validation. */
+.di-field-invalid input, .di-field-invalid select, .di-field-invalid .di-switch, .di-field-invalid .di-datepick {
+    border-color: #c0392b !important;
+    box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.15);
+}
+.di-field-invalid > label { color: #c0392b; }
+.di-field-invalid::after {
+    content: "Required — please complete this field.";
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #c0392b;
+}
+
 .di-lov-badge {
     display: inline-block;
     margin-left: 6px;
