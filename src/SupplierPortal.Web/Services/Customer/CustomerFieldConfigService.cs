@@ -71,6 +71,7 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             row.CustomerControl = Normalize(edit.CustomerControl);
             row.IsVisible = edit.IsVisible;
             row.IsRequired = edit.IsRequired;
+            row.IsRequiredForCustomer = edit.IsRequiredForCustomer;
             row.IsRemoved = edit.IsRemoved;
             // Conditional (depends-on) rule: null out both when no controlling field is chosen.
             row.ControllingFieldKey = string.IsNullOrWhiteSpace(edit.ControllingFieldKey) ? null : edit.ControllingFieldKey;

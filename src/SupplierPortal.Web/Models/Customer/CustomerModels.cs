@@ -332,7 +332,13 @@ public class CustomerFieldConfig
 
     public bool IsVisible { get; set; } = true;
 
+    /// <summary>Whether the field is mandatory for INTERNAL users (the Business Relation / admin portal form).</summary>
     public bool IsRequired { get; set; }
+
+    /// <summary>Whether the field is mandatory for the CUSTOMER (the self-service / DMZ portal form). Independent
+    /// of <see cref="IsRequired"/>, so a field can be required for internal staff but optional for the customer
+    /// (or vice-versa).</summary>
+    public bool IsRequiredForCustomer { get; set; }
 
     /// <summary>When true the field is removed from the form entirely (not shown to any role, never required)
     /// but kept so an admin can restore it. Mirrors the supplier field manager's remove/restore.</summary>

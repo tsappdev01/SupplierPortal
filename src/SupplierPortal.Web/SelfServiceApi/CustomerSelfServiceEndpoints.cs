@@ -458,7 +458,8 @@ public static class CustomerSelfServiceEndpoints
                 FieldKind = c.FieldKind,
                 CustomerControl = c.CustomerControl,
                 IsVisible = c.IsVisible,
-                IsRequired = c.IsRequired,
+                // The DMZ form is customer-facing, so "required" here means required-for-the-customer.
+                IsRequired = c.IsRequiredForCustomer,
                 ControllingFieldKey = c.ControllingFieldKey,
                 ControllingValue = c.ControllingValue
             }).ToList(),

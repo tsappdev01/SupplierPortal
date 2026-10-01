@@ -1008,6 +1008,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<bool>("IsRequired")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsRequiredForCustomer")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsVisible")
                         .HasColumnType("bit");
 

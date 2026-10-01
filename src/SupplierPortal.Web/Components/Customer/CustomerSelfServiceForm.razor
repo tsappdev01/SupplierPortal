@@ -130,7 +130,7 @@
                             <div class="di-field">
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
-                                    @if (cfg.IsRequired) { <span class="di-req">*</span> }
+                                    @if (cfg.IsRequiredForCustomer) { <span class="di-req">*</span> }
                                     @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <button type="button" class="di-help-icon" @onclick='() => ShowHelp(isCombinedCountry ? "Country" : cfg.DisplayLabel, cfg.HelpText)' aria-label="Show help">&#9432;</button> }
                                 </label>
                                 @if (!editable)
@@ -715,7 +715,7 @@
     {
         if (step.IsReview || customer is null) return [];
         return step.Groups.SelectMany(g => config
-            .Where(f => f.IsVisible && f.IsRequired && f.Section == g.Section && f.GroupName == g.Group)
+            .Where(f => f.IsVisible && f.IsRequiredForCustomer && f.Section == g.Section && f.GroupName == g.Group)
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
@@ -783,7 +783,7 @@
     {
         if (customer is null) return;
 
-        var missing = config.Where(f => f.IsVisible && f.IsRequired)
+        var missing = config.Where(f => f.IsVisible && f.IsRequiredForCustomer)
             .Where(IsConditionallyVisible)
             .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
             .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
