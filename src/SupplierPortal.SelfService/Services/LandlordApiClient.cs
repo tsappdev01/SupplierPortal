@@ -127,7 +127,8 @@ public class LandlordApiClient(
     }
 
     public async Task<LandlordDocumentUploadResponse> UploadDocumentAsync(
-        string linkToken, string sessionToken, string documentType, Stream content, string fileName, string contentType)
+        string linkToken, string sessionToken, string documentType, Stream content, string fileName, string contentType,
+        int? contactId = null)
     {
         try
         {
@@ -137,6 +138,7 @@ public class LandlordApiClient(
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType);
             form.Add(fileContent, "file", fileName);
             form.Add(new StringContent(documentType), "documentType");
+            if (contactId is int cid) form.Add(new StringContent(cid.ToString()), "contactId");
             var res = await http.PostAsync("/api/selfservice/landlord/documents", form);
             if (!res.IsSuccessStatusCode) return new LandlordDocumentUploadResponse { Success = false, Error = "Upload failed. Please try again." };
             return await res.Content.ReadFromJsonAsync<LandlordDocumentUploadResponse>() ?? new LandlordDocumentUploadResponse { Success = false, Error = "Unexpected response." };

@@ -134,11 +134,6 @@
                                 <div class="r"><span class="k">Property code</span><span class="v mono">@FormatCode(landlord.PropertyCode)</span></div>
                                 <div class="r"><span class="k">Company</span><span class="v">@(string.IsNullOrWhiteSpace(landlord.CompanyName) ? "—" : landlord.CompanyName)</span></div>
                                 <div class="r"><span class="k">Building</span><span class="v">@(string.IsNullOrWhiteSpace(landlord.Building) ? "—" : landlord.Building)</span></div>
-                                <div class="r"><span class="k">Agreement type</span><span class="v">@landlord.Type</span></div>
-                                @if (!string.IsNullOrWhiteSpace(landlord.LandLordCode))
-                                {
-                                    <div class="r"><span class="k">Landlord code</span><span class="v mono">@landlord.LandLordCode</span></div>
-                                }
                             </div>
                             <div class="hint">Set by Business Centre · issued by Dubai Municipality (read-only).</div>
                         </div>

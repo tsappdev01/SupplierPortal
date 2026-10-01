@@ -116,6 +116,7 @@ public static class LandlordSelfServiceEndpoints
                 PropertyCode = landlord.PropertyCode,
                 CompanyName = landlord.CompanyName,
                 Status = landlord.Status.ToString(),
+                AgreementType = landlord.Type.ToString(),
                 SigningRule = landlord.SigningRule.ToString(),
                 CorrectionComment = correction?.Comment,
                 LogoUrl = await branding.GetBusinessUnitLogoSrcAsync(landlord.BusinessUnitId),
@@ -189,7 +190,8 @@ public static class LandlordSelfServiceEndpoints
             return Results.Ok(new LandlordDocumentUploadResponse { Success = true, Documents = list.Select(ToDocDto).ToList() });
         });
 
-        group.MapPost("/documents", async (HttpContext ctx, LandlordAccessTokenService tokens, LandlordDocumentService docs) =>
+        group.MapPost("/documents", async (HttpContext ctx, LandlordAccessTokenService tokens, LandlordDocumentService docs,
+            LandlordService landlords, IDocumentOcrService ocr) =>
         {
             var (link, session) = ReadSession(ctx);
             var token = await tokens.ValidateSessionAsync(link, session);
@@ -206,6 +208,15 @@ public static class LandlordSelfServiceEndpoints
                 return Results.BadRequest(new LandlordDocumentUploadResponse { Success = false, Error = "Invalid document type." });
             }
 
+            // Optional: associate the document with a specific contact (per-contact document requirements).
+            // The contact id must belong to this landlord, otherwise it is ignored (treated as landlord-level).
+            int? contactId = null;
+            if (int.TryParse(form["contactId"].ToString(), out var cid) && cid > 0)
+            {
+                var landlord = await landlords.GetForSelfServiceAsync(token.LandlordId);
+                if (landlord is not null && landlord.Contacts.Any(c => c.Id == cid)) contactId = cid;
+            }
+
             byte[] bytes;
             await using (var stream = file.OpenReadStream())
             using (var ms = new MemoryStream())
@@ -214,9 +225,24 @@ public static class LandlordSelfServiceEndpoints
                 bytes = ms.ToArray();
             }
 
-            var (ok, err) = await docs.UploadBytesAsync(token.LandlordId, type, file.FileName, file.ContentType, bytes, Actor);
+            var (ok, err) = await docs.UploadBytesAsync(token.LandlordId, type, file.FileName, file.ContentType, bytes, Actor, contactId: contactId);
             var current = await LandlordDocsAsync(docs, token.LandlordId);
-            return Results.Ok(new LandlordDocumentUploadResponse { Success = ok, Error = err, Documents = current.Select(ToDocDto).ToList() });
+            var response = new LandlordDocumentUploadResponse { Success = ok, Error = err, Documents = current.Select(ToDocDto).ToList() };
+
+            // Best-effort Emirates ID auto-read — never fails the upload.
+            if (ok && type == LandlordDocumentType.EmiratesId)
+            {
+                try
+                {
+                    var (num, name, expiry, note) = await TryExtractEmiratesIdAsync(ocr, bytes, file.FileName);
+                    response.ExtractedEmiratesId = num;
+                    response.ExtractedEmiratesIdName = name;
+                    response.ExtractedEmiratesIdExpiry = expiry;
+                    response.ExtractNote = note;
+                }
+                catch { response.ExtractNote = "Document uploaded. Please enter the Emirates ID details."; }
+            }
+            return Results.Ok(response);
         }).RequireRateLimiting("upload");
 
         group.MapGet("/documents/{id:int}", async (int id, HttpContext ctx, LandlordAccessTokenService tokens, LandlordDocumentService docs) =>
@@ -282,6 +308,49 @@ public static class LandlordSelfServiceEndpoints
     private static LandlordDocumentDto ToDocDto(LandlordDocument d) => new()
     {
         Id = d.Id, DocumentType = d.DocumentType.ToString(), FileName = d.FileName,
-        ContentType = d.ContentType, UploadedAt = d.UploadedAt, FileSizeBytes = d.FileSizeBytes
+        ContentType = d.ContentType, UploadedAt = d.UploadedAt, FileSizeBytes = d.FileSizeBytes,
+        ContactId = d.ContactId
     };
+
+    /// <summary>Best-effort server-side Emirates ID read for the DMZ upload path: tries the PDF text layer
+    /// first (no cloud), then cloud OCR for image-only cards. Mirrors the in-app wizard's extraction.</summary>
+    private static async Task<(string? Number, string? Name, DateTime? Expiry, string Note)> TryExtractEmiratesIdAsync(
+        IDocumentOcrService ocr, byte[] bytes, string fileName)
+    {
+        string? text = null;
+        if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            text = LocalPdfText.TryExtract(bytes);
+        var haveId = !string.IsNullOrWhiteSpace(text) && EmiratesIdExtractor.Parse(text).Number is not null;
+
+        if (!haveId && ocr.IsEnabled)
+        {
+            string? temp = null;
+            try
+            {
+                temp = Path.Combine(Path.GetTempPath(), $"eid-{Guid.NewGuid():N}{Path.GetExtension(fileName)}");
+                await File.WriteAllBytesAsync(temp, bytes);
+                var o = await ocr.ExtractTextAsync(temp);
+                if (!string.IsNullOrWhiteSpace(o)) text = o;
+            }
+            catch { /* fall through to the manual-entry note */ }
+            finally { if (temp is not null && File.Exists(temp)) { try { File.Delete(temp); } catch { } } }
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return (null, null, null, ocr.IsEnabled
+                ? "We couldn't read the card automatically — please enter the Emirates ID details."
+                : "Automatic reading is unavailable — please enter the Emirates ID details.");
+        }
+
+        var r = EmiratesIdExtractor.Parse(text);
+        DateTime? expiry = null;
+        if (r.Expiry is not null && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var exp))
+            expiry = exp;
+        var note = (r.Number is not null || r.Name is not null || expiry is not null)
+            ? $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}. Please check and correct if needed."
+            : "We couldn't read the card automatically — please enter the Emirates ID details.";
+        return (r.Number, r.Name, expiry, note);
+    }
 }

@@ -47,74 +47,41 @@
             }
 
             <div class="ll-section">
-                <div class="ll-section-title">Primary contact</div>
-                <div class="ll-grid">
-                    @if (FVisible("FullName"))
-                    {
-                        <div class="ll-field"><label>@FLabel("FullName", "Full name") @Req("FullName", true)@HelpIc("FullName")</label>
-                            <input type="text" maxlength="@FMax("FullName")" @bind="primary.FullName" /></div>
-                    }
-                    @if (FVisible("Designation"))
-                    {
-                        <div class="ll-field"><label>@FLabel("Designation", "Designation") @Req("Designation", false)@HelpIc("Designation")</label>
-                            <input type="text" maxlength="@FMax("Designation")" @bind="primary.Designation" /></div>
-                    }
-                    @if (FVisible("Email"))
-                    {
-                        <div class="ll-field"><label>@FLabel("Email", "Email address") @Req("Email", true)@HelpIc("Email")</label>
-                            <input type="text" maxlength="@FMax("Email")" @bind="primary.Email" /></div>
-                    }
-                    @if (FVisible("Mobile"))
-                    {
-                        <div class="ll-field"><label>@FLabel("Mobile", "Mobile number") @Req("Mobile", true)@HelpIc("Mobile")</label>
-                            <input type="text" placeholder="+9715XXXXXXXX" @bind="primary.Mobile" /></div>
-                    }
-                    @if (FVisible("EmiratesId"))
-                    {
-                        <div class="ll-field"><label>@FLabel("EmiratesId", "Emirates ID")@HelpIc("EmiratesId")</label>
-                            <input type="text" @bind="primary.EmiratesId" /></div>
-                    }
-                    @if (FVisible("EmiratesIdExpiry"))
-                    {
-                        <div class="ll-field"><label>@FLabel("EmiratesIdExpiry", "Emirates ID expiry")</label>
-                            <input type="date" @bind="primary.EmiratesIdExpiry" /></div>
-                    }
-                </div>
+                <div class="ll-section-title">Agreement type</div>
+                <div class="ll-agree">@(IsIndividual ? "Individual" : "Company")</div>
+                <div class="ll-muted" style="font-size:13px;margin-top:4px">Set by Business Centre for this property — read-only. It determines the documents required for each contact.</div>
+            </div>
+
+            @if (uploading)
+            {
+                <div class="ll-upbar"><div class="ll-upbar-fill"></div></div>
+                <div class="ll-muted" style="margin-bottom:8px">Uploading @uploadingName…</div>
+            }
+
+            @ContactBlock(primary, true, "Primary contact", null)
+
+            <div class="ll-section">
+                <div class="ll-section-title">Secondary contacts</div>
+                @if (secondaries.Count == 0)
+                {
+                    <p class="ll-muted" style="font-size:13px">No secondary contacts added. These are optional.</p>
+                }
+                @for (var i = 0; i < secondaries.Count; i++)
+                {
+                    var idx = i;
+                    <div class="ll-subcard">
+                        <div class="ll-subcard-hd"><span>Secondary contact @(idx + 1)</span>
+                            <button class="ll-x" @onclick="() => RemoveSecondary(idx)" disabled="@(busy || uploading)">Remove</button></div>
+                        @ContactInner(secondaries[idx], false, $"Secondary contact {idx + 1}")
+                    </div>
+                }
+                <button class="ll-btn ll-btn-secondary" style="margin-top:10px" @onclick="AddSecondary" disabled="@(busy || uploading)">+ Add secondary contact</button>
             </div>
 
             <div class="ll-section">
-                <div class="ll-section-title">Documents</div>
-                @if (uploading)
-                {
-                    <div class="ll-upbar"><div class="ll-upbar-fill"></div></div>
-                    <div class="ll-muted" style="margin-bottom:8px">Uploading @uploadingName…</div>
-                }
+                <div class="ll-section-title">Other documents (optional)</div>
                 <div class="ll-docs">
-                    @foreach (var dt in bootstrap.DocumentTypes.OrderBy(d => d.Sequence))
-                    {
-                        // "Other" allows several files; the single-slot types match at most one stored document.
-                        var docs = documents.Where(d => string.Equals(d.DocumentType, dt.Code, StringComparison.OrdinalIgnoreCase)).ToList();
-                        <div class="ll-doc">
-                            <div class="ll-doc-t">@dt.Name @(dt.IsRequired ? RawReq() : null)</div>
-                            @if (docs.Count > 0)
-                            {
-                                @foreach (var doc in docs)
-                                {
-                                    <div class="ll-doc-file"><span class="ll-doc-name" title="@doc.FileName">@doc.FileName</span>
-                                        <button class="ll-x" @onclick="() => RemoveAsync(doc.Id)" disabled="@uploading">✕</button></div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="ll-muted" style="font-size:13px">No file uploaded</div>
-                            }
-                            <label class="ll-choose @(uploading ? "is-disabled" : null)">
-                                @(docs.Count > 0 ? "Replace / add" : "Upload")
-                                <InputFile class="ll-file" accept=".pdf,.jpg,.jpeg,.png" disabled="@uploading"
-                                           OnChange="e => UploadAsync(e, dt.Code)" />
-                            </label>
-                        </div>
-                    }
+                    @DocSlot(null, "TitleDeed", "Title Deed", required: false, isEid: false)
                 </div>
             </div>
 
@@ -141,6 +108,18 @@
     .ll-head h1 { font-size: 22px; font-weight: 700; color: #16244a; margin: 0; }
     .ll-section { background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; padding: 18px 20px; margin-top: 16px; }
     .ll-section-title { font-weight: 700; color: #16244a; margin-bottom: 12px; }
+    .ll-agree { display: inline-block; font-weight: 700; color: #16244a; background: #eef1ff; border: 1px solid #d5dbe6; border-radius: 7px; padding: 6px 14px; }
+    .ll-subcard { border: 1px solid #e2e5ea; border-radius: 9px; padding: 14px 16px; margin-bottom: 12px; background: #fcfcfd; }
+    .ll-subcard-hd { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #16244a; margin-bottom: 10px; }
+    .ll-subcard-hd .ll-x { font-size: 13px; font-weight: 600; }
+    .ll-cdocs { margin-top: 14px; border-top: 1px dashed #e2e5ea; padding-top: 12px; }
+    .ll-cdocs-t { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #7b8697; font-weight: 700; margin-bottom: 10px; }
+    .ll-badge { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: 1px; }
+    .ll-badge-req { color: #c0392b; background: #fdecea; border: 1px solid #f1c7c2; }
+    .ll-badge-opt { color: #7b8697; background: #fff; border: 1px solid #d5dbe6; }
+    .ll-eid { background: #f7f9fc; border: 1px solid #e2e5ea; border-radius: 8px; padding: 12px; margin-top: 8px; }
+    .ll-eid .ll-ok { color: #16632a; font-size: 13px; margin: 0 0 8px; }
+    .ll-eid .ll-warn { color: #c0392b; font-size: 13px; margin: 8px 0 0; }
     .ll-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
     .ll-field { display: flex; flex-direction: column; }
     .ll-field label { font-weight: 600; font-size: 13px; color: #46618f; margin-bottom: 5px; }
@@ -227,25 +206,203 @@
         }
     };
 
+    // ---- Agreement type + contact helpers ----
+    private bool IsIndividual => string.Equals(bootstrap?.AgreementType, "Individual", StringComparison.OrdinalIgnoreCase);
+    private static readonly string[] ContactTypes = { "Owner", "AuthorisedRepresentative", "Manager", "Legal", "Other" };
+    private static string CKey(LandlordContactDto c) => (c.Email ?? "").Trim().ToLowerInvariant();
+    private static string RoleLabel(string? type) => string.Equals(type, "Owner", StringComparison.OrdinalIgnoreCase) ? "Owner" : $"{type} (Other)";
+    // OCR note per contact email (shown beside the captured Emirates ID details).
+    private readonly Dictionary<string, string?> eidNote = new();
+
+    private void AddSecondary() => secondaries.Add(new LandlordContactDto { ContactType = "AuthorisedRepresentative" });
+    private void RemoveSecondary(int i) { if (i >= 0 && i < secondaries.Count) secondaries.RemoveAt(i); }
+
+    /// <summary>The documents required for a contact — Emirates ID is mandatory in every case, and the second
+    /// mandatory document depends on the agreement type (Individual/Company) and the contact's role.</summary>
+    private sealed record DocReq(string Code, string Label, bool Required, bool IsEid);
+    private List<DocReq> DocsFor(LandlordContactDto c)
+    {
+        var isOwner = string.Equals(c.ContactType, "Owner", StringComparison.OrdinalIgnoreCase);
+        if (IsIndividual)
+            return isOwner
+                ? new() { new("EmiratesId", "Emirates ID", true, true) }
+                : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
+        return isOwner
+            ? new() { new("TradeLicense", "Trade Licence", true, false), new("EmiratesId", "Emirates ID", true, true) }
+            : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
+    }
+
+    private LandlordDocumentDto? DocFor(LandlordContactDto? owner, string code)
+    {
+        if (owner is null)
+            return documents.FirstOrDefault(d => d.ContactId is null && string.Equals(d.DocumentType, code, StringComparison.OrdinalIgnoreCase));
+        return owner.Id is int id
+            ? documents.FirstOrDefault(d => d.ContactId == id && string.Equals(d.DocumentType, code, StringComparison.OrdinalIgnoreCase))
+            : null;
+    }
+
+    private LandlordContactDto? FindContact(string? email)
+    {
+        var key = (email ?? "").Trim().ToLowerInvariant();
+        if (key.Length == 0) return null;
+        return CKey(primary) == key ? primary : secondaries.FirstOrDefault(c => CKey(c) == key);
+    }
+
+    // ---- Render fragments ----
+    private RenderFragment ContactBlock(LandlordContactDto c, bool isPrimary, string who, int? removeIdx) => __builder =>
+    {
+        <div class="ll-section">
+            <div class="ll-section-title">@who</div>
+            @ContactInner(c, isPrimary, who)
+        </div>
+    };
+
+    private RenderFragment ContactInner(LandlordContactDto c, bool isPrimary, string who) => __builder =>
+    {
+        <div class="ll-grid">
+            @if (FVisible("FullName"))
+            {
+                <div class="ll-field"><label>@FLabel("FullName", "Full name") @Req("FullName", true)@HelpIc("FullName")</label>
+                    <input type="text" maxlength="@FMax("FullName")" @bind="c.FullName" /></div>
+            }
+            @if (FVisible("Designation"))
+            {
+                <div class="ll-field"><label>@FLabel("Designation", "Designation") @Req("Designation", false)@HelpIc("Designation")</label>
+                    <input type="text" maxlength="@FMax("Designation")" @bind="c.Designation" /></div>
+            }
+            @if (FVisible("Email"))
+            {
+                <div class="ll-field"><label>@FLabel("Email", "Email address") @Req("Email", true)@HelpIc("Email")</label>
+                    <input type="text" maxlength="@FMax("Email")" @bind="c.Email" /></div>
+            }
+            @if (FVisible("Mobile"))
+            {
+                <div class="ll-field"><label>@FLabel("Mobile", "Mobile number") @Req("Mobile", true)@HelpIc("Mobile")</label>
+                    <input type="text" placeholder="+9715XXXXXXXX" @bind="c.Mobile" /></div>
+            }
+            <div class="ll-field"><label>Contact type</label>
+                <select @bind="c.ContactType">@foreach (var t in ContactTypes) { <option value="@t">@t</option> }</select></div>
+        </div>
+        <div class="ll-cdocs">
+            <div class="ll-cdocs-t">Required documents · @RoleLabel(c.ContactType)</div>
+            @if (string.IsNullOrWhiteSpace(c.FullName) || string.IsNullOrWhiteSpace(c.Email))
+            {
+                <div class="ll-muted" style="font-size:13px;margin-bottom:8px">Enter this contact's name and email above to enable document upload.</div>
+            }
+            <div class="ll-docs">
+                @foreach (var r in DocsFor(c))
+                {
+                    @DocSlot(c, r.Code, r.Label, r.Required, r.IsEid)
+                }
+            </div>
+        </div>
+    };
+
+    private RenderFragment DocSlot(LandlordContactDto? owner, string code, string label, bool required, bool isEid) => __builder =>
+    {
+        var doc = DocFor(owner, code);
+        var canUpload = owner is null || (!string.IsNullOrWhiteSpace(owner.FullName) && !string.IsNullOrWhiteSpace(owner.Email));
+        <div class="ll-doc">
+            <div class="ll-doc-t">@label <span class="ll-badge @(required ? "ll-badge-req" : "ll-badge-opt")">@(required ? "Mandatory" : "Optional")</span></div>
+            @if (doc is not null)
+            {
+                <div class="ll-doc-file"><span class="ll-doc-name" title="@doc.FileName">@doc.FileName</span>
+                    <button class="ll-x" @onclick="() => RemoveAsync(doc.Id)" disabled="@uploading">✕</button></div>
+            }
+            else
+            {
+                <div class="ll-muted" style="font-size:13px">No file uploaded</div>
+            }
+            @if (canUpload)
+            {
+                <label class="ll-choose @(uploading ? "is-disabled" : null)">
+                    @(doc is not null ? "Replace" : "Upload")
+                    <InputFile class="ll-file" accept=".pdf,.jpg,.jpeg,.png" disabled="@uploading"
+                               OnChange="e => UploadDocAsync(owner, code, e)" />
+                </label>
+            }
+            else
+            {
+                <div class="ll-muted" style="font-size:12px">Name &amp; email required first</div>
+            }
+            @if (isEid && owner is not null && doc is not null)
+            {
+                @EidDetails(owner)
+            }
+        </div>
+    };
+
+    private RenderFragment EidDetails(LandlordContactDto c) => __builder =>
+    {
+        var note = eidNote.GetValueOrDefault(CKey(c));
+        <div class="ll-eid">
+            @if (!string.IsNullOrWhiteSpace(note))
+            {
+                <p class="ll-ok">@note</p>
+            }
+            <div class="ll-grid">
+                <div class="ll-field"><label>Emirates ID number @RawReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="c.EmiratesId" /></div>
+                <div class="ll-field"><label>Name (as on card) @RawReq()</label><input type="text" @bind="c.EmiratesIdName" /></div>
+                <div class="ll-field"><label>Expiry date @RawReq()</label><input type="date" @bind="c.EmiratesIdExpiry" /></div>
+            </div>
+            @if (c.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
+            {
+                <p class="ll-warn">This Emirates ID has expired (@exp.ToString("dd MMM yyyy")). A valid, unexpired Emirates ID is required to submit.</p>
+            }
+        </div>
+    };
+
+    // ---- Persistence / validation ----
     private SaveLandlordRequest BuildRequest() => new()
     {
         SigningRule = bootstrap?.SigningRule ?? "All",
-        Contacts = new[] { primary }.Concat(secondaries).ToList(),
+        Contacts = new[] { primary }.Concat(secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName))).ToList(),
         Signatories = bootstrap?.Signatories ?? []
     };
 
-    private List<string> ValidateContact()
+    private List<string> ValidateContactFields(LandlordContactDto c, string who)
     {
         var errs = new List<string>();
-        if (FVisible("FullName") && FRequired("FullName", true) && string.IsNullOrWhiteSpace(primary.FullName)) errs.Add($"{FLabel("FullName", "Full name")} is required.");
-        if (FVisible("Email") && FRequired("Email", true) && string.IsNullOrWhiteSpace(primary.Email)) errs.Add($"{FLabel("Email", "Email")} is required.");
-        if (FVisible("Mobile") && FRequired("Mobile", true) && string.IsNullOrWhiteSpace(primary.Mobile)) errs.Add($"{FLabel("Mobile", "Mobile number")} is required.");
-        foreach (var (key, label, val) in new[] { ("FullName", "Full name", primary.FullName), ("Designation", "Designation", primary.Designation), ("Email", "Email", primary.Email) })
+        if (FVisible("FullName") && FRequired("FullName", true) && string.IsNullOrWhiteSpace(c.FullName)) errs.Add($"{who}: {FLabel("FullName", "Full name")} is required.");
+        if (FVisible("Email") && FRequired("Email", true) && string.IsNullOrWhiteSpace(c.Email)) errs.Add($"{who}: {FLabel("Email", "Email")} is required.");
+        if (FVisible("Mobile") && FRequired("Mobile", true) && string.IsNullOrWhiteSpace(c.Mobile)) errs.Add($"{who}: {FLabel("Mobile", "Mobile number")} is required.");
+        foreach (var (key, label, val) in new[] { ("FullName", "Full name", c.FullName), ("Designation", "Designation", c.Designation), ("Email", "Email", c.Email) })
         {
             if (string.IsNullOrWhiteSpace(val) || !FVisible(key)) continue;
             var len = val.Trim().Length;
-            if (FMin(key) is int mn && len < mn) errs.Add($"{FLabel(key, label)} must be at least {mn} characters.");
-            if (FMax(key) is int mx && len > mx) errs.Add($"{FLabel(key, label)} must be at most {mx} characters.");
+            if (FMin(key) is int mn && len < mn) errs.Add($"{who}: {FLabel(key, label)} must be at least {mn} characters.");
+            if (FMax(key) is int mx && len > mx) errs.Add($"{who}: {FLabel(key, label)} must be at most {mx} characters.");
+        }
+        return errs;
+    }
+
+    private List<string> ValidateDocs(LandlordContactDto c, string who)
+    {
+        var errs = new List<string>();
+        foreach (var r in DocsFor(c).Where(r => r.Required))
+            if (DocFor(c, r.Code) is null) errs.Add($"{who}: {r.Label} is required.");
+        if (DocFor(c, "EmiratesId") is not null)
+        {
+            if (string.IsNullOrWhiteSpace(c.EmiratesId)) errs.Add($"{who}: the Emirates ID number is required.");
+            if (string.IsNullOrWhiteSpace(c.EmiratesIdName)) errs.Add($"{who}: the name as printed on the Emirates ID is required.");
+            if (c.EmiratesIdExpiry is null) errs.Add($"{who}: the Emirates ID expiry date is required.");
+        }
+        return errs;
+    }
+
+    private List<string> ValidateAll()
+    {
+        var errs = ValidateContactFields(primary, "Primary contact");
+        for (var i = 0; i < secondaries.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+            errs.AddRange(ValidateContactFields(secondaries[i], $"Secondary contact {i + 1}"));
+        }
+        errs.AddRange(ValidateDocs(primary, "Primary contact"));
+        for (var i = 0; i < secondaries.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+            errs.AddRange(ValidateDocs(secondaries[i], $"Secondary contact {i + 1}"));
         }
         return errs;
     }
@@ -255,6 +412,14 @@
         var result = await Api.SaveAsync(link, session, BuildRequest());
         if (!result.Success) { error = string.Join(" ", result.Errors); return false; }
         return true;
+    }
+
+    private void ApplyBootstrap(LandlordFormBootstrapDto bs)
+    {
+        bootstrap = bs;
+        documents = bs.Documents;
+        primary = bs.Contacts.FirstOrDefault(c => c.IsPrimary) ?? primary;
+        secondaries = bs.Contacts.Where(c => !c.IsPrimary).ToList();
     }
 
     private async Task SaveAsync()
@@ -268,7 +433,7 @@
     private async Task SubmitAsync()
     {
         error = null;
-        var errs = ValidateContact();
+        var errs = ValidateAll();
         if (errs.Count > 0) { error = string.Join(" ", errs); return; }
 
         busy = true; submitting = true; blocking = true; StateHasChanged();
@@ -280,21 +445,56 @@
         Toast.ShowSuccess("Registration submitted for review.");
     }
 
-    private async Task UploadAsync(InputFileChangeEventArgs e, string typeCode)
+    /// <summary>Uploads a document. When <paramref name="owner"/> is a contact, the form is first saved so the
+    /// contact row exists (with an id); the document is then uploaded against that contact and, for an Emirates
+    /// ID, the auto-read details are applied to the contact. A null owner uploads a landlord-level document.</summary>
+    private async Task UploadDocAsync(LandlordContactDto? owner, string code, InputFileChangeEventArgs e)
     {
         var file = e.File;
+        if (file.Size == 0) { Toast.ShowError("The selected file is empty."); return; }
         if (file.Size > 10 * 1024 * 1024) { Toast.ShowError("File exceeds the 10 MB size limit."); return; }
-        uploading = true; uploadingName = file.Name; StateHasChanged();
+        if (owner is not null && (string.IsNullOrWhiteSpace(owner.FullName) || string.IsNullOrWhiteSpace(owner.Email)))
+        {
+            error = "Enter the contact's name and email before uploading their documents.";
+            return;
+        }
+
+        error = null; uploading = true; uploadingName = file.Name; StateHasChanged();
         try
         {
-            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-            ms.Position = 0;
-            // The upload endpoint parses the enum NAME (Code), not the numeric key or the display label.
-            var result = await Api.UploadDocumentAsync(link, session, typeCode, ms, file.Name, file.ContentType);
-            if (result.Success) { documents = result.Documents; }
-            else { Toast.ShowError(result.Error ?? "Upload failed."); }
+            byte[] bytes;
+            await using (var stream = file.OpenReadStream(10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
+            {
+                await stream.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            }
+
+            int? contactId = null;
+            if (owner is not null)
+            {
+                // Persist so contacts get ids, then refresh to find this contact's id.
+                if (!await PersistAsync()) return;
+                var bs = await Api.GetBootstrapAsync(link, session);
+                if (bs is null) { error = "Your session has expired. Please use the link from your email again."; return; }
+                ApplyBootstrap(bs);
+                owner = FindContact(owner.Email);
+                if (owner?.Id is not int oid) { error = "Could not match this contact — please check the email address and try again."; return; }
+                contactId = oid;
+            }
+
+            using var up = new MemoryStream(bytes);
+            var result = await Api.UploadDocumentAsync(link, session, code, up, file.Name, file.ContentType, contactId);
+            if (!result.Success) { Toast.ShowError(result.Error ?? "Upload failed."); return; }
+            documents = result.Documents;
+
+            if (owner is not null && string.Equals(code, "EmiratesId", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(result.ExtractedEmiratesId)) owner.EmiratesId = result.ExtractedEmiratesId;
+                if (!string.IsNullOrWhiteSpace(result.ExtractedEmiratesIdName)) owner.EmiratesIdName = result.ExtractedEmiratesIdName;
+                if (result.ExtractedEmiratesIdExpiry is not null && owner.EmiratesIdExpiry is null) owner.EmiratesIdExpiry = result.ExtractedEmiratesIdExpiry;
+                eidNote[CKey(owner)] = result.ExtractNote;
+            }
         }
         finally { uploading = false; uploadingName = null; }
     }

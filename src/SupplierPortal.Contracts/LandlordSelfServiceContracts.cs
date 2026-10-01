@@ -67,6 +67,9 @@ public class LandlordDocumentDto
     public string? ContentType { get; set; }
     public DateTime UploadedAt { get; set; }
     public long FileSizeBytes { get; set; }
+    /// <summary>The contact this document belongs to, when it was uploaded against a specific contact
+    /// (per-contact document requirements). Null for landlord-level documents (e.g. the title deed).</summary>
+    public int? ContactId { get; set; }
 }
 
 /// <summary>A document type the landlord may upload (enum key + code + display name + mandatory flag).</summary>
@@ -88,6 +91,9 @@ public class LandlordFormBootstrapDto
     public string? PropertyCode { get; set; }
     public string? CompanyName { get; set; }
     public string? Status { get; set; }
+    /// <summary>The agreement type set by Business Centre — "Individual" or "Company". Drives the per-contact
+    /// document requirements (read-only on the form).</summary>
+    public string AgreementType { get; set; } = "Company";
     public string SigningRule { get; set; } = "All";
     public List<LandlordContactDto> Contacts { get; set; } = [];
     public List<LandlordSignatoryDto> Signatories { get; set; } = [];
@@ -141,4 +147,11 @@ public class LandlordDocumentUploadResponse
     public bool Success { get; set; }
     public string? Error { get; set; }
     public List<LandlordDocumentDto> Documents { get; set; } = [];
+    /// <summary>When an Emirates ID was uploaded, the values auto-read from the card (best-effort) so the form
+    /// can prefill that contact's Emirates ID details. Null when not an Emirates ID or nothing could be read.</summary>
+    public string? ExtractedEmiratesId { get; set; }
+    public string? ExtractedEmiratesIdName { get; set; }
+    public DateTime? ExtractedEmiratesIdExpiry { get; set; }
+    /// <summary>A short note about the Emirates ID auto-read outcome, shown beside the captured details.</summary>
+    public string? ExtractNote { get; set; }
 }
