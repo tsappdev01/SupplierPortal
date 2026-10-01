@@ -411,7 +411,7 @@ else
                 }
                 else
                 {
-                    <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="ReturnToCustomerAsync">Return to customer</button>
+                    <button type="button" class="di-btn di-btn-danger" disabled="@busy" @onclick="() => confirmReturn = true">Return to customer</button>
                 }
             }
         </div>
@@ -478,7 +478,73 @@ else
         </div>
     </div>
 }
+
+@* ---- Return-to-customer (send update link) confirmation ---- *@
+@if (confirmReturn && customer is not null)
+{
+    <div class="di-confirm-backdrop" @onclick="() => confirmReturn = false">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="() => confirmReturn = false">&times;</button>
+            <div class="di-confirm-badge">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+                    <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+                    <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h3 class="di-confirm-title">Return to customer?</h3>
+            <p class="di-confirm-sub">We'll save the record and email a self-service update link to:</p>
+            <div class="di-confirm-target">
+                <div class="di-confirm-avatar">@ReturnInitials(customer.LegalName)</div>
+                <div class="di-confirm-who">
+                    <span class="di-confirm-name">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "Customer" : customer.LegalName)</span>
+                    @{ var rcp = CustomerAccessTokenService.EmailFor(customer); }
+                    @if (!string.IsNullOrWhiteSpace(rcp))
+                    {
+                        <span class="di-confirm-email">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
+                            @rcp
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="() => confirmReturn = false">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmReturnAsync">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>
+                    <span>Send Email</span>
+                </button>
+            </div>
+        </div>
+    </div>
 }
+}
+
+<style>
+    /* ---- Send-email confirmation dialog (mirrors the Supplier dashboard) ---- */
+    .di-confirm-backdrop { position: fixed; inset: 0; z-index: 1090; background: rgba(11, 37, 69, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: di-confirm-fade 0.15s ease; }
+    .di-confirm-card { position: relative; background: #fff; width: min(430px, 100%); border-radius: 18px; padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(11, 37, 69, 0.35); animation: di-confirm-pop 0.18s cubic-bezier(.2,.9,.3,1.2); }
+    .di-confirm-x { position: absolute; top: 12px; right: 14px; border: none; background: transparent; font-size: 24px; line-height: 1; color: #9aa6b8; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+    .di-confirm-x:hover { background: #f1f4f9; color: #46618f; }
+    .di-confirm-badge { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 25%, #eaf1fb, #d7e5f7); box-shadow: 0 0 0 8px rgba(11, 37, 69, 0.06); }
+    .di-confirm-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color: #0b2545; }
+    .di-confirm-sub { margin: 0 0 16px; font-size: 13.5px; color: #7b8697; }
+    .di-confirm-target { display: flex; align-items: center; gap: 12px; text-align: left; background: #f6f8fc; border: 1px solid #e6ecf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 22px; }
+    .di-confirm-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0b2545; color: #c9a227; font-weight: 800; font-size: 14px; }
+    .di-confirm-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .di-confirm-name { font-weight: 700; font-size: 14.5px; color: #1a2233; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46618f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email svg { flex: none; opacity: 0.75; }
+    .di-confirm-actions { display: flex; gap: 12px; }
+    .di-confirm-btn { flex: 1; border-radius: 10px; padding: 11px 16px; font-size: 14.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .di-confirm-cancel { background: #fff; border-color: #d3dae6; color: #46618f; }
+    .di-confirm-cancel:hover { background: #f1f4f9; }
+    .di-confirm-send { background: linear-gradient(135deg, #14396b, #0b2545); color: #fff; box-shadow: 0 6px 16px rgba(11,37,69,0.28); }
+    .di-confirm-send:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(11,37,69,0.36); }
+    @@keyframes di-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes di-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+</style>
 
 @code {
     [Parameter] public int Id { get; set; }
@@ -925,6 +991,21 @@ else
         var docTypes = await DocumentService.GetTypesAsync();
         var have = (await DocumentService.GetDocumentsAsync(customer.Id)).Select(d => d.DocumentType).ToHashSet();
         return docTypes.Where(t => t.IsRequired && !have.Contains(t.Name)).Select(t => t.Name).ToList();
+    }
+
+    // ---- Return-to-customer send confirmation ----
+    private bool confirmReturn;
+    private static string ReturnInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "–";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1 ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+    private async Task ConfirmReturnAsync()
+    {
+        confirmReturn = false;
+        await ReturnToCustomerAsync();
     }
 
     /// <summary>Returns the record to the customer: saves, emails a fresh self-service link (which moves

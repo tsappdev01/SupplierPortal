@@ -56,7 +56,7 @@
         <span>Print</span>
     </button>
 
-    <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="NotifyAllAsync" title="Email a self-service update link to the customers in view">
+    <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="() => confirmNotifyAll = true" title="Email a self-service update link to the customers in view">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4.5" width="19" height="14" rx="2.5" fill="#e3f6fb" stroke="#0aa2c0" stroke-width="1.7"/><path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0aa2c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2"/><path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span>Notify All Customers</span>
     </button>
@@ -215,7 +215,7 @@
 {
     <div class="di-bulk-bar no-print">
         <span>@selectedIds.Count selected</span>
-        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="BulkNotifySelectedAsync">
+        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="() => confirmBulk = true">
             @if (bulkSending)
             {
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -227,6 +227,71 @@
             }
         </button>
         <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="ClearSelection">Clear Selection</button>
+    </div>
+}
+
+@* ---- Single-customer send-link confirmation ---- *@
+@if (confirmSendRow is not null)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelSendLink">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelSendLink">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Send notification email?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to:</p>
+            <div class="di-confirm-target">
+                <div class="di-confirm-avatar">@CustInitials(confirmSendRow.Name)</div>
+                <div class="di-confirm-who">
+                    <span class="di-confirm-name">@confirmSendRow.Name</span>
+                    @if (!string.IsNullOrWhiteSpace(confirmSendRow.Email))
+                    {
+                        <span class="di-confirm-email">@ConfirmMailIcon @confirmSendRow.Email</span>
+                    }
+                    else
+                    {
+                        <span class="di-confirm-email" style="color:#b45309">No email on file — sending will be skipped.</span>
+                    }
+                </div>
+            </div>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelSendLink">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmSendLinkAsync">@ConfirmSendIcon <span>Send Email</span></button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Notify-all confirmation ---- *@
+@if (confirmNotifyAll)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelNotifyAll">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelNotifyAll">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Notify all customers in view?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to <strong>@NotifyAllWithEmail</strong> customer(s) currently in view@(NotifyAllNoEmail > 0 ? $" ({NotifyAllNoEmail} without an email will be skipped)" : "").</p>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelNotifyAll">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmNotifyAllAsync">@ConfirmSendIcon <span>Send @NotifyAllWithEmail email(s)</span></button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Bulk-selected confirmation ---- *@
+@if (confirmBulk)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelBulk">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelBulk">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Send notification emails?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to <strong>@BulkWithEmail</strong> selected customer(s)@(BulkNoEmail > 0 ? $" ({BulkNoEmail} without an email will be skipped)" : "").</p>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelBulk">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmBulkAsync">@ConfirmSendIcon <span>Send @BulkWithEmail email(s)</span></button>
+            </div>
+        </div>
     </div>
 }
 
@@ -338,7 +403,7 @@
                             <a class="btn btn-sm btn-outline-primary" href="/admin/customers/@row.Id" title="Edit">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/></svg>
                             </a>
-                            <button class="btn btn-sm btn-outline-secondary" title="Send self-service update link to customer" disabled="@(notifyingId == row.Id)" @onclick="() => SendLinkAsync(row)">
+                            <button class="btn btn-sm btn-outline-secondary" title="Send self-service update link to customer" disabled="@(notifyingId == row.Id)" @onclick="() => RequestSendLink(row)">
                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
                             </button>
                         </td>
@@ -671,6 +736,29 @@
     .di-cols-item { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px; font-size: 13.5px; color: #1a2233; cursor: pointer; }
     .di-cols-item:hover { background: #f4f6fb; }
     .di-cols-item input { width: 15px; height: 15px; flex: none; cursor: pointer; }
+
+    /* ---- Send-email confirmation dialog (mirrors the Supplier dashboard) ---- */
+    .di-confirm-backdrop { position: fixed; inset: 0; z-index: 1090; background: rgba(11, 37, 69, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: di-confirm-fade 0.15s ease; }
+    .di-confirm-card { position: relative; background: #fff; width: min(430px, 100%); border-radius: 18px; padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(11, 37, 69, 0.35); animation: di-confirm-pop 0.18s cubic-bezier(.2,.9,.3,1.2); }
+    .di-confirm-x { position: absolute; top: 12px; right: 14px; border: none; background: transparent; font-size: 24px; line-height: 1; color: #9aa6b8; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+    .di-confirm-x:hover { background: #f1f4f9; color: #46618f; }
+    .di-confirm-badge { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 25%, #eaf1fb, #d7e5f7); box-shadow: 0 0 0 8px rgba(11, 37, 69, 0.06); }
+    .di-confirm-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color: #0b2545; }
+    .di-confirm-sub { margin: 0 0 16px; font-size: 13.5px; color: #7b8697; }
+    .di-confirm-target { display: flex; align-items: center; gap: 12px; text-align: left; background: #f6f8fc; border: 1px solid #e6ecf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 22px; }
+    .di-confirm-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0b2545; color: #c9a227; font-weight: 800; font-size: 14px; }
+    .di-confirm-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .di-confirm-name { font-weight: 700; font-size: 14.5px; color: #1a2233; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46618f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email svg { flex: none; opacity: 0.75; }
+    .di-confirm-actions { display: flex; gap: 12px; }
+    .di-confirm-btn { flex: 1; border-radius: 10px; padding: 11px 16px; font-size: 14.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .di-confirm-cancel { background: #fff; border-color: #d3dae6; color: #46618f; }
+    .di-confirm-cancel:hover { background: #f1f4f9; }
+    .di-confirm-send { background: linear-gradient(135deg, #14396b, #0b2545); color: #fff; box-shadow: 0 6px 16px rgba(11,37,69,0.28); }
+    .di-confirm-send:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(11,37,69,0.36); }
+    @@keyframes di-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes di-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
 </style>
 
 @code {
@@ -820,6 +908,58 @@
         hiddenCols.Clear();
         try { await JS.InvokeVoidAsync("localStorage.removeItem", ColsKey); } catch { }
     }
+
+    // ---- Send-email confirmation dialogs ----
+    private CustomerService.CustomerRow? confirmSendRow;
+    private bool confirmNotifyAll;
+    private bool confirmBulk;
+
+    private int NotifyAllWithEmail => statusFiltered.Count(r => !string.IsNullOrWhiteSpace(r.Email));
+    private int NotifyAllNoEmail => statusFiltered.Count() - NotifyAllWithEmail;
+    private int BulkWithEmail => statusFiltered.Count(r => selectedIds.Contains(r.Id) && !string.IsNullOrWhiteSpace(r.Email));
+    private int BulkNoEmail => selectedIds.Count - BulkWithEmail;
+
+    private static string CustInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "–";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1 ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+
+    private void RequestSendLink(CustomerService.CustomerRow row) => confirmSendRow = row;
+    private void CancelSendLink() => confirmSendRow = null;
+    private async Task ConfirmSendLinkAsync()
+    {
+        var row = confirmSendRow;
+        confirmSendRow = null;
+        if (row is not null) await SendLinkAsync(row);
+    }
+
+    private void CancelNotifyAll() => confirmNotifyAll = false;
+    private async Task ConfirmNotifyAllAsync()
+    {
+        confirmNotifyAll = false;
+        await NotifyAllAsync();
+    }
+
+    private void CancelBulk() => confirmBulk = false;
+    private async Task ConfirmBulkAsync()
+    {
+        confirmBulk = false;
+        await BulkNotifySelectedAsync();
+    }
+
+    private static readonly RenderFragment ConfirmMailBadge = @<div class="di-confirm-badge">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+            <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+            <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+    </div>;
+    private static readonly RenderFragment ConfirmMailIcon = @<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>;
+    private static readonly RenderFragment ConfirmSendIcon = @<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>;
 
     // ---- Bulk selection actions ----
     private void ClearSelection() => selectedIds.Clear();
