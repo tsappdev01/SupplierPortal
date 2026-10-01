@@ -41,6 +41,22 @@ window.idleGuard = {
 
 // Opens a fully-formed HTML document in a new window and prints it. Used to print a report (all rows,
 // chosen columns) independent of the on-screen page/pagination and app chrome.
+// Scroll the customer self-service form to a field that needs input and put the cursor in it — called after a
+// failed tab/submit validation so the user is taken straight to the first missing field.
+window.diForm = {
+    focusField: function (id) {
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var input = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+        if (input) {
+            setTimeout(function () {
+                try { input.focus({ preventScroll: true }); } catch (e) { try { input.focus(); } catch (x) { } }
+            }, 150);
+        }
+    }
+};
+
 window.printHtml = function (html) {
     var w = window.open('', '_blank');
     if (!w) { return; }

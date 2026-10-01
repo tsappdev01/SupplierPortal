@@ -25,6 +25,24 @@ window.ssSubmitForm = function (id) {
     if (form) { form.submit(); }
 };
 
+// Scroll the self-service form to a field that needs input and put the cursor in it. Called after a failed
+// tab/submit validation so the user is taken straight to the first missing field. External (not inline) so
+// it is allowed under the site CSP (script-src 'self').
+window.ssForm = {
+    focusField: function (id) {
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        var input = el.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled])');
+        if (input) {
+            // Delay the focus slightly so it doesn't fight the smooth scroll on some browsers.
+            setTimeout(function () {
+                try { input.focus({ preventScroll: true }); } catch (e) { try { input.focus(); } catch (x) { } }
+            }, 150);
+        }
+    }
+};
+
 // Smooth signature pad for the supplier declaration. Uses Pointer Events so mouse, touch and stylus /
 // signature-pad devices all work the same way, and quadratic-curve smoothing (drawing through the
 // midpoints of successive points) so strokes are smooth rather than jagged straight segments.

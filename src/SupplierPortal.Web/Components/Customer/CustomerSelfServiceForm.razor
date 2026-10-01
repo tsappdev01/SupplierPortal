@@ -127,7 +127,7 @@
                                 lastSub = sub;
                                 <div class="di-subheading">@sub</div>
                             }
-                            <div class="di-field @(IsInvalidField(cfg) ? "di-field-invalid" : "")">
+                            <div class="di-field @(IsInvalidField(cfg) ? "di-field-invalid" : "")" id="di-f-@cfg.Section-@cfg.FieldKey">
                                 <label>
                                     @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
                                     @if (cfg.IsRequiredForCustomer) { <span class="di-req">*</span> }
@@ -656,27 +656,68 @@
         message = null;
     }
 
-    /// <summary>Validates one tab: flags the missing mandatory fields (for inline highlight), and toasts the
-    /// missing / format / date / VAT-group problems. Returns true when the tab is complete.</summary>
-    private bool ValidateStep(Step step)
+    /// <summary>All validation problems for a step WITHOUT mutating highlight state — safe to call for any step
+    /// (e.g. checking earlier steps before a forward jump or submit).</summary>
+    private List<string> StepProblems(Step step)
     {
-        var missing = MissingRequiredConfigs(step);
-        invalidKeys.Clear();
-        foreach (var f in missing) invalidKeys.Add(f.FieldKey);
-
-        var problems = missing.Select(m => $"{m.DisplayLabel} is required.")
+        var problems = MissingRequiredConfigs(step).Select(m => $"{m.DisplayLabel} is required.")
             .Concat(DateErrorsForStep(step))
             .Concat(FormatErrors(FieldsFor(step))).ToList();
         if (FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
         {
             problems.AddRange(VatGroupErrors());
         }
+        return problems;
+    }
+
+    /// <summary>Validates one tab: flags the missing mandatory fields (for inline highlight), toasts the
+    /// problems, and points the cursor at the first field needing input. Returns true when the tab is complete.</summary>
+    private bool ValidateStep(Step step)
+    {
+        invalidKeys.Clear();
+        foreach (var f in MissingRequiredConfigs(step)) invalidKeys.Add(f.FieldKey);
+
+        var problems = StepProblems(step);
         if (problems.Count > 0)
         {
             ToastService.ShowErrors(problems);
+            RequestFocusFirstInvalid(step);
             return false;
         }
         return true;
+    }
+
+    // The field the cursor should move to after a failed validation (first field needing input).
+    private string? pendingFocusFieldId;
+
+    /// <summary>Validates every non-review step before <paramref name="targetIndex"/>. If one is incomplete the
+    /// user is moved there, its fields flagged, its errors shown and the cursor pointed at the first field
+    /// needing input — returning false. Returns true when every earlier step is complete.</summary>
+    private bool EnsureStepsComplete(int targetIndex)
+    {
+        for (var i = 0; i < targetIndex && i < steps.Count; i++)
+        {
+            if (steps[i].IsReview) continue;
+            var problems = StepProblems(steps[i]);
+            if (problems.Count > 0)
+            {
+                current = i;
+                invalidKeys.Clear();
+                foreach (var f in MissingRequiredConfigs(steps[i])) invalidKeys.Add(f.FieldKey);
+                ToastService.ShowErrors(problems);
+                RequestFocusFirstInvalid(steps[i]);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void RequestFocusFirstInvalid(Step step)
+    {
+        var fields = FieldsFor(step).ToList();
+        var target = fields.FirstOrDefault(f => invalidKeys.Contains(f.FieldKey) && FieldStillMissing(f))
+                     ?? fields.FirstOrDefault(f => FormatErrors(new[] { f }).Count > 0);
+        pendingFocusFieldId = target is null ? null : $"di-f-{target.Section}-{target.FieldKey}";
     }
 
     // Stricter than DataAnnotations' EmailAddressAttribute (which accepts "a@b" with no domain dot):
@@ -826,9 +867,10 @@
     {
         if (index == current) return;
         await SaveAsync(true);
-        // Leaving the current tab forward enforces that tab's validation (so errors surface tab-by-tab rather
-        // than all at once on Review). Jumping backward is always allowed.
-        if (index > current && !ValidateStep(steps[current])) return;
+        // Jumping forward (including straight to Review via the stepper) enforces EVERY step up to the target,
+        // so no incomplete tab can be skipped past — the user lands on the first one that needs input.
+        // Jumping backward is always allowed.
+        if (index > current && !EnsureStepsComplete(index)) return;
         invalidKeys.Clear();
         current = Math.Clamp(index, 0, steps.Count - 1);
         message = null;
@@ -838,32 +880,9 @@
     {
         if (customer is null) return;
 
-        var missing = config.Where(f => f.IsVisible && f.IsRequiredForCustomer)
-            .Where(IsConditionallyVisible)
-            .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
-            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
-                f.Section == "Account" ? (object)customer : contact, f.FieldKey)))
-            .Select(f => f.DisplayLabel).ToList();
-        var vatGroupErrors = VatGroupErrors();
-        if (missing.Count > 0 || vatGroupErrors.Count > 0)
-        {
-            ToastService.ShowErrors(missing.Select(m => $"{m} is required.").Concat(vatGroupErrors));
-            return;
-        }
-
-        var dateErrors = TradeLicenseDateErrors();
-        if (dateErrors.Count > 0)
-        {
-            ToastService.ShowErrors(dateErrors);
-            return;
-        }
-
-        var formatErrors = FormatErrors(config.Where(f => f.IsVisible).Where(IsConditionallyVisible));
-        if (formatErrors.Count > 0)
-        {
-            ToastService.ShowErrors(formatErrors);
-            return;
-        }
+        // Enforce every step's mandatory fields BEFORE the declaration/signature — send the user back to the
+        // first field needing input rather than surfacing the gaps only after they sign and acknowledge.
+        if (!EnsureStepsComplete(steps.Count - 1)) return;
 
         var haveDocs = (await DataGateway.ListDocumentsAsync(activeToken, activeSession)).Select(d => d.DocumentType).ToHashSet();
         var missingDocs = docTypes.Where(t => CustomerDocRules.RequiredNow(t, customer, contact, config) && !haveDocs.Contains(t.Name))
@@ -909,6 +928,14 @@
         {
             sigInitialized = true;
             try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { /* best-effort */ }
+        }
+
+        // Point the cursor at the first field needing input after a failed validation.
+        if (pendingFocusFieldId is not null)
+        {
+            var id = pendingFocusFieldId;
+            pendingFocusFieldId = null;
+            try { await JS.InvokeVoidAsync("diForm.focusField", id); } catch { /* best-effort */ }
         }
     }
 
