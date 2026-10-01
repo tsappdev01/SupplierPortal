@@ -103,9 +103,14 @@
     private string enteredCode = "";
     private string? errorMessage;
 
+    /// <summary>The per-recipient link tag ("p" = Primary Email, "c" = contact Email) from the emailed link's
+    /// <c>?r=</c> query, so the verification code is sent back to the same inbox that opened the link.</summary>
+    private string? recipientKey;
+
     protected override async Task OnInitializedAsync()
     {
-        link = await Access.ResolveAsync(Token);
+        recipientKey = ReadRecipientKey();
+        link = await Access.ResolveAsync(Token, recipientKey);
 
         // Brand the header whenever the logo could be resolved, including the invalid/expired case.
         if (!string.IsNullOrWhiteSpace(link.LogoSrc))
@@ -117,7 +122,7 @@
         {
             if (link.NeedsFreshOtp)
             {
-                var (success, error) = await Access.SendOtpAsync(Token);
+                var (success, error) = await Access.SendOtpAsync(Token, recipientKey);
                 if (!success)
                 {
                     errorMessage = error;
@@ -126,6 +131,13 @@
         }
 
         loading = false;
+    }
+
+    private string? ReadRecipientKey()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        return q.TryGetValue("r", out var r) ? r.ToString() : null;
     }
 
     private async Task VerifyAsync()
@@ -153,7 +165,7 @@
         resending = true;
         errorMessage = null;
 
-        var (success, error) = await Access.SendOtpAsync(Token);
+        var (success, error) = await Access.SendOtpAsync(Token, recipientKey);
         if (success)
         {
             ToastService.ShowSuccess("A new verification code has been sent.");

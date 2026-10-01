@@ -8,11 +8,11 @@ public class HttpCustomerSelfServiceAccessGateway(IHttpClientFactory httpFactory
 {
     private HttpClient Client => httpFactory.CreateClient("SelfServiceApi");
 
-    public async Task<SsCustomerLinkInfo> ResolveAsync(string token)
+    public async Task<SsCustomerLinkInfo> ResolveAsync(string token, string? recipientKey = null)
     {
         try
         {
-            var resp = await Client.PostAsJsonAsync("/api/ss/customer/resolve", new SsTokenRequest(token));
+            var resp = await Client.PostAsJsonAsync("/api/ss/customer/resolve", new SsTokenRequest(token, recipientKey));
             if (!resp.IsSuccessStatusCode)
             {
                 return new SsCustomerLinkInfo(false, null, null, null, false);
@@ -26,11 +26,11 @@ public class HttpCustomerSelfServiceAccessGateway(IHttpClientFactory httpFactory
         }
     }
 
-    public async Task<(bool Success, string? Error)> SendOtpAsync(string token)
+    public async Task<(bool Success, string? Error)> SendOtpAsync(string token, string? recipientKey = null)
     {
         try
         {
-            var resp = await Client.PostAsJsonAsync("/api/ss/customer/otp/send", new SsTokenRequest(token));
+            var resp = await Client.PostAsJsonAsync("/api/ss/customer/otp/send", new SsTokenRequest(token, recipientKey));
             var result = await resp.Content.ReadFromJsonAsync<SsResult>();
             return result is null ? (false, "The service is unavailable. Please try again.") : (result.Success, result.Error);
         }

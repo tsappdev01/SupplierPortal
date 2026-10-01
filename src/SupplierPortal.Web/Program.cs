@@ -720,12 +720,12 @@ csApi.AddEndpointFilter(async (ctx, next) =>
 
 csApi.MapPost("/resolve", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
     SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway gateway) =>
-    Results.Ok(await gateway.ResolveAsync(body.Token)));
+    Results.Ok(await gateway.ResolveAsync(body.Token, body.R)));
 
 csApi.MapPost("/otp/send", async (SupplierPortal.Web.Services.SelfService.SsTokenRequest body,
     SupplierPortal.Web.Services.SelfService.ICustomerSelfServiceAccessGateway gateway) =>
 {
-    var (success, error) = await gateway.SendOtpAsync(body.Token);
+    var (success, error) = await gateway.SendOtpAsync(body.Token, body.R);
     return Results.Ok(new SupplierPortal.Web.Services.SelfService.SsResult(success, error));
 }).RequireRateLimiting("credential");
 

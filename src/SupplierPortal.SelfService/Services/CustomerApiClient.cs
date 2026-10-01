@@ -30,13 +30,13 @@ public class CustomerApiClient(
         return http;
     }
 
-    public async Task<OtpRequestResponse> RequestOtpAsync(string linkToken, bool resend = false)
+    public async Task<OtpRequestResponse> RequestOtpAsync(string linkToken, bool resend = false, string? recipientKey = null)
     {
         try
         {
             var http = await AuthedClientAsync();
             var res = await http.PostAsJsonAsync("/api/selfservice/customer/otp/request",
-                new OtpRequestRequest { LinkToken = linkToken, Resend = resend });
+                new OtpRequestRequest { LinkToken = linkToken, Resend = resend, R = recipientKey });
             if (!res.IsSuccessStatusCode)
             {
                 var body = await res.Content.ReadAsStringAsync();

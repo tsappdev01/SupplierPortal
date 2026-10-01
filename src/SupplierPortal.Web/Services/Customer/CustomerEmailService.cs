@@ -33,7 +33,7 @@ public class CustomerEmailService(
         // Data) and the branding business unit. The caller-passed address is ignored so delivery always matches
         // the record.
         int? businessUnitId;
-        IReadOnlyList<string> recipients;
+        IReadOnlyList<(string Key, string Email)> recipientLinks;
         await using (var lookupDb = await dbFactory.CreateDbContextAsync())
         {
             var c = await lookupDb.Customers.AsNoTracking().Include(x => x.Contact)
@@ -43,10 +43,10 @@ public class CustomerEmailService(
                 return (false, "Customer not found.");
             }
             businessUnitId = c.BusinessUnitId;
-            recipients = CustomerAccessTokenService.RecipientsFor(c);
+            recipientLinks = CustomerAccessTokenService.RecipientLinksFor(c);
         }
 
-        if (recipients.Count == 0)
+        if (recipientLinks.Count == 0)
         {
             return (false, "This customer has no email address on file.");
         }
@@ -70,25 +70,29 @@ public class CustomerEmailService(
                 .Select(b => b.Domain).FirstOrDefaultAsync();
         }
         var linkBase = SupplierEmailService.SelfServiceLinkBase(buDomain, configuration["SelfService:PortalUrl"], baseUrl);
-        var link = $"{linkBase.TrimEnd('/')}/customer/self-service/{rawToken}";
+        var linkRoot = $"{linkBase.TrimEnd('/')}/customer/self-service/{rawToken}";
 
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var logo = await branding.GetBusinessUnitLogoSrcAsync(businessUnitId) ?? await branding.GetLogoSrcAsync(actorUsername, businessUnitId);
-        var body = await File.ReadAllTextAsync(templatePath);
-        body = body
-            .Replace("{CompanyLogo}", BrandBlock(logo, brand))
-            .Replace("{Customer Name}", System.Net.WebUtility.HtmlEncode(customerName))
-            .Replace("{Link}", link);
+        var template = await File.ReadAllTextAsync(templatePath);
+        var brandBlock = BrandBlock(logo, brand);
+        var safeCustomerName = System.Net.WebUtility.HtmlEncode(customerName);
 
         var subject = $"Customer Information Update - {customerName}";
 
         var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Customer);
-        // Deliver the same link to every recipient (Primary + contact). Send per-address so each provider gets a
-        // single clean recipient; the notification succeeds when at least one copy is delivered.
+        // Each recipient (Primary + contact) gets a link TAGGED with which address it was sent to (?r=p / ?r=c),
+        // so when they open it the verification code is delivered back to that same inbox — not to both. Send
+        // per-address so each provider gets a single clean recipient; success when at least one copy is delivered.
         var anySent = false;
         string? lastError = null;
-        foreach (var to in recipients)
+        foreach (var (key, to) in recipientLinks)
         {
+            var link = $"{linkRoot}?r={key}";
+            var body = template
+                .Replace("{CompanyLogo}", brandBlock)
+                .Replace("{Customer Name}", safeCustomerName)
+                .Replace("{Link}", link);
             var (ok, err) = await emailDispatcher.SendHtmlAsync(to, subject, body, fromEmail: fromEmail, fromName: brand);
             if (ok) anySent = true; else lastError = err;
         }
@@ -99,7 +103,7 @@ public class CustomerEmailService(
 
         await auditService.LogAsync(
             actorUsername, AuditAction.Notify, "Customer", customerId,
-            $"Sent update notification email to {string.Join(", ", recipients)}");
+            $"Sent update notification email to {string.Join(", ", recipientLinks.Select(r => r.Email))}");
 
         // Move the record to "Awaiting Customer Response".
         await using (var statusDb = await dbFactory.CreateDbContextAsync())

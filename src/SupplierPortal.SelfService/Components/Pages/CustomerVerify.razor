@@ -108,8 +108,16 @@
     private int expiresInMinutes = 10;
     private string? error;
 
+    /// <summary>The per-recipient link tag ("p" = Primary Email, "c" = contact Email) from the emailed link's
+    /// <c>?r=</c> query, so the verification code is sent back to the same inbox that opened the link.</summary>
+    private string? recipientKey;
+
     protected override async Task OnInitializedAsync()
     {
+        var uri = new Uri(Nav.Uri);
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        recipientKey = q.TryGetValue("r", out var r) ? r.ToString() : null;
+
         // If this browser already holds a valid session cookie FOR THIS LINK (a refresh after verifying),
         // skip the OTP entirely and go straight to the form.
         if (AuthState is not null)
@@ -123,7 +131,7 @@
         }
 
         // Automatic send on load: reuse a still-valid code (resend: false) so a reload does not issue a new OTP.
-        var result = await Api.RequestOtpAsync(Token, resend: false);
+        var result = await Api.RequestOtpAsync(Token, resend: false, recipientKey: recipientKey);
         loading = false;
 
         Branding.SetLogo(result.LogoUrl);
@@ -177,7 +185,7 @@
         StateHasChanged();
         try
         {
-            var result = await Api.RequestOtpAsync(Token, resend: true);
+            var result = await Api.RequestOtpAsync(Token, resend: true, recipientKey: recipientKey);
             maskedEmail = result.MaskedEmail;
             if (!result.Success)
             {

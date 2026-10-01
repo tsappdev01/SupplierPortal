@@ -40,6 +40,53 @@ public class CustomerAccessTokenService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    /// <summary>The notification recipients, each paired with the link tag ("p" = Primary Email, "c" = contact
+    /// Email) that a later OTP is routed back to — so the verification code reaches the same inbox that opened
+    /// the link. Primary first, then the contact; blanks dropped and the two de-duplicated (when both addresses
+    /// match, only the Primary-tagged link is sent).</summary>
+    public static IReadOnlyList<(string Key, string Email)> RecipientLinksFor(Customer c)
+    {
+        var list = new List<(string Key, string Email)>();
+        void Add(string key, string? email)
+        {
+            var e = email?.Trim();
+            if (!string.IsNullOrWhiteSpace(e) && !list.Any(x => string.Equals(x.Email, e, StringComparison.OrdinalIgnoreCase)))
+            {
+                list.Add((key, e!));
+            }
+        }
+        Add("p", c.PrimaryEmail);
+        Add("c", c.Contact?.Email);
+        return list;
+    }
+
+    /// <summary>Resolves a per-recipient link tag to the single address an OTP should be delivered to:
+    /// "p" = Primary Email, "c" = contact Email (each falling back to the other when blank). Any other value
+    /// (null/empty/unknown — e.g. an older untagged link) means "all recipients", preserving the previous
+    /// behaviour of sending to both.</summary>
+    public static IReadOnlyList<string> RecipientsFor(Customer c, string? recipientKey)
+    {
+        switch (recipientKey?.Trim().ToLowerInvariant())
+        {
+            case "p":
+                var p = !string.IsNullOrWhiteSpace(c.PrimaryEmail) ? c.PrimaryEmail : c.Contact?.Email;
+                return string.IsNullOrWhiteSpace(p) ? [] : new[] { p!.Trim() };
+            case "c":
+                var ct = !string.IsNullOrWhiteSpace(c.Contact?.Email) ? c.Contact?.Email : c.PrimaryEmail;
+                return string.IsNullOrWhiteSpace(ct) ? [] : new[] { ct!.Trim() };
+            default:
+                return RecipientsFor(c);
+        }
+    }
+
+    /// <summary>The masked address for the "we've sent a code to …" hint, for the recipient the link was opened
+    /// from (p/c); falls back to the primary-preferred address when the tag is absent.</summary>
+    public static string? MaskedEmailFor(Customer c, string? recipientKey)
+    {
+        var list = RecipientsFor(c, recipientKey);
+        return SupplierAccessTokenService.MaskEmail(list.Count > 0 ? list[0] : EmailFor(c));
+    }
+
     public async Task<string> CreateTokenAsync(int customerId, string createdBy, bool isAdminTest = false)
     {
         var raw = GenerateRawToken();
@@ -89,8 +136,10 @@ public class CustomerAccessTokenService(
             .FirstOrDefaultAsync(t => t.TokenHash == hash);
     }
 
-    /// <summary>Generate, persist and email a fresh OTP for a link.</summary>
-    public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId)
+    /// <summary>Generate, persist and email a fresh OTP for a link. When <paramref name="recipientKey"/> is a
+    /// per-recipient link tag ("p" = Primary Email, "c" = contact Email), the code is sent only to that address
+    /// — so it reaches the same inbox that opened the link. Null/unknown sends to every recipient (legacy links).</summary>
+    public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId, string? recipientKey = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var token = await db.CustomerAccessTokens
@@ -100,7 +149,7 @@ public class CustomerAccessTokenService(
         {
             return (false, "Link not found.");
         }
-        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer);
+        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer, recipientKey);
         if (recipients.Count == 0)
         {
             return (false, "This customer has no email address on file.");
@@ -136,8 +185,8 @@ public class CustomerAccessTokenService(
         // succeeds. Persisting before the send would make a FAILED send look successful — the verify page's
         // auto-send would then not retry and the error would be hidden, so the customer never receives a code.
         var fromEmail = await branding.GetPortalSenderEmailAsync(token.Customer.BusinessUnitId, Models.PortalType.Customer);
-        // Send the code to every recipient (Primary + contact), one clean address per send; success when at
-        // least one copy is delivered.
+        // Send the code to the resolved recipient(s) — the single address the link was opened from when tagged,
+        // otherwise every recipient — one clean address per send; success when at least one copy is delivered.
         var anySent = false;
         string? error = null;
         foreach (var to in recipients)

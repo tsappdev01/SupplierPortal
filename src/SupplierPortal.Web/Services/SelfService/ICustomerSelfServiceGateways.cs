@@ -5,8 +5,8 @@ namespace SupplierPortal.Web.Services.SelfService;
 /// <summary>Customer self-service access flow (link resolve + OTP). Local = database; DMZ (Http) = internal API.</summary>
 public interface ICustomerSelfServiceAccessGateway
 {
-    Task<SsCustomerLinkInfo> ResolveAsync(string token);
-    Task<(bool Success, string? Error)> SendOtpAsync(string token);
+    Task<SsCustomerLinkInfo> ResolveAsync(string token, string? recipientKey = null);
+    Task<(bool Success, string? Error)> SendOtpAsync(string token, string? recipientKey = null);
     Task<(bool Success, string? Error, string? SessionToken)> VerifyOtpAsync(string token, string code);
 }
 

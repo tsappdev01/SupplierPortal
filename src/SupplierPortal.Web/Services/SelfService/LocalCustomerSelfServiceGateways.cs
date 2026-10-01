@@ -8,7 +8,7 @@ public class LocalCustomerSelfServiceAccessGateway(
     CustomerAccessTokenService accessTokenService, EmailBrandingService branding)
     : ICustomerSelfServiceAccessGateway
 {
-    public async Task<SsCustomerLinkInfo> ResolveAsync(string token)
+    public async Task<SsCustomerLinkInfo> ResolveAsync(string token, string? recipientKey = null)
     {
         // Resolve even if expired so the "link not available" page can show the business unit's logo + e-mail.
         var t = await accessTokenService.GetTokenForDisplayAsync(token);
@@ -21,16 +21,17 @@ public class LocalCustomerSelfServiceAccessGateway(
         var email = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Customer);
         var valid = t.ExpiresAt >= DateTime.UtcNow;
         var needsFresh = valid && (t.OtpGeneratedAt is null || t.OtpExpiresAt is null || t.OtpExpiresAt < DateTime.UtcNow);
-        var maskedRecipient = t.Customer is null ? null : SupplierAccessTokenService.MaskEmail(CustomerAccessTokenService.EmailFor(t.Customer));
+        // Mask the SAME address the code will be sent to — the recipient the link was opened from (p/c).
+        var maskedRecipient = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, recipientKey);
         return new SsCustomerLinkInfo(valid, t.Customer?.LegalName, buId, logo, needsFresh, email, maskedRecipient);
     }
 
-    public async Task<(bool Success, string? Error)> SendOtpAsync(string token)
+    public async Task<(bool Success, string? Error)> SendOtpAsync(string token, string? recipientKey = null)
     {
         var t = await accessTokenService.GetValidTokenAsync(token);
         return t is null
             ? (false, "This link is invalid or has expired.")
-            : await accessTokenService.GenerateAndSendOtpAsync(t.Id);
+            : await accessTokenService.GenerateAndSendOtpAsync(t.Id, recipientKey);
     }
 
     public async Task<(bool Success, string? Error, string? SessionToken)> VerifyOtpAsync(string token, string code)

@@ -112,6 +112,11 @@ public class OtpRequestRequest
     /// reused instead of emailing a new one — so a reload does not generate another OTP. When true (the
     /// user clicked "Resend code"), a fresh code is always issued.</summary>
     public bool Resend { get; set; }
+
+    /// <summary>Customer self-service only: the per-recipient link tag ("p" = Primary Email, "c" = contact
+    /// Email) carried on the emailed link's <c>?r=</c> query, so the verification code is delivered to the same
+    /// inbox that opened the link. Null for supplier/landlord (single recipient) and for legacy links.</summary>
+    public string? R { get; set; }
 }
 
 public class OtpRequestResponse

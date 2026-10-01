@@ -39,7 +39,7 @@ public static class CustomerSelfServiceEndpoints
                 });
             }
 
-            var (success, error) = await accessTokens.GenerateAndSendOtpAsync(t.Id);
+            var (success, error) = await accessTokens.GenerateAndSendOtpAsync(t.Id, req.R);
             var logo = await logoInliner.InlineIfUrlAsync(
                 await branding.GetBusinessUnitUploadedLogoSrcAsync(t.Customer?.BusinessUnitId));
 
@@ -47,7 +47,7 @@ public static class CustomerSelfServiceEndpoints
             {
                 Success = success,
                 Error = error,
-                MaskedEmail = SupplierAccessTokenService.MaskEmail(t.Customer is null ? null : CustomerAccessTokenService.EmailFor(t.Customer)),
+                MaskedEmail = t.Customer is null ? null : CustomerAccessTokenService.MaskedEmailFor(t.Customer, req.R),
                 ExpiresInMinutes = 10,
                 LogoUrl = logo
             });
