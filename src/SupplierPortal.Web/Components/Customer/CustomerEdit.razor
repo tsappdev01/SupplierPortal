@@ -88,10 +88,6 @@ else
         }
     </div>
 
-    @if (message is not null)
-    {
-        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
-    }
 
     @{ var step = steps[current]; }
 
@@ -590,8 +586,6 @@ else
         ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
 
     private string currentUser = "unknown";
-    private string? message;
-    private bool isError;
     private bool busy;
     private bool blocking;
     private string blockingTitle = "Processing…";
@@ -788,13 +782,12 @@ else
     {
         if (customer is null) return;
         busy = true;
-        if (!silent) message = null;
         ClearHiddenConditionalFields();
         customer.Contact = contact;
         var (lockedAcct, lockedCont) = LockedKeys();
         await CustomerService.SaveAsync(customer, currentUser, lockedAcct, lockedCont);
         busy = false;
-        if (!silent) { isError = false; message = "Saved."; }
+        if (!silent) ToastService.ShowSuccess("Saved.");
         savedTick = true;
     }
 
@@ -803,7 +796,6 @@ else
         await SaveAsync(true);
         if (!ValidateStep(steps[current])) return;
         if (current < steps.Count - 1) current++;
-        message = null;
     }
 
     // Stricter than DataAnnotations' EmailAddressAttribute (which accepts "a@b" with no domain dot):
@@ -1005,7 +997,6 @@ else
         await SaveAsync(true);
         invalidKeys.Clear();
         if (current > 0) current--;
-        message = null;
     }
 
     private async Task JumpToAsync(int index)
@@ -1016,7 +1007,6 @@ else
         if (index > current && !ValidateStep(steps[current])) return;
         invalidKeys.Clear();
         current = Math.Clamp(index, 0, steps.Count - 1);
-        message = null;
     }
 
     private async Task OnDocsChanged()
@@ -1064,7 +1054,7 @@ else
     private async Task ReturnToCustomerAsync()
     {
         if (customer is null) return;
-        busy = true; blocking = true; blockingTitle = "Sending the update link…"; message = null;
+        busy = true; blocking = true; blockingTitle = "Sending the update link…";
         StateHasChanged();
         ClearHiddenConditionalFields();
         customer.Contact = contact;
@@ -1077,14 +1067,10 @@ else
         if (ok)
         {
             customer.Status = CustomerStatuses.AwaitingCustomerResponse;
-            isError = false;
-            message = "A self-service link was sent to the customer and the status is now “Awaiting Customer Response”.";
-            ToastService.ShowSuccess("Returned to customer — update link sent.");
+            ToastService.ShowSuccess("A self-service link was sent to the customer and the status is now “Awaiting Customer Response”.");
         }
         else
         {
-            isError = true;
-            message = err ?? "Could not send the update link.";
             ToastService.ShowError(err ?? "Could not send the update link.");
         }
     }
@@ -1126,7 +1112,7 @@ else
                 return;
             }
         }
-        busy = true; blocking = true; message = null;
+        busy = true; blocking = true;
         blockingTitle = status == CustomerStatuses.Complete ? "Completing the record…" : "Saving…";
         StateHasChanged();
         customer.Contact = contact;
@@ -1134,8 +1120,7 @@ else
         await CustomerService.SaveAsync(customer, currentUser, setAcct, setCont);
         await CustomerService.SetStatusAsync(customer.Id, status, currentUser);
         customer.Status = status;
-        isError = false;
-        message = $"Saved and moved to “{status}”.";
+        ToastService.ShowSuccess($"Saved and moved to “{status}”.");
 
         // On completion, expire the self-service link so it can no longer be opened, and send the
         // customer a thank-you email (mirrors the supplier flow).
