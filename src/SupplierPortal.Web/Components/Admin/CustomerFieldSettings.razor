@@ -210,17 +210,24 @@
                                     <select class="di-cfm-select" value="@(field.ControllingFieldKey ?? "")" disabled="@field.IsRemoved"
                                             @onchange="e => OnControllingChanged(field, (string?)e.Value)">
                                         <option value="">— always shown —</option>
-                                        @foreach (var yn in rows.Where(r => !r.IsRemoved && r.Section == field.Section && r.FieldKind == "yesno" && r.FieldKey != field.FieldKey))
+                                        @foreach (var yn in rows.Where(r => !r.IsRemoved && r.Section == field.Section && (r.FieldKind == "yesno" || r.FieldKind == "lookup") && r.FieldKey != field.FieldKey))
                                         {
                                             <option value="@yn.FieldKey">@yn.DisplayLabel</option>
                                         }
                                     </select>
                                     @if (!string.IsNullOrWhiteSpace(field.ControllingFieldKey))
                                     {
-                                        <select class="di-cfm-select mt-1" @bind="field.ControllingValue">
-                                            <option value="true">is Yes → show</option>
-                                            <option value="false">is No → show</option>
-                                        </select>
+                                        @if (ControllingKind(field.ControllingFieldKey) == "yesno")
+                                        {
+                                            <select class="di-cfm-select mt-1" @bind="field.ControllingValue">
+                                                <option value="true">is Yes → show</option>
+                                                <option value="false">is No → show</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input class="di-cfm-select mt-1" @bind="field.ControllingValue" placeholder="equals… (e.g. Others)" title="Show this field only when the controlling field equals this exact option" />
+                                        }
                                     }
                                 </td>
                                 <td>
@@ -726,11 +733,18 @@
         if (!visible) { f.IsRequired = false; f.IsRequiredForCustomer = false; }
     }
 
+    /// <summary>The field-kind ("yesno" / "lookup") of a controlling field, so the value editor can switch
+    /// between a Yes/No picker and a free-text option value.</summary>
+    private string? ControllingKind(string? fieldKey) =>
+        rows.FirstOrDefault(r => r.FieldKey == fieldKey)?.FieldKind;
+
     private void OnControllingChanged(CustomerFieldConfig f, string? controllingKey)
     {
         f.ControllingFieldKey = string.IsNullOrWhiteSpace(controllingKey) ? null : controllingKey;
+        // Default the trigger value: Yes for a Yes/No controlling field; blank for an LOV so the admin types
+        // the exact option (e.g. "Others").
         f.ControllingValue = f.ControllingFieldKey is null ? null
-            : (string.IsNullOrWhiteSpace(f.ControllingValue) ? "true" : f.ControllingValue);
+            : (ControllingKind(f.ControllingFieldKey) == "yesno" ? "true" : "");
     }
 
     // ---- Title-group tab management (one modal row per distinct title, unified across both sections) ----
