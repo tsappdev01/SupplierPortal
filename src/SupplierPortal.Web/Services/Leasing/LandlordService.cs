@@ -155,6 +155,11 @@ public class LandlordService(
         var vErr = ValidateContacts(contacts, update.Signatories);
         if (vErr is not null) return (false, vErr);
 
+        // Contacts and signatories are replaced on each save (new ids); capture the old id→email maps so the
+        // per-contact and per-signatory documents (linked by ContactId / SignatoryId) can be re-pointed by email.
+        var oldContactEmailById = l.Contacts.ToDictionary(c => c.Id, c => (c.Email ?? "").Trim().ToLowerInvariant());
+        var oldSignatoryEmailById = l.Signatories.ToDictionary(s => s.Id, s => (s.Email ?? "").Trim().ToLowerInvariant());
+
         db.LandlordContacts.RemoveRange(l.Contacts);
         foreach (var c in contacts)
             l.Contacts.Add(new LandlordContact
@@ -178,8 +183,45 @@ public class LandlordService(
         l.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
+        await RelinkDocumentsByEmailAsync(db, landlordId, oldContactEmailById, oldSignatoryEmailById, l);
+
         await AddEventAsync(db, landlordId, "InformationUpdated", "Business Centre edited the registration details", actor, ActorBusinessCentre, l.Status, l.Status);
         return (true, null);
+    }
+
+    /// <summary>Re-points per-contact (ContactId) and per-signatory (SignatoryId) documents to the freshly
+    /// re-inserted contact / signatory rows, matched by email, so they survive the delete/re-insert that
+    /// every contacts/signatories save performs. Call after the save that recreated those rows.</summary>
+    private static async Task RelinkDocumentsByEmailAsync(
+        LeasingDbContext db, int landlordId,
+        Dictionary<int, string> oldContactEmailById, Dictionary<int, string> oldSignatoryEmailById, Landlord l)
+    {
+        var newContactIdByEmail = l.Contacts
+            .GroupBy(c => (c.Email ?? "").Trim().ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        var newSignatoryIdByEmail = l.Signatories
+            .GroupBy(s => (s.Email ?? "").Trim().ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        var docs = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && (d.ContactId != null || d.SignatoryId != null)).ToListAsync();
+        var changed = false;
+        foreach (var d in docs)
+        {
+            if (d.ContactId is int cid && oldContactEmailById.TryGetValue(cid, out var ce) && !string.IsNullOrWhiteSpace(ce)
+                && newContactIdByEmail.TryGetValue(ce, out var newCid) && d.ContactId != newCid)
+            {
+                d.ContactId = newCid;
+                changed = true;
+            }
+            if (d.SignatoryId is int sid && oldSignatoryEmailById.TryGetValue(sid, out var se) && !string.IsNullOrWhiteSpace(se)
+                && newSignatoryIdByEmail.TryGetValue(se, out var newSid) && d.SignatoryId != newSid)
+            {
+                d.SignatoryId = newSid;
+                changed = true;
+            }
+        }
+        if (changed) await db.SaveChangesAsync();
     }
 
     public async Task<List<LandlordEvent>> GetTraceAsync(int landlordId)
@@ -336,6 +378,10 @@ public class LandlordService(
         var oldSecondaryCount = l.Contacts.Count(c => !c.IsPrimary);
         var oldSignatoryCount = l.Signatories.Count;
 
+        // Contacts are replaced on each save (new ids); capture the old id→email map so per-contact documents
+        // (linked by ContactId) can be re-pointed to the new rows by email afterwards.
+        var oldContactEmailById = l.Contacts.ToDictionary(c => c.Id, c => (c.Email ?? "").Trim().ToLowerInvariant());
+
         // Replace contacts with the submitted set (first primary); normalise mobiles to +9715XXXXXXXX.
         db.LandlordContacts.RemoveRange(l.Contacts);
         foreach (var c in contacts)
@@ -404,6 +450,23 @@ public class LandlordService(
                 && newSignatoryIdByEmail.TryGetValue(em, out var newId) && d.SignatoryId != newId)
             {
                 d.SignatoryId = newId;
+                relinked = true;
+            }
+        }
+
+        // Re-point per-contact documents (Emirates ID / trade licence / MOA-POA captured against a contact) to
+        // the freshly-inserted contact rows, matched by email, so they survive the delete/re-insert above.
+        var newContactIdByEmail = l.Contacts
+            .GroupBy(c => (c.Email ?? "").Trim().ToLowerInvariant())
+            .ToDictionary(g => g.Key, g => g.First().Id);
+        var contactDocs = await db.LandlordDocuments
+            .Where(d => d.LandlordId == landlordId && d.ContactId != null).ToListAsync();
+        foreach (var d in contactDocs)
+        {
+            if (oldContactEmailById.TryGetValue(d.ContactId!.Value, out var em) && !string.IsNullOrWhiteSpace(em)
+                && newContactIdByEmail.TryGetValue(em, out var newId) && d.ContactId != newId)
+            {
+                d.ContactId = newId;
                 relinked = true;
             }
         }

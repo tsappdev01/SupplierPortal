@@ -144,6 +144,7 @@
                         </div>
 
                         @ContactFields(primary, isPrimary: true)
+                        @ContactDocuments(primary, "Primary contact")
                     }
 
                     @* ===== Step 1: Secondary Contacts ===== *@
@@ -158,7 +159,10 @@
                             var idx = i;
                             <div class="rev">
                                 <h3>Secondary contact @(idx + 1)<button class="link danger" @onclick="() => RemoveSecondary(idx)">Remove</button></h3>
-                                <div style="padding:14px 16px">@ContactFields(secondaries[idx], isPrimary: false)</div>
+                                <div style="padding:14px 16px">
+                                    @ContactFields(secondaries[idx], isPrimary: false)
+                                    @ContactDocuments(secondaries[idx], $"Secondary contact {idx + 1}")
+                                </div>
                             </div>
                         }
                         <div class="addrow"><button class="btn ghost" @onclick="AddSecondary">+ Add secondary contact</button></div>
@@ -167,23 +171,15 @@
                     @* ===== Step 2: Documents ===== *@
                     else if (step == 2)
                     {
-                        @if (landlord.Type == LandlordType.Individual)
+                        var namedSecs = secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList();
+                        <p class="muted mb-3">Each contact's required documents are uploaded on their own step (Primary / Secondary Contact), determined by the agreement type and the contact's role. The summary below shows what is still outstanding. A title deed can be attached here (optional).</p>
+                        @ContactDocSummary(primary, "Primary contact", 0)
+                        @for (var i = 0; i < namedSecs.Count; i++)
                         {
-                            <p class="muted mb-3">Upload your Emirates ID (required). Its number, name and expiry are read from the card and can be corrected below. A title deed is optional.</p>
-                            @UploadField(LandlordDocumentType.EmiratesId, "Emirates ID", required: true)
-                            @if (documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
-                            {
-                                @EmiratesIdDetails()
-                            }
-                            @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
+                            @ContactDocSummary(namedSecs[i], $"Secondary contact {i + 1}", 1)
                         }
-                        else
-                        {
-                            <p class="muted mb-3">Upload the company's MOA or POA (one document, required). Trade licence and title deed are optional.</p>
-                            @UploadField(LandlordDocumentType.MoaOrPoa, "MOA / POA", required: true)
-                            @UploadField(LandlordDocumentType.TradeLicense, "Trade Licence", required: false)
-                            @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
-                        }
+                        <div class="subhead">Other documents (optional)</div>
+                        @UploadField(LandlordDocumentType.TitleDeed, "Title Deed", required: false)
                     }
 
                     @* ===== Step 3: Signatories ===== *@
@@ -309,11 +305,17 @@
                             }
                         </div>
 
+                        @ContactDocSummary(primary, "Primary contact", 0)
+                        @foreach (var (c, i) in namedSecondaries.Select((c, i) => (c, i)))
+                        {
+                            @ContactDocSummary(c, $"Secondary contact {i + 1}", 1)
+                        }
+
                         <div class="rev">
-                            <h3>Documents<button class="link" @onclick="() => step = 2">Edit</button></h3>
+                            <h3>Other documents<button class="link" @onclick="() => step = 2">Edit</button></h3>
                             @if (documents.Count == 0)
                             {
-                                <dl><div class="r"><dd class="muted">No documents uploaded.</dd></div></dl>
+                                <dl><div class="r"><dd class="muted">None uploaded.</dd></div></dl>
                             }
                             else
                             {
@@ -430,6 +432,14 @@
     @@keyframes di-up-slide{0%{margin-left:-40%}100%{margin-left:100%}}
     .di-llw .link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--navy);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
     .di-llw .link.danger{color:var(--danger)}
+    .di-llw .up .link{margin-left:4px}
+    .di-llw .cdocs{border:1px solid var(--line);border-radius:var(--r);background:var(--sand);padding:14px 16px 4px;margin-top:4px}
+    .di-llw .cdocs .subhead{margin-top:0}
+    .di-llw .cdocs .field{margin-bottom:14px}
+    .di-llw .cdocs .up{background:#fff}
+    .di-llw .doc-badge{font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;border-radius:99px;padding:2px 8px;margin-left:8px;vertical-align:1px}
+    .di-llw .doc-badge.req{color:var(--danger);background:var(--danger-bg);border:1px solid #E7C3C0}
+    .di-llw .doc-badge.opt{color:var(--ink-soft);background:#fff;border:1px solid var(--line-strong)}
 
     .di-llw .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:var(--r);border:1px solid transparent;font-size:14.5px;font-weight:600;cursor:pointer;background:var(--navy);color:#fff}
     .di-llw .btn:hover{background:var(--navy-mid)}
@@ -552,11 +562,17 @@
     private string? error, reference;
 
     private string ActorLabel => $"Landlord Self-Service ({landlord?.Email})";
-    private string? eidExtractNote;
 
-    // Inline per-document upload indicator.
+    // Inline per-document upload indicator (landlord-level docs, e.g. Title Deed).
     private LandlordDocumentType? uploadingType;
     private string? uploadingName;
+
+    // Per-contact documents (Emirates ID / Trade Licence / MOA-POA), keyed by the contact's (lower-cased)
+    // email — contacts are deleted/re-inserted on every save (new ids), so email is the stable key in the UI.
+    private Dictionary<string, List<LandlordDocument>> contactDocsByEmail = new();
+    private string? contactUploadingKey;   // "{emailLower}|{(int)DocumentType}" while a contact upload is in flight
+    private string? contactUploadingName;
+    private readonly Dictionary<string, string?> eidNoteByEmail = new();   // OCR note per contact email
 
     // Per-signatory authorisation (MOA / POA) documents, keyed by the signatory's (lower-cased) email.
     private Dictionary<string, LandlordDocument> sigDocByEmail = new();
@@ -610,7 +626,7 @@
                 correction = await LandlordService.GetOpenCorrectionAsync(landlord.Id);
                 SeedFromExisting();
                 ApplyUaePass();
-                documents = await LoadLandlordDocumentsAsync(landlord.Id);
+                await LoadAllDocsAsync();
                 await LoadSignatoryDocsAsync();
             }
         }
@@ -746,27 +762,149 @@
         </div>
     };
 
-    /// <summary>Editable Emirates ID details shown once the card is uploaded — prefilled from OCR, correctable
-    /// by the landlord, and saved onto the primary contact.</summary>
-    private RenderFragment EmiratesIdDetails() => __builder =>
+    /// <summary>The document requirements for a contact, derived from the agreement type (landlord) and the
+    /// contact's role. Owner = <see cref="ContactType.Owner"/>; any other role is treated as "Other".
+    /// Individual+Owner → Emirates ID mandatory; Individual+Other → MOA/POA mandatory, Emirates ID optional;
+    /// Company+Owner → Trade Licence mandatory, Emirates ID optional; Company+Other → MOA/POA mandatory,
+    /// Emirates ID optional. Whenever an Emirates ID is provided (mandatory or optional) its details are
+    /// captured (and auto-read).</summary>
+    private sealed record DocReq(LandlordDocumentType Type, bool Required, bool IsEid);
+
+    private List<DocReq> DocsFor(ContactInput c)
     {
-        <div class="panel mb-3">
-            @if (eidExtractNote is not null)
+        var isOwner = c.ContactType == ContactType.Owner;
+        if (landlord!.Type == LandlordType.Individual)
+            return isOwner
+                ? new() { new(LandlordDocumentType.EmiratesId, true, true) }
+                : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, false, true) };
+        return isOwner
+            ? new() { new(LandlordDocumentType.TradeLicense, true, false), new(LandlordDocumentType.EmiratesId, false, true) }
+            : new() { new(LandlordDocumentType.MoaOrPoa, true, false), new(LandlordDocumentType.EmiratesId, false, true) };
+    }
+
+    private static string CKey(ContactInput c) => (c.Email ?? "").Trim().ToLowerInvariant();
+
+    private LandlordDocument? ContactDoc(ContactInput c, LandlordDocumentType type)
+        => contactDocsByEmail.TryGetValue(CKey(c), out var list) ? list.FirstOrDefault(d => d.DocumentType == type) : null;
+
+    /// <summary>Per-contact document uploads, dynamically determined by the agreement type and contact type.
+    /// Each required/optional document is shown with its status; an uploaded Emirates ID reveals its captured
+    /// (OCR-prefilled) details. Rendered on both the Primary and Secondary contact steps.</summary>
+    private RenderFragment ContactDocuments(ContactInput c, string who) => __builder =>
+    {
+        var key = CKey(c);
+        var canUpload = !string.IsNullOrWhiteSpace(c.FullName) && !string.IsNullOrWhiteSpace(c.Email);
+        <div class="cdocs">
+            <div class="subhead">Required documents · @ContactRoleLabel(c.ContactType)</div>
+            @if (!canUpload)
             {
-                <p style="color:var(--ok);margin:0 0 10px">@eidExtractNote</p>
+                <div class="hint mb-2">Enter this contact's name and email above to enable document upload.</div>
+            }
+            @foreach (var r in DocsFor(c))
+            {
+                var doc = ContactDoc(c, r.Type);
+                var upKey = $"{key}|{(int)r.Type}";
+                var isUp = contactUploadingKey == upKey;
+                <div class="field">
+                    <label class="lbl">
+                        @DocLabel(r.Type) @(r.Required ? MarkReq() : null)
+                        <span class="doc-badge @(r.Required ? "req" : "opt")">@(r.Required ? "Mandatory" : "Optional")</span>
+                    </label>
+                    <div class="up @(doc is not null ? "filled" : "") @(isUp ? "uploading" : "")">
+                        @if (isUp)
+                        {
+                            <span class="name"><span class="di-up-spinner"></span> Uploading @(contactUploadingName ?? "file")…</span>
+                        }
+                        else
+                        {
+                            <span class="name @(doc is null ? "empty" : "")">@(doc?.FileName ?? "No file chosen — PDF, JPG or PNG up to 10 MB")</span>
+                            @if (doc is not null)
+                            {
+                                <button class="link" type="button" @onclick="() => ViewDocumentAsync(doc.Id)">View</button>
+                                <button class="link danger" type="button" @onclick="() => DeleteContactDocAsync(doc.Id)">Replace / remove</button>
+                            }
+                            else if (canUpload)
+                            {
+                                <label class="btn ghost" style="padding:7px 13px;font-size:13px;margin:0">
+                                    Choose file
+                                    <InputFile OnChange="@(e => UploadContactDocAsync(c, r.Type, e))" style="display:none" accept=".pdf,image/*" />
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="muted">Name &amp; email required first</span>
+                            }
+                        }
+                    </div>
+                    @if (isUp)
+                    {
+                        <div class="di-up-bar"><div class="di-up-bar-fill"></div></div>
+                    }
+                    @if (r.IsEid && doc is not null)
+                    {
+                        @ContactEidDetails(c)
+                    }
+                </div>
+            }
+        </div>
+    };
+
+    /// <summary>Editable Emirates ID details shown once a contact's card is uploaded — prefilled from OCR,
+    /// correctable by the landlord, and saved onto that contact.</summary>
+    private RenderFragment ContactEidDetails(ContactInput c) => __builder =>
+    {
+        var note = eidNoteByEmail.GetValueOrDefault(CKey(c));
+        <div class="panel mb-3">
+            @if (!string.IsNullOrWhiteSpace(note))
+            {
+                <p style="color:var(--ok);margin:0 0 10px">@note</p>
             }
             <div class="grid2">
-                <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID number @MarkReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="primary.EmiratesId" /></div>
-                <div class="field" style="margin-bottom:0"><label class="lbl">Name (as on card) @MarkReq()</label><input type="text" @bind="primary.EmiratesIdName" /></div>
-                <div class="field" style="margin-bottom:0"><label class="lbl">Expiry date @MarkReq()</label><input type="date" @bind="primary.EmiratesIdExpiry" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Emirates ID number @MarkReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="c.EmiratesId" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Name (as on card) @MarkReq()</label><input type="text" @bind="c.EmiratesIdName" /></div>
+                <div class="field" style="margin-bottom:0"><label class="lbl">Expiry date @MarkReq()</label><input type="date" @bind="c.EmiratesIdExpiry" /></div>
             </div>
             <div class="hint">Read automatically from the uploaded card — please check and correct if needed.</div>
-            @if (primary.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
+            @if (c.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
             {
                 <p style="color:var(--danger);margin:8px 0 0;font-size:13px">This Emirates ID has expired (@exp.ToString("dd MMM yyyy")). A valid, unexpired Emirates ID is required to submit.</p>
             }
         </div>
     };
+
+    /// <summary>Read-only per-contact documents summary shown on the Documents step, flagging any outstanding
+    /// mandatory document, with an "Edit" link back to that contact's step.</summary>
+    private RenderFragment ContactDocSummary(ContactInput c, string who, int editStep) => __builder =>
+    {
+        <div class="rev">
+            <h3>@who — @ContactRoleLabel(c.ContactType)<button class="link" type="button" @onclick="() => step = editStep">Edit</button></h3>
+            <dl>
+                @foreach (var r in DocsFor(c))
+                {
+                    var doc = ContactDoc(c, r.Type);
+                    <div class="r">
+                        <dt>@DocLabel(r.Type) @(r.Required ? "(mandatory)" : "(optional)")</dt>
+                        <dd>
+                            @if (doc is not null)
+                            {
+                                @doc.FileName
+                            }
+                            else if (r.Required)
+                            {
+                                <span style="color:var(--danger);font-weight:600">⚠ Missing</span>
+                            }
+                            else
+                            {
+                                <text>—</text>
+                            }
+                        </dd>
+                    </div>
+                }
+            </dl>
+        </div>
+    };
+
+    private static string ContactRoleLabel(ContactType t) => t == ContactType.Owner ? "Owner" : $"{t} (Other)";
 
     // Small inline SVG icons (Bootstrap-icon paths) used across the signatory step.
     private static readonly RenderFragment PersonIcon = @<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" /></svg>;
@@ -996,14 +1134,16 @@
         error = null;
         if (step == 0)
         {
-            error = ContactErrors(primary, "Primary contact");
+            error = ContactErrors(primary, "Primary contact") ?? ValidateContactDocs(primary, "Primary contact");
             if (error is not null) return;
         }
         if (step == 1)
         {
             for (var i = 0; i < secondaries.Count; i++)
             {
-                error = ContactErrors(secondaries[i], $"Secondary contact {i + 1}");
+                if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+                error = ContactErrors(secondaries[i], $"Secondary contact {i + 1}")
+                        ?? ValidateContactDocs(secondaries[i], $"Secondary contact {i + 1}");
                 if (error is not null) return;
             }
         }
@@ -1080,7 +1220,8 @@
             return;
         }
 
-        // 2) Now show the inline indicator while the file is stored and (for an Emirates ID) OCR-scanned.
+        // 2) Now show the inline indicator while the file is stored. This path is landlord-level only
+        //    (e.g. the optional Title Deed); per-contact documents go through UploadContactDocAsync.
         uploadingType = type;
         uploadingName = fileName;
         await InvokeAsync(StateHasChanged);
@@ -1092,16 +1233,7 @@
                 error = res.Error ?? "The document could not be saved. Please try again.";
                 return;
             }
-
-            // Emirates-ID auto-read is best-effort — it must never fail the upload. On any problem we just
-            // leave a note asking the user to enter the details manually.
-            if (type == LandlordDocumentType.EmiratesId)
-            {
-                try { await TryExtractEmiratesIdAsync(bytes, fileName); }
-                catch { eidExtractNote = "Document uploaded. We couldn't auto-read the Emirates ID — please enter the number, name and expiry below."; }
-            }
-
-            documents = await LoadLandlordDocumentsAsync(landlord.Id);
+            await LoadAllDocsAsync();
         }
         finally
         {
@@ -1110,11 +1242,94 @@
         }
     }
 
-    /// <summary>Best-effort extraction of an uploaded Emirates ID: reads the PDF text layer locally first
-    /// (instant, no cloud), then falls back to cloud OCR for image-only cards. Prefills the primary contact
-    /// and always leaves a note so the user knows whether to check / enter the details manually.</summary>
-    private async Task TryExtractEmiratesIdAsync(byte[] bytes, string fileName)
+    /// <summary>Uploads a document against a specific contact, with requirements driven by the agreement type
+    /// and the contact's role. The current form is first saved as a draft so the contact row exists (with an
+    /// id) to attach the document to; the document is matched back to the contact by email. For an Emirates ID
+    /// the card is OCR-read to prefill that contact's EID details.</summary>
+    private async Task UploadContactDocAsync(ContactInput c, LandlordDocumentType type, InputFileChangeEventArgs e)
     {
+        if (landlord is null || accessToken is null) return;
+        error = null;
+
+        if (string.IsNullOrWhiteSpace(c.FullName) || string.IsNullOrWhiteSpace(c.Email))
+        {
+            error = "Enter the contact's name and email before uploading their documents.";
+            return;
+        }
+
+        const long maxBytes = 10 * 1024 * 1024;
+        var ext = Path.GetExtension(e.File.Name).ToLowerInvariant();
+        if (e.File.Size == 0) { error = "The selected file is empty. Please choose a different file."; return; }
+        if (e.File.Size > maxBytes) { error = "The file exceeds the 10 MB size limit."; return; }
+        if (ext is not (".pdf" or ".jpg" or ".jpeg" or ".png" or ".tif" or ".tiff"))
+        {
+            error = $"Unsupported file type '{ext}'. Allowed: PDF or image (JPG, PNG, TIFF).";
+            return;
+        }
+
+        // Read the browser file to bytes before any re-render (the stream can be opened only once and is
+        // invalidated when the <InputFile> is swapped out by the "Uploading…" indicator).
+        byte[] bytes;
+        try
+        {
+            using var ms = new MemoryStream();
+            await using (var src = e.File.OpenReadStream(maxBytes)) await src.CopyToAsync(ms);
+            bytes = ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Contact document: reading the uploaded file failed (landlord {LandlordId}).", landlord.Id);
+            error = $"Could not read the selected file ({ex.Message}). Please choose the file again.";
+            return;
+        }
+        if (bytes.Length == 0) { error = "The selected file is empty. Please choose a different file."; return; }
+
+        var key = CKey(c);
+        contactUploadingKey = $"{key}|{(int)type}";
+        contactUploadingName = e.File.Name;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            // Persist the current form as a draft so the contact rows exist (with ids) to attach to.
+            var draft = await LandlordService.SaveAsync(landlord.Id, BuildUpdate(), submit: false, ActorLabel, accessToken.Id, null);
+            if (!draft.Success)
+            {
+                error = draft.Error ?? "Please complete the required contact fields before uploading.";
+                return;
+            }
+            landlord = await LandlordService.GetForSelfServiceAsync(accessToken.LandlordId) ?? landlord;
+            var contact = landlord.Contacts.FirstOrDefault(x =>
+                string.Equals((x.Email ?? "").Trim(), c.Email.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (contact is null)
+            {
+                error = "Could not match this contact — please check the email address and try again.";
+                return;
+            }
+            var res = await DocumentService.UploadBytesAsync(landlord.Id, type, e.File.Name, e.File.ContentType, bytes, ActorLabel, contactId: contact.Id);
+            if (!res.Success) { error = res.Error ?? "The document could not be saved. Please try again."; return; }
+
+            // Emirates-ID auto-read is best-effort — it must never fail the upload.
+            if (type == LandlordDocumentType.EmiratesId)
+            {
+                try { await TryExtractEmiratesIdAsync(bytes, e.File.Name, c); }
+                catch { eidNoteByEmail[key] = "Document uploaded. We couldn't auto-read the Emirates ID — please enter the number, name and expiry below."; }
+            }
+            await LoadAllDocsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Contact document upload failed (landlord {LandlordId}, contact {Email}).", landlord.Id, c.Email);
+            error = $"Could not upload the document: {ex.Message}";
+        }
+        finally { contactUploadingKey = null; contactUploadingName = null; }
+    }
+
+    /// <summary>Best-effort extraction of an uploaded Emirates ID: reads the PDF text layer locally first
+    /// (instant, no cloud), then falls back to cloud OCR for image-only cards. Prefills the given contact
+    /// and always leaves a note so the user knows whether to check / enter the details manually.</summary>
+    private async Task TryExtractEmiratesIdAsync(byte[] bytes, string fileName, ContactInput target)
+    {
+        var key = CKey(target);
         string? text = null;
 
         // 1) Fast path: a PDF that carries a real text layer can be read locally without any cloud OCR.
@@ -1139,35 +1354,54 @@
 
         if (string.IsNullOrWhiteSpace(text))
         {
-            eidExtractNote = Ocr.IsEnabled
+            eidNoteByEmail[key] = Ocr.IsEnabled
                 ? "We couldn't read the card automatically — please enter the Emirates ID details below."
                 : "Automatic reading is unavailable — please enter the Emirates ID details below.";
             return;
         }
 
         var r = EmiratesIdExtractor.Parse(text);
-        if (r.Number is not null) primary.EmiratesId = r.Number;
+        if (r.Number is not null) target.EmiratesId = r.Number;
         // The card name is its OWN field — it is never copied into the contact's entered Full Name.
-        if (r.Name is not null) primary.EmiratesIdName = r.Name;
-        if (r.Expiry is not null && primary.EmiratesIdExpiry is null
+        if (r.Name is not null) target.EmiratesIdName = r.Name;
+        if (r.Expiry is not null && target.EmiratesIdExpiry is null
             && DateTime.TryParseExact(r.Expiry.Replace('-', '/'), "dd/MM/yyyy",
                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var exp))
-            primary.EmiratesIdExpiry = exp;
-        eidExtractNote = (r.Number is not null || r.Name is not null || r.Expiry is not null)
+            target.EmiratesIdExpiry = exp;
+        eidNoteByEmail[key] = (r.Number is not null || r.Name is not null || r.Expiry is not null)
             ? $"Read from the card — ID: {r.Number ?? "—"}, Name: {r.Name ?? "—"}, Expiry: {r.Expiry ?? "—"}. Please check and correct if needed."
             : "We couldn't read the card automatically — please enter the Emirates ID details below.";
     }
 
-    // Landlord-facing document list — excludes the system-generated registration-summary PDF.
-    private async Task<List<LandlordDocument>> LoadLandlordDocumentsAsync(int landlordId) =>
-        (await DocumentService.GetDocumentsAsync(landlordId))
-            .Where(d => d.DocumentType is not (LandlordDocumentType.RegistrationSummary or LandlordDocumentType.SignedDocument))
+    /// <summary>Loads the landlord's current documents and splits them into: per-contact documents (keyed by
+    /// the owning contact's email) and landlord-level documents (no contact / signatory), excluding the
+    /// system-generated registration summary and signed PDFs.</summary>
+    private async Task LoadAllDocsAsync()
+    {
+        if (landlord is null) return;
+        var all = await DocumentService.GetDocumentsAsync(landlord.Id);
+        var emailByContactId = landlord.Contacts.ToDictionary(x => x.Id, x => (x.Email ?? "").Trim().ToLowerInvariant());
+        contactDocsByEmail = all
+            .Where(d => d.ContactId is int cid && emailByContactId.ContainsKey(cid)
+                && !string.IsNullOrWhiteSpace(emailByContactId[cid]))
+            .GroupBy(d => emailByContactId[d.ContactId!.Value])
+            .ToDictionary(g => g.Key, g => g.ToList());
+        documents = all
+            .Where(d => d.ContactId is null && d.SignatoryId is null
+                && d.DocumentType is not (LandlordDocumentType.RegistrationSummary or LandlordDocumentType.SignedDocument))
             .ToList();
+    }
 
     private async Task DeleteDocAsync(int docId)
     {
         await DocumentService.DeleteAsync(docId);
-        documents = await LoadLandlordDocumentsAsync(landlord!.Id);
+        await LoadAllDocsAsync();
+    }
+
+    private async Task DeleteContactDocAsync(int docId)
+    {
+        await DocumentService.DeleteAsync(docId);
+        await LoadAllDocsAsync();
     }
 
     private async Task SaveDraftAsync()
@@ -1198,21 +1432,33 @@
         var sigDocError = ValidateSignatoryDocs();
         if (sigDocError is not null) return sigDocError;
 
-        if (landlord!.Type == LandlordType.Individual)
+        // Per-contact document requirements (dynamic by agreement type + contact type).
+        var pdErr = ValidateContactDocs(primary, "Primary contact");
+        if (pdErr is not null) return pdErr;
+        for (var i = 0; i < secondaries.Count; i++)
         {
-            if (!documents.Any(d => d.DocumentType == LandlordDocumentType.EmiratesId))
-                return "Emirates ID document is mandatory for an individual landlord.";
-            if (string.IsNullOrWhiteSpace(primary.EmiratesId))
-                return "The Emirates ID number is required — check the Documents step.";
-            if (string.IsNullOrWhiteSpace(primary.EmiratesIdName))
-                return "The name as printed on the Emirates ID is required — check the Documents step.";
-            if (primary.EmiratesIdExpiry is null)
-                return "The Emirates ID expiry date is required — check the Documents step.";
-            // An expired Emirates ID only raises an alert (below / inline) — it does not block submission.
+            if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+            var sdErr = ValidateContactDocs(secondaries[i], $"Secondary contact {i + 1}");
+            if (sdErr is not null) return sdErr;
         }
-        else if (!documents.Any(d => d.DocumentType is LandlordDocumentType.MoaOrPoa
-                     or LandlordDocumentType.PowerOfAttorney or LandlordDocumentType.Moa))
-            return "The MOA / POA document is required for a company.";
+        return null;
+    }
+
+    /// <summary>Blocks submission when a contact is missing a mandatory document, or has uploaded an Emirates
+    /// ID without the (mandatory) captured details. An expired Emirates ID only warns — it does not block.</summary>
+    private string? ValidateContactDocs(ContactInput c, string who)
+    {
+        foreach (var r in DocsFor(c).Where(r => r.Required))
+            if (ContactDoc(c, r.Type) is null)
+                return $"{who}: {DocLabel(r.Type)} is required.";
+
+        // Whenever an Emirates ID is provided (mandatory or optional), its details must be captured.
+        if (ContactDoc(c, LandlordDocumentType.EmiratesId) is not null)
+        {
+            if (string.IsNullOrWhiteSpace(c.EmiratesId)) return $"{who}: the Emirates ID number is required.";
+            if (string.IsNullOrWhiteSpace(c.EmiratesIdName)) return $"{who}: the name as printed on the Emirates ID is required.";
+            if (c.EmiratesIdExpiry is null) return $"{who}: the Emirates ID expiry date is required.";
+        }
         return null;
     }
 
