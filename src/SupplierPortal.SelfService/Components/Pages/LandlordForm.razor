@@ -98,10 +98,85 @@
             </div>
         </div>
     }
+
+    @* ---- "Where do I find this in UAE PASS" help modal (annotated illustration) ---- *@
+    @if (uaePassHelpOpen)
+    {
+        <div class="uaep-modal-backdrop" @onclick="() => uaePassHelpOpen = false">
+            <div class="uaep-modal" @onclick:stopPropagation="true" role="dialog" aria-modal="true" aria-label="Find your details in UAE PASS">
+                <div class="uaep-modal-head">
+                    <h3>Find your details in UAE&nbsp;PASS</h3>
+                    <button type="button" class="uaep-modal-x" @onclick="() => uaePassHelpOpen = false" aria-label="Close">&times;</button>
+                </div>
+                <div class="uaep-modal-body">
+                    <ol class="uaep-steps">
+                        <li>Open the <strong>UAE&nbsp;PASS</strong> app on your phone.</li>
+                        <li>Tap <strong>Profile</strong> (bottom-right), then open <strong>Personal&nbsp;details</strong>.</li>
+                        <li>Copy your <span class="uaep-chip">1 Mobile Number</span> into the <strong>Mobile number</strong> field here.</li>
+                        <li>Copy your <span class="uaep-chip">2 Email Address</span> into the <strong>Email address</strong> field here.</li>
+                        <li>Enter them <strong>exactly</strong> as shown in UAE&nbsp;PASS — they must match for verification to succeed.</li>
+                    </ol>
+                    <div class="uaep-phone" aria-hidden="true">
+                        <div class="uaep-ph-status"><span>8:01</span><span>&#9201; &#128246; &#128267;</span></div>
+                        <div class="uaep-ph-title">Personal details</div>
+                        <div class="uaep-ph-profile"><span class="uaep-ph-ava"></span><span class="uaep-ph-bar"></span></div>
+                        <div class="uaep-ph-section">Personal details</div>
+                        <div class="uaep-ph-row uaep-hl">
+                            <span class="uaep-ph-badge">1</span>
+                            <div><div class="uaep-ph-k">Mobile Number</div><div class="uaep-ph-v">+971 5• ••• ••••</div></div>
+                        </div>
+                        <div class="uaep-ph-row uaep-hl">
+                            <span class="uaep-ph-badge">2</span>
+                            <div><div class="uaep-ph-k">Email Address</div><div class="uaep-ph-v">name@email.com</div></div>
+                        </div>
+                        <div class="uaep-ph-row"><div><div class="uaep-ph-k">Date of Birth</div><div class="uaep-ph-v">•• ••• ••••</div></div></div>
+                        <div class="uaep-ph-row"><div><div class="uaep-ph-k">Nationality</div><div class="uaep-ph-v">••••••</div></div></div>
+                        <div class="uaep-ph-nav"><span>Home</span><span>Documents</span><span>Notifications</span><span>History</span><span class="uaep-ph-navact">Profile</span></div>
+                    </div>
+                </div>
+                <div class="uaep-modal-foot">
+                    <button type="button" class="ll-btn ll-btn-primary" @onclick="() => uaePassHelpOpen = false">Got it</button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
     .ll-wrap { width: 100%; display: flex; justify-content: center; }
+    .ll-hint { color: #7b8697; font-size: 12.5px; margin-top: 4px; line-height: 1.5; }
+
+    /* ---- UAE PASS helper: callout, link and annotated modal ---- */
+    .uaep-callout { display: flex; gap: 9px; align-items: flex-start; background: #EEF4FB; border: 1px solid #CFE0F2; color: #0E3A66; border-radius: 6px; padding: 9px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+    .uaep-callout-ic { color: #2F6FB0; font-size: 15px; line-height: 1.2; flex: none; }
+    .uaep-help-link { background: none; border: 0; padding: 0; margin: 0; color: #2F6FB0; font-weight: 600; font-size: inherit; text-decoration: underline; cursor: pointer; }
+    .uaep-help-link:hover { color: #16244a; }
+    .uaep-modal-backdrop { position: fixed; inset: 0; background: rgba(6,21,37,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1200; }
+    .uaep-modal { background: #fff; border-radius: 10px; max-width: 720px; width: 100%; max-height: 92vh; overflow: auto; box-shadow: 0 24px 60px rgba(6,21,37,.35); color: #20262D; }
+    .uaep-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e2e5ea; }
+    .uaep-modal-head h3 { margin: 0; font-size: 18px; color: #16244a; font-weight: 700; }
+    .uaep-modal-x { background: none; border: 0; font-size: 22px; line-height: 1; color: #7b8697; cursor: pointer; padding: 0 4px; }
+    .uaep-modal-x:hover { color: #20262D; }
+    .uaep-modal-body { display: flex; gap: 22px; padding: 20px; align-items: flex-start; }
+    .uaep-modal-foot { padding: 0 20px 18px; text-align: right; }
+    .uaep-steps { margin: 0; padding-left: 20px; flex: 1 1 auto; font-size: 14px; line-height: 1.75; color: #2F3A4C; }
+    .uaep-steps li { margin-bottom: 6px; }
+    .uaep-chip { display: inline-flex; align-items: center; gap: 5px; background: #EEF4FB; border: 1px solid #CFE0F2; color: #0E3A66; border-radius: 999px; padding: 1px 9px 1px 7px; font-weight: 600; font-size: 12.5px; }
+    .uaep-phone { flex: 0 0 232px; width: 232px; border: 1px solid #e2e5ea; border-radius: 22px; background: #F2F4F3; padding: 10px 10px 0; box-shadow: 0 8px 22px rgba(6,21,37,.12); }
+    .uaep-ph-status { display: flex; justify-content: space-between; font-size: 10px; color: #7b8697; padding: 2px 4px 8px; }
+    .uaep-ph-title { font-size: 19px; font-weight: 800; color: #141A21; padding: 0 4px 8px; }
+    .uaep-ph-profile { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 10px; padding: 8px; margin-bottom: 10px; }
+    .uaep-ph-ava { width: 30px; height: 30px; border-radius: 50%; background: #D9CFC6; flex: none; }
+    .uaep-ph-bar { height: 9px; border-radius: 5px; background: #E4E8EC; flex: 1; }
+    .uaep-ph-section { font-size: 13px; font-weight: 700; color: #141A21; margin: 2px 2px 7px; }
+    .uaep-ph-row { position: relative; background: #fff; border-radius: 10px; padding: 7px 10px; margin-bottom: 8px; border: 1px solid transparent; }
+    .uaep-ph-k { font-size: 10.5px; color: #8A939E; }
+    .uaep-ph-v { font-size: 12.5px; color: #222; font-weight: 600; margin-top: 1px; }
+    .uaep-ph-row.uaep-hl { border-color: #2F6FB0; box-shadow: 0 0 0 3px rgba(47,111,176,.18); padding-left: 30px; }
+    .uaep-ph-badge { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; border-radius: 50%; background: #2F6FB0; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .uaep-ph-nav { display: flex; justify-content: space-between; gap: 2px; border-top: 1px solid #e2e5ea; margin: 6px -10px 0; padding: 7px 8px 9px; font-size: 8.2px; color: #8A939E; }
+    .uaep-ph-navact { color: #1D6F53; font-weight: 700; }
+    @@media (max-width: 620px) { .uaep-modal-body { flex-direction: column; align-items: center; } .uaep-phone { order: -1; } }
     .ll-form, .ll-card { width: 100%; max-width: 860px; }
     .ll-card { background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .ll-muted { color: #7b8697; font-size: 15px; line-height: 1.5; }
@@ -165,6 +240,7 @@
     private LandlordContactDto primary = new() { IsPrimary = true, ContactType = "Owner" };
     private List<LandlordContactDto> secondaries = [];
     private List<LandlordFieldConfigDto> config = [];
+    private bool uaePassHelpOpen;
     private string link = "", session = "";
     private bool loading = true, busy, submitting, blocking, uploading, declared, completed;
     private string? error, uploadingName;
@@ -259,6 +335,13 @@
 
     private RenderFragment ContactInner(LandlordContactDto c, bool isPrimary, string who) => __builder =>
     {
+        <div class="uaep-callout">
+            <span class="uaep-callout-ic" aria-hidden="true">&#9432;</span>
+            <div>
+                The <strong>mobile number</strong> and <strong>email</strong> must match this contact's <strong>UAE&nbsp;PASS</strong> account, or verification will fail.
+                <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">See where to find them</button>
+            </div>
+        </div>
         <div class="ll-grid">
             @if (FVisible("FullName"))
             {
@@ -273,12 +356,14 @@
             @if (FVisible("Email"))
             {
                 <div class="ll-field"><label>@FLabel("Email", "Email address") @Req("Email", true)@HelpIc("Email")</label>
-                    <input type="text" maxlength="@FMax("Email")" @bind="c.Email" /></div>
+                    <input type="text" maxlength="@FMax("Email")" @bind="c.Email" />
+                    <div class="ll-hint">Your UAE PASS email address. <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">Where do I find this?</button></div></div>
             }
             @if (FVisible("Mobile"))
             {
                 <div class="ll-field"><label>@FLabel("Mobile", "Mobile number") @Req("Mobile", true)@HelpIc("Mobile")</label>
-                    <input type="text" placeholder="+9715XXXXXXXX" @bind="c.Mobile" /></div>
+                    <input type="text" placeholder="+9715XXXXXXXX" @bind="c.Mobile" />
+                    <div class="ll-hint">Your UAE PASS mobile number. <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">Where do I find this?</button></div></div>
             }
             <div class="ll-field"><label>Contact type</label>
                 <select @bind="c.ContactType">@foreach (var t in ContactTypes) { <option value="@t">@t</option> }</select></div>
