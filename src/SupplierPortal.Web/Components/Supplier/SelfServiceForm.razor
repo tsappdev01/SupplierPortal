@@ -1,0 +1,117 @@
+@page "/supplier/self-service/{Token}/form"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.SelfService
+@inject ISupplierSelfServiceDataGateway DataGateway
+@inject PublicBrandingState PublicBranding
+@inject ToastService ToastService
+
+<PageTitle>Supplier Information - Supplier Portal</PageTitle>
+
+<div class="di-self-service-wrap">
+    @if (loading)
+    {
+        <LoadingIndicator Message="Your supplier information is being retrieved, please wait…" />
+    }
+    else if (supplier is null)
+    {
+        <div class="di-self-service-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">
+                Your verification session is no longer valid. Please use the link from your email
+                again to restart verification.
+            </p>
+        </div>
+    }
+    else if (completed)
+    {
+        <div class="di-self-service-card">
+            <h1>Thank You</h1>
+            <p class="text-muted">
+                Your supplier information has been submitted successfully. Our team will review the
+                changes shortly.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="di-self-service-form">
+            <p class="text-muted mb-3">
+                Please review and update your supplier information below. Only fields belonging to
+                <strong>@supplier.SupplierName</strong> are shown.
+            </p>
+            <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="@actorLabel"
+                          SupplierFacing="true"
+                          SsGateway="DataGateway" Preloaded="bundle" SsToken="@activeToken" SsSession="@activeSession"
+                          OnComplete="HandleCompleteAsync" />
+        </div>
+    }
+</div>
+
+<style>
+    .di-self-service-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border-radius: 8px;
+        border: 1px solid #e2e5ea;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        padding: 2rem;
+    }
+
+    .di-self-service-form {
+        width: 100%;
+        max-width: 960px;
+    }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private SsFormData? bundle;
+    private Supplier? supplier;
+    private string actorLabel = "Supplier Self-Service";
+    private bool loading = true;
+    private bool completed;
+
+    // Pin the link + session from the first (query-bound) render. A later interactive re-render can re-bind
+    // [SupplyParameterFromQuery] to null without re-running OnInitializedAsync (so the form stays visible),
+    // which previously blanked the session passed to the child and surfaced a spurious "session expired"
+    // on document upload/save. Passing these stable copies keeps every gateway call on the loaded session.
+    private string activeToken = "";
+    private string activeSession = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        activeToken = Token;
+        activeSession = SessionToken ?? "";
+
+        // All data comes through the gateway — the database on the internal side, or the internal API when
+        // this page runs on the DMZ. No direct database access here.
+        if (!string.IsNullOrWhiteSpace(activeSession))
+        {
+            bundle = await DataGateway.LoadFormAsync(activeToken, activeSession);
+        }
+
+        if (bundle is not null)
+        {
+            supplier = bundle.Supplier;
+            actorLabel = $"Supplier Self-Service ({supplier?.ContactEmail})";
+            PublicBranding.SetLogo(bundle.LogoSrc);
+        }
+
+        loading = false;
+    }
+
+    private Task HandleCompleteAsync(Supplier updated)
+    {
+        // The submission (status change, notifications, token expiry) already ran on the internal side
+        // through the gateway's SaveAsync(complete: true); nothing to do here but show the confirmation.
+        completed = true;
+        ToastService.ShowSuccess("Your supplier information has been submitted.");
+        return Task.CompletedTask;
+    }
+}

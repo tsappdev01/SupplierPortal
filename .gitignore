@@ -1,0 +1,28 @@
+## .NET
+bin/
+obj/
+*.user
+
+## Deployment package output (created by deploy/Publish-And-Package.ps1)
+dist/
+
+## Local secrets - never commit real connection strings
+appsettings.Local.json
+appsettings.*.Local.json
+
+## Runtime-uploaded supplier documents - never commit real business documents
+src/SupplierPortal.Web/doc/supplier/
+src/SupplierPortal.Api/doc/supplier/
+src/SupplierPortal.Web/doc/landlord/
+
+## Data Protection keys - generated at runtime, never commit
+src/SupplierPortal.Web/keys/
+src/SupplierPortal.SelfService/keys/
+
+## IDE
+.vs/
+.vscode/
+*.suo
+
+## OS
+.DS_Store

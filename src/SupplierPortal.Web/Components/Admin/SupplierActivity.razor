@@ -1,0 +1,79 @@
+@page "/admin/supplier-activity"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Services
+@inject SupplierActivityService ActivityService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Supplier Activity - Supplier Portal</PageTitle>
+
+<h1>Supplier Activity</h1>
+<p class="text-muted">All changes made by suppliers through self-service, most recent first.</p>
+
+@if (loading)
+{
+    <LoadingIndicator Message="Loading activity…" />
+}
+else if (entries.Count == 0)
+{
+    <div class="alert alert-info">No supplier changes have been recorded yet.</div>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>When</th>
+                <th>Supplier</th>
+                <th>Field</th>
+                <th>Old value</th>
+                <th>New value</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in entries)
+            {
+                <tr>
+                    <td class="text-nowrap">@e.ChangedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                    <td><a href="/supplier/edit/@e.SupplierId">@e.SupplierName</a></td>
+                    <td>@e.FieldLabel</td>
+                    <td class="di-old">@Display(e.OldValue)</td>
+                    <td class="di-new">@Display(e.NewValue)</td>
+                    <td>
+                        @if (e.IsAcknowledged)
+                        {
+                            <span class="badge bg-success">Reviewed</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<style>
+    .di-old { color: #8a94a6; text-decoration: line-through; max-width: 260px; }
+    .di-new { color: #1a2233; font-weight: 600; max-width: 260px; }
+</style>
+
+@code {
+    private bool loading = true;
+    private List<SupplierActivityEntry> entries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var scope = state.User.IsAdministrator() ? null : (IReadOnlyCollection<int>)state.User.GetBusinessUnitIds();
+        entries = await ActivityService.GetActivityAsync(scope);
+        loading = false;
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+}

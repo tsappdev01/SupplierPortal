@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css?v=@SupplierPortal.Web.AppVersion.Token" />
+    <link rel="stylesheet" href="SupplierPortal.Web.styles.css?v=@SupplierPortal.Web.AppVersion.Token" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script>
+        // Apply the saved (or system) theme before first paint to avoid a flash of the wrong theme.
+        (function () {
+            try {
+                var t = localStorage.getItem('di-theme');
+                if (!t) { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+                document.documentElement.setAttribute('data-theme', t);
+                document.documentElement.setAttribute('data-bs-theme', t);
+            } catch (e) { /* ignore */ }
+            // Apply the saved sidebar state (collapsed/expanded) before first paint to avoid a flash.
+            try {
+                var s = localStorage.getItem('di-sidebar');
+                document.documentElement.setAttribute('data-sidebar', s === 'collapsed' ? 'collapsed' : 'expanded');
+            } catch (e) { /* ignore */ }
+        })();
+        // Sidebar hide/show toggle. Defined inline (like the pre-paint block) so it is always
+        // available to the top-bar button's onclick, independent of any external script file.
+        window.diSidebar = {
+            KEY: 'di-sidebar',
+            get: function () { return document.documentElement.getAttribute('data-sidebar') === 'collapsed'; },
+            set: function (collapsed) {
+                document.documentElement.setAttribute('data-sidebar', collapsed ? 'collapsed' : 'expanded');
+                try { localStorage.setItem(this.KEY, collapsed ? 'collapsed' : 'expanded'); } catch (e) { /* storage blocked */ }
+            },
+            toggle: function () { this.set(!this.get()); }
+        };
+        // Blazor enhanced navigation morphs <html> to the freshly-fetched server markup, which has no
+        // data-theme / data-sidebar attributes — so the theme (and sidebar state) is lost when clicking
+        // an internal link. Re-apply the persisted chrome state after every enhanced page load.
+        (function () {
+            function reapplyChrome() {
+                try {
+                    var t = localStorage.getItem('di-theme');
+                    if (!t) { t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+                    document.documentElement.setAttribute('data-theme', t);
+                    document.documentElement.setAttribute('data-bs-theme', t);
+                    var s = localStorage.getItem('di-sidebar');
+                    document.documentElement.setAttribute('data-sidebar', s === 'collapsed' ? 'collapsed' : 'expanded');
+                } catch (e) { /* ignore */ }
+            }
+            function hook() {
+                if (window.Blazor && window.Blazor.addEventListener) {
+                    window.Blazor.addEventListener('enhancedload', reapplyChrome);
+                } else {
+                    setTimeout(hook, 50);
+                }
+            }
+            hook();
+        })();
+    </script>
+    <HeadOutlet />
+</head>
+
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="js/site-doc.js?v=20260918b"></script>
+    <script src="js/theme.js"></script>
+</body>
+
+</html>

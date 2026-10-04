@@ -1,0 +1,592 @@
+@page "/landlord/{Token}/form"
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Contracts
+@inject LandlordApiClient Api
+@inject SelfServiceSession Session
+@inject SelfServiceBranding Branding
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ToastService Toast
+
+<PageTitle>Landlord Registration</PageTitle>
+
+@if (blocking)
+{
+    <div class="ll-block"><div class="ll-block-card"><div class="ll-spin"></div>
+        <div class="ll-block-t">Submitting your registration…</div>
+        <div class="ll-block-s">Please do not close or refresh this page.</div></div></div>
+}
+
+<div class="ll-wrap">
+    @if (loading)
+    {
+        <div class="ll-card"><p class="ll-muted">Loading your registration…</p></div>
+    }
+    else if (bootstrap is null)
+    {
+        <div class="ll-card"><h1>Session expired</h1><p class="ll-muted">Please use the link from your email again to verify and continue.</p></div>
+    }
+    else if (completed)
+    {
+        <div class="ll-card"><h1>Registration submitted</h1>
+            <p class="ll-muted">Thank you — your landlord registration has been submitted for review. You will be notified once it has been reviewed. No further action is needed.</p></div>
+    }
+    else
+    {
+        <div class="ll-form">
+            <div class="ll-head">
+                <h1>@(string.IsNullOrWhiteSpace(bootstrap.CompanyName) ? bootstrap.PropertyCode : bootstrap.CompanyName)</h1>
+                <div class="ll-muted">Property @bootstrap.PropertyCode</div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(bootstrap.CorrectionComment))
+            {
+                <div class="ll-alert ll-alert-warn"><strong>Correction requested:</strong> @bootstrap.CorrectionComment</div>
+            }
+
+            <div class="ll-section">
+                <div class="ll-section-title">Agreement type</div>
+                <div class="ll-agree">@(IsIndividual ? "Individual" : "Company")</div>
+                <div class="ll-muted" style="font-size:13px;margin-top:4px">Set by Business Centre for this property — read-only. It determines the documents required for each contact.</div>
+            </div>
+
+            @if (uploading)
+            {
+                <div class="ll-upbar"><div class="ll-upbar-fill"></div></div>
+                <div class="ll-muted" style="margin-bottom:8px">Uploading @uploadingName…</div>
+            }
+
+            @ContactBlock(primary, true, "Primary contact", null)
+
+            <div class="ll-section">
+                <div class="ll-section-title">Secondary contacts</div>
+                @if (secondaries.Count == 0)
+                {
+                    <p class="ll-muted" style="font-size:13px">No secondary contacts added. These are optional.</p>
+                }
+                @for (var i = 0; i < secondaries.Count; i++)
+                {
+                    var idx = i;
+                    <div class="ll-subcard">
+                        <div class="ll-subcard-hd"><span>Secondary contact @(idx + 1)</span>
+                            <button class="ll-x" @onclick="() => RemoveSecondary(idx)" disabled="@(busy || uploading)">Remove</button></div>
+                        @ContactInner(secondaries[idx], false, $"Secondary contact {idx + 1}")
+                    </div>
+                }
+                <button class="ll-btn ll-btn-secondary" style="margin-top:10px" @onclick="AddSecondary" disabled="@(busy || uploading)">+ Add secondary contact</button>
+            </div>
+
+            <div class="ll-section">
+                <div class="ll-section-title">Other documents (optional)</div>
+                <div class="ll-docs">
+                    @DocSlot(null, "TitleDeed", "Title Deed", required: false, isEid: false)
+                </div>
+            </div>
+
+            <div class="ll-section">
+                <label class="ll-check"><input type="checkbox" @bind="declared" />
+                    <span>I confirm that all the information provided above — contacts and documents — is accurate and complete.</span></label>
+            </div>
+
+            @if (error is not null) { <div class="ll-alert ll-alert-error">@error</div> }
+
+            <div class="ll-actions">
+                <button class="ll-btn ll-btn-secondary" @onclick="SaveAsync" disabled="@(busy || uploading)">@(busy && !submitting ? "Saving…" : "Save draft")</button>
+                <button class="ll-btn ll-btn-primary" @onclick="SubmitAsync" disabled="@(busy || uploading || !declared)">@(submitting ? "Submitting…" : "Submit registration")</button>
+            </div>
+        </div>
+    }
+
+    @* ---- "Where do I find this in UAE PASS" help modal (annotated illustration) ---- *@
+    @if (uaePassHelpOpen)
+    {
+        <div class="uaep-modal-backdrop" @onclick="() => uaePassHelpOpen = false">
+            <div class="uaep-modal" @onclick:stopPropagation="true" role="dialog" aria-modal="true" aria-label="Find your details in UAE PASS">
+                <div class="uaep-modal-head">
+                    <h3>Find your details in UAE&nbsp;PASS</h3>
+                    <button type="button" class="uaep-modal-x" @onclick="() => uaePassHelpOpen = false" aria-label="Close">&times;</button>
+                </div>
+                <div class="uaep-modal-body">
+                    <ol class="uaep-steps">
+                        <li>Open the <strong>UAE&nbsp;PASS</strong> app on your phone.</li>
+                        <li>Tap <strong>Profile</strong> (bottom-right), then open <strong>Personal&nbsp;details</strong>.</li>
+                        <li>Copy your <span class="uaep-chip">1 Mobile Number</span> into the <strong>Mobile number</strong> field here.</li>
+                        <li>Copy your <span class="uaep-chip">2 Email Address</span> into the <strong>Email address</strong> field here.</li>
+                        <li>Enter them <strong>exactly</strong> as shown in UAE&nbsp;PASS — they must match for verification to succeed.</li>
+                    </ol>
+                    <div class="uaep-phone" aria-hidden="true">
+                        <div class="uaep-ph-status"><span>8:01</span><span>&#9201; &#128246; &#128267;</span></div>
+                        <div class="uaep-ph-title">Personal details</div>
+                        <div class="uaep-ph-profile"><span class="uaep-ph-ava"></span><span class="uaep-ph-bar"></span></div>
+                        <div class="uaep-ph-section">Personal details</div>
+                        <div class="uaep-ph-row uaep-hl">
+                            <span class="uaep-ph-badge">1</span>
+                            <div><div class="uaep-ph-k">Mobile Number</div><div class="uaep-ph-v">+971 5• ••• ••••</div></div>
+                        </div>
+                        <div class="uaep-ph-row uaep-hl">
+                            <span class="uaep-ph-badge">2</span>
+                            <div><div class="uaep-ph-k">Email Address</div><div class="uaep-ph-v">name@email.com</div></div>
+                        </div>
+                        <div class="uaep-ph-row"><div><div class="uaep-ph-k">Date of Birth</div><div class="uaep-ph-v">•• ••• ••••</div></div></div>
+                        <div class="uaep-ph-row"><div><div class="uaep-ph-k">Nationality</div><div class="uaep-ph-v">••••••</div></div></div>
+                        <div class="uaep-ph-nav"><span>Home</span><span>Documents</span><span>Notifications</span><span>History</span><span class="uaep-ph-navact">Profile</span></div>
+                    </div>
+                </div>
+                <div class="uaep-modal-foot">
+                    <button type="button" class="ll-btn ll-btn-primary" @onclick="() => uaePassHelpOpen = false">Got it</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .ll-wrap { width: 100%; display: flex; justify-content: center; }
+    .ll-hint { color: #7b8697; font-size: 12.5px; margin-top: 4px; line-height: 1.5; }
+
+    /* ---- UAE PASS helper: callout, link and annotated modal ---- */
+    .uaep-callout { display: flex; gap: 9px; align-items: flex-start; background: #EEF4FB; border: 1px solid #CFE0F2; color: #0E3A66; border-radius: 6px; padding: 9px 12px; font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+    .uaep-callout-ic { color: #2F6FB0; font-size: 15px; line-height: 1.2; flex: none; }
+    .uaep-help-link { background: none; border: 0; padding: 0; margin: 0; color: #2F6FB0; font-weight: 600; font-size: inherit; text-decoration: underline; cursor: pointer; }
+    .uaep-help-link:hover { color: #16244a; }
+    .uaep-modal-backdrop { position: fixed; inset: 0; background: rgba(6,21,37,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1200; }
+    .uaep-modal { background: #fff; border-radius: 10px; max-width: 720px; width: 100%; max-height: 92vh; overflow: auto; box-shadow: 0 24px 60px rgba(6,21,37,.35); color: #20262D; }
+    .uaep-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e2e5ea; }
+    .uaep-modal-head h3 { margin: 0; font-size: 18px; color: #16244a; font-weight: 700; }
+    .uaep-modal-x { background: none; border: 0; font-size: 22px; line-height: 1; color: #7b8697; cursor: pointer; padding: 0 4px; }
+    .uaep-modal-x:hover { color: #20262D; }
+    .uaep-modal-body { display: flex; gap: 22px; padding: 20px; align-items: flex-start; }
+    .uaep-modal-foot { padding: 0 20px 18px; text-align: right; }
+    .uaep-steps { margin: 0; padding-left: 20px; flex: 1 1 auto; font-size: 14px; line-height: 1.75; color: #2F3A4C; }
+    .uaep-steps li { margin-bottom: 6px; }
+    .uaep-chip { display: inline-flex; align-items: center; gap: 5px; background: #EEF4FB; border: 1px solid #CFE0F2; color: #0E3A66; border-radius: 999px; padding: 1px 9px 1px 7px; font-weight: 600; font-size: 12.5px; }
+    .uaep-phone { flex: 0 0 232px; width: 232px; border: 1px solid #e2e5ea; border-radius: 22px; background: #F2F4F3; padding: 10px 10px 0; box-shadow: 0 8px 22px rgba(6,21,37,.12); }
+    .uaep-ph-status { display: flex; justify-content: space-between; font-size: 10px; color: #7b8697; padding: 2px 4px 8px; }
+    .uaep-ph-title { font-size: 19px; font-weight: 800; color: #141A21; padding: 0 4px 8px; }
+    .uaep-ph-profile { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 10px; padding: 8px; margin-bottom: 10px; }
+    .uaep-ph-ava { width: 30px; height: 30px; border-radius: 50%; background: #D9CFC6; flex: none; }
+    .uaep-ph-bar { height: 9px; border-radius: 5px; background: #E4E8EC; flex: 1; }
+    .uaep-ph-section { font-size: 13px; font-weight: 700; color: #141A21; margin: 2px 2px 7px; }
+    .uaep-ph-row { position: relative; background: #fff; border-radius: 10px; padding: 7px 10px; margin-bottom: 8px; border: 1px solid transparent; }
+    .uaep-ph-k { font-size: 10.5px; color: #8A939E; }
+    .uaep-ph-v { font-size: 12.5px; color: #222; font-weight: 600; margin-top: 1px; }
+    .uaep-ph-row.uaep-hl { border-color: #2F6FB0; box-shadow: 0 0 0 3px rgba(47,111,176,.18); padding-left: 30px; }
+    .uaep-ph-badge { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; border-radius: 50%; background: #2F6FB0; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .uaep-ph-nav { display: flex; justify-content: space-between; gap: 2px; border-top: 1px solid #e2e5ea; margin: 6px -10px 0; padding: 7px 8px 9px; font-size: 8.2px; color: #8A939E; }
+    .uaep-ph-navact { color: #1D6F53; font-weight: 700; }
+    @@media (max-width: 620px) { .uaep-modal-body { flex-direction: column; align-items: center; } .uaep-phone { order: -1; } }
+    .ll-form, .ll-card { width: 100%; max-width: 860px; }
+    .ll-card { background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .ll-muted { color: #7b8697; font-size: 15px; line-height: 1.5; }
+    .ll-head h1 { font-size: 22px; font-weight: 700; color: #16244a; margin: 0; }
+    .ll-section { background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; padding: 18px 20px; margin-top: 16px; }
+    .ll-section-title { font-weight: 700; color: #16244a; margin-bottom: 12px; }
+    .ll-agree { display: inline-block; font-weight: 700; color: #16244a; background: #eef1ff; border: 1px solid #d5dbe6; border-radius: 7px; padding: 6px 14px; }
+    .ll-subcard { border: 1px solid #e2e5ea; border-radius: 9px; padding: 14px 16px; margin-bottom: 12px; background: #fcfcfd; }
+    .ll-subcard-hd { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #16244a; margin-bottom: 10px; }
+    .ll-subcard-hd .ll-x { font-size: 13px; font-weight: 600; }
+    .ll-cdocs { margin-top: 14px; border-top: 1px dashed #e2e5ea; padding-top: 12px; }
+    .ll-cdocs-t { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #7b8697; font-weight: 700; margin-bottom: 10px; }
+    .ll-badge { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; border-radius: 999px; padding: 2px 8px; margin-left: 8px; vertical-align: 1px; }
+    .ll-badge-req { color: #c0392b; background: #fdecea; border: 1px solid #f1c7c2; }
+    .ll-badge-opt { color: #7b8697; background: #fff; border: 1px solid #d5dbe6; }
+    .ll-eid { background: #f7f9fc; border: 1px solid #e2e5ea; border-radius: 8px; padding: 12px; margin-top: 8px; }
+    .ll-eid .ll-ok { color: #16632a; font-size: 13px; margin: 0 0 8px; }
+    .ll-eid .ll-warn { color: #c0392b; font-size: 13px; margin: 8px 0 0; }
+    .ll-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+    .ll-field { display: flex; flex-direction: column; }
+    .ll-field label { font-weight: 600; font-size: 13px; color: #46618f; margin-bottom: 5px; }
+    .ll-field input { padding: 9px 11px; border: 1px solid #e2e5ea; border-radius: 7px; font-size: 14px; }
+    .ll-req { color: #c0392b; }
+    .ll-help { color: #8a94a6; cursor: help; margin-left: 4px; font-size: 13px; }
+    .ll-docs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .ll-doc { border: 1px solid #e2e5ea; border-radius: 8px; padding: 12px; }
+    .ll-doc-t { font-weight: 700; color: #1a2233; margin-bottom: 6px; font-size: 14px; }
+    .ll-doc-file { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+    .ll-doc-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #16632a; font-weight: 600; }
+    .ll-x { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 15px; }
+    .ll-choose { display: inline-block; background: #eef1ff; color: #3b5bdb; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .ll-choose.is-disabled { opacity: .6; cursor: default; }
+    .ll-file { display: none; }
+    .ll-check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: #2f3a4c; cursor: pointer; }
+    .ll-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .ll-btn { font-weight: 700; font-size: 15px; padding: 10px 22px; border-radius: 7px; cursor: pointer; border: 1px solid transparent; }
+    .ll-btn-primary { background: #a8842f; color: #fff; }
+    .ll-btn-primary:disabled { opacity: .6; cursor: default; }
+    .ll-btn-secondary { background: #fff; border-color: #d5dbe6; color: #16244a; }
+    .ll-alert { padding: .7rem .9rem; border-radius: 6px; margin: 12px 0; font-size: 14px; }
+    .ll-alert-error { background: #fdecea; color: #c0392b; }
+    .ll-alert-warn { background: #fff6e6; color: #8a5a00; }
+    .ll-upbar { height: 5px; border-radius: 3px; background: #eee3c7; overflow: hidden; margin-bottom: 6px; }
+    .ll-upbar-fill { height: 100%; width: 40%; background: #a8842f; border-radius: 3px; animation: ll-slide 1.1s ease-in-out infinite; }
+    @@keyframes ll-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .ll-block { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; background: rgba(16,24,40,.55); }
+    .ll-block-card { background: #fff; border-radius: 14px; padding: 30px 40px; text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+    .ll-spin { width: 44px; height: 44px; margin: 0 auto 14px; border: 4px solid #e4e8f0; border-top-color: #a8842f; border-radius: 50%; animation: ll-spin 0.8s linear infinite; }
+    @@keyframes ll-spin { to { transform: rotate(360deg); } }
+    .ll-block-t { font-weight: 700; color: #16244a; }
+    .ll-block-s { font-size: 13px; color: #6b7688; margin-top: 6px; }
+    @@media (max-width: 640px) { .ll-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private LandlordFormBootstrapDto? bootstrap;
+    private List<LandlordDocumentDto> documents = [];
+    private LandlordContactDto primary = new() { IsPrimary = true, ContactType = "Owner" };
+    private List<LandlordContactDto> secondaries = [];
+    private List<LandlordFieldConfigDto> config = [];
+    private bool uaePassHelpOpen;
+    private string link = "", session = "";
+    private bool loading = true, busy, submitting, blocking, uploading, declared, completed;
+    private string? error, uploadingName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null) { Session.PopulateFrom((await AuthState).User); }
+        if (!Session.IsActiveFor(Token)) { Nav.NavigateTo($"/landlord/{Token}"); return; }
+        link = Session.LinkToken!; session = Session.SessionToken!;
+
+        bootstrap = await Api.GetBootstrapAsync(link, session);
+        loading = false;
+        if (bootstrap is null) return;
+
+        Branding.SetLogo(bootstrap.LogoUrl);
+        config = bootstrap.FieldConfigs;
+        documents = bootstrap.Documents;
+        var p = bootstrap.Contacts.FirstOrDefault(c => c.IsPrimary);
+        if (p is not null) primary = p;
+        secondaries = bootstrap.Contacts.Where(c => !c.IsPrimary).ToList();
+    }
+
+    // ---- Config helpers ----
+    private LandlordFieldConfigDto? Cfg(string key) => config.FirstOrDefault(f => f.FieldKey == key);
+    private bool FVisible(string key) { var c = Cfg(key); return c is null || c.IsVisible; }
+    private bool FRequired(string key, bool dflt) { var c = Cfg(key); return c is null ? dflt : c.IsVisible && c.IsRequired; }
+    private string FLabel(string key, string dflt) { var c = Cfg(key); return string.IsNullOrWhiteSpace(c?.DisplayLabel) ? dflt : c!.DisplayLabel; }
+    private string? FHelp(string key) => Cfg(key)?.HelpText;
+    private int? FMax(string key) { var c = Cfg(key); return c?.MaxLength is > 0 ? c.MaxLength : null; }
+    private int? FMin(string key) { var c = Cfg(key); return c?.MinLength is > 0 ? c.MinLength : null; }
+    private RenderFragment? Req(string key, bool dflt) => FRequired(key, dflt) ? RawReq() : null;
+    private RenderFragment RawReq() => b => { b.OpenElement(0, "span"); b.AddAttribute(1, "class", "ll-req"); b.AddContent(2, "*"); b.CloseElement(); };
+    private RenderFragment HelpIc(string key) => b =>
+    {
+        var h = FHelp(key);
+        if (!string.IsNullOrWhiteSpace(h))
+        {
+            b.OpenElement(0, "span"); b.AddAttribute(1, "class", "ll-help"); b.AddAttribute(2, "title", h); b.AddMarkupContent(3, "&#9432;"); b.CloseElement();
+        }
+    };
+
+    // ---- Agreement type + contact helpers ----
+    private bool IsIndividual => string.Equals(bootstrap?.AgreementType, "Individual", StringComparison.OrdinalIgnoreCase);
+    private static readonly string[] ContactTypes = { "Owner", "AuthorisedRepresentative", "Manager", "Legal", "Other" };
+    private static string CKey(LandlordContactDto c) => (c.Email ?? "").Trim().ToLowerInvariant();
+    private static string RoleLabel(string? type) => string.Equals(type, "Owner", StringComparison.OrdinalIgnoreCase) ? "Owner" : $"{type} (Other)";
+    // OCR note per contact email (shown beside the captured Emirates ID details).
+    private readonly Dictionary<string, string?> eidNote = new();
+
+    private void AddSecondary() => secondaries.Add(new LandlordContactDto { ContactType = "AuthorisedRepresentative" });
+    private void RemoveSecondary(int i) { if (i >= 0 && i < secondaries.Count) secondaries.RemoveAt(i); }
+
+    /// <summary>The documents required for a contact — Emirates ID is mandatory in every case, and the second
+    /// mandatory document depends on the agreement type (Individual/Company) and the contact's role.</summary>
+    private sealed record DocReq(string Code, string Label, bool Required, bool IsEid);
+    private List<DocReq> DocsFor(LandlordContactDto c)
+    {
+        var isOwner = string.Equals(c.ContactType, "Owner", StringComparison.OrdinalIgnoreCase);
+        if (IsIndividual)
+            return isOwner
+                ? new() { new("EmiratesId", "Emirates ID", true, true) }
+                : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
+        return isOwner
+            ? new() { new("TradeLicense", "Trade Licence", true, false), new("EmiratesId", "Emirates ID", true, true) }
+            : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
+    }
+
+    private LandlordDocumentDto? DocFor(LandlordContactDto? owner, string code)
+    {
+        if (owner is null)
+            return documents.FirstOrDefault(d => d.ContactId is null && string.Equals(d.DocumentType, code, StringComparison.OrdinalIgnoreCase));
+        return owner.Id is int id
+            ? documents.FirstOrDefault(d => d.ContactId == id && string.Equals(d.DocumentType, code, StringComparison.OrdinalIgnoreCase))
+            : null;
+    }
+
+    private LandlordContactDto? FindContact(string? email)
+    {
+        var key = (email ?? "").Trim().ToLowerInvariant();
+        if (key.Length == 0) return null;
+        return CKey(primary) == key ? primary : secondaries.FirstOrDefault(c => CKey(c) == key);
+    }
+
+    // ---- Render fragments ----
+    private RenderFragment ContactBlock(LandlordContactDto c, bool isPrimary, string who, int? removeIdx) => __builder =>
+    {
+        <div class="ll-section">
+            <div class="ll-section-title">@who</div>
+            @ContactInner(c, isPrimary, who)
+        </div>
+    };
+
+    private RenderFragment ContactInner(LandlordContactDto c, bool isPrimary, string who) => __builder =>
+    {
+        <div class="uaep-callout">
+            <span class="uaep-callout-ic" aria-hidden="true">&#9432;</span>
+            <div>
+                The <strong>mobile number</strong> and <strong>email</strong> must match this contact's <strong>UAE&nbsp;PASS</strong> account, or verification will fail.
+                <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">See where to find them</button>
+            </div>
+        </div>
+        <div class="ll-grid">
+            @if (FVisible("FullName"))
+            {
+                <div class="ll-field"><label>@FLabel("FullName", "Full name") @Req("FullName", true)@HelpIc("FullName")</label>
+                    <input type="text" maxlength="@FMax("FullName")" @bind="c.FullName" /></div>
+            }
+            @if (FVisible("Designation"))
+            {
+                <div class="ll-field"><label>@FLabel("Designation", "Designation") @Req("Designation", false)@HelpIc("Designation")</label>
+                    <input type="text" maxlength="@FMax("Designation")" @bind="c.Designation" /></div>
+            }
+            @if (FVisible("Email"))
+            {
+                <div class="ll-field"><label>@FLabel("Email", "Email address") @Req("Email", true)@HelpIc("Email")</label>
+                    <input type="text" maxlength="@FMax("Email")" @bind="c.Email" />
+                    <div class="ll-hint">Your UAE PASS email address. <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">Where do I find this?</button></div></div>
+            }
+            @if (FVisible("Mobile"))
+            {
+                <div class="ll-field"><label>@FLabel("Mobile", "Mobile number") @Req("Mobile", true)@HelpIc("Mobile")</label>
+                    <input type="text" placeholder="+9715XXXXXXXX" @bind="c.Mobile" />
+                    <div class="ll-hint">Your UAE PASS mobile number. <button type="button" class="uaep-help-link" @onclick="() => uaePassHelpOpen = true">Where do I find this?</button></div></div>
+            }
+            <div class="ll-field"><label>Contact type</label>
+                <select @bind="c.ContactType">@foreach (var t in ContactTypes) { <option value="@t">@t</option> }</select></div>
+        </div>
+        <div class="ll-cdocs">
+            <div class="ll-cdocs-t">Required documents · @RoleLabel(c.ContactType)</div>
+            @if (string.IsNullOrWhiteSpace(c.FullName) || string.IsNullOrWhiteSpace(c.Email))
+            {
+                <div class="ll-muted" style="font-size:13px;margin-bottom:8px">Enter this contact's name and email above to enable document upload.</div>
+            }
+            <div class="ll-docs">
+                @foreach (var r in DocsFor(c))
+                {
+                    @DocSlot(c, r.Code, r.Label, r.Required, r.IsEid)
+                }
+            </div>
+        </div>
+    };
+
+    private RenderFragment DocSlot(LandlordContactDto? owner, string code, string label, bool required, bool isEid) => __builder =>
+    {
+        var doc = DocFor(owner, code);
+        var canUpload = owner is null || (!string.IsNullOrWhiteSpace(owner.FullName) && !string.IsNullOrWhiteSpace(owner.Email));
+        <div class="ll-doc">
+            <div class="ll-doc-t">@label <span class="ll-badge @(required ? "ll-badge-req" : "ll-badge-opt")">@(required ? "Mandatory" : "Optional")</span></div>
+            @if (doc is not null)
+            {
+                <div class="ll-doc-file"><span class="ll-doc-name" title="@doc.FileName">@doc.FileName</span>
+                    <button class="ll-x" @onclick="() => RemoveAsync(doc.Id)" disabled="@uploading">✕</button></div>
+            }
+            else
+            {
+                <div class="ll-muted" style="font-size:13px">No file uploaded</div>
+            }
+            @if (canUpload)
+            {
+                <label class="ll-choose @(uploading ? "is-disabled" : null)">
+                    @(doc is not null ? "Replace" : "Upload")
+                    <InputFile class="ll-file" accept=".pdf,.jpg,.jpeg,.png" disabled="@uploading"
+                               OnChange="e => UploadDocAsync(owner, code, e)" />
+                </label>
+            }
+            else
+            {
+                <div class="ll-muted" style="font-size:12px">Name &amp; email required first</div>
+            }
+            @if (isEid && owner is not null && doc is not null)
+            {
+                @EidDetails(owner)
+            }
+        </div>
+    };
+
+    private RenderFragment EidDetails(LandlordContactDto c) => __builder =>
+    {
+        var note = eidNote.GetValueOrDefault(CKey(c));
+        <div class="ll-eid">
+            @if (!string.IsNullOrWhiteSpace(note))
+            {
+                <p class="ll-ok">@note</p>
+            }
+            <div class="ll-grid">
+                <div class="ll-field"><label>Emirates ID number @RawReq()</label><input type="text" placeholder="784-YYYY-XXXXXXX-X" @bind="c.EmiratesId" /></div>
+                <div class="ll-field"><label>Name (as on card) @RawReq()</label><input type="text" @bind="c.EmiratesIdName" /></div>
+                <div class="ll-field"><label>Expiry date @RawReq()</label><input type="date" @bind="c.EmiratesIdExpiry" /></div>
+            </div>
+            @if (c.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
+            {
+                <p class="ll-warn">This Emirates ID has expired (@exp.ToString("dd MMM yyyy")). A valid, unexpired Emirates ID is required to submit.</p>
+            }
+        </div>
+    };
+
+    // ---- Persistence / validation ----
+    private SaveLandlordRequest BuildRequest() => new()
+    {
+        SigningRule = bootstrap?.SigningRule ?? "All",
+        Contacts = new[] { primary }.Concat(secondaries.Where(c => !string.IsNullOrWhiteSpace(c.FullName))).ToList(),
+        Signatories = bootstrap?.Signatories ?? []
+    };
+
+    private List<string> ValidateContactFields(LandlordContactDto c, string who)
+    {
+        var errs = new List<string>();
+        if (FVisible("FullName") && FRequired("FullName", true) && string.IsNullOrWhiteSpace(c.FullName)) errs.Add($"{who}: {FLabel("FullName", "Full name")} is required.");
+        if (FVisible("Email") && FRequired("Email", true) && string.IsNullOrWhiteSpace(c.Email)) errs.Add($"{who}: {FLabel("Email", "Email")} is required.");
+        if (FVisible("Mobile") && FRequired("Mobile", true) && string.IsNullOrWhiteSpace(c.Mobile)) errs.Add($"{who}: {FLabel("Mobile", "Mobile number")} is required.");
+        foreach (var (key, label, val) in new[] { ("FullName", "Full name", c.FullName), ("Designation", "Designation", c.Designation), ("Email", "Email", c.Email) })
+        {
+            if (string.IsNullOrWhiteSpace(val) || !FVisible(key)) continue;
+            var len = val.Trim().Length;
+            if (FMin(key) is int mn && len < mn) errs.Add($"{who}: {FLabel(key, label)} must be at least {mn} characters.");
+            if (FMax(key) is int mx && len > mx) errs.Add($"{who}: {FLabel(key, label)} must be at most {mx} characters.");
+        }
+        return errs;
+    }
+
+    private List<string> ValidateDocs(LandlordContactDto c, string who)
+    {
+        var errs = new List<string>();
+        foreach (var r in DocsFor(c).Where(r => r.Required))
+            if (DocFor(c, r.Code) is null) errs.Add($"{who}: {r.Label} is required.");
+        if (DocFor(c, "EmiratesId") is not null)
+        {
+            if (string.IsNullOrWhiteSpace(c.EmiratesId)) errs.Add($"{who}: the Emirates ID number is required.");
+            if (string.IsNullOrWhiteSpace(c.EmiratesIdName)) errs.Add($"{who}: the name as printed on the Emirates ID is required.");
+            if (c.EmiratesIdExpiry is null) errs.Add($"{who}: the Emirates ID expiry date is required.");
+        }
+        return errs;
+    }
+
+    private List<string> ValidateAll()
+    {
+        var errs = ValidateContactFields(primary, "Primary contact");
+        for (var i = 0; i < secondaries.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+            errs.AddRange(ValidateContactFields(secondaries[i], $"Secondary contact {i + 1}"));
+        }
+        errs.AddRange(ValidateDocs(primary, "Primary contact"));
+        for (var i = 0; i < secondaries.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(secondaries[i].FullName)) continue;
+            errs.AddRange(ValidateDocs(secondaries[i], $"Secondary contact {i + 1}"));
+        }
+        return errs;
+    }
+
+    private async Task<bool> PersistAsync()
+    {
+        var result = await Api.SaveAsync(link, session, BuildRequest());
+        if (!result.Success) { error = string.Join(" ", result.Errors); return false; }
+        return true;
+    }
+
+    private void ApplyBootstrap(LandlordFormBootstrapDto bs)
+    {
+        bootstrap = bs;
+        documents = bs.Documents;
+        primary = bs.Contacts.FirstOrDefault(c => c.IsPrimary) ?? primary;
+        secondaries = bs.Contacts.Where(c => !c.IsPrimary).ToList();
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null; busy = true;
+        var ok = await PersistAsync();
+        busy = false;
+        if (ok) Toast.ShowSuccess("Draft saved.");
+    }
+
+    private async Task SubmitAsync()
+    {
+        error = null;
+        var errs = ValidateAll();
+        if (errs.Count > 0) { error = string.Join(" ", errs); return; }
+
+        busy = true; submitting = true; blocking = true; StateHasChanged();
+        if (!await PersistAsync()) { busy = false; submitting = false; blocking = false; return; }
+        var result = await Api.SubmitAsync(link, session, new SubmitLandlordRequest { Acknowledged = declared });
+        busy = false; submitting = false; blocking = false;
+        if (!result.Success) { error = result.Error ?? "Submission failed. Please try again."; return; }
+        completed = true;
+        Toast.ShowSuccess("Registration submitted for review.");
+    }
+
+    /// <summary>Uploads a document. When <paramref name="owner"/> is a contact, the form is first saved so the
+    /// contact row exists (with an id); the document is then uploaded against that contact and, for an Emirates
+    /// ID, the auto-read details are applied to the contact. A null owner uploads a landlord-level document.</summary>
+    private async Task UploadDocAsync(LandlordContactDto? owner, string code, InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size == 0) { Toast.ShowError("The selected file is empty."); return; }
+        if (file.Size > 10 * 1024 * 1024) { Toast.ShowError("File exceeds the 10 MB size limit."); return; }
+        if (owner is not null && (string.IsNullOrWhiteSpace(owner.FullName) || string.IsNullOrWhiteSpace(owner.Email)))
+        {
+            error = "Enter the contact's name and email before uploading their documents.";
+            return;
+        }
+
+        error = null; uploading = true; uploadingName = file.Name; StateHasChanged();
+        try
+        {
+            byte[] bytes;
+            await using (var stream = file.OpenReadStream(10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
+            {
+                await stream.CopyToAsync(ms);
+                bytes = ms.ToArray();
+            }
+
+            int? contactId = null;
+            if (owner is not null)
+            {
+                // Persist so contacts get ids, then refresh to find this contact's id.
+                if (!await PersistAsync()) return;
+                var bs = await Api.GetBootstrapAsync(link, session);
+                if (bs is null) { error = "Your session has expired. Please use the link from your email again."; return; }
+                ApplyBootstrap(bs);
+                owner = FindContact(owner.Email);
+                if (owner?.Id is not int oid) { error = "Could not match this contact — please check the email address and try again."; return; }
+                contactId = oid;
+            }
+
+            using var up = new MemoryStream(bytes);
+            var result = await Api.UploadDocumentAsync(link, session, code, up, file.Name, file.ContentType, contactId);
+            if (!result.Success) { Toast.ShowError(result.Error ?? "Upload failed."); return; }
+            documents = result.Documents;
+
+            if (owner is not null && string.Equals(code, "EmiratesId", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrWhiteSpace(result.ExtractedEmiratesId)) owner.EmiratesId = result.ExtractedEmiratesId;
+                if (!string.IsNullOrWhiteSpace(result.ExtractedEmiratesIdName)) owner.EmiratesIdName = result.ExtractedEmiratesIdName;
+                if (result.ExtractedEmiratesIdExpiry is not null && owner.EmiratesIdExpiry is null) owner.EmiratesIdExpiry = result.ExtractedEmiratesIdExpiry;
+                eidNote[CKey(owner)] = result.ExtractNote;
+            }
+        }
+        finally { uploading = false; uploadingName = null; }
+    }
+
+    private async Task RemoveAsync(int docId)
+    {
+        var result = await Api.DeleteDocumentAsync(link, session, docId);
+        if (result.Success) documents = result.Documents;
+    }
+}

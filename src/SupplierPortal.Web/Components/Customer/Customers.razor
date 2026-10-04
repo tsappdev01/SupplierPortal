@@ -1,0 +1,1434 @@
+@page "/admin/customers"
+@attribute [Authorize(Policy = "Portal.Customer")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerService CustomerService
+@inject CustomerExportService CustomerExport
+@inject CustomerEmailService CustomerEmailService
+@inject CustomerDocumentService DocumentService
+@inject CustomerFieldConfigService FieldConfigService
+@inject BusinessUnitService BusinessUnitService
+@inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@inject ToastService ToastService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Manage Customer - CST Portal</PageTitle>
+
+<h1>Manage Customer</h1>
+
+<div class="di-stat-row no-print">
+    <div class="di-stat-tile di-stat-total">
+        <div class="di-stat-value">@buFiltered.Count</div>
+        <div class="di-stat-label">Total Customers</div>
+    </div>
+    <div class="di-stat-tile di-stat-new">
+        <div class="di-stat-value">@Count(CustomerStatuses.NotSubmitted)</div>
+        <div class="di-stat-label">Not Submitted</div>
+    </div>
+    <div class="di-stat-tile di-stat-await">
+        <div class="di-stat-value">@Count(CustomerStatuses.AwaitingCustomerResponse)</div>
+        <div class="di-stat-label">Awaiting Customer Response</div>
+    </div>
+    <div class="di-stat-tile di-stat-review">
+        <div class="di-stat-value">@Count(CustomerStatuses.ForReview)</div>
+        <div class="di-stat-label">For Review</div>
+    </div>
+    <div class="di-stat-tile di-stat-complete">
+        <div class="di-stat-value">@Count(CustomerStatuses.Complete)</div>
+        <div class="di-stat-label">Completed</div>
+    </div>
+</div>
+
+<div class="d-flex gap-2 mb-3 no-print align-items-center flex-wrap">
+    <button type="button" class="di-export-btn" @onclick="OpenTemplateDialog" title="Generate a customer upload template">
+        <svg width="26" height="30" viewBox="0 0 44 52" fill="none"><rect x="5" y="3" width="34" height="46" rx="4" fill="#fff" stroke="#1565c0" stroke-width="2.5"/><path d="M30 3h9v9z" fill="#90caf9" stroke="#1565c0" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 16h16M12 22h16M12 28h16M12 34h9" stroke="#90caf9" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Generate Template</span>
+    </button>
+    <button type="button" class="di-export-btn" @onclick="OpenPrintDialog" title="Print">
+        <svg width="28" height="30" viewBox="0 0 48 48" fill="none"><path d="M14 6h20v11H14z" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><rect x="7" y="16" width="34" height="17" rx="3.5" fill="#607d8b"/><rect x="14" y="29" width="20" height="13" rx="1.5" fill="#fff" stroke="#455a64" stroke-width="2.5" stroke-linejoin="round"/><path d="M18 34h12M18 38h8" stroke="#455a64" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Print</span>
+    </button>
+
+    <button type="button" class="di-action-btn is-notify ms-auto" disabled="@bulkSending" @onclick="() => confirmNotifyAll = true" title="Email a self-service update link to the customers in view">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4.5" width="19" height="14" rx="2.5" fill="#e3f6fb" stroke="#0aa2c0" stroke-width="1.7"/><path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0aa2c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19.5" cy="6" r="3.4" fill="#0aa2c0" stroke="#fff" stroke-width="1.2"/><path d="M19.5 4.4v3.2M17.9 6h3.2" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span>Notify All Customers</span>
+    </button>
+    @if (isAdministrator)
+    {
+        <button type="button" class="di-action-btn is-register" @onclick="RegisterCustomerAsync" title="Register a new customer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="9.5" cy="8" r="3.6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7"/><path d="M3.5 20c0-3.6 2.7-6 6-6s6 2.4 6 6" fill="#e6ebf7" stroke="#1a2233" stroke-width="1.7" stroke-linecap="round"/><circle cx="18.5" cy="16.5" r="4.5" fill="#1a2233"/><path d="M18.5 14.3v4.4M16.3 16.5h4.4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>Register Customer</span>
+        </button>
+        <a class="di-action-btn is-upload" href="/admin/customers/upload" title="Bulk-upload customers from Excel">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 19.5a4 4 0 0 1-.6-7.96 5.5 5.5 0 0 1 10.8-1.06A3.75 3.75 0 0 1 18.5 19.5H6Z" fill="#faf1d8" stroke="#a8842f" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 16.5V9m0 0-2.6 2.6M12 9l2.6 2.6" stroke="#a8842f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Upload Customer Data</span>
+        </a>
+    }
+</div>
+
+@if (showTemplateDialog)
+{
+    <div class="di-tmpl-backdrop" @onclick="CloseTemplateDialog">
+        <div class="di-tmpl-modal" @onclick:stopPropagation>
+            <h5 class="di-tmpl-title">Generate Customer Template</h5>
+            <p class="di-tmpl-text">
+                Download an Excel template for the business to fill in and re-upload. On upload,
+                existing customers (by Customer Unique Number) are updated rather than duplicated.
+            </p>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="custTmplMode" checked="@(!templatePopulate)" @onchange="() => templatePopulate = false" />
+                <span>Blank template (headers only)</span>
+            </label>
+            <label class="di-tmpl-radio">
+                <input type="radio" name="custTmplMode" checked="@templatePopulate" @onchange="() => templatePopulate = true" />
+                <span>Populate with existing customer data</span>
+            </label>
+            @if (templatePopulate)
+            {
+                <div class="di-tmpl-field">
+                    <label>Business Unit</label>
+                    <select @bind="templateBuId" disabled="@generatingTemplate">
+                        <option value="0">@(seesAllBusinessUnits ? "All Business Units" : "All My Business Units")</option>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <option value="@bu.Id">@bu.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+            @if (generatingTemplate)
+            {
+                <div class="di-tmpl-progress">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>@templateProgress</span>
+                </div>
+            }
+            <div class="di-tmpl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CloseTemplateDialog" disabled="@generatingTemplate">Cancel</button>
+                <button type="button" class="di-btn di-btn-primary" @onclick="DownloadTemplateAsync" disabled="@generatingTemplate">
+                    @if (generatingTemplate)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span>Generating…</span>
+                    }
+                    else
+                    {
+                        <span>Download</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="row g-2 mb-3 no-print">
+    @if (businessUnits.Count > 1 || isAdministrator)
+    {
+        <div class="col-auto" style="min-width: 240px;">
+            <label class="form-label">Business Unit</label>
+            @* Custom dropdown so each option can show the business unit logo before its name. *@
+            <div class="di-bu-select">
+                <button type="button" class="form-select di-bu-toggle" @onclick="ToggleBuDropdown">
+                    @if (filterBusinessUnitId != 0)
+                    {
+                        <img src="/business-units/@filterBusinessUnitId/logo" alt="" class="di-bu-opt-logo" onerror="this.style.display='none'" />
+                    }
+                    <span class="di-bu-text">@SelectedBuLabel</span>
+                    <span class="di-bu-caret">&#9662;</span>
+                </button>
+                @if (buDropdownOpen)
+                {
+                    <div class="di-bu-backdrop" @onclick="CloseBuDropdown"></div>
+                    <div class="di-bu-menu">
+                        <button type="button" class="di-bu-item @(filterBusinessUnitId == 0 ? "active" : "")" @onclick="() => SelectBu(0)">
+                            <span class="di-bu-text">@(seesAllBusinessUnits ? "All Business Units" : "All My Business Units")</span>
+                        </button>
+                        @foreach (var bu in businessUnits)
+                        {
+                            <button type="button" class="di-bu-item @(filterBusinessUnitId == bu.Id ? "active" : "")" @onclick="() => SelectBu(bu.Id)">
+                                <img src="/business-units/@bu.Id/logo" alt="" class="di-bu-opt-logo" onerror="this.style.display='none'" />
+                                <span class="di-bu-text">@bu.Name</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    <div class="col-auto" style="min-width: 240px;">
+        <label class="form-label">Customer Name</label>
+        <input class="form-control" placeholder="Search by name..." @bind="searchName" @bind:event="oninput" @bind:after="OnFilterChanged" />
+    </div>
+    <div class="col-auto" style="min-width: 220px;">
+        <label class="form-label">Status</label>
+        <select class="form-select" @bind="statusFilter" @bind:after="OnFilterChanged">
+            <option value="">All Statuses</option>
+            @foreach (var s in CustomerStatuses.All)
+            {
+                <option value="@s">@s</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto" style="min-width: 150px;">
+        <label class="form-label">Priority</label>
+        <select class="form-select" @bind="priorityFilter" @bind:after="OnFilterChanged">
+            <option value="">All Priorities</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+        </select>
+    </div>
+    <div class="col-auto" style="min-width: 180px;">
+        <label class="form-label">Assigned To</label>
+        <select class="form-select" @bind="assignedFilter" @bind:after="OnFilterChanged">
+            <option value="">All Assignees</option>
+            <option value="unassigned">— Unassigned —</option>
+            @foreach (var u in assignableUsers)
+            {
+                <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+            }
+        </select>
+    </div>
+</div>
+
+<ul class="nav nav-tabs no-print mb-3">
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == 0 ? "active" : "")" @onclick="() => SetTab(0)">Recently Updated (@statusFiltered.Count(IsRecent))</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == 1 ? "active" : "")" @onclick="() => SetTab(1)">Updated Last Week (@statusFiltered.Count(IsLastWeek))</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(activeTab == 2 ? "active" : "")" @onclick="() => SetTab(2)">Everything Else (@statusFiltered.Count(IsOlder))</button>
+    </li>
+</ul>
+
+@if (selectedIds.Count > 0)
+{
+    <div class="di-bulk-bar no-print">
+        <span>@selectedIds.Count selected</span>
+        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="() => confirmBulk = true">
+            @if (bulkSending)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <text> Sending...</text>
+            }
+            else
+            {
+                <text>Send Notification to Selected</text>
+            }
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="ClearSelection">Clear Selection</button>
+    </div>
+}
+
+@* ---- Single-customer send-link confirmation ---- *@
+@if (confirmSendRow is not null)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelSendLink">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelSendLink">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Send notification email?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to:</p>
+            <div class="di-confirm-target">
+                <div class="di-confirm-avatar">@CustInitials(confirmSendRow.Name)</div>
+                <div class="di-confirm-who">
+                    <span class="di-confirm-name">@confirmSendRow.Name</span>
+                    @if (confirmSendRow.Recipients.Count > 0)
+                    {
+                        @foreach (var rcp in confirmSendRow.Recipients)
+                        {
+                            <span class="di-confirm-email">@ConfirmMailIcon @rcp</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="di-confirm-email" style="color:#b45309">No email on file — sending will be skipped.</span>
+                    }
+                </div>
+            </div>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelSendLink">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmSendLinkAsync">@ConfirmSendIcon <span>Send Email</span></button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Notify-all confirmation ---- *@
+@if (confirmNotifyAll)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelNotifyAll">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelNotifyAll">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Notify all customers in view?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to <strong>@NotifyAllWithEmail</strong> customer(s) currently in view@(NotifyAllNoEmail > 0 ? $" ({NotifyAllNoEmail} without an email will be skipped)" : "").</p>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelNotifyAll">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmNotifyAllAsync">@ConfirmSendIcon <span>Send @NotifyAllWithEmail email(s)</span></button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Bulk-selected confirmation ---- *@
+@if (confirmBulk)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelBulk">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelBulk">&times;</button>
+            @ConfirmMailBadge
+            <h3 class="di-confirm-title">Send notification emails?</h3>
+            <p class="di-confirm-sub">We'll send the self-service update link to <strong>@BulkWithEmail</strong> selected customer(s)@(BulkNoEmail > 0 ? $" ({BulkNoEmail} without an email will be skipped)" : "").</p>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelBulk">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmBulkAsync">@ConfirmSendIcon <span>Send @BulkWithEmail email(s)</span></button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="d-flex align-items-center gap-2 no-print mb-2">
+    <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage == 1)" @onclick="() => GoToPage(currentPage - 1)">Previous</button>
+    <span>Page @currentPage of @TotalPages (@TabFiltered.Count() customers)</span>
+    <button class="btn btn-sm btn-outline-secondary" disabled="@(currentPage >= TotalPages)" @onclick="() => GoToPage(currentPage + 1)">Next</button>
+</div>
+
+<div class="di-cols-bar no-print">
+    <div class="di-cols-wrap">
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => showColumnMenu = !showColumnMenu" title="Show or hide table columns">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2Zm5 0v14h6V2H5ZM1 2v3h3V1H2a1 1 0 0 0-1 1Zm3 4H1v4h3V6Zm0 5H1v3a1 1 0 0 0 1 1h2v-4Zm8-10v4h3V2a1 1 0 0 0-1-1h-2Zm3 5h-3v4h3V6Zm0 5h-3v4h2a1 1 0 0 0 1-1v-3Z" />
+            </svg>
+            Columns
+        </button>
+        @if (showColumnMenu)
+        {
+            <div class="di-cols-menu" @onclick:stopPropagation>
+                <div class="di-cols-menu-head">
+                    <span>Show columns</span>
+                    <button type="button" class="di-chip-btn" @onclick="ResetColumnsAsync">Reset</button>
+                </div>
+                @foreach (var col in ChoosableCols)
+                {
+                    <label class="di-cols-item">
+                        <input type="checkbox" checked="@ColOn(col.Key)" @onchange="() => ToggleColumnAsync(col.Key)" />
+                        <span>@col.Label</span>
+                    </label>
+                }
+            </div>
+        }
+    </div>
+</div>
+@if (showColumnMenu)
+{
+    <div class="di-cols-backdrop no-print" @onclick="() => showColumnMenu = false"></div>
+}
+
+<div class="di-supplier-scroll">
+    <table class="table table-striped table-sm align-middle">
+        <thead>
+            <tr>
+                <th class="no-print"><input type="checkbox" checked="@AllOnPageSelected" @onchange="ToggleSelectAllOnPage" /></th>
+                @if (ColOn("number")) { <th>Customer Number</th> }
+                @if (ColOn("priority")) { <th>Priority</th> }
+                @if (ColOn("name")) { <th>Customer Name</th> }
+                @if (ColOn("fullname")) { <th>Full Name</th> }
+                @if (ColOn("email")) { <th>Contact Email</th> }
+                @if (ColOn("status")) { <th>Status</th> }
+                @if (ColOn("assigned")) { <th class="no-print">Assigned To</th> }
+                @if (ColOn("actions")) { <th class="no-print">Actions</th> }
+            </tr>
+        </thead>
+        <tbody>
+            @if (loading)
+            {
+                <tr><td colspan="9" class="text-center text-muted py-4">Loading…</td></tr>
+            }
+            else if (!Paged.Any())
+            {
+                <tr><td colspan="9" class="text-center text-muted py-4">No customers found.</td></tr>
+            }
+            else
+            {
+                @foreach (var c in Paged)
+                {
+                    var row = c;
+                    <tr>
+                        <td class="no-print"><input type="checkbox" checked="@selectedIds.Contains(row.Id)" @onchange="() => ToggleSelected(row.Id)" /></td>
+                        @if (ColOn("number")) { <td>@row.Number</td> }
+                        @if (ColOn("priority"))
+                        {
+                            <td>
+                                <select class="di-inline-select di-prio-@(row.Priority?.ToLowerInvariant() ?? "none")"
+                                        value="@row.Priority" @onchange="e => SetPriorityAsync(row, (string?)e.Value)">
+                                    <option value="">—</option>
+                                    <option value="P1">P1</option>
+                                    <option value="P2">P2</option>
+                                    <option value="P3">P3</option>
+                                    <option value="P4">P4</option>
+                                </select>
+                            </td>
+                        }
+                        @if (ColOn("name")) { <td>@row.Name</td> }
+                        @if (ColOn("fullname")) { <td>@row.FullName</td> }
+                        @if (ColOn("email")) { <td>@row.Email</td> }
+                        @if (ColOn("status")) { <td><span class="badge @StatusClass(row.Status)">@row.Status</span></td> }
+                        @if (ColOn("assigned"))
+                        {
+                            <td class="no-print">
+                                <select class="di-inline-select" value="@row.AssignedToUserId"
+                                        @onchange="e => AssignAsync(row, e.Value?.ToString())">
+                                    <option value="">— Unassigned —</option>
+                                    @foreach (var u in assignableUsers)
+                                    {
+                                        <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                                    }
+                                </select>
+                            </td>
+                        }
+                        @if (ColOn("actions"))
+                        {
+                        <td class="no-print">
+                            <button class="btn btn-sm btn-outline-secondary" title="View attached documents" @onclick="() => ShowDocumentsAsync(row)">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM9.5 3A1.5 1.5 0 0 0 11 4.5h1.5L9.5 1.5V3zM5 8.5a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1H5z"/></svg>
+                            </button>
+                            <a class="btn btn-sm btn-outline-primary" href="/admin/customers/@row.Id" title="Edit">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z"/></svg>
+                            </a>
+                            <button class="btn btn-sm btn-outline-secondary" title="Send self-service update link to customer" disabled="@(notifyingId == row.Id)" @onclick="() => RequestSendLink(row)">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
+                            </button>
+                        </td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (showDocsModal)
+{
+    <div class="di-modal-backdrop no-print" @onclick="CloseDocsModal"></div>
+    <div class="di-modal di-modal-adv no-print" role="dialog" aria-modal="true">
+        <div class="di-modal-head">
+            <div class="di-modal-head-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M6 2.5h8l4 4V21a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 6 21V2.5z" fill="#fff" opacity=".92"/><path d="M14 2.5v4h4" fill="#cbd8ee"/><path d="M8.5 12h7M8.5 15h7M8.5 18h4.5" stroke="#274a7d" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div class="di-modal-head-text">
+                <h2 class="di-modal-title text-truncate">Attached Documents</h2>
+                <p class="di-modal-subtitle text-truncate">@docsCustomerName@(modalDocuments.Count > 0 ? $" · {modalDocuments.Count} file(s)" : "")</p>
+            </div>
+            <button type="button" class="di-modal-x" aria-label="Close" @onclick="CloseDocsModal">✕</button>
+        </div>
+        <div class="di-modal-body" tabindex="0" @ref="docsViewerRef" @onkeydown="OnDocsKeyDown">
+            @if (modalDocsLoading)
+            {
+                <LoadingIndicator Message="Documents are being retrieved, please wait…" />
+            }
+            else if (modalDocuments.Count == 0)
+            {
+                <p><em>No documents have been uploaded for this customer.</em></p>
+            }
+            else
+            {
+                <div class="di-docsall-toolbar">
+                    <span class="di-docsall-count">@modalDocuments.Count document(s)</span>
+                    <div class="di-docsall-toolbar-actions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OpenImagesPdfAsync">All images as PDF</button>
+                        <button type="button" class="btn btn-sm btn-dark" @onclick="DownloadAllZipAsync" disabled="@(zipDownloading || downloadingDocId is not null)">
+                            @if (zipDownloading)
+                            {
+                                <span class="di-dl-spinner" aria-hidden="true"></span>
+                                <span>@(dlPercent < 0 ? "Downloading…" : $"Downloading… {dlPercent}%")</span>
+                            }
+                            else
+                            {
+                                <span>⬇ Download all (zip)</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+                @if (zipDownloading)
+                {
+                    <div class="di-dl-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
+                        <div class="di-dl-progress-track">
+                            <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                 style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
+                        </div>
+                        <span class="di-dl-progress-label">
+                            @if (dlPercent < 0)
+                            {
+                                <text>Preparing your download…</text>
+                            }
+                            else
+                            {
+                                <text>@dlPercent%@(string.IsNullOrEmpty(dlTotalText) ? "" : $" — {dlReceivedText} of {dlTotalText}")</text>
+                            }
+                        </span>
+                    </div>
+                }
+                <div class="di-docsall-grid">
+                    @foreach (var doc in modalDocuments)
+                    {
+                        <div class="di-docsall-card">
+                            <div class="di-docsall-preview">
+                                @if (!previewLoaded.Contains(doc.Id))
+                                {
+                                    <div class="di-preview-loading">
+                                        <span class="di-preview-spinner" aria-hidden="true"></span>
+                                        <span>Loading preview…</span>
+                                    </div>
+                                }
+                                @if (doc.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <img src="/customers/documents/@doc.Id" alt="@doc.FileName" loading="lazy"
+                                         @onload="() => MarkPreviewLoaded(doc.Id)" @onerror="() => MarkPreviewLoaded(doc.Id)" />
+                                }
+                                else
+                                {
+                                    <iframe src="/customers/documents/@doc.Id#toolbar=0&navpanes=0&view=FitH" title="@doc.FileName" loading="lazy"
+                                            @onload="() => MarkPreviewLoaded(doc.Id)"></iframe>
+                                }
+                            </div>
+                            <div class="di-docsall-info">
+                                <span class="di-docsall-type badge">@doc.DocumentType</span>
+                                <span class="di-docsall-name" title="@doc.FileName">@doc.FileName</span>
+                            </div>
+                            <div class="di-docsall-actions">
+                                <a class="btn btn-sm btn-outline-primary" href="/customers/documents/@doc.Id" target="_blank" title="Open in a new tab">Open</a>
+                                <button type="button" class="btn btn-sm btn-primary" title="Download the original file"
+                                        @onclick="() => DownloadDocAsync(doc)"
+                                        disabled="@(zipDownloading || downloadingDocId is not null)">
+                                    @if (downloadingDocId == doc.Id)
+                                    {
+                                        <span class="di-dl-spinner" aria-hidden="true"></span>
+                                        <span>@(dlPercent < 0 ? "Downloading…" : $"{dlPercent}%")</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Download</span>
+                                    }
+                                </button>
+                            </div>
+                            @if (downloadingDocId == doc.Id)
+                            {
+                                <div class="di-dl-progress di-dl-progress-card" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(dlPercent < 0 ? 0 : dlPercent)">
+                                    <div class="di-dl-progress-track">
+                                        <div class="di-dl-progress-fill @(dlPercent < 0 ? "di-dl-indeterminate" : "")"
+                                             style="@(dlPercent < 0 ? "" : $"width:{dlPercent}%")"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="small text-muted mt-2">Tip: click a preview's Open to view full size, or Download to save the original. Esc closes.</div>
+            }
+        </div>
+    </div>
+}
+
+@if (showPrintDialog)
+{
+    <div class="di-print-backdrop no-print" @onclick="ClosePrintDialog"></div>
+    <div class="di-print-dialog no-print" role="dialog" aria-modal="true" aria-label="Print options">
+        <div class="di-print-head">
+            <div>
+                <h3 class="di-print-title">Print Customers</h3>
+                <p class="di-print-sub">Filter by Status, Priority and Assigned To, then choose the columns. All <strong>@PrintFiltered.Count()</strong> matching customer(s) will be printed — across every tab, not just this page.</p>
+            </div>
+            <button type="button" class="di-print-x" aria-label="Close" @onclick="ClosePrintDialog">✕</button>
+        </div>
+        <div class="di-print-body">
+            <div class="di-print-filters">
+                <div class="di-print-filter">
+                    <label>Status</label>
+                    <select @bind="printStatusFilter">
+                        <option value="">All Statuses</option>
+                        @foreach (var s in CustomerStatuses.All)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Priority</label>
+                    <select @bind="printPriorityFilter">
+                        <option value="">All Priorities</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                    </select>
+                </div>
+                <div class="di-print-filter">
+                    <label>Assigned To</label>
+                    <select @bind="printAssignedFilter">
+                        <option value="">All Assignees</option>
+                        <option value="unassigned">— Unassigned —</option>
+                        @foreach (var u in assignableUsers)
+                        {
+                            <option value="@u.Id">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="di-print-toolbar">
+                <span class="di-print-count">@printColumns.Count(c => c.Selected) of @printColumns.Count columns</span>
+                <div class="di-print-toolbar-actions">
+                    <button type="button" class="di-chip-btn" @onclick="() => SetAllPrintCols(true)">Select all</button>
+                    <button type="button" class="di-chip-btn" @onclick="() => SetAllPrintCols(false)">Clear</button>
+                </div>
+            </div>
+            <div class="di-print-cols">
+                @foreach (var col in printColumns)
+                {
+                    <label class="di-print-col @(col.Selected ? "is-on" : "")">
+                        <input type="checkbox" checked="@col.Selected" @onchange="e => { col.Selected = e.Value is true; }" />
+                        <span>@col.Label</span>
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="di-print-actions">
+            <button type="button" class="di-btn2 di-btn2-ghost" @onclick="ClosePrintDialog">Cancel</button>
+            <button type="button" class="di-btn2 di-btn2-primary" @onclick="DoPrintAsync"
+                    disabled="@(!printColumns.Any(c => c.Selected) || !PrintFiltered.Any())">
+                Print @PrintFiltered.Count() row(s)
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1055; }
+    .di-modal { position: fixed; z-index: 1060; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: min(1160px, 95vw); max-height: 92vh; display: flex; flex-direction: column;
+        background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    .di-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e2e5ea; }
+    .di-modal-body { padding: 12px 16px; overflow: auto; outline: none; }
+
+    /* Advanced modal: gradient header with icon + subtitle, softer frame (matches supplier). */
+    .di-modal-adv { border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px rgba(2, 10, 40, .4); }
+    .di-modal-adv .di-modal-head { align-items: flex-start; gap: 14px; padding: 18px 20px; border-bottom: 0; background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff; }
+    .di-modal-head-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.16); }
+    .di-modal-head-text { min-width: 0; flex: 1; }
+    .di-modal-title { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.2; }
+    .di-modal-subtitle { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; }
+    .di-modal-x { flex: none; background: rgba(255,255,255,.14); border: 0; color: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .di-modal-x:hover { background: rgba(255,255,255,.28); }
+    .di-modal-adv .di-modal-body { padding: 16px 20px; }
+
+    /* "Download all (zip)" / single-file progress bar + button spinner. */
+    .di-dl-progress { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .di-dl-progress-track { flex: 1; height: 8px; background: #e7ebf2; border-radius: 999px; overflow: hidden; }
+    .di-dl-progress-fill { height: 100%; background: linear-gradient(90deg, #1a2233, #2f4a7a); border-radius: 999px; transition: width .15s ease; }
+    .di-dl-progress-fill.di-dl-indeterminate { width: 40%; animation: di-dl-slide 1.1s ease-in-out infinite; }
+    @@keyframes di-dl-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .di-dl-progress-label { font-size: 12.5px; font-weight: 600; color: #46506b; white-space: nowrap; min-width: 140px; text-align: right; }
+    .di-dl-progress-card { margin: 0 12px 12px; }
+    .di-dl-progress-card .di-dl-progress-track { height: 5px; }
+    .di-dl-spinner { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
+    @@keyframes di-dl-spin { to { transform: rotate(360deg); } }
+
+    /* Per-card "Loading preview…" overlay. */
+    .di-preview-loading { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: #7488a6; font-size: 12.5px; font-weight: 600; background: linear-gradient(180deg, #fbfcfe, #f1f4f9); }
+    .di-preview-spinner { width: 24px; height: 24px; border: 3px solid #d9e0ec; border-top-color: #2f6fed; border-radius: 50%; animation: di-dl-spin .7s linear infinite; }
+
+    .di-docsall-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-docsall-toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .di-docsall-count { font-size: 13px; font-weight: 600; color: #46506b; }
+    .di-docsall-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .di-docsall-card { border: 1px solid #e2e5ea; border-radius: 10px; overflow: hidden; background: #fff; transition: box-shadow .15s ease; }
+    .di-docsall-card:hover { box-shadow: 0 6px 20px rgba(20, 30, 50, 0.1); }
+    .di-docsall-preview { height: 200px; background: #f6f7f9; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+    .di-docsall-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .di-docsall-preview iframe { width: 100%; height: 100%; border: 0; }
+    .di-docsall-info { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
+    .di-docsall-type { background: #eef1ff; color: #3b5bdb; font-weight: 600; flex: none; }
+    .di-docsall-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .di-docsall-actions { display: flex; gap: 8px; padding: 8px 12px 12px; }
+    .di-docsall-actions .btn { display: inline-flex; align-items: center; gap: 6px; flex: 1 1 0; justify-content: center; }
+
+    .di-bu-select { position: relative; }
+    .di-bu-toggle { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; cursor: pointer; }
+    .di-bu-caret { margin-left: auto; color: #6c757d; }
+    .di-bu-backdrop { position: fixed; inset: 0; z-index: 1040; background: transparent; }
+    .di-bu-menu { position: absolute; z-index: 1041; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; box-shadow: 0 8px 24px rgba(20,30,50,0.12); max-height: 320px; overflow: auto; padding: 4px; }
+    .di-bu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: none; background: transparent; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; color: #1a2233; }
+    .di-bu-item:hover, .di-bu-item.active { background: #eef1ff; }
+    .di-bu-opt-logo { width: 26px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+    .di-bu-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .di-tmpl-backdrop { position: fixed; inset: 0; background: rgba(15,22,35,0.55); display: flex; align-items: center; justify-content: center; z-index: 1080; padding: 24px; }
+    .di-tmpl-modal { background: #fff; border-radius: 10px; width: min(460px, 100%); padding: 22px 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+    .di-tmpl-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; color: #1a2233; }
+    .di-tmpl-text { margin: 0 0 16px; font-size: 13.5px; color: #6b7280; }
+    .di-tmpl-radio { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14.5px; color: #26303f; cursor: pointer; }
+    .di-tmpl-field { margin: 10px 0 4px; display: flex; flex-direction: column; gap: 5px; }
+    .di-tmpl-field label { font-size: 13px; font-weight: 600; color: #46618f; }
+    .di-tmpl-field select { padding: 9px 11px; border: 1px solid #e2e5ea; border-radius: 8px; font-size: 15px; color: #1a2233; background: #fff; font-family: inherit; }
+    .di-tmpl-progress { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13.5px; color: #46618f; }
+    .di-tmpl-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .di-tmpl-actions .di-btn { display: inline-flex; align-items: center; gap: 7px; font-family: inherit; font-size: 15px; font-weight: 700; padding: 10px 22px; border-radius: 8px; cursor: pointer; border: none; text-decoration: none; }
+    .di-tmpl-actions .di-btn-primary { background: #3b5bdb; color: #fff; }
+    .di-tmpl-actions .di-btn-primary:hover { background: #2f4bc4; }
+    .di-tmpl-actions .di-btn-secondary { background: #fff; color: #1a2233; border: 1px solid #e2e5ea; }
+    .di-tmpl-actions .di-btn-secondary:hover { background: #f5f7fc; }
+
+    /* Inline row selects for Priority / Assigned To */
+    .di-inline-select { border: 1px solid #d9e0ec; border-radius: 7px; padding: 3px 6px; font-size: 12.5px; background: #fff; color: #1a2233; max-width: 160px; }
+    .di-inline-select:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px rgba(59,91,219,.12); }
+    .di-prio-p1 { border-color: #dc3545; color: #b02a37; font-weight: 700; }
+    .di-prio-p2 { border-color: #fd7e14; color: #c85e04; font-weight: 700; }
+    .di-prio-p3 { border-color: #0d6efd; color: #0a58ca; font-weight: 600; }
+    .di-prio-p4 { border-color: #6c757d; color: #565e64; }
+
+    /* Advanced Print dialog (mirrors the supplier dialog) */
+    .di-print-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); z-index: 1090; }
+    .di-print-dialog { position: fixed; z-index: 1091; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+    .di-print-head { display: flex; align-items: flex-start; gap: 14px; padding: 20px 22px; background: #0b2545; border-radius: 14px 14px 0 0; }
+    .di-print-title { margin: 0; font-size: 18px; font-weight: 700; color: #fff; }
+    .di-print-sub { margin: 3px 0 0; font-size: 12.5px; color: #cdd8ec; line-height: 1.5; }
+    .di-print-sub strong { color: #fff; }
+    .di-print-x { margin-left: auto; flex: none; background: rgba(255,255,255,.14); border: 0; color: #fff; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
+    .di-print-x:hover { background: rgba(255,255,255,.28); }
+    .di-print-body { padding: 18px 22px; }
+    .di-print-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #eef1f6; }
+    .di-print-filter { flex: 1 1 150px; min-width: 140px; }
+    .di-print-filter label { display: block; font-size: 12px; font-weight: 600; color: #46506b; margin-bottom: 5px; }
+    .di-print-filter select { width: 100%; padding: 8px 10px; border: 1.5px solid #d3dae6; border-radius: 9px; font-size: 13.5px; background: #fff; }
+    .di-print-filter select:focus { outline: none; border-color: #2f6fed; box-shadow: 0 0 0 3px rgba(47,111,237,.15); }
+    .di-print-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-print-count { font-size: 12.5px; font-weight: 600; color: #46506b; }
+    .di-print-toolbar-actions { display: flex; gap: 6px; }
+    .di-chip-btn { border: 1px solid #d9e0ec; background: #fff; color: #46506b; font-size: 12.5px; font-weight: 600; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+    .di-chip-btn:hover { border-color: #3b5bdb; color: #1e3a8a; }
+    .di-print-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+    .di-print-col { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border: 1.5px solid #e4e8f0; border-radius: 10px; cursor: pointer; font-size: 13.5px; }
+    .di-print-col:hover { border-color: #b9c6df; }
+    .di-print-col.is-on { border-color: #2f6fed; background: #eef4ff; color: #12315f; font-weight: 600; }
+    .di-print-col input { width: 16px; height: 16px; accent-color: #2f6fed; }
+    .di-print-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px 20px; border-top: 1px solid #eef1f6; }
+    .di-btn2 { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; padding: 9px 18px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; }
+    .di-btn2-ghost { background: #fff; color: #46506b; border-color: #d9e0ec; }
+    .di-btn2-ghost:hover { background: #f5f7fc; }
+    .di-btn2-primary { background: #2f6fed; color: #fff; }
+    .di-btn2-primary:hover { background: #245ad1; }
+    .di-btn2-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Bulk-actions bar + Columns chooser (mirror the supplier dashboard) */
+    .di-bulk-bar { display: flex; align-items: center; gap: 12px; background: #eef1ff; border: 1px solid #c7d0f7; border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .di-cols-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+    .di-cols-wrap { position: relative; }
+    .di-cols-backdrop { position: fixed; inset: 0; z-index: 1080; }
+    .di-cols-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 1085; width: 250px; max-height: 60vh; overflow-y: auto; background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; box-shadow: 0 10px 30px rgba(20, 34, 70, 0.14); padding: 8px; }
+    .di-cols-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px 8px; margin-bottom: 4px; border-bottom: 1px solid #eef1f5; font-size: 12.5px; font-weight: 700; color: #46506b; }
+    .di-cols-item { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px; font-size: 13.5px; color: #1a2233; cursor: pointer; }
+    .di-cols-item:hover { background: #f4f6fb; }
+    .di-cols-item input { width: 15px; height: 15px; flex: none; cursor: pointer; }
+
+    /* ---- Send-email confirmation dialog (mirrors the Supplier dashboard) ---- */
+    .di-confirm-backdrop { position: fixed; inset: 0; z-index: 1090; background: rgba(11, 37, 69, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: di-confirm-fade 0.15s ease; }
+    .di-confirm-card { position: relative; background: #fff; width: min(430px, 100%); border-radius: 18px; padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(11, 37, 69, 0.35); animation: di-confirm-pop 0.18s cubic-bezier(.2,.9,.3,1.2); }
+    .di-confirm-x { position: absolute; top: 12px; right: 14px; border: none; background: transparent; font-size: 24px; line-height: 1; color: #9aa6b8; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+    .di-confirm-x:hover { background: #f1f4f9; color: #46618f; }
+    .di-confirm-badge { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 25%, #eaf1fb, #d7e5f7); box-shadow: 0 0 0 8px rgba(11, 37, 69, 0.06); }
+    .di-confirm-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color: #0b2545; }
+    .di-confirm-sub { margin: 0 0 16px; font-size: 13.5px; color: #7b8697; }
+    .di-confirm-target { display: flex; align-items: center; gap: 12px; text-align: left; background: #f6f8fc; border: 1px solid #e6ecf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 22px; }
+    .di-confirm-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0b2545; color: #c9a227; font-weight: 800; font-size: 14px; }
+    .di-confirm-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .di-confirm-name { font-weight: 700; font-size: 14.5px; color: #1a2233; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46618f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email svg { flex: none; opacity: 0.75; }
+    .di-confirm-actions { display: flex; gap: 12px; }
+    .di-confirm-btn { flex: 1; border-radius: 10px; padding: 11px 16px; font-size: 14.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .di-confirm-cancel { background: #fff; border-color: #d3dae6; color: #46618f; }
+    .di-confirm-cancel:hover { background: #f1f4f9; }
+    .di-confirm-send { background: linear-gradient(135deg, #14396b, #0b2545); color: #fff; box-shadow: 0 6px 16px rgba(11,37,69,0.28); }
+    .di-confirm-send:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(11,37,69,0.36); }
+    @@keyframes di-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes di-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+</style>
+
+@code {
+    private List<CustomerService.CustomerRow> rows = [];
+    private List<BusinessUnit> businessUnits = [];
+    private int filterBusinessUnitId;
+    private bool buDropdownOpen;
+
+    private string SelectedBuLabel => filterBusinessUnitId == 0
+        ? (seesAllBusinessUnits ? "All Business Units" : "All My Business Units")
+        : businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "";
+
+    private void ToggleBuDropdown() => buDropdownOpen = !buDropdownOpen;
+    private void CloseBuDropdown() => buDropdownOpen = false;
+    private void SelectBu(int id) { buDropdownOpen = false; filterBusinessUnitId = id; OnFilterChanged(); }
+    private string? searchName;
+    private string statusFilter = "";
+    private string priorityFilter = "";
+    private string assignedFilter = "";      // "", "unassigned", or a user id
+    private List<User> assignableUsers = [];
+    private int activeTab;
+    private int currentPage = 1;
+    private const int PageSize = 25;
+    private readonly HashSet<int> selectedIds = [];
+    private bool loading = true;
+    private bool isAdministrator;
+    private bool seesAllBusinessUnits;
+    private string currentUser = "unknown";
+
+    // "Generate Template" dialog state.
+    private bool showTemplateDialog;
+    private bool templatePopulate;
+    private int templateBuId;
+    private bool generatingTemplate;
+    private string templateProgress = "";
+    private List<int> userBuIds = [];
+
+    // ---- derived collections ----
+    private List<CustomerService.CustomerRow> buFiltered =>
+        filterBusinessUnitId == 0 ? rows : rows.Where(r => r.BusinessUnitId == filterBusinessUnitId).ToList();
+
+    private List<CustomerService.CustomerRow> statusFiltered => buFiltered
+        .Where(r => string.IsNullOrEmpty(statusFilter) || r.Status == statusFilter)
+        .Where(r => string.IsNullOrEmpty(priorityFilter) || r.Priority == priorityFilter)
+        .Where(MatchesAssignedFilter)
+        .Where(r => string.IsNullOrWhiteSpace(searchName) || r.Name.Contains(searchName!, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(r => PriorityRank(r.Priority)).ThenByDescending(r => r.Updated)
+        .ToList();
+
+    private bool MatchesAssignedFilter(CustomerService.CustomerRow r) => assignedFilter switch
+    {
+        "" => true,
+        "unassigned" => r.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => r.AssignedToUserId == uid,
+        _ => true
+    };
+
+    private static int PriorityRank(string? p) => p switch { "P1" => 1, "P2" => 2, "P3" => 3, "P4" => 4, _ => 5 };
+
+    private IEnumerable<CustomerService.CustomerRow> TabFiltered => activeTab switch
+    {
+        0 => statusFiltered.Where(IsRecent),
+        1 => statusFiltered.Where(IsLastWeek),
+        _ => statusFiltered.Where(IsOlder)
+    };
+
+    private IEnumerable<CustomerService.CustomerRow> Paged => TabFiltered.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(TabFiltered.Count() / (double)PageSize));
+    private bool AllOnPageSelected => Paged.Any() && Paged.All(r => selectedIds.Contains(r.Id));
+
+    private static bool IsRecent(CustomerService.CustomerRow r) => r.Updated >= DateTime.UtcNow.AddDays(-1);
+    private static bool IsLastWeek(CustomerService.CustomerRow r) => r.Updated < DateTime.UtcNow.AddDays(-1) && r.Updated >= DateTime.UtcNow.AddDays(-7);
+    private static bool IsOlder(CustomerService.CustomerRow r) => r.Updated < DateTime.UtcNow.AddDays(-7);
+
+    private int Count(string status) => buFiltered.Count(r => r.Status == status);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        isAdministrator = state.User.IsAdministrator();
+        // Only an administrator with no business-unit assignment sees all customers; a user (admin or
+        // not) assigned to specific business units is scoped to those — both in the list and the filter.
+        var ids = state.User.GetBusinessUnitIds();
+        userBuIds = ids;
+        seesAllBusinessUnits = isAdministrator && ids.Count == 0;
+        var scope = seesAllBusinessUnits ? new List<int>() : ids;
+        var allBu = await BusinessUnitService.GetAllAsync();
+        businessUnits = seesAllBusinessUnits ? allBu : allBu.Where(b => ids.Contains(b.Id)).ToList();
+        rows = await CustomerService.GetDashboardAsync(scope);
+        assignableUsers = await UserService.GetCustomerAssignableUsersAsync();
+        loading = false;
+    }
+
+    // ---- On-grid column chooser (mirrors the supplier dashboard) ----
+    private static readonly (string Key, string Label)[] ChoosableCols =
+    [
+        ("number", "Customer Number"),
+        ("priority", "Priority"),
+        ("name", "Customer Name"),
+        ("fullname", "Full Name"),
+        ("email", "Contact Email"),
+        ("status", "Status"),
+        ("assigned", "Assigned To"),
+        ("actions", "Actions"),
+    ];
+    private readonly HashSet<string> hiddenCols = [];
+    private bool showColumnMenu;
+    private const string ColsKey = "di-customer-cols";
+    private bool ColOn(string key) => !hiddenCols.Contains(key);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", ColsKey);
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    var visible = saved.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+                    hiddenCols.Clear();
+                    foreach (var c in ChoosableCols) { if (!visible.Contains(c.Key)) hiddenCols.Add(c.Key); }
+                    StateHasChanged();
+                }
+            }
+            catch { /* localStorage unavailable — show all columns */ }
+        }
+
+        // Focus the documents modal body when it opens, so Esc/arrow keys work immediately.
+        if (focusDocsPending)
+        {
+            focusDocsPending = false;
+            try { await docsViewerRef.FocusAsync(); } catch { /* element not ready; harmless */ }
+        }
+    }
+
+    private async Task ToggleColumnAsync(string key)
+    {
+        if (!hiddenCols.Remove(key)) { hiddenCols.Add(key); }
+        var visible = ChoosableCols.Select(c => c.Key).Where(ColOn);
+        try { await JS.InvokeVoidAsync("localStorage.setItem", ColsKey, string.Join(",", visible)); } catch { }
+    }
+
+    private async Task ResetColumnsAsync()
+    {
+        hiddenCols.Clear();
+        try { await JS.InvokeVoidAsync("localStorage.removeItem", ColsKey); } catch { }
+    }
+
+    // ---- Send-email confirmation dialogs ----
+    private CustomerService.CustomerRow? confirmSendRow;
+    private bool confirmNotifyAll;
+    private bool confirmBulk;
+
+    private int NotifyAllWithEmail => statusFiltered.Count(r => !string.IsNullOrWhiteSpace(r.Email));
+    private int NotifyAllNoEmail => statusFiltered.Count() - NotifyAllWithEmail;
+    private int BulkWithEmail => statusFiltered.Count(r => selectedIds.Contains(r.Id) && !string.IsNullOrWhiteSpace(r.Email));
+    private int BulkNoEmail => selectedIds.Count - BulkWithEmail;
+
+    private static string CustInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "–";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1 ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+
+    private void RequestSendLink(CustomerService.CustomerRow row) => confirmSendRow = row;
+    private void CancelSendLink() => confirmSendRow = null;
+    private async Task ConfirmSendLinkAsync()
+    {
+        var row = confirmSendRow;
+        confirmSendRow = null;
+        if (row is not null) await SendLinkAsync(row);
+    }
+
+    private void CancelNotifyAll() => confirmNotifyAll = false;
+    private async Task ConfirmNotifyAllAsync()
+    {
+        confirmNotifyAll = false;
+        await NotifyAllAsync();
+    }
+
+    private void CancelBulk() => confirmBulk = false;
+    private async Task ConfirmBulkAsync()
+    {
+        confirmBulk = false;
+        await BulkNotifySelectedAsync();
+    }
+
+    private static readonly RenderFragment ConfirmMailBadge = @<div class="di-confirm-badge">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+            <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+            <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+    </div>;
+    private static readonly RenderFragment ConfirmMailIcon = @<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>;
+    private static readonly RenderFragment ConfirmSendIcon = @<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>;
+
+    // ---- Bulk selection actions ----
+    private void ClearSelection() => selectedIds.Clear();
+
+    private async Task BulkNotifySelectedAsync()
+    {
+        var targets = statusFiltered.Where(r => selectedIds.Contains(r.Id)).ToList();
+        if (targets.Count == 0) { ToastService.ShowInfo("No customers selected."); return; }
+        bulkSending = true;
+        int sent = 0, failed = 0;
+        foreach (var row in targets)
+        {
+            var (ok, _) = await CustomerEmailService.NotifyCustomerAsync(row.Id, row.Name, row.Email, currentUser, Nav.BaseUri);
+            if (ok) { sent++; } else { failed++; }
+        }
+        bulkSending = false;
+        await ReloadRowsAsync();
+        ToastService.ShowSuccess($"Update link sent to {sent} customer(s)." + (failed > 0 ? $" {failed} skipped (no email or send error)." : ""));
+    }
+
+    private void OnFilterChanged() => currentPage = 1;
+    private void SetTab(int tab) { activeTab = tab; currentPage = 1; }
+    private void GoToPage(int p) => currentPage = Math.Clamp(p, 1, TotalPages);
+
+    private void ToggleSelected(int id) { if (!selectedIds.Add(id)) selectedIds.Remove(id); }
+    private void ToggleSelectAllOnPage(ChangeEventArgs e)
+    {
+        var on = (bool)(e.Value ?? false);
+        foreach (var r in Paged) { if (on) selectedIds.Add(r.Id); else selectedIds.Remove(r.Id); }
+    }
+
+    private async Task RegisterCustomerAsync()
+    {
+        var id = await CustomerService.CreateDraftAsync(currentUser, filterBusinessUnitId == 0 ? null : filterBusinessUnitId);
+        Nav.NavigateTo($"/admin/customers/{id}");
+    }
+
+    // ---- inline priority / assignment ----
+    private async Task SetPriorityAsync(CustomerService.CustomerRow row, string? value)
+    {
+        var prio = string.IsNullOrWhiteSpace(value) ? null : value;
+        await CustomerService.SetPriorityAsync(row.Id, prio, currentUser);
+        var idx = rows.FindIndex(r => r.Id == row.Id);
+        if (idx >= 0) { rows[idx] = rows[idx] with { Priority = prio }; }
+    }
+
+    private async Task AssignAsync(CustomerService.CustomerRow row, string? value)
+    {
+        int? uid = int.TryParse(value, out var v) ? v : null;
+        var name = await CustomerService.AssignAsync(row.Id, uid, currentUser);
+        var idx = rows.FindIndex(r => r.Id == row.Id);
+        if (idx >= 0) { rows[idx] = rows[idx] with { AssignedToUserId = uid, AssignedToUserName = name }; }
+        ToastService.ShowSuccess(uid is null ? "Customer unassigned." : $"Assigned to {name}.");
+    }
+
+    // ---- advanced Print dialog ----
+    private bool showPrintDialog;
+    private string printStatusFilter = "";
+    private string printPriorityFilter = "";
+    private string printAssignedFilter = "";
+    private List<PrintColumn> printColumns = [];
+
+    private sealed class PrintColumn
+    {
+        public string Label = "";
+        public Func<CustomerService.CustomerRow, string> Value = _ => "";
+        public bool Selected = true;
+    }
+
+    private void EnsurePrintColumns()
+    {
+        if (printColumns.Count > 0) { return; }
+        printColumns =
+        [
+            new() { Label = "Customer Number", Value = r => r.Number },
+            new() { Label = "Priority", Value = r => r.Priority ?? "" },
+            new() { Label = "Customer Name", Value = r => r.Name },
+            new() { Label = "Full Name", Value = r => r.FullName ?? "" },
+            new() { Label = "Contact Email", Value = r => r.Email ?? "" },
+            new() { Label = "Status", Value = r => r.Status },
+            new() { Label = "Assigned To", Value = r => r.AssignedToUserName ?? "" },
+            new() { Label = "Business Unit", Value = r => businessUnits.FirstOrDefault(b => b.Id == r.BusinessUnitId)?.Name ?? "" },
+        ];
+    }
+
+    // Customers matching the print-dialog filters (all rows the user can see, respecting the current business
+    // unit), sorted like the grid. Independent of the active tab.
+    private IEnumerable<CustomerService.CustomerRow> PrintFiltered => rows
+        .Where(r => filterBusinessUnitId == 0 || r.BusinessUnitId == filterBusinessUnitId)
+        .Where(r => string.IsNullOrEmpty(printStatusFilter) || r.Status == printStatusFilter)
+        .Where(r => string.IsNullOrEmpty(printPriorityFilter) || r.Priority == printPriorityFilter)
+        .Where(MatchesPrintAssignedFilter)
+        .OrderBy(r => PriorityRank(r.Priority)).ThenByDescending(r => r.Updated);
+
+    private bool MatchesPrintAssignedFilter(CustomerService.CustomerRow r) => printAssignedFilter switch
+    {
+        "" => true,
+        "unassigned" => r.AssignedToUserId is null,
+        var v when int.TryParse(v, out var uid) => r.AssignedToUserId == uid,
+        _ => true
+    };
+
+    private string PrintFilterSummary
+    {
+        get
+        {
+            var parts = new List<string> { string.IsNullOrEmpty(printStatusFilter) ? "All statuses" : printStatusFilter };
+            if (!string.IsNullOrEmpty(printPriorityFilter)) { parts.Add(printPriorityFilter); }
+            if (printAssignedFilter == "unassigned") { parts.Add("Unassigned"); }
+            else if (int.TryParse(printAssignedFilter, out var uid))
+            {
+                var u = assignableUsers.FirstOrDefault(x => x.Id == uid);
+                parts.Add(u is null ? "Assigned" : (string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName));
+            }
+            if (filterBusinessUnitId != 0)
+            {
+                parts.Add(businessUnits.FirstOrDefault(b => b.Id == filterBusinessUnitId)?.Name ?? "Business Unit");
+            }
+            return string.Join(" · ", parts);
+        }
+    }
+
+    private void OpenPrintDialog()
+    {
+        EnsurePrintColumns();
+        printStatusFilter = statusFilter;
+        printPriorityFilter = priorityFilter;
+        printAssignedFilter = assignedFilter;
+        showPrintDialog = true;
+    }
+
+    private void ClosePrintDialog() => showPrintDialog = false;
+    private void SetAllPrintCols(bool on) { foreach (var c in printColumns) { c.Selected = on; } }
+
+    private async Task DoPrintAsync()
+    {
+        var cols = printColumns.Where(c => c.Selected).ToList();
+        var toPrint = PrintFiltered.ToList();
+        if (cols.Count == 0 || toPrint.Count == 0) { return; }
+        var html = BuildPrintHtml(cols, toPrint);
+        showPrintDialog = false;
+        await JS.InvokeVoidAsync("printHtml", html);
+    }
+
+    /// <summary>Builds a standalone print-ready HTML report (chosen columns × every filtered row). Orientation
+    /// and font size adapt to the number of columns. Mirrors the supplier dashboard's print output.</summary>
+    private string BuildPrintHtml(List<PrintColumn> cols, List<CustomerService.CustomerRow> rowsToPrint)
+    {
+        static string Esc(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+        var landscape = cols.Count > 5;
+        var fontSize = cols.Count <= 6 ? "11px" : cols.Count <= 9 ? "9.5px" : "8.5px";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Manage Customer</title><style>");
+        sb.Append($"@page{{size:A4 {(landscape ? "landscape" : "portrait")};margin:12mm;}}");
+        sb.Append($"*{{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}body{{font-family:'Segoe UI',Arial,sans-serif;color:#111827;font-size:{fontSize};margin:0;}}");
+        sb.Append(".hd{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #caa04d;padding-bottom:8px;margin-bottom:12px;}");
+        sb.Append(".hd h1{font-size:20px;color:#0b2545;margin:0;}");
+        sb.Append(".hd .meta{font-size:10px;color:#374151;text-align:right;}");
+        sb.Append("table{width:100%;border-collapse:collapse;}");
+        sb.Append("th,td{border:1px solid #b7c2d6;padding:5px 7px;text-align:left;vertical-align:top;word-break:break-word;}");
+        sb.Append("th{background:#e7ecf3;color:#0b2545;font-weight:700;border-bottom:2px solid #0b2545;}");
+        sb.Append("tr:nth-child(even) td{background:#f4f6fb;}");
+        sb.Append("</style></head><body>");
+        sb.Append("<div class=\"hd\"><h1>Manage Customer</h1><div class=\"meta\">");
+        sb.Append($"{Esc(PrintFilterSummary)} &middot; {rowsToPrint.Count} customer(s)<br>Generated {Esc(DateTime.Now.ToString("dd MMM yyyy HH:mm"))}");
+        sb.Append("</div></div>");
+        sb.Append("<table><thead><tr>");
+        foreach (var c in cols) { sb.Append($"<th>{Esc(c.Label)}</th>"); }
+        sb.Append("</tr></thead><tbody>");
+        foreach (var r in rowsToPrint)
+        {
+            sb.Append("<tr>");
+            foreach (var c in cols) { sb.Append($"<td>{Esc(c.Value(r))}</td>"); }
+            sb.Append("</tr>");
+        }
+        sb.Append("</tbody></table></body></html>");
+        return sb.ToString();
+    }
+
+    // Attached-documents viewer modal.
+    private bool showDocsModal;
+    private int docsCustomerId;
+    private string docsCustomerName = "";
+    private List<CustomerDocument> modalDocuments = [];
+    private bool modalDocsLoading;
+    private ElementReference docsViewerRef;
+    private bool focusDocsPending;
+    private readonly HashSet<int> previewLoaded = [];
+    private void MarkPreviewLoaded(int docId) { previewLoaded.Add(docId); StateHasChanged(); }
+
+    // Download progress (shared by the "Download all (zip)" button and each row's Download button;
+    // zipDownloading vs downloadingDocId says which UI to light up). dlPercent < 0 = "preparing".
+    private bool zipDownloading;
+    private int? downloadingDocId;
+    private int dlPercent;
+    private string dlReceivedText = "";
+    private string dlTotalText = "";
+    private DotNetObjectReference<Customers>? dlDotNetRef;
+
+    private async Task ShowDocumentsAsync(CustomerService.CustomerRow row)
+    {
+        // Open immediately with a loading indicator, then fetch (so the progress shows while retrieving).
+        showDocsModal = true;
+        docsCustomerId = row.Id;
+        docsCustomerName = row.Name;
+        modalDocuments = [];
+        previewLoaded.Clear();
+        modalDocsLoading = true;
+        StateHasChanged();
+
+        var docs = await DocumentService.GetDocumentsAsync(row.Id);
+        modalDocsLoading = false;
+        if (docs.Count == 0)
+        {
+            showDocsModal = false;
+            ToastService.ShowInfo($"No documents have been uploaded for {row.Name}.");
+            return;
+        }
+        modalDocuments = docs;
+        focusDocsPending = true;
+    }
+
+    private void CloseDocsModal() => showDocsModal = false;
+
+    private static bool IsImage(CustomerDocument doc) =>
+        doc.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Opens the "combine images into one PDF" view — only when the customer has image attachments.</summary>
+    private async Task OpenImagesPdfAsync()
+    {
+        if (!modalDocuments.Any(IsImage))
+        {
+            ToastService.ShowInfo("This customer has no image attachments (e.g. scans/photos) to combine into a PDF.");
+            return;
+        }
+        await JS.InvokeVoidAsync("open", $"/customers/{docsCustomerId}/documents.pdf", "_blank");
+    }
+
+    /// <summary>Streams the "download all" zip via JS so the user sees a live progress bar (0→100%). The
+    /// server names the archive "{CustomerNumber}_{CustomerName}.zip" (its Content-Disposition wins).</summary>
+    private async Task DownloadAllZipAsync()
+    {
+        if (zipDownloading || downloadingDocId is not null) { return; }
+        zipDownloading = true;
+        BeginDownloadState(preparing: true);   // "Preparing…" until the first bytes (server builds the archive)
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/{docsCustomerId}/documents.zip", $"customer-{docsCustomerId}.zip", dlDotNetRef);
+        }
+        catch
+        {
+            zipDownloading = false;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    /// <summary>Streams a single document via JS so its Download button shows the same live progress.</summary>
+    private async Task DownloadDocAsync(CustomerDocument doc)
+    {
+        if (zipDownloading || downloadingDocId is not null) { return; }
+        downloadingDocId = doc.Id;
+        BeginDownloadState(preparing: false);
+        try
+        {
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/documents/{doc.Id}?download=1",
+                string.IsNullOrWhiteSpace(doc.FileName) ? $"document-{doc.Id}" : doc.FileName, dlDotNetRef);
+        }
+        catch
+        {
+            downloadingDocId = null;
+            ToastService.ShowError("Could not start the download. Please try again.");
+        }
+    }
+
+    private void BeginDownloadState(bool preparing)
+    {
+        dlPercent = preparing ? -1 : 0;
+        dlReceivedText = "";
+        dlTotalText = "";
+        dlDotNetRef ??= DotNetObjectReference.Create(this);
+    }
+
+    [JSInvokable]
+    public Task OnDownloadProgress(int percent, long received, long total)
+    {
+        dlPercent = percent;
+        dlReceivedText = FormatBytes(received);
+        dlTotalText = total > 0 ? FormatBytes(total) : "";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadComplete(string fileName)
+    {
+        zipDownloading = false;
+        downloadingDocId = null;
+        dlPercent = 100;
+        ToastService.ShowSuccess($"Downloaded {fileName}");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadError(string message)
+    {
+        zipDownloading = false;
+        downloadingDocId = null;
+        ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) { return "0 KB"; }
+        double kb = bytes / 1024d;
+        return kb < 1024 ? $"{kb:0} KB" : $"{kb / 1024:0.0} MB";
+    }
+
+    private void OnDocsKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { CloseDocsModal(); }
+    }
+
+    public void Dispose() => dlDotNetRef?.Dispose();
+
+    private int? notifyingId;
+    private bool bulkSending;
+
+    /// <summary>Reloads the dashboard rows after a status-changing action (e.g. a link send moves the
+    /// customer to "Awaiting Customer Response").</summary>
+    private async Task ReloadRowsAsync()
+    {
+        var scope = seesAllBusinessUnits ? new List<int>() : userBuIds;
+        rows = await CustomerService.GetDashboardAsync(scope);
+    }
+
+    /// <summary>Sends one customer a secure self-service update link (mirrors the supplier flow): the
+    /// customer verifies via OTP and updates their own information, moving the record to review.</summary>
+    private async Task SendLinkAsync(CustomerService.CustomerRow row)
+    {
+        notifyingId = row.Id;
+        var (ok, err) = await CustomerEmailService.NotifyCustomerAsync(row.Id, row.Name, row.Email, currentUser, Nav.BaseUri);
+        notifyingId = null;
+        if (ok)
+        {
+            ToastService.ShowSuccess($"Update link sent to {row.Name}.");
+            await ReloadRowsAsync();
+        }
+        else
+        {
+            ToastService.ShowError(err ?? "Could not send the update link.");
+        }
+    }
+
+    /// <summary>Emails a self-service update link to every customer currently in view (after the business
+    /// unit / status / search filters), skipping those without an email.</summary>
+    private async Task NotifyAllAsync()
+    {
+        var targets = statusFiltered.ToList();
+        if (targets.Count == 0)
+        {
+            ToastService.ShowInfo("There are no customers in the current view to notify.");
+            return;
+        }
+
+        bulkSending = true;
+        int sent = 0, failed = 0;
+        foreach (var row in targets)
+        {
+            var (ok, _) = await CustomerEmailService.NotifyCustomerAsync(row.Id, row.Name, row.Email, currentUser, Nav.BaseUri);
+            if (ok) sent++; else failed++;
+        }
+        bulkSending = false;
+        await ReloadRowsAsync();
+        ToastService.ShowSuccess($"Update link sent to {sent} customer(s)." + (failed > 0 ? $" {failed} skipped (no email or send error)." : ""));
+    }
+
+    private void OpenTemplateDialog()
+    {
+        templatePopulate = false;
+        // Default the populate scope to the business unit currently filtered in the list.
+        templateBuId = filterBusinessUnitId;
+        generatingTemplate = false;
+        showTemplateDialog = true;
+    }
+
+    private void CloseTemplateDialog()
+    {
+        if (generatingTemplate) return;
+        showTemplateDialog = false;
+    }
+
+    /// <summary>Builds the template workbook in-component (showing progress) and hands the finished file to
+    /// the browser via JS, so the user sees a spinner while a populated template is being generated. The
+    /// business-unit scope mirrors the export endpoint's server-side check.</summary>
+    private async Task DownloadTemplateAsync()
+    {
+        if (generatingTemplate) return;
+        generatingTemplate = true;
+        try
+        {
+            var config = await FieldConfigService.GetAllAsync();
+
+            List<Customer> customers = [];
+            if (templatePopulate)
+            {
+                templateProgress = "Loading customer data…";
+                StateHasChanged();
+
+                var scope = seesAllBusinessUnits ? new List<int>() : userBuIds;
+                int? bu = templateBuId > 0 ? templateBuId : null;
+                customers = await CustomerService.GetForExportAsync(null, null, bu, scope);
+            }
+
+            templateProgress = templatePopulate
+                ? $"Generating template for {customers.Count} customer(s)…"
+                : "Generating template…";
+            StateHasChanged();
+
+            // Offload the CPU-bound workbook build so the spinner keeps rendering while it runs.
+            var bytes = await Task.Run(() => CustomerExport.ExportUploadTemplate(customers, config));
+            var fileName = templatePopulate ? "Customer Template (Populated).xlsx" : "Customer Template (Blank).xlsx";
+
+            templateProgress = "Preparing download…";
+            StateHasChanged();
+
+            await JS.InvokeVoidAsync("ssDoc.download", fileName,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                Convert.ToBase64String(bytes));
+
+            showTemplateDialog = false;
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Template generation failed: {ex.Message}");
+        }
+        finally
+        {
+            generatingTemplate = false;
+        }
+    }
+
+    /// <summary>Builds an export URL carrying the current list filters (business unit, status, search) so
+    /// the download matches what the grid shows. BU/status scope is re-checked server-side.</summary>
+    private string ExportUrl(string format)
+    {
+        var q = new List<string>();
+        if (filterBusinessUnitId > 0) q.Add($"businessUnitId={filterBusinessUnitId}");
+        if (!string.IsNullOrWhiteSpace(statusFilter)) q.Add($"status={Uri.EscapeDataString(statusFilter)}");
+        if (!string.IsNullOrWhiteSpace(searchName)) q.Add($"search={Uri.EscapeDataString(searchName)}");
+        return q.Count > 0 ? $"/customers/export/{format}?{string.Join("&", q)}" : $"/customers/export/{format}";
+    }
+
+    private void ComingSoon(string what) => ToastService.ShowInfo($"{what} is coming in the next update.");
+
+    private static string StatusClass(string status) => status switch
+    {
+        CustomerStatuses.Complete => "bg-success-subtle text-success-emphasis",
+        CustomerStatuses.ForReview => "bg-warning-subtle text-warning-emphasis",
+        CustomerStatuses.AwaitingCustomerResponse => "bg-info-subtle text-info-emphasis",
+        CustomerStatuses.Returned => "bg-danger-subtle text-danger-emphasis",
+        _ => "bg-secondary-subtle text-secondary-emphasis"
+    };
+}

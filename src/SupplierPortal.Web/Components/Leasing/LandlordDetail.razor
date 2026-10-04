@@ -1,0 +1,876 @@
+@page "/admin/landlords/{Id:int}"
+@attribute [Authorize(Policy = "Portal.Landlord")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordService LandlordService
+@inject SupplierPortal.Web.Services.Leasing.LandlordFieldConfigService FieldConfig
+@inject LandlordDocumentService DocumentService
+@inject BusinessUnitService BusinessUnitService
+@inject UserService UserService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Landlord Registration Review - Supplier Portal</PageTitle>
+
+@if (landlord is null)
+{
+    <LoadingIndicator Message="Loading registration…" />
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <a href="/admin/landlords" class="text-decoration-none small">&larr; Landlord Registrations</a>
+            <h1 class="mb-1">@(landlord.CompanyName ?? landlord.PropertyCode)</h1>
+            <span class="badge @Landlords.StatusClass(landlord.Status)">@Landlords.Label(landlord.Status)</span>
+            @if (landlord.Reference is not null)
+            {
+                <span class="text-muted ms-2">Ref @landlord.Reference</span>
+            }
+            <span class="text-muted ms-2">@(buName ?? "—")</span>
+        </div>
+        <div class="text-end">
+            @if (landlord.Status is LandlordStatus.Draft or LandlordStatus.InvitationSent or LandlordStatus.OtpVerified or LandlordStatus.InProgress or LandlordStatus.CorrectionRequired)
+            {
+                <button class="btn btn-primary" @onclick="InviteAsync">
+                    @(landlord.Status == LandlordStatus.Draft ? "Send Invitation" : "Re-send Link")
+                </button>
+            }
+            @if (landlord.Status == LandlordStatus.Rejected)
+            {
+                <button class="btn btn-warning" @onclick="RestartAsync">Restart Registration</button>
+            }
+        </div>
+    </div>
+
+    @if (inviteUrl is not null)
+    {
+        <div class="alert alert-success">
+            <div class="fw-semibold mb-1">Secure link generated</div>
+            <div class="input-group">
+                <input class="form-control" readonly value="@inviteUrl" />
+                <button class="btn btn-outline-secondary" @onclick="CopyInviteAsync">Copy</button>
+            </div>
+            <div class="small text-muted mt-1">Valid for 30 days. Sent to @landlord.Email.</div>
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+            @* ---------- Property Information (prefilled, read-only) ---------- *@
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Property Information <span class="text-muted small">(from Property View)</span></span>
+                    @if (canEditProperty && !editingProperty)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" title="Edit property information" @onclick="BeginEditProperty">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>
+                        </button>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (editingProperty)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label">Agreement Type</label>
+                            <select class="form-select" @bind="edit.Type">
+                                <option value="@LandlordType.Company">Company</option>
+                                <option value="@LandlordType.Individual">Individual</option>
+                            </select>
+                        </div>
+                        <div class="mb-2"><label class="form-label">Company Name</label><input class="form-control" @bind="edit.CompanyName" /></div>
+                        <div class="mb-2"><label class="form-label">Building</label><input class="form-control" @bind="edit.Building" /></div>
+                        <div class="mb-2"><label class="form-label">Invitation Email</label><input class="form-control" @bind="edit.Email" /></div>
+                        <button class="btn btn-primary btn-sm" @onclick="SaveEditPropertyAsync">Save</button>
+                        <button class="btn btn-link btn-sm" @onclick="() => editingProperty = false">Cancel</button>
+                    }
+                    else
+                    {
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Property Code 🔒</dt><dd class="col-sm-8">@landlord.PropertyCode</dd>
+                            <dt class="col-sm-4">Company Name 🔒</dt><dd class="col-sm-8">@(landlord.CompanyName ?? "—")</dd>
+                            <dt class="col-sm-4">Building 🔒</dt><dd class="col-sm-8">@(landlord.Building ?? "—")</dd>
+                            <dt class="col-sm-4">Email 🔒</dt><dd class="col-sm-8">@landlord.Email</dd>
+                            <dt class="col-sm-4">Agreement Type 🔒</dt><dd class="col-sm-8">@landlord.Type</dd>
+                        </dl>
+                    }
+                </div>
+            </div>
+
+            @* ---------- Correction / rejection comments ---------- *@
+            @if (landlord.Comments.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-header">Review Comments</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var c in landlord.Comments.OrderByDescending(c => c.CreatedAt))
+                        {
+                            <li class="list-group-item">
+                                <span class="badge @(c.CommentType == LandlordCommentType.Rejection ? "bg-danger" : "bg-warning text-dark") me-2">@c.CommentType</span>
+                                @c.Comment
+                                <div class="small text-muted">@c.CreatedBy · @c.CreatedAt.ToLocalTime().ToString("g") @(c.IsResolved ? "· resolved" : "")</div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @* ---------- Landlord updates (highlighted changes since last review) ---------- *@
+            @if (fieldChanges.Count > 0)
+            {
+                <div class="card mb-4 border-warning">
+                    <div class="card-header bg-warning-subtle d-flex align-items-center">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="me-2"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566ZM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5Zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+                        <span class="fw-semibold">Landlord Updates</span>
+                        <span class="text-muted small ms-2">what the landlord filled in / changed</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0 align-middle">
+                            <thead><tr><th>Field</th><th>Previous</th><th>New</th><th class="text-nowrap">When</th></tr></thead>
+                            <tbody>
+                                @foreach (var f in fieldChanges.OrderBy(f => f.DisplayLabel))
+                                {
+                                    <tr class="di-changed">
+                                        <td>@f.DisplayLabel</td>
+                                        <td class="text-muted">@(string.IsNullOrEmpty(f.OldValue) ? "—" : f.OldValue)</td>
+                                        <td class="fw-semibold">@(string.IsNullOrEmpty(f.NewValue) ? "—" : f.NewValue)</td>
+                                        <td class="small text-muted text-nowrap">@f.ChangedAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            @* ---------- Contacts + Signatories (editable by Business Centre) ---------- *@
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Contacts &amp; Signatories</span>
+                    @if (canEditDetails && !editingDetails)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" title="Edit contacts &amp; signatories" @onclick="BeginEditDetails">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>
+                        </button>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (!editingDetails)
+                    {
+                        @if (landlord.Contacts.Count == 0)
+                        {
+                            <p class="text-muted">No contacts captured yet.</p>
+                        }
+                        @foreach (var c in landlord.Contacts.OrderByDescending(c => c.IsPrimary))
+                        {
+                            var changed = c.IsPrimary && ChangedKeys.Any(k => k.StartsWith("Contact.Primary."));
+                            <div class="border rounded p-2 mb-2 @(changed ? "di-changed" : "")">
+                                <div class="fw-semibold">@c.FullName <span class="badge bg-secondary ms-1">@(c.IsPrimary ? "Primary" : "Secondary")</span> <span class="badge bg-light text-dark">@c.ContactType</span>
+                                    @if (changed) { <span class="badge bg-warning text-dark ms-1">Updated by landlord</span> }
+                                </div>
+                                <div class="small text-muted">@(c.Designation ?? "—") · @c.Email · @(c.Mobile ?? "—") @(string.IsNullOrWhiteSpace(c.EmiratesId) ? "" : $"· EID {c.EmiratesId}") @(string.IsNullOrWhiteSpace(c.EmiratesIdName) ? "" : $"· EID name: {c.EmiratesIdName}") @(c.EmiratesIdExpiry is DateTime ex ? $"· exp {ex:dd MMM yyyy}" : "")</div>
+                            </div>
+                        }
+                        @if (landlord.Signatories.Count > 0)
+                        {
+                            <div class="text-muted small mt-3 mb-1"><strong>Authorised signatories</strong> (@(landlord.SigningRule == SigningRule.All ? "All Authorized Signatories" : "Any One Authorized Signatory")) — authorisation document (MOA / POA):</div>
+                            @foreach (var s in landlord.Signatories.OrderBy(s => s.Order))
+                            {
+                                var sid = s.Id;
+                                var doc = signatoryDocs.GetValueOrDefault(sid);
+                                var up = SigUpload(sid);
+                                <div class="border rounded p-2 mb-2">
+                                    <div class="fw-semibold">@s.Name @(s.IsPrimaryContact ? "" : "") <span class="small text-muted">· @s.Email</span></div>
+                                    <div class="small mt-1">
+                                        <span class="text-muted">Authorisation document:</span>
+                                        @if (doc is not null)
+                                        {
+                                            <span class="badge bg-secondary ms-1">@DocLabel(doc.DocumentType)</span>
+                                            <span class="badge @StatusBadge(doc.SignatoryDocStatus) ms-1">@(doc.SignatoryDocStatus?.ToString() ?? "—")</span>
+                                            @if (doc.ExpiryDate is { } de)
+                                            {
+                                                var expired = de.Date < DateTime.UtcNow.Date;
+                                                <span class="ms-1 @(expired ? "text-danger fw-semibold" : "text-muted")">exp @de.ToString("dd MMM yyyy")@(expired ? " (expired)" : "")</span>
+                                            }
+                                            <a class="ms-2" href="/landlord-documents/@doc.Id" target="_blank">View</a>
+                                            <a class="ms-2" href="/landlord-documents/@doc.Id?download=1" download>Download</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted ms-1">None uploaded</span>
+                                        }
+                                    </div>
+                                    <div class="row g-2 mt-1 align-items-end">
+                                        <div class="col-auto">
+                                            <label class="form-label form-label-sm small text-muted mb-0">Type</label>
+                                            <select class="form-select form-select-sm" @bind="up.DocType" style="width:110px">
+                                                <option value="@LandlordDocumentType.Moa">MOA</option>
+                                                <option value="@LandlordDocumentType.PowerOfAttorney">POA</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-auto">
+                                            <label class="form-label form-label-sm small text-muted mb-0">Expiry</label>
+                                            <input type="date" class="form-control form-control-sm" @bind="up.Expiry" style="width:160px" />
+                                        </div>
+                                        <div class="col">
+                                            <label class="form-label form-label-sm small text-muted mb-0">@(doc is null ? "Upload" : "Replace")</label>
+                                            <InputFile class="form-control form-control-sm" OnChange="e => UploadSignatoryDocAsync(sid, e)" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff" />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    }
+                    else
+                    {
+                        @for (var i = 0; i < editContacts.Count; i++)
+                        {
+                            var idx = i;
+                            var c = editContacts[idx];
+                            <div class="border rounded p-2 mb-2">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="fw-semibold">@(c.IsPrimary ? "Primary contact" : $"Secondary contact")</span>
+                                    @if (!c.IsPrimary)
+                                    {
+                                        <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => editContacts.RemoveAt(idx)">Remove</button>
+                                    }
+                                </div>
+                                <div class="row g-2">
+                                    @if (FVisible("FullName")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("FullName","Full name")" maxlength="@FMax("FullName")" @bind="c.FullName" /></div> }
+                                    @if (FVisible("Designation")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Designation","Designation")" maxlength="@FMax("Designation")" @bind="c.Designation" /></div> }
+                                    @if (FVisible("Email")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Email","Email")" maxlength="@FMax("Email")" @bind="c.Email" /></div> }
+                                    @if (FVisible("Mobile")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("Mobile","Mobile")" @bind="c.Mobile" /></div> }
+                                    <div class="col-md-6">
+                                        <select class="form-select form-select-sm" @bind="c.ContactType">
+                                            @foreach (var t in Enum.GetValues<ContactType>()) { <option value="@t">@t</option> }
+                                        </select>
+                                    </div>
+                                    @if (FVisible("EmiratesId")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("EmiratesId","Emirates ID")" @bind="c.EmiratesId" /></div> }
+                                    @if (FVisible("EmiratesIdName")) { <div class="col-md-6"><input class="form-control form-control-sm" placeholder="@FLabel("EmiratesIdName","Name on Emirates ID")" @bind="c.EmiratesIdName" /></div> }
+                                    @if (FVisible("EmiratesIdExpiry")) { <div class="col-md-6"><label class="form-label form-label-sm small mb-0 text-muted">@FLabel("EmiratesIdExpiry","Emirates ID expiry")</label><input type="date" class="form-control form-control-sm" @bind="c.EmiratesIdExpiry" /></div> }
+                                </div>
+                            </div>
+                        }
+                        <button class="btn btn-sm btn-outline-primary mb-3" @onclick="AddEditSecondary">+ Add secondary contact</button>
+
+                        <div class="mb-2">
+                            <label class="form-label mb-1">Signing rule</label>
+                            <select class="form-select form-select-sm" style="max-width:280px" @bind="editSigningRule">
+                                <option value="@SigningRule.All">All Authorized Signatories</option>
+                                <option value="@SigningRule.Any">Any One Authorized Signatory</option>
+                            </select>
+                        </div>
+                        <table class="table table-sm align-middle">
+                            <thead><tr><th>Signatory</th><th>Email</th><th>Mobile</th><th></th></tr></thead>
+                            <tbody>
+                                @for (var i = 0; i < editSignatories.Count; i++)
+                                {
+                                    var idx = i;
+                                    <tr>
+                                        <td><input class="form-control form-control-sm" @bind="editSignatories[idx].Name" /></td>
+                                        <td><input class="form-control form-control-sm" @bind="editSignatories[idx].Email" /></td>
+                                        <td><input class="form-control form-control-sm" @bind="editSignatories[idx].Mobile" /></td>
+                                        <td><button class="btn btn-sm btn-link text-danger p-0" @onclick="() => editSignatories.RemoveAt(idx)">Remove</button></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => editSignatories.Add(new())">+ Add signatory</button>
+
+                        <div class="mt-3">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveDetailsAsync">Save changes</button>
+                            <button class="btn btn-link btn-sm" @onclick="() => editingDetails = false">Cancel</button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ---------- Documents (view / preview / upload / replace) ---------- *@
+            <div class="card mb-4">
+                <div class="card-header">Documents</div>
+                <div class="card-body">
+                    @if (documents.Count == 0)
+                    {
+                        <p class="text-muted">No documents uploaded.</p>
+                    }
+                    else
+                    {
+                        <div class="di-doclist">
+                            @foreach (var d in documents)
+                            {
+                                <div class="di-doc @(d.IsCurrent ? "" : "old")">
+                                    <div class="di-doc-ico">
+                                        @if (d.ContentType.StartsWith("image/"))
+                                        {
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12Zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12Z"/></svg>
+                                        }
+                                        else
+                                        {
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5Zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2Z"/></svg>
+                                        }
+                                    </div>
+                                    <div class="di-doc-meta">
+                                        <div class="di-doc-name">@d.FileName</div>
+                                        <div class="di-doc-sub">
+                                            <span class="di-doc-badge">@DocLabel(d.DocumentType)</span>
+                                            <span>@FormatSize(d.FileSizeBytes)</span>
+                                            <span>·</span>
+                                            <span>@d.UploadedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                            <span class="di-doc-ver">v@(d.Version)@(d.IsCurrent ? "" : " · superseded")</span>
+                                        </div>
+                                    </div>
+                                    <div class="di-doc-acts">
+                                        <a class="di-iconbtn" href="/landlord-documents/@d.Id" target="_blank" title="Preview" aria-label="Preview">
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8ZM1.173 8a13.1 13.1 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.1 13.1 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.1 13.1 0 0 1 1.172 8Z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z"/></svg>
+                                        </a>
+                                        <a class="di-iconbtn" href="/landlord-documents/@d.Id?download=1" download title="Download" aria-label="Download">
+                                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5Z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3Z"/></svg>
+                                        </a>
+                                        @if (canEditDetails && d.IsCurrent)
+                                        {
+                                            <button class="di-iconbtn danger" @onclick="() => BcDeleteDocAsync(d.Id)" title="Delete" aria-label="Delete">
+                                                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/></svg>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (canEditDetails)
+                    {
+                        <div class="di-doc-upload">
+                            <div>
+                                <label class="form-label mb-1 small fw-semibold">Add / replace document</label>
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
+                                    <select class="form-select form-select-sm" style="width:auto" @bind="bcUploadType">
+                                        @foreach (var dt in Enum.GetValues<LandlordDocumentType>()) { <option value="@dt">@DocLabel(dt)</option> }
+                                    </select>
+                                    <label class="btn btn-sm btn-primary mb-0">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5Z"/><path d="M5 4.854a.5.5 0 0 0 .707 0L7.5 3.06V10.5a.5.5 0 0 0 1 0V3.06l1.793 1.794A.5.5 0 1 0 11 4.146L8.354 1.5a.5.5 0 0 0-.708 0L5 4.146a.5.5 0 0 0 0 .708Z"/></svg>
+                                        Choose file
+                                        <InputFile OnChange="BcUploadAsync" style="display:none" accept=".pdf,image/*" />
+                                    </label>
+                                    @if (bcUploading) { <span class="small text-muted">Uploading…</span> }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ---------- Review actions ---------- *@
+            @if (landlord.Status is LandlordStatus.Submitted or LandlordStatus.UnderReview)
+            {
+                <div class="card mb-4 border-info">
+                    <div class="card-header bg-info-subtle">Review Decision</div>
+                    <div class="card-body">
+                        <label class="form-label">Comment / reason</label>
+                        <textarea class="form-control mb-3" rows="2" @bind="decisionText"
+                                  placeholder="Required for correction or rejection"></textarea>
+                        <button class="btn btn-success me-1" @onclick="CompleteAsync">Approve Registration</button>
+                        <button class="btn btn-warning me-1" @onclick="RequestCorrectionAsync">Request Re-upload / Correction</button>
+                        <button class="btn btn-danger" @onclick="RejectAsync">Reject</button>
+                    </div>
+                </div>
+            }
+            else if (landlord.Status == LandlordStatus.Rejected)
+            {
+                <div class="alert alert-danger">
+                    <strong>Rejected</strong> by @landlord.RejectedBy — @landlord.RejectionReason
+                </div>
+            }
+            else if (landlord.Status == LandlordStatus.RegistrationComplete)
+            {
+                <div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><strong>Approved</strong> — completed by @landlord.CompletedBy on @landlord.CompletedAt?.ToLocalTime().ToString("g"). The secure link is now inactive.</span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="ReopenForChangesAsync" disabled="@reopenBusy" title="Resend the link so the landlord can change signatories or information">
+                        @(reopenBusy ? "Reopening…" : "Reopen for changes (resend link)")
+                    </button>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>E-signature <span class="text-muted small">(Circularo)</span></span>
+                        @if (landlord.SignatureStatus is string ss)
+                        {
+                            <span class="badge @(ss == "Signed" ? "bg-success" : ss is "Failed" or "Declined" ? "bg-danger" : "bg-info text-dark")">@ss</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (landlord.SignatureStatus == "Signed")
+                        {
+                            <p class="mb-2">Signed by <strong>@landlord.SignatureSentTo</strong>@(landlord.SignatureSignedAt is { } sg ? $" on {sg.ToLocalTime():g}" : "").</p>
+                            var signedDoc = documents.FirstOrDefault(d => d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent);
+                            @if (signedDoc is not null)
+                            {
+                                <a class="btn btn-sm btn-outline-primary" href="/landlord-documents/@signedDoc.Id" target="_blank">View signed document</a>
+                                <a class="btn btn-sm btn-outline-primary ms-1" href="/landlord-documents/@signedDoc.Id?download=1" download>Download signed document</a>
+                            }
+                            else
+                            {
+                                <p class="text-muted small mb-2">The signed copy has not been retrieved from Circularo yet.</p>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="FetchSignedCopyAsync" disabled="@signatureBusy">
+                                    @(signatureBusy ? "Fetching…" : "Fetch signed copy")
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                            @if (landlord.SignatureStatus is null)
+                            {
+                                <p class="text-muted mb-2">The registration summary has not been sent for signature yet. Send it to all authorised signatories to sign via Circularo (@(landlord.Signatories.Count) signatory/ies).</p>
+                            }
+                            else
+                            {
+                                <p class="mb-2">Status: <strong>@landlord.SignatureStatus</strong>@(string.IsNullOrWhiteSpace(landlord.SignatureSentTo) ? "" : $" · sent to {landlord.SignatureSentTo}")@(landlord.SignatureSentAt is { } sa ? $" on {sa.ToLocalTime():g}" : "").</p>
+                            }
+                            <button class="btn btn-primary btn-sm" @onclick="SendForSignatureAsync" disabled="@signatureBusy">
+                                @(signatureBusy ? "Sending…" : landlord.SignatureStatus is null ? "Send for signature" : "Resend for signature")
+                            </button>
+                            @if (landlord.SignatureStatus is not null)
+                            {
+                                <button class="btn btn-outline-primary btn-sm ms-1" @onclick="SyncStatusAsync" disabled="@signatureBusy" title="Check Circularo for the latest signing status">
+                                    @(signatureBusy ? "Checking…" : "Check signature status")
+                                </button>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(landlord.CircularoSigningUrl))
+                            {
+                                <a class="btn btn-outline-secondary btn-sm ms-1" href="@landlord.CircularoSigningUrl" target="_blank" rel="noopener">Open in Circularo</a>
+                            }
+                            <div class="form-text mt-1">If the landlord has signed but the status hasn't updated, click “Check signature status”.</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* ---------- Audit trail ---------- *@
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">Audit Trail</div>
+                <div class="card-body">
+                    @if (trace.Count == 0)
+                    {
+                        <p class="text-muted mb-0">No activity yet.</p>
+                    }
+                    else
+                    {
+                        <ul class="di-timeline">
+                            @foreach (var e in trace)
+                            {
+                                <li>
+                                    <div class="di-timeline-dot"></div>
+                                    <div class="di-timeline-body">
+                                        <div class="fw-semibold">@TraceLabel(e.EventType)</div>
+                                        @if (!string.IsNullOrWhiteSpace(e.Detail))
+                                        {
+                                            <div class="small">@e.Detail</div>
+                                        }
+                                        @if (e.OldStatus is not null && e.NewStatus is not null && e.OldStatus != e.NewStatus)
+                                        {
+                                            <div class="small text-muted">@e.OldStatus → @e.NewStatus</div>
+                                        }
+                                        <div class="small text-muted">@e.At.ToLocalTime().ToString("g") · @(e.By ?? "—")@(e.ByType is null ? "" : $" ({e.ByType})")</div>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-doclist { display: flex; flex-direction: column; gap: 8px; }
+    .di-doc { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--bs-border-color); border-radius: .55rem; background: var(--bs-body-bg); transition: box-shadow .12s, border-color .12s; }
+    .di-doc:hover { border-color: #c8a24a; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .di-doc.old { opacity: .6; }
+    .di-doc-ico { flex: none; width: 38px; height: 38px; border-radius: .45rem; background: #eef2f7; color: #1a5276; display: flex; align-items: center; justify-content: center; }
+    .di-doc-ico svg { width: 20px; height: 20px; }
+    .di-doc-meta { flex: 1; min-width: 0; }
+    .di-doc-name { font-weight: 600; color: #1a2233; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .di-doc-sub { font-size: .78rem; color: var(--bs-secondary-color); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+    .di-doc-badge { background: #1a2233; color: #fff; border-radius: 999px; padding: 1px 9px; font-size: .7rem; font-weight: 600; }
+    .di-doc-ver { margin-left: auto; }
+    .di-doc-acts { flex: none; display: flex; gap: 6px; }
+    .di-iconbtn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--bs-border-color); background: var(--bs-body-bg); border-radius: .45rem; color: #1a5276; cursor: pointer; text-decoration: none; transition: background .12s, border-color .12s, color .12s; }
+    .di-iconbtn svg { width: 16px; height: 16px; }
+    .di-iconbtn:hover { background: #eef2f7; border-color: #c8a24a; }
+    .di-iconbtn.danger { color: #c0392b; }
+    .di-iconbtn.danger:hover { background: #fdecea; border-color: #c0392b; }
+    .di-doc-upload { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--bs-border-color); }
+    .di-timeline { list-style: none; padding-left: 0; margin: 0; }
+    .di-timeline li { position: relative; padding-left: 1.5rem; padding-bottom: 1rem; border-left: 2px solid var(--bs-border-color); margin-left: .35rem; }
+    .di-timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .di-timeline-dot { position: absolute; left: -0.45rem; top: .2rem; width: .8rem; height: .8rem; border-radius: 50%; background: var(--bs-primary); }
+    .di-changed { background: #fff8e1; box-shadow: inset 3px 0 0 #f0ad4e; }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Landlord? landlord;
+    private string? buName;
+    private List<LandlordEvent> trace = [];
+    private List<LandlordDocument> documents = [];
+    private Dictionary<int, LandlordDocument> signatoryDocs = new();
+    private readonly Dictionary<int, SigUploadState> sigUploads = new();
+    private List<LandlordFieldChange> fieldChanges = [];
+
+    private sealed class SigUploadState { public LandlordDocumentType DocType { get; set; } = LandlordDocumentType.Moa; public DateTime? Expiry { get; set; } }
+    private SigUploadState SigUpload(int signatoryId)
+    {
+        if (!sigUploads.TryGetValue(signatoryId, out var s)) { s = new SigUploadState(); sigUploads[signatoryId] = s; }
+        return s;
+    }
+
+    private static string StatusBadge(SignatoryDocStatus? s) => s switch
+    {
+        SignatoryDocStatus.Approved => "bg-success",
+        SignatoryDocStatus.ResubmissionRequired => "bg-danger",
+        SignatoryDocStatus.Deactivated => "bg-secondary",
+        SignatoryDocStatus.UnderReview => "bg-info text-dark",
+        _ => "bg-warning text-dark"
+    };
+
+    private async Task UploadSignatoryDocAsync(int signatoryId, InputFileChangeEventArgs e)
+    {
+        var up = SigUpload(signatoryId);
+        var (ok, err) = await Loading.RunAsync(() =>
+            DocumentService.UploadSignatoryDocAsync(Id, signatoryId, up.DocType, up.Expiry, e.File, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Upload failed."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess($"{DocLabel(up.DocType)} uploaded for the signatory.");
+    }
+    private HashSet<string> ChangedKeys => fieldChanges.Select(f => f.FieldKey).ToHashSet();
+    private string currentUser = "unknown";
+
+    private bool editingProperty;
+    private readonly EditBuffer edit = new();
+    private string decisionText = "";
+    private string? inviteUrl;
+
+    private bool HasSubmission => landlord!.Status is LandlordStatus.Submitted or LandlordStatus.UnderReview
+        or LandlordStatus.CorrectionRequired or LandlordStatus.RegistrationComplete or LandlordStatus.Rejected;
+    private bool canEditProperty => landlord!.Status is LandlordStatus.Draft or LandlordStatus.InvitationSent
+        or LandlordStatus.OtpVerified or LandlordStatus.InProgress;
+    // Business Centre may modify captured details on any open (not closed) registration.
+    private bool canEditDetails => landlord!.Status is not (LandlordStatus.RegistrationComplete or LandlordStatus.Rejected);
+
+    private bool editingDetails;
+    private readonly List<ContactInput> editContacts = new();
+    private readonly List<SignatoryInput> editSignatories = new();
+    private SigningRule editSigningRule = SigningRule.All;
+    private LandlordDocumentType bcUploadType = LandlordDocumentType.EmiratesId;
+    private bool bcUploading;
+    private bool signatureBusy;
+
+    // ---- Config-driven contact field metadata (Landlord Field Manager, Section = "Contact") ----
+    private List<SupplierPortal.Web.Models.Leasing.LandlordFieldConfig> contactConfig = [];
+    private SupplierPortal.Web.Models.Leasing.LandlordFieldConfig? FCfg(string key) => contactConfig.FirstOrDefault(f => f.FieldKey == key && !f.IsRemoved);
+    private bool FVisible(string key) { var c = FCfg(key); return c is null || c.IsVisible; }
+    private string FLabel(string key, string dflt) { var c = FCfg(key); return string.IsNullOrWhiteSpace(c?.DisplayLabel) ? dflt : c!.DisplayLabel; }
+    private int? FMax(string key) { var c = FCfg(key); return c?.MaxLength is > 0 ? c.MaxLength : null; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        contactConfig = (await FieldConfig.GetAllAsync()).Where(f => f.Section == "Contact").ToList();
+        await LoadAsync();
+
+        // Opening a submitted registration starts the review (FRD "Review Started").
+        if (landlord?.Status == LandlordStatus.Submitted)
+        {
+            await LandlordService.StartReviewAsync(Id, currentUser);
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync() => await Loading.RunAsync(async () =>
+    {
+        landlord = await LandlordService.GetByIdAsync(Id);
+        if (landlord is null) return;
+        buName = (await BusinessUnitService.GetByIdAsync(landlord.BusinessUnitId))?.Name;
+        trace = await LandlordService.GetTraceAsync(Id);
+        documents = await DocumentService.GetAllVersionsAsync(Id);
+        signatoryDocs = await DocumentService.GetSignatoryDocumentsAsync(Id);
+        fieldChanges = await LandlordService.GetFieldChangesAsync(Id);
+
+        // Sent for signature but not yet resolved: poll Circularo for the current status (the completion
+        // webhook may not reach this server), so opening the page reflects a signature the landlord has
+        // already completed. Best-effort and quiet — the explicit "Check signature status" button reports.
+        var status = landlord.SignatureStatus;
+        var pending = !string.IsNullOrWhiteSpace(status)
+            && !string.Equals(status, "Signed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Declined", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase);
+        if (pending && !string.IsNullOrWhiteSpace(landlord.CircularoDocumentId))
+        {
+            var (changed, _) = await LandlordService.SyncSignatureStatusAsync(Id, currentUser);
+            if (changed)
+            {
+                landlord = await LandlordService.GetByIdAsync(Id) ?? landlord;
+                trace = await LandlordService.GetTraceAsync(Id);
+            }
+        }
+
+        // If the document is signed but we don't yet hold the signed copy (webhook without the file, or a
+        // transient download failure at callback time), pull it now so it's on record for future reference.
+        if (string.Equals(landlord.SignatureStatus, "Signed", StringComparison.OrdinalIgnoreCase) &&
+            !documents.Any(d => d.DocumentType == LandlordDocumentType.SignedDocument && d.IsCurrent))
+        {
+            if (await LandlordService.EnsureSignedDocumentAsync(Id, currentUser))
+                documents = await DocumentService.GetAllVersionsAsync(Id);
+        }
+    });
+
+    private async Task FetchSignedCopyAsync()
+    {
+        signatureBusy = true;
+        try
+        {
+            var ok = await Loading.RunAsync(() => LandlordService.EnsureSignedDocumentAsync(Id, currentUser));
+            if (ok) { await LoadAsync(); Toast.ShowSuccess("Signed document retrieved."); }
+            else Toast.ShowError("The signed copy could not be retrieved from Circularo yet. Please try again shortly.");
+        }
+        finally { signatureBusy = false; }
+    }
+
+    private async Task SyncStatusAsync()
+    {
+        signatureBusy = true;
+        try
+        {
+            var (changed, message) = await Loading.RunAsync(() => LandlordService.SyncSignatureStatusAsync(Id, currentUser));
+            await LoadAsync();
+            if (changed) Toast.ShowSuccess(message);
+            else Toast.ShowInfo(message);
+        }
+        finally { signatureBusy = false; }
+    }
+
+    private void BeginEditProperty()
+    {
+        edit.Type = landlord!.Type;
+        edit.CompanyName = landlord.CompanyName;
+        edit.Building = landlord.Building;
+        edit.Email = landlord.Email;
+        editingProperty = true;
+    }
+
+    private async Task SaveEditPropertyAsync()
+    {
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.UpdatePropertyInfoAsync(
+            Id, edit.Type, edit.CompanyName, edit.Building, edit.Email, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Update failed."); return; }
+        editingProperty = false;
+        await LoadAsync();
+        Toast.ShowSuccess("Property information updated.");
+    }
+
+    private void BeginEditDetails()
+    {
+        editContacts.Clear();
+        var ordered = landlord!.Contacts.OrderByDescending(c => c.IsPrimary).ToList();
+        if (!ordered.Any(c => c.IsPrimary))
+            editContacts.Add(new ContactInput { IsPrimary = true, ContactType = ContactType.Owner });
+        foreach (var c in ordered)
+            editContacts.Add(new ContactInput { Id = c.Id, IsPrimary = c.IsPrimary, ContactType = c.ContactType,
+                FullName = c.FullName, Designation = c.Designation, Mobile = c.Mobile, Email = c.Email,
+                EmiratesId = c.EmiratesId, EmiratesIdName = c.EmiratesIdName, EmiratesIdExpiry = c.EmiratesIdExpiry });
+
+        editSignatories.Clear();
+        foreach (var s in landlord.Signatories.OrderBy(s => s.Order))
+            editSignatories.Add(new SignatoryInput { Name = s.Name, Email = s.Email, Mobile = s.Mobile, IsPrimaryContact = s.IsPrimaryContact });
+        editSigningRule = landlord.SigningRule;
+        editingDetails = true;
+    }
+
+    private void AddEditSecondary() => editContacts.Add(new ContactInput { ContactType = ContactType.AuthorisedRepresentative });
+
+    private async Task SaveDetailsAsync()
+    {
+        var update = new LandlordSelfUpdate
+        {
+            SigningRule = editSigningRule,
+            Contacts = editContacts.Where(c => !string.IsNullOrWhiteSpace(c.FullName)).ToList(),
+            Signatories = editSignatories
+        };
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.UpdateDetailsAsync(Id, update, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Update failed."); return; }
+        editingDetails = false;
+        await LoadAsync();
+        Toast.ShowSuccess("Registration details updated.");
+    }
+
+    private async Task BcUploadAsync(InputFileChangeEventArgs e)
+    {
+        bcUploading = true;
+        var (ok, err) = await DocumentService.UploadAsync(Id, bcUploadType, e.File, currentUser);
+        bcUploading = false;
+        if (!ok) { Toast.ShowError(err ?? "Upload failed."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess("Document uploaded.");
+    }
+
+    private async Task SendForSignatureAsync()
+    {
+        signatureBusy = true;
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.SendForSignatureManualAsync(Id, currentUser));
+        signatureBusy = false;
+        if (!ok) { Toast.ShowError(err ?? "Could not send for signature."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess("Sent to the primary contact for signature via Circularo.");
+    }
+
+    private async Task BcDeleteDocAsync(int docId)
+    {
+        await DocumentService.DeleteAsync(docId);
+        await LoadAsync();
+    }
+
+    private async Task InviteAsync()
+    {
+        var (ok, err, raw) = await Loading.RunAsync(() => LandlordService.InviteAsync(Id, currentUser, Nav.BaseUri));
+        if (!ok || raw is null) { Toast.ShowError(err ?? "Invite failed."); return; }
+        inviteUrl = $"{Nav.BaseUri}landlord/{raw}";
+        await LoadAsync();
+        Toast.ShowSuccess("Invitation sent.");
+    }
+
+    private async Task CopyInviteAsync()
+    {
+        if (inviteUrl is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", inviteUrl);
+        Toast.ShowSuccess("Link copied.");
+    }
+
+    private bool reopenBusy;
+    private async Task ReopenForChangesAsync()
+    {
+        reopenBusy = true;
+        try
+        {
+            var (ok, err, raw) = await Loading.RunAsync(() => LandlordService.ReopenForChangesAsync(Id, currentUser, Nav.BaseUri));
+            if (!ok || raw is null) { Toast.ShowError(err ?? "Could not reopen the registration."); return; }
+            inviteUrl = $"{Nav.BaseUri}landlord/{raw}";
+            await LoadAsync();
+            Toast.ShowSuccess("Registration reopened — a fresh link was resent to the landlord.");
+        }
+        finally { reopenBusy = false; }
+    }
+
+    private async Task CompleteAsync()
+    {
+        if (!await Confirm("Complete this landlord registration? The secure link will be deactivated.")) return;
+        var staff = (await StaffEmailsAsync()).ToList();
+        // Make sure the Business-Centre user who initiated the request is notified, even if their account
+        // no longer matches the general staff filter.
+        var initiator = await UserService.GetByUsernameAsync(landlord!.CreatedBy);
+        if (!string.IsNullOrWhiteSpace(initiator?.Email)) staff.Insert(0, initiator.Email!);
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.CompleteAsync(Id, currentUser, staff, null));
+        if (!ok) { Toast.ShowError(err ?? "Could not complete."); return; }
+        await LoadAsync();
+        Toast.ShowSuccess("Registration completed.");
+    }
+
+    private async Task RequestCorrectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(decisionText)) { Toast.ShowError("Enter a comment describing the correction required."); return; }
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.RequestCorrectionAsync(Id, decisionText, currentUser, Nav.BaseUri, null));
+        if (!ok) { Toast.ShowError(err ?? "Could not request correction."); return; }
+        decisionText = "";
+        await LoadAsync();
+        Toast.ShowSuccess("Correction requested; the landlord has been emailed.");
+    }
+
+    private async Task RejectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(decisionText)) { Toast.ShowError("A rejection reason is required."); return; }
+        if (!await Confirm("Reject this registration? This cannot be undone; a restart will be required.")) return;
+        var (ok, err) = await Loading.RunAsync(() => LandlordService.RejectAsync(Id, decisionText, currentUser, null));
+        if (!ok) { Toast.ShowError(err ?? "Could not reject."); return; }
+        decisionText = "";
+        await LoadAsync();
+        Toast.ShowSuccess("Registration rejected.");
+    }
+
+    private async Task RestartAsync()
+    {
+        if (!await Confirm("Restart this registration? A new registration and secure link will be created.")) return;
+        var (ok, err, newId) = await Loading.RunAsync(() => LandlordService.RestartAsync(Id, currentUser));
+        if (!ok) { Toast.ShowError(err ?? "Could not restart."); return; }
+        Nav.NavigateTo($"/admin/landlords/{newId}");
+    }
+
+    private async Task<IEnumerable<string>> StaffEmailsAsync()
+    {
+        var users = await UserService.GetAllAsync();
+        return users.Where(u => u.IsActive && u.PortalAccess.HasFlag(PortalAccess.Landlord))
+            .Select(u => u.Email).Where(e => !string.IsNullOrWhiteSpace(e))!;
+    }
+
+    private async Task<bool> Confirm(string message) => await JS.InvokeAsync<bool>("confirm", message);
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024.0):0.#} MB",
+        >= 1024 => $"{bytes / 1024.0:0} KB",
+        _ => $"{bytes} B"
+    };
+
+    private static string DocLabel(LandlordDocumentType t) => t switch
+    {
+        LandlordDocumentType.EmiratesId => "Emirates ID",
+        LandlordDocumentType.TradeLicense => "Trade Licence",
+        LandlordDocumentType.Moa => "MOA",
+        LandlordDocumentType.MoaOrPoa => "MOA / POA",
+        LandlordDocumentType.PowerOfAttorney => "POA",
+        LandlordDocumentType.AuthorisationLetter => "Authorisation Letter",
+        LandlordDocumentType.TitleDeed => "Title Deed",
+        LandlordDocumentType.RegistrationSummary => "Registration Summary",
+        LandlordDocumentType.SignedDocument => "Signed Document",
+        _ => "Other"
+    };
+
+    private static string TraceLabel(string t) => t switch
+    {
+        LandlordService.EventCreated => "Registration created",
+        LandlordService.EventInvited => "Invitation sent",
+        LandlordService.EventOtpVerified => "OTP verified",
+        LandlordService.EventDraftSaved => "Draft saved",
+        LandlordService.EventSubmitted => "Registration submitted",
+        LandlordService.EventReviewStarted => "Review started",
+        LandlordService.EventCorrectionRequested => "Correction requested",
+        LandlordService.EventResubmitted => "Resubmitted",
+        LandlordService.EventRejected => "Rejected",
+        LandlordService.EventRestarted => "Restarted",
+        LandlordService.EventReopened => "Reopened for changes",
+        LandlordService.EventCompleted => "Registration completed",
+        LandlordService.EventSignatureRequested => "Sent for signature",
+        LandlordService.EventSignatureCompleted => "Signature completed",
+        LandlordService.EventLinkDeactivated => "Link deactivated",
+        _ => t
+    };
+
+    private sealed class EditBuffer
+    {
+        public LandlordType Type { get; set; }
+        public string? CompanyName { get; set; }
+        public string? Building { get; set; }
+        public string Email { get; set; } = "";
+    }
+}

@@ -1,0 +1,78 @@
+@page "/customer"
+@attribute [Authorize(Policy = "Portal.Customer")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Services
+
+<PageTitle>Customer Portal</PageTitle>
+
+<h1>Customer Portal</h1>
+<p class="text-muted">Onboard and maintain customer accounts and their primary contact. Managed by the Business Relation department.</p>
+
+<div class="di-cst-grid">
+    <a class="di-cst-tile" href="/admin/customers">
+        <div class="di-cst-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v4H3zM3 10h18v11H3z"/><path d="M7 14h6"/></svg>
+        </div>
+        <div class="di-cst-body">
+            <div class="di-cst-title">Customer Registrations</div>
+            <div class="di-cst-sub">Create, review and complete customer records &amp; their primary contact.</div>
+        </div>
+        <span class="di-cst-cta">Open →</span>
+    </a>
+
+    @if (isAdministrator)
+    {
+        <a class="di-cst-tile" href="/admin/customer-fields">
+            <div class="di-cst-ico">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+            </div>
+            <div class="di-cst-body">
+                <div class="di-cst-title">Field Settings</div>
+                <div class="di-cst-sub">Per-field control (Business vs Customer), visibility and required rules.</div>
+            </div>
+            <span class="di-cst-cta">Open →</span>
+        </a>
+    }
+</div>
+
+<style>
+    .di-cst-grid { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+    .di-cst-tile {
+        flex: 1 1 320px; display: flex; align-items: center; gap: 1rem;
+        padding: 1.15rem 1.3rem; border-radius: 12px; text-decoration: none;
+        background: var(--di-surface); border: 1px solid var(--di-border);
+        color: var(--di-text); box-shadow: 0 1px 3px rgba(26,34,51,.06);
+        transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    a.di-cst-tile:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(26,34,51,.16); border-color: #14897f; color: var(--di-text); }
+    .di-cst-tile.is-soon { opacity: .75; }
+    .di-cst-ico { flex: none; width: 48px; height: 48px; border-radius: 11px;
+        background: rgba(15,118,110,.12); color: #0f766e; display: grid; place-items: center; }
+    [data-theme="dark"] .di-cst-ico { background: rgba(43,179,163,.16); color: #2bb3a3; }
+    .di-cst-ico svg { width: 26px; height: 26px; }
+    .di-cst-body { flex: 1; }
+    .di-cst-title { font-weight: 700; font-size: 1.05rem; color: var(--di-heading); }
+    .di-cst-sub { font-size: .85rem; color: var(--di-text-soft); margin-top: 2px; }
+    .di-cst-cta { font-weight: 600; color: #0f766e; white-space: nowrap; }
+    [data-theme="dark"] .di-cst-cta { color: #2bb3a3; }
+    .di-cst-badge { font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+        background: var(--di-surface-2); border: 1px solid var(--di-border); color: var(--di-text-soft);
+        border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+</style>
+
+@code {
+    private bool isAdministrator;
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            isAdministrator = state.User.IsAdministrator();
+        }
+    }
+}

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SupplierPortal.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The API runs on the INTERNAL network and owns the database. It reuses the proven domain
+         services + EF model from the web project rather than duplicating them. -->
+    <ProjectReference Include="..\SupplierPortal.Web\SupplierPortal.Web.csproj" />
+    <ProjectReference Include="..\SupplierPortal.Contracts\SupplierPortal.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

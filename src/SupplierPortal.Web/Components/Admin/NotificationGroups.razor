@@ -1,0 +1,262 @@
+@page "/admin/notification-groups"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject NotificationGroupService GroupService
+@inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Notification Groups - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-1">
+    <div>
+        <h1 class="mb-0">Notification Groups</h1>
+        <p class="text-muted mb-0">Named recipient lists. Disable a group to keep it but exclude it from notifications.</p>
+    </div>
+    @if (!editing)
+    {
+        <button class="btn btn-primary" @onclick="StartNew">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" /></svg>
+            New Group
+        </button>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+@if (message is not null)
+{
+    <div class="alert alert-success py-2 mt-3">@message</div>
+}
+
+@if (editing)
+{
+    <div class="card mb-4 mt-3 di-ng-card">
+        <div class="card-body">
+            <h5 class="card-title mb-3">@(editId is null ? "New Group" : "Edit Group")</h5>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Group Name</label>
+                    <input class="form-control" @bind="editName" placeholder="e.g. ALL_USERS" />
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div>
+                        <label class="form-label fw-semibold d-block mb-1">Notifications</label>
+                        <label class="di-switch" title="@(editActive ? "Enabled" : "Disabled")">
+                            <input type="checkbox" checked="@editActive" @onchange="e => editActive = (bool)e.Value!" />
+                            <span class="di-switch-slider"></span>
+                        </label>
+                        <span class="ms-2 small fw-semibold @(editActive ? "text-success" : "text-danger")">@(editActive ? "Enabled" : "Disabled")</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-2 d-flex align-items-center justify-content-between">
+                <label class="form-label fw-semibold mb-0">User(s) in the group (@selectedUserIds.Count selected)</label>
+                <input class="form-control form-control-sm" style="max-width: 260px;" placeholder="Filter users…" @bind="userFilter" @bind:event="oninput" />
+            </div>
+            <div class="border rounded" style="max-height: 320px; overflow-y: auto;">
+                @foreach (var u in FilteredUsers)
+                {
+                    <label class="d-flex align-items-center gap-2 px-3 py-2 border-bottom di-ng-userrow">
+                        <input type="checkbox" checked="@selectedUserIds.Contains(u.Id)" @onchange="() => ToggleUser(u.Id)" />
+                        <span class="fw-semibold">@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                        <span class="text-muted small">@u.Email</span>
+                    </label>
+                }
+                @if (!FilteredUsers.Any())
+                {
+                    <div class="px-3 py-2 text-muted small">No users match your filter.</div>
+                }
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save")</button>
+                <button class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@saving">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="di-ng-table-wrap mt-3">
+    <table class="table align-middle di-ng-table mb-0">
+        <thead>
+            <tr>
+                <th>Group Name</th>
+                <th>User(s) in the group</th>
+                <th class="text-center" style="width: 110px;">Members</th>
+                <th class="text-center" style="width: 130px;">Notifications</th>
+                <th class="text-end" style="width: 160px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var g in groups)
+            {
+                <tr class="@(g.IsActive ? null : "di-ng-inactive")">
+                    <td class="fw-semibold">@g.Name</td>
+                    <td>
+                        @if (g.Users.Count == 0)
+                        {
+                            <span class="text-muted small">No users</span>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var u in g.Users.OrderBy(u => u.Email))
+                                {
+                                    <span class="badge rounded-pill di-ng-chip">@u.Email</span>
+                                }
+                            </div>
+                        }
+                    </td>
+                    <td class="text-center">
+                        <span class="badge rounded-pill text-bg-light border">@g.Users.Count</span>
+                    </td>
+                    <td class="text-center">
+                        <label class="di-switch" title="@(g.IsActive ? "Enabled — click to disable" : "Disabled — click to enable")">
+                            <input type="checkbox" checked="@g.IsActive" @onchange="e => ToggleActiveAsync(g, (bool)e.Value!)" />
+                            <span class="di-switch-slider"></span>
+                        </label>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(g)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => DeleteAsync(g)">Delete</button>
+                    </td>
+                </tr>
+            }
+            @if (groups.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4"><em>No notification groups yet. Use "New Group" to add one.</em></td></tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .di-ng-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .di-ng-table thead th { background: #0b2545; color: #fff; font-weight: 600; font-size: 13px; border: none; padding: 12px 14px; }
+    .di-ng-table tbody td { padding: 12px 14px; vertical-align: middle; }
+    .di-ng-table tbody tr { border-bottom: 1px solid #eef1f5; }
+    .di-ng-table tbody tr:last-child { border-bottom: none; }
+    .di-ng-inactive td { opacity: .55; }
+    .di-ng-chip { background: #eef2fb; color: #33477a; font-weight: 500; padding: .35em .7em; }
+    .di-ng-card { border: 1px solid #e2e5ea; border-radius: 12px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .di-ng-userrow { cursor: pointer; }
+    .di-ng-userrow:hover { background: #f4f6fb; }
+
+    .di-switch { position: relative; display: inline-block; width: 40px; height: 22px; vertical-align: middle; margin: 0; }
+    .di-switch input { opacity: 0; width: 0; height: 0; }
+    .di-switch-slider { position: absolute; cursor: pointer; inset: 0; background-color: #dc3545; border-radius: 22px; transition: background-color .15s ease; }
+    .di-switch-slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: transform .15s ease; }
+    .di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+    .di-switch input:checked + .di-switch-slider::before { transform: translateX(18px); }
+</style>
+
+@code {
+    private List<NotificationGroup> groups = [];
+    private List<User> allUsers = [];
+    private string currentUser = "unknown";
+
+    private bool editing;
+    private int? editId;
+    private string editName = "";
+    private bool editActive = true;
+    private HashSet<int> selectedUserIds = [];
+    private string userFilter = "";
+    private bool saving;
+    private string? error;
+    private string? message;
+
+    private IEnumerable<User> FilteredUsers =>
+        string.IsNullOrWhiteSpace(userFilter)
+            ? allUsers
+            : allUsers.Where(u =>
+                (u.FullName ?? "").Contains(userFilter, StringComparison.OrdinalIgnoreCase)
+                || u.Username.Contains(userFilter, StringComparison.OrdinalIgnoreCase)
+                || u.Email.Contains(userFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        allUsers = await UserService.GetAllAsync();
+        groups = await GroupService.GetAllAsync();
+    }
+
+    private void StartNew()
+    {
+        editId = null;
+        editName = "";
+        editActive = true;
+        selectedUserIds = [];
+        userFilter = "";
+        error = message = null;
+        editing = true;
+    }
+
+    private void StartEdit(NotificationGroup g)
+    {
+        editId = g.Id;
+        editName = g.Name;
+        editActive = g.IsActive;
+        selectedUserIds = g.Users.Select(u => u.Id).ToHashSet();
+        userFilter = "";
+        error = message = null;
+        editing = true;
+    }
+
+    private void CancelEdit() { editing = false; error = null; }
+
+    private void ToggleUser(int userId)
+    {
+        if (!selectedUserIds.Remove(userId)) { selectedUserIds.Add(userId); }
+    }
+
+    private async Task SaveAsync()
+    {
+        error = message = null;
+        saving = true;
+        try
+        {
+            if (editId is null)
+            {
+                var (ok, err, _) = await GroupService.CreateAsync(editName, selectedUserIds, editActive, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Group '{editName.Trim()}' created.";
+            }
+            else
+            {
+                var (ok, err) = await GroupService.UpdateAsync(editId.Value, editName, selectedUserIds, editActive, currentUser);
+                if (!ok) { error = err; return; }
+                message = $"Group '{editName.Trim()}' updated.";
+            }
+            groups = await GroupService.GetAllAsync();
+            editing = false;
+        }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleActiveAsync(NotificationGroup g, bool isActive)
+    {
+        error = message = null;
+        await GroupService.SetActiveAsync(g.Id, isActive, currentUser);
+        groups = await GroupService.GetAllAsync();
+        message = $"Group '{g.Name}' {(isActive ? "enabled" : "disabled")}.";
+    }
+
+    private async Task DeleteAsync(NotificationGroup g)
+    {
+        error = message = null;
+        if (await GroupService.DeleteAsync(g.Id, currentUser))
+        {
+            message = $"Group '{g.Name}' deleted.";
+            groups = await GroupService.GetAllAsync();
+        }
+    }
+}

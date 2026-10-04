@@ -1,0 +1,208 @@
+@page "/supplier/self-service/{Token}"
+@inject SupplierApiClient Api
+@inject SelfServiceSession Session
+@inject SelfServiceBranding Branding
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Verify — Supplier Self-Service</PageTitle>
+
+@* Hidden hand-off form: a same-origin POST that lets the server set the HttpOnly session cookie after
+   the OTP is verified, so a later refresh keeps the session without re-entering the code. *@
+@if (handoff)
+{
+    <form id="ss-signin-form" method="post" action="/account/ss-signin">
+        <input type="hidden" name="SessionToken" value="@Session.SessionToken" />
+        <input type="hidden" name="LinkToken" value="@Token" />
+        <input type="hidden" name="SupplierName" value="@Session.SupplierName" />
+        <input type="hidden" name="ContactEmail" value="@Session.ContactEmail" />
+        <input type="hidden" name="ExpiresAtUtc" value="@(Session.ExpiresAtUtc?.ToString("o"))" />
+        <input type="hidden" name="ReturnUrl" value="@($"/supplier/self-service/{Token}/form")" />
+    </form>
+}
+
+<div class="ss-card">
+    <h1 class="ss-title">Verify it's you</h1>
+
+    @if (handoff)
+    {
+        <p class="ss-muted">Verified — taking you to your details…</p>
+    }
+    else if (loading)
+    {
+        <p class="ss-muted">Sending a verification code…</p>
+    }
+    else if (!linkValid)
+    {
+        <div class="ss-alert ss-alert-error">@(error ?? "This link is invalid or has expired.")</div>
+    }
+    else
+    {
+        <p class="ss-muted">
+            We sent a 6-digit verification code to <strong>@maskedEmail</strong>.
+            Enter it below to continue. The code expires in @expiresInMinutes minutes.
+        </p>
+
+        @if (devOtp is not null)
+        {
+            <div class="ss-alert ss-alert-info">Development mode — your code is <strong>@devOtp</strong>.</div>
+        }
+
+        <div class="ss-field">
+            <label>Verification code</label>
+            <input type="text" inputmode="numeric" maxlength="6" @bind="code" @bind:event="oninput"
+                   class="ss-input ss-code" placeholder="000000" autocomplete="one-time-code" />
+        </div>
+
+        @if (error is not null)
+        {
+            <div class="ss-alert ss-alert-error">@error</div>
+        }
+        @if (resendNotice is not null)
+        {
+            <div class="ss-alert ss-alert-info">@resendNotice</div>
+        }
+
+        <button class="ss-btn ss-btn-primary" @onclick="VerifyAsync" disabled="@(verifying || resending || code.Length < 6)">
+            @(verifying ? "Verifying…" : "Verify and continue")
+        </button>
+        <button class="ss-btn ss-btn-link" @onclick="ResendAsync" disabled="@(verifying || resending)">
+            @if (resending)
+            {
+                <span class="ss-spin" aria-hidden="true"></span><span>Sending…</span>
+            }
+            else
+            {
+                <span>Resend code</span>
+            }
+        </button>
+    }
+</div>
+
+<style>
+    .ss-card { width: 100%; max-width: 460px; background: #fff; border: 1px solid #e2e5ea; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .ss-title { font-size: 24px; font-weight: 700; color: #1a2233; margin: 0 0 1rem; }
+    .ss-muted { color: #7b8697; font-size: 15px; line-height: 1.5; }
+    .ss-field { margin: 1.25rem 0; display: flex; flex-direction: column; }
+    .ss-field label { font-weight: 600; color: #46618f; margin-bottom: 6px; }
+    .ss-input { padding: 10px 12px; border: 1px solid #e2e5ea; border-radius: 5px; font-size: 15px; }
+    .ss-code { font-size: 28px; letter-spacing: 0.5em; text-align: center; }
+    .ss-btn { font-family: inherit; font-size: 15px; font-weight: 700; padding: 10px 22px; border-radius: 5px; cursor: pointer; border: none; margin-right: 10px; }
+    .ss-btn-primary { background: #3b5bdb; color: #fff; }
+    .ss-btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .ss-btn-link { background: none; color: #46618f; text-decoration: underline; padding: 10px 4px; }
+    .ss-btn-link:disabled { opacity: 0.7; cursor: default; }
+    .ss-spin { display: inline-block; width: 13px; height: 13px; margin-right: 6px; vertical-align: -2px; border: 2px solid #c3ccdd; border-top-color: #46618f; border-radius: 50%; animation: ss-spin 0.6s linear infinite; }
+    @@keyframes ss-spin { to { transform: rotate(360deg); } }
+    .ss-alert { padding: 0.7rem 0.9rem; border-radius: 6px; margin: 0.75rem 0; font-size: 14px; }
+    .ss-alert-error { background: #fdecea; color: #c0392b; }
+    .ss-alert-info { background: #eef1ff; color: #1a2233; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private bool loading = true;
+    private bool linkValid;
+    private bool verifying;
+    private bool handoff;
+    private string code = "";
+    private string? maskedEmail;
+    private string? devOtp;
+    private int expiresInMinutes = 10;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // If this browser already holds a valid session cookie FOR THIS LINK (a refresh after verifying),
+        // skip the OTP entirely and go straight to the form.
+        if (AuthState is not null)
+        {
+            Session.PopulateFrom((await AuthState).User);
+            if (Session.IsActiveFor(Token))
+            {
+                Nav.NavigateTo($"/supplier/self-service/{Token}/form");
+                return;
+            }
+        }
+
+        // Automatic send on load: reuse a still-valid code (resend: false) so a reload does not issue a new OTP.
+        var result = await Api.RequestOtpAsync(Token, resend: false);
+        loading = false;
+
+        // Brand the header with the supplier's business-unit logo when available.
+        Branding.SetLogo(result.LogoUrl);
+        linkValid = result.Success;
+        maskedEmail = result.MaskedEmail;
+        devOtp = result.DevOtp;
+        expiresInMinutes = result.ExpiresInMinutes;
+        error = result.Success ? null : result.Error;
+    }
+
+    private async Task VerifyAsync()
+    {
+        error = null;
+        verifying = true;
+        var result = await Api.VerifyOtpAsync(Token, code.Trim());
+        verifying = false;
+
+        if (!result.Success || result.SessionToken is null)
+        {
+            error = result.Error ?? "Incorrect code. Please try again.";
+            return;
+        }
+
+        // Stash the verified session, then post it to the server so it lands in the HttpOnly cookie.
+        Session.SessionToken = result.SessionToken;
+        Session.LinkToken = Token;
+        Session.SupplierName = result.SupplierName;
+        Session.ContactEmail = result.ContactEmail;
+        Session.ExpiresAtUtc = result.ExpiresAtUtc;
+        handoff = true; // renders the hidden form; OnAfterRender submits it (browser POST -> Set-Cookie -> /form)
+    }
+
+    private bool submitted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (handoff && !submitted)
+        {
+            submitted = true;
+            await JS.InvokeVoidAsync("ssSubmitForm", "ss-signin-form");
+        }
+    }
+
+    private bool resending;
+    private string? resendNotice;
+
+    private async Task ResendAsync()
+    {
+        error = null;
+        resendNotice = null;
+        code = "";
+        // Show the in-progress state immediately (before the network round-trip).
+        resending = true;
+        StateHasChanged();
+        try
+        {
+            // Explicit user action: force a fresh code.
+            var result = await Api.RequestOtpAsync(Token, resend: true);
+            maskedEmail = result.MaskedEmail;
+            devOtp = result.DevOtp;
+            if (!result.Success)
+            {
+                error = result.Error;
+            }
+            else
+            {
+                resendNotice = "A new verification code has been sent.";
+            }
+        }
+        finally
+        {
+            resending = false;
+        }
+    }
+}

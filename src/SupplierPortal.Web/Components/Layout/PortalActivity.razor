@@ -1,0 +1,43 @@
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Nav
+
+@* Shows only the current portal's activity/notification widget. Supplier activity never appears on the
+   Landlord portal (or vice-versa); Customer/Broker have no activity feed yet, so nothing is shown there. *@
+@if (portal == "supplier")
+{
+    <NotificationBell />
+}
+else if (portal == "landlord")
+{
+    <LandlordBell />
+}
+
+@code {
+    private string portal = "";
+
+    protected override void OnInitialized()
+    {
+        Compute();
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var before = portal;
+        Compute();
+        if (before != portal) InvokeAsync(StateHasChanged);
+    }
+
+    private void Compute()
+    {
+        var p = Nav.ToBaseRelativePath(Nav.Uri).ToLowerInvariant();
+        portal =
+            p.StartsWith("supplier") ? "supplier"
+            : (p.StartsWith("admin/land-register") || p.StartsWith("admin/landlords")) ? "landlord"
+            : (p.StartsWith("admin/customers") || p.StartsWith("customer")) ? "customer"
+            : "";
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

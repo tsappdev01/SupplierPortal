@@ -1,0 +1,151 @@
+@page "/supplier/upload"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject ExcelImportService ExcelImportService
+@inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Upload Supplier Data - Supplier Portal</PageTitle>
+
+<h1>Upload Supplier Data</h1>
+<p>Upload an Excel (.xlsx) file. The first row must contain column headers matching the supplier fields (Supplier Number, Supplier Name, Email, Tax Organization Type, Supplier Type, Taxpayer Country, Country Name, Tax Registration Number, Address Line 1, Address Line 2, City, Country).</p>
+
+@if (businessUnits.Count > 1 || isAdministrator)
+{
+    <div class="mb-3" style="max-width: 300px;">
+        <label class="form-label">Business Unit</label>
+        <select class="form-select" @bind="selectedBusinessUnitId">
+            <option value="0">-- Select --</option>
+            @foreach (var businessUnit in businessUnits)
+            {
+                <option value="@businessUnit.Id">@businessUnit.Name</option>
+            }
+        </select>
+    </div>
+}
+
+<InputFile OnChange="OnFileSelectedAsync" accept=".xlsx" class="form-control mb-3" style="max-width: 400px;" />
+
+@if (isImporting)
+{
+    <div class="mb-3" style="max-width: 400px;">
+        <div class="progress" role="progressbar" aria-label="Importing" style="height: 22px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width: 100%; background-color: var(--di-navy, #1a2233);">
+                Importing…
+            </div>
+        </div>
+    </div>
+}
+
+@if (result is not null)
+{
+    <div class="alert @(result.Errors.Count == 0 ? "alert-success" : "alert-warning")">
+        Imported @result.SuccessCount supplier(s).
+        @if (result.Errors.Count > 0)
+        {
+            <span>@result.Errors.Count row(s) failed.</span>
+        }
+        @if (result.Warnings.Count > 0)
+        {
+            <span>@result.Warnings.Count imported row(s) had unrecognized optional values left blank.</span>
+        }
+    </div>
+
+    @if (result.Errors.Count > 0)
+    {
+        <h5>Rejected rows</h5>
+        <table class="table table-sm">
+            <thead><tr><th>Row</th><th>Error</th></tr></thead>
+            <tbody>
+                @foreach (var error in result.Errors)
+                {
+                    <tr><td>@error.RowNumber</td><td>@error.Message</td></tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (result.Warnings.Count > 0)
+    {
+        <h5>Imported with blanks</h5>
+        <table class="table table-sm">
+            <thead><tr><th>Row</th><th>Note</th></tr></thead>
+            <tbody>
+                @foreach (var warning in result.Warnings)
+                {
+                    <tr><td>@warning.RowNumber</td><td>@warning.Message</td></tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+    private const long MaxFileSize = 20 * 1024 * 1024;
+
+    private bool isAdministrator;
+    private int selectedBusinessUnitId;
+    private string uploadedBy = "unknown";
+    private List<BusinessUnit> businessUnits = [];
+    private bool isImporting;
+    private ImportResult? result;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdministrator = state.User.IsAdministrator();
+        uploadedBy = state.User.Identity?.Name ?? "unknown";
+
+        // Only an administrator with no business-unit assignment sees all; a user (admin or not)
+        // assigned to specific business units is scoped to those.
+        var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        var seesAll = isAdministrator && userBusinessUnitIds.Count == 0;
+        var allBusinessUnits = await BusinessUnitService.GetAllAsync();
+        businessUnits = seesAll ? allBusinessUnits : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
+        if (businessUnits.Count == 1)
+        {
+            selectedBusinessUnitId = businessUnits[0].Id;
+        }
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        result = null;
+
+        var targetBusinessUnitId = selectedBusinessUnitId;
+        if (targetBusinessUnitId <= 0)
+        {
+            errorMessage = "Select a business unit before uploading.";
+            return;
+        }
+
+        isImporting = true;
+        try
+        {
+            await using var stream = e.File.OpenReadStream(MaxFileSize);
+            result = await Loading.RunAsync(() => ExcelImportService.ImportAsync(stream, targetBusinessUnitId, uploadedBy));
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+}

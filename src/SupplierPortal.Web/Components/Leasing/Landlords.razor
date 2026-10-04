@@ -1,0 +1,520 @@
+@page "/admin/landlords"
+@attribute [Authorize(Policy = "Portal.Landlord")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordService LandlordService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Landlords - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Landlord Registrations</h1>
+    <a class="btn btn-primary di-initiate" href="/admin/land-register">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z"/></svg>
+        New Registration
+    </a>
+</div>
+
+@* KPI cards (Manage-Supplier style) — click to filter *@
+<div class="di-kpis mb-3">
+    <button class="di-kpi @(statusFilter is null ? "sel" : "")" @onclick="() => SetFilter(null)">
+        <span class="di-kpi-n">@counts.Values.Sum()</span><span class="di-kpi-l">Total</span>
+    </button>
+    @foreach (var g in kpiGroups)
+    {
+        <button class="di-kpi @(IsActive(g.Statuses) ? "sel" : "")" style="--kpi:@g.Color" @onclick="() => SetFilter(g.Statuses)">
+            <span class="di-kpi-n">@g.Statuses.Sum(s => counts.GetValueOrDefault(s))</span><span class="di-kpi-l">@g.Label</span>
+        </button>
+    }
+</div>
+
+@* Search + priority / assigned-to filters (dashboard parity) *@
+<div class="di-ll-toolbar mb-3">
+    <div class="di-ll-search">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+        <input type="text" placeholder="Search company, property, email or reference…" @bind="searchText" @bind:event="oninput" @bind:after="() => page = 1" />
+    </div>
+    <select class="form-select form-select-sm di-ll-filter" @bind="priorityFilter" @bind:after="() => page = 1">
+        <option value="">All priorities</option>
+        @foreach (var p in Priorities) { <option value="@p">@p</option> }
+    </select>
+    <select class="form-select form-select-sm di-ll-filter" @bind="assignedFilter" @bind:after="() => page = 1">
+        <option value="">All owners</option>
+        <option value="unassigned">Unassigned</option>
+        @foreach (var u in assignableUsers) { <option value="@u.Id">@u.Name</option> }
+    </select>
+    @if (HasActiveFilters)
+    {
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">Clear</button>
+    }
+</div>
+
+@* Bulk email bar — appears once one or more landlords are selected (tick the checkboxes, or the header
+   checkbox to select every eligible row matching the current filters), then send the invite to all in one click. *@
+@if (selected.Count > 0)
+{
+    <div class="di-ll-bulkbar mb-3">
+        <span class="di-ll-bulkbar-count"><strong>@selected.Count</strong> landlord(s) selected</span>
+        <button class="btn btn-sm btn-primary" disabled="@bulkSending" @onclick="() => confirmBulk = true">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg>
+            @(bulkSending ? $"Sending… ({bulkDone}/{bulkTotal})" : "Email selected landlords")
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="() => selected.Clear()">Clear selection</button>
+    </div>
+}
+
+@if (Filtered.Count == 0)
+{
+    <div class="alert alert-light border">No registrations@(statusFilter is null && !HasActiveFilters ? "" : " match the current filters") yet.</div>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th style="width:34px;" @onclick:stopPropagation="true">
+                    <input type="checkbox" class="form-check-input" title="Select all eligible (matching the current filters)"
+                           checked="@AllEligibleSelected" @onchange="e => ToggleSelectAll((bool)e.Value!)" />
+                </th>
+                <th>Company / Property</th>
+                <th>Property Code</th>
+                <th>Type</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Assigned To</th>
+                <th>Reference</th>
+                <th>Updated</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var l in PageItems)
+            {
+                <tr style="cursor:pointer;" @onclick="() => Open(l.Id)">
+                    <td @onclick:stopPropagation="true">
+                        <input type="checkbox" class="form-check-input" disabled="@(!l.LinkActive)"
+                               title="@(l.LinkActive ? "Select for bulk email" : "No active invite link to email")"
+                               checked="@selected.Contains(l.Id)" @onchange="e => ToggleSelect(l.Id, (bool)e.Value!)" />
+                    </td>
+                    <td>
+                        @l.DisplayName
+                        @if (l.VersionCount > 1)
+                        {
+                            <button class="di-verchip" @onclick:stopPropagation="true" @onclick="() => ToggleHistory(l.Id)"
+                                    title="@l.VersionCount registrations for this property — show history">
+                                v@(l.VersionCount) history
+                                <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" class="@(expanded.Contains(l.Id) ? "di-rot" : "")"><path d="M4.646 6.146a.5.5 0 0 1 .708 0L8 8.793l2.646-2.647a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 0-.708Z"/></svg>
+                            </button>
+                        }
+                    </td>
+                    <td>@l.PropertyCode</td>
+                    <td>@l.Type</td>
+                    <td>@l.Email</td>
+                    <td><span class="badge @StatusClass(l.Status)">@Label(l.Status)</span></td>
+                    <td @onclick:stopPropagation="true">
+                        <select class="form-select form-select-sm di-ll-inline" value="@(l.Priority ?? "")"
+                                @onchange="e => SetPriorityAsync(l.Id, (string?)e.Value)">
+                            <option value="">—</option>
+                            @foreach (var p in Priorities) { <option value="@p" selected="@(p == l.Priority)">@p</option> }
+                        </select>
+                    </td>
+                    <td @onclick:stopPropagation="true">
+                        <select class="form-select form-select-sm di-ll-inline" value="@(l.AssignedToUserId?.ToString() ?? "")"
+                                @onchange="e => AssignAsync(l.Id, (string?)e.Value)">
+                            <option value="">Unassigned</option>
+                            @foreach (var u in assignableUsers) { <option value="@u.Id" selected="@(u.Id == l.AssignedToUserId)">@u.Name</option> }
+                        </select>
+                    </td>
+                    <td>@(l.Reference ?? "—")</td>
+                    <td>@l.UpdatedAt.ToLocalTime().ToString("g")</td>
+                    <td class="text-end text-nowrap" @onclick:stopPropagation="true">
+                        <a class="btn btn-sm btn-outline-secondary me-1" title="View / edit all details" href="/admin/landlords/@l.Id">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>
+                        </a>
+                        <button class="btn btn-sm btn-outline-primary me-1" title="Email invite"
+                                disabled="@(!l.LinkActive || sending == l.Id)" @onclick="() => RequestEmail(l)">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z" /></svg>
+                        </button>
+                        <a class="btn btn-sm btn-outline-dark me-1" title="View attachments" href="/admin/landlords/@l.Id">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3Z" /></svg>
+                        </a>
+                        <a class="btn btn-sm btn-outline-info @(l.Status is LandlordStatus.Submitted or LandlordStatus.UnderReview ? "" : "disabled")"
+                           title="Review" href="/admin/landlords/@l.Id">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z" /><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12Zm7.354 4.854-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 9.293l2.646-2.647a.5.5 0 0 1 .708.708Z" /></svg>
+                        </a>
+                    </td>
+                </tr>
+                @if (expanded.Contains(l.Id) && l.Older.Count > 0)
+                {
+                    @foreach (var v in l.Older)
+                    {
+                        <tr class="di-histrow" @onclick="() => Open(v.Id)" style="cursor:pointer;">
+                            <td></td>
+                            <td class="ps-4"><span class="text-muted small">↳ version @v.Version</span></td>
+                            <td class="text-muted small">@l.PropertyCode</td>
+                            <td></td>
+                            <td></td>
+                            <td><span class="badge @StatusClass(v.Status)">@Label(v.Status)</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-muted small">@(v.Reference ?? "—")</td>
+                            <td class="text-muted small">@v.UpdatedAt.ToLocalTime().ToString("g")</td>
+                            <td class="text-end"><a class="small" href="/admin/landlords/@v.Id" @onclick:stopPropagation="true">View</a></td>
+                        </tr>
+                    }
+                }
+            }
+        </tbody>
+    </table>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Showing @(Filtered.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, Filtered.Count) of @Filtered.Count</span>
+        @if (TotalPages > 1)
+        {
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(page == 1 ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page - 1)">Prev</button></li>
+                    @foreach (var pg in PageWindow)
+                    {
+                        <li class="page-item @(pg == page ? "active" : "")"><button class="page-link" @onclick="() => GoTo(pg)">@pg</button></li>
+                    }
+                    <li class="page-item @(page == TotalPages ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page + 1)">Next</button></li>
+                </ul>
+            </nav>
+        }
+    </div>
+}
+
+@* ---- Single-landlord email confirmation ---- *@
+@if (confirmEmailLandlord is not null)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelEmail">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelEmail">&times;</button>
+            <div class="di-confirm-badge">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+                    <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+                    <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h3 class="di-confirm-title">Send invitation email?</h3>
+            <p class="di-confirm-sub">We'll send the landlord registration link to:</p>
+            <div class="di-confirm-target">
+                <div class="di-confirm-avatar">@Initials(confirmEmailLandlord.DisplayName)</div>
+                <div class="di-confirm-who">
+                    <span class="di-confirm-name">@confirmEmailLandlord.DisplayName</span>
+                    @if (!string.IsNullOrWhiteSpace(confirmEmailLandlord.Email))
+                    {
+                        <span class="di-confirm-email">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
+                            @confirmEmailLandlord.Email
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelEmail">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmEmailAsync">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>
+                    <span>Send Email</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Bulk email confirmation ---- *@
+@if (confirmBulk)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelBulk">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelBulk">&times;</button>
+            <div class="di-confirm-badge">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+                    <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+                    <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h3 class="di-confirm-title">Send invitation emails?</h3>
+            <p class="di-confirm-sub">We'll send the landlord registration link to <strong>@EligibleSelectedCount</strong> selected landlord(s) with an active invite link.</p>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelBulk">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmBulkAsync">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>
+                    <span>Send @EligibleSelectedCount email(s)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-kpis { display: flex; gap: 10px; flex-wrap: wrap; }
+    .di-kpi { flex: 1 1 130px; min-width: 120px; text-align: left; background: #fff; border: 1px solid var(--bs-border-color); border-top: 3px solid var(--kpi, #64748b); border-radius: .5rem; padding: .6rem .9rem; cursor: pointer; }
+    .di-kpi:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .di-kpi.sel { outline: 2px solid var(--kpi, #1a2233); }
+    .di-kpi-n { display: block; font-size: 1.5rem; font-weight: 700; line-height: 1.1; color: #1a2233; }
+    .di-kpi-l { display: block; font-size: .78rem; color: var(--bs-secondary-color); }
+    .di-initiate { display: inline-flex; align-items: center; gap: 6px; }
+    .di-verchip { border: 1px solid var(--bs-border-color); background: #f4f6f9; color: #46618f; border-radius: 999px; font-size: .68rem; font-weight: 600; padding: 1px 8px; margin-left: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+    .di-verchip:hover { background: #e9eef5; }
+    .di-verchip svg.di-rot { transform: rotate(180deg); }
+    .di-histrow { background: #fafbfc; }
+    .di-histrow:hover { background: #f1f4f8; }
+    .di-ll-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .di-ll-search { position: relative; flex: 1 1 280px; min-width: 220px; }
+    .di-ll-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #9aa4b8; }
+    .di-ll-search input { width: 100%; padding: 7px 12px 7px 33px; border: 1px solid var(--bs-border-color); border-radius: 8px; font-size: 14px; }
+    .di-ll-filter { width: auto; min-width: 150px; }
+    .di-ll-inline { min-width: 96px; }
+    .di-ll-bulkbar { display: flex; align-items: center; gap: 12px; background: #eef4ff; border: 1px solid #c7dbff; border-radius: 8px; padding: 8px 14px; }
+    .di-ll-bulkbar-count { color: #1a2233; font-size: 14px; }
+
+    /* ---- Send-email confirmation dialog (mirrors the Supplier dashboard) ---- */
+    .di-confirm-backdrop { position: fixed; inset: 0; z-index: 1090; background: rgba(11, 37, 69, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: di-confirm-fade 0.15s ease; }
+    .di-confirm-card { position: relative; background: #fff; width: min(430px, 100%); border-radius: 18px; padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(11, 37, 69, 0.35); animation: di-confirm-pop 0.18s cubic-bezier(.2,.9,.3,1.2); }
+    .di-confirm-x { position: absolute; top: 12px; right: 14px; border: none; background: transparent; font-size: 24px; line-height: 1; color: #9aa6b8; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+    .di-confirm-x:hover { background: #f1f4f9; color: #46618f; }
+    .di-confirm-badge { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 25%, #eaf1fb, #d7e5f7); box-shadow: 0 0 0 8px rgba(11, 37, 69, 0.06); }
+    .di-confirm-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color: #0b2545; }
+    .di-confirm-sub { margin: 0 0 16px; font-size: 13.5px; color: #7b8697; }
+    .di-confirm-target { display: flex; align-items: center; gap: 12px; text-align: left; background: #f6f8fc; border: 1px solid #e6ecf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 22px; }
+    .di-confirm-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0b2545; color: #c9a227; font-weight: 800; font-size: 14px; }
+    .di-confirm-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .di-confirm-name { font-weight: 700; font-size: 14.5px; color: #1a2233; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46618f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email svg { flex: none; opacity: 0.75; }
+    .di-confirm-actions { display: flex; gap: 12px; }
+    .di-confirm-btn { flex: 1; border-radius: 10px; padding: 11px 16px; font-size: 14.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .di-confirm-cancel { background: #fff; border-color: #d3dae6; color: #46618f; }
+    .di-confirm-cancel:hover { background: #f1f4f9; }
+    .di-confirm-send { background: linear-gradient(135deg, #14396b, #0b2545); color: #fff; box-shadow: 0 6px 16px rgba(11,37,69,0.28); }
+    .di-confirm-send:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(11,37,69,0.36); }
+    @@keyframes di-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes di-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+</style>
+
+@code {
+    private List<LandlordListItem> items = [];
+    private Dictionary<LandlordStatus, int> counts = new();
+    private LandlordStatus[]? statusFilter;
+    private string currentUser = "unknown";
+    private int? sending;
+    private readonly HashSet<int> expanded = new();
+
+    // ---- Bulk email ----
+    private readonly HashSet<int> selected = new();
+    private bool bulkSending;
+    private int bulkDone, bulkTotal;
+
+    // ---- Send-email confirmation dialogs ----
+    private LandlordListItem? confirmEmailLandlord;
+    private bool confirmBulk;
+    private int EligibleSelectedCount => items.Count(i => selected.Contains(i.Id) && i.LinkActive);
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "–";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1 ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+
+    private void RequestEmail(LandlordListItem l) => confirmEmailLandlord = l;
+    private void CancelEmail() => confirmEmailLandlord = null;
+
+    private async Task ConfirmEmailAsync()
+    {
+        var l = confirmEmailLandlord;
+        confirmEmailLandlord = null;
+        if (l is not null) await EmailAsync(l.Id);
+    }
+
+    private void CancelBulk() => confirmBulk = false;
+
+    private async Task ConfirmBulkAsync()
+    {
+        confirmBulk = false;
+        await BulkEmailAsync();
+    }
+
+    // Only rows with an active invite link can be emailed (matches the per-row Email button's gating).
+    private IEnumerable<LandlordListItem> EligibleFiltered => Filtered.Where(i => i.LinkActive);
+    private bool AllEligibleSelected => EligibleFiltered.Any() && EligibleFiltered.All(i => selected.Contains(i.Id));
+
+    private void ToggleSelect(int id, bool on) { if (on) selected.Add(id); else selected.Remove(id); }
+
+    private void ToggleSelectAll(bool on)
+    {
+        if (on) { foreach (var i in EligibleFiltered) selected.Add(i.Id); }
+        else { foreach (var i in EligibleFiltered.ToList()) selected.Remove(i.Id); }
+    }
+
+    private async Task BulkEmailAsync()
+    {
+        // Snapshot the still-eligible selected ids so a filter/data change mid-send can't affect the batch.
+        var ids = items.Where(i => selected.Contains(i.Id) && i.LinkActive).Select(i => i.Id).ToList();
+        if (ids.Count == 0) { Toast.ShowError("None of the selected landlords have an active invite link to email."); return; }
+
+        bulkSending = true; bulkDone = 0; bulkTotal = ids.Count;
+        int ok = 0, fail = 0;
+        foreach (var id in ids)
+        {
+            var (sent, _, _) = await LandlordService.InviteAsync(id, currentUser, Nav.BaseUri);
+            if (sent) ok++; else fail++;
+            bulkDone++;
+            StateHasChanged();
+        }
+        bulkSending = false;
+        selected.Clear();
+        if (fail == 0) Toast.ShowSuccess($"Invitation email sent to {ok} landlord(s).");
+        else Toast.ShowError($"Sent {ok} of {ids.Count}; {fail} failed. Retry the failed ones individually.");
+        await LoadAsync();
+    }
+
+    private void ToggleHistory(int id) { if (!expanded.Add(id)) expanded.Remove(id); }
+
+    private bool IsActive(LandlordStatus[] set) => statusFilter is not null && statusFilter.Length == set.Length && !set.Except(statusFilter).Any();
+
+    public sealed record Kpi(string Label, LandlordStatus[] Statuses, string Color);
+    // Status groups (labels shown across the module). Shared by the KPI cards and the Property-list filter.
+    public static readonly Kpi[] kpiGroups =
+    [
+        new("Unregistered", [LandlordStatus.Draft], "#64748b"),
+        new("Awaiting Response", [LandlordStatus.InvitationSent, LandlordStatus.OtpVerified, LandlordStatus.InProgress, LandlordStatus.CorrectionRequired], "#2563eb"),
+        new("Under Review", [LandlordStatus.Submitted, LandlordStatus.UnderReview], "#b45309"),
+        new("Rejected", [LandlordStatus.Rejected], "#b91c1c"),
+        new("Approved", [LandlordStatus.RegistrationComplete], "#15803d"),
+    ];
+
+    // ---- Search + priority/assigned filters ----
+    private string searchText = "";
+    private string priorityFilter = "";
+    private string assignedFilter = "";
+    private List<(int Id, string Name)> assignableUsers = [];
+    private static readonly string[] Priorities = ["P1", "P2", "P3", "P4"];
+    private bool HasActiveFilters => !string.IsNullOrWhiteSpace(searchText)
+        || !string.IsNullOrWhiteSpace(priorityFilter) || !string.IsNullOrWhiteSpace(assignedFilter);
+
+    private List<LandlordListItem> Filtered
+    {
+        get
+        {
+            IEnumerable<LandlordListItem> q = items;
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var s = searchText.Trim();
+                q = q.Where(i =>
+                    (i.DisplayName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.PropertyCode?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (i.Reference?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+            if (!string.IsNullOrWhiteSpace(priorityFilter)) q = q.Where(i => i.Priority == priorityFilter);
+            if (assignedFilter == "unassigned") q = q.Where(i => i.AssignedToUserId is null);
+            else if (int.TryParse(assignedFilter, out var uid)) q = q.Where(i => i.AssignedToUserId == uid);
+            return q.ToList();
+        }
+    }
+
+    private void ClearFilters() { searchText = ""; priorityFilter = ""; assignedFilter = ""; page = 1; }
+
+    private async Task SetPriorityAsync(int id, string? priority)
+    {
+        await LandlordService.SetPriorityAsync(id, priority, currentUser);
+        var idx = items.FindIndex(i => i.Id == id);
+        if (idx >= 0) items[idx] = items[idx] with { Priority = string.IsNullOrWhiteSpace(priority) ? null : priority };
+    }
+
+    private async Task AssignAsync(int id, string? userIdText)
+    {
+        int? userId = int.TryParse(userIdText, out var u) ? u : null;
+        await LandlordService.AssignAsync(id, userId, currentUser);
+        var idx = items.FindIndex(i => i.Id == id);
+        if (idx >= 0)
+        {
+            var name = userId is int uid ? assignableUsers.FirstOrDefault(x => x.Id == uid).Name : null;
+            items[idx] = items[idx] with { AssignedToUserId = userId, AssignedToUserName = name };
+        }
+    }
+
+    private const int PageSize = 50;
+    private int page = 1;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(Filtered.Count / (double)PageSize));
+    private IEnumerable<LandlordListItem> PageItems => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
+    private IEnumerable<int> PageWindow
+    {
+        get
+        {
+            var start = Math.Max(1, page - 2);
+            var end = Math.Min(TotalPages, start + 4);
+            start = Math.Max(1, end - 4);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+    private void GoTo(int p) { if (p >= 1 && p <= TotalPages) page = p; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        assignableUsers = await LandlordService.GetAssignableUsersAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => await Loading.RunAsync(async () =>
+    {
+        items = await LandlordService.GetAllAsync(statuses: statusFilter);
+        counts = await LandlordService.GetStatusCountsAsync();
+        page = 1;
+    });
+
+    private async Task EmailAsync(int id)
+    {
+        sending = id;
+        var (ok, error, _) = await Loading.RunAsync(() => LandlordService.InviteAsync(id, currentUser, Nav.BaseUri));
+        sending = null;
+        if (!ok) { Toast.ShowError(error ?? "Could not send the invite."); return; }
+        Toast.ShowSuccess("Invitation email sent to the landlord.");
+        await LoadAsync();
+    }
+
+    private async Task SetFilter(LandlordStatus[]? statuses)
+    {
+        statusFilter = statuses;
+        await LoadAsync();
+    }
+
+    private void Open(int id) => Nav.NavigateTo($"/admin/landlords/{id}");
+
+    // Grouped display labels (business terminology).
+    public static string Label(LandlordStatus s) => s switch
+    {
+        LandlordStatus.Draft => "Unregistered",
+        LandlordStatus.InvitationSent or LandlordStatus.OtpVerified or LandlordStatus.InProgress
+            or LandlordStatus.CorrectionRequired => "Awaiting Response",
+        LandlordStatus.Submitted or LandlordStatus.UnderReview => "Under Review",
+        LandlordStatus.Rejected => "Rejected",
+        LandlordStatus.RegistrationComplete => "Approved",
+        _ => s.ToString()
+    };
+
+    public static string StatusClass(LandlordStatus s) => s switch
+    {
+        LandlordStatus.RegistrationComplete => "bg-success",
+        LandlordStatus.Submitted or LandlordStatus.UnderReview => "bg-info text-dark",
+        LandlordStatus.Rejected => "bg-danger",
+        LandlordStatus.Draft => "bg-secondary",
+        _ => "bg-primary" // Awaiting Response group
+    };
+}

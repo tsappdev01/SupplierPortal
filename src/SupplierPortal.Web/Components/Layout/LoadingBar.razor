@@ -1,0 +1,53 @@
+@implements IDisposable
+@using SupplierPortal.Web.Services
+@inject LoadingService LoadingService
+
+@if (LoadingService.IsVisible)
+{
+    <div class="di-loading-bar" role="progressbar" aria-label="Processing">
+        <div class="di-loading-bar-fill"></div>
+    </div>
+}
+
+<style>
+    .di-loading-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        z-index: 3000;
+        background: rgba(200, 162, 74, 0.18);
+        overflow: hidden;
+    }
+
+    .di-loading-bar-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, #1a2233, #c8a24a);
+        animation: di-loading-slide 1.1s ease-in-out infinite;
+    }
+
+    @@keyframes di-loading-slide {
+        0% { left: -40%; width: 40%; }
+        50% { width: 55%; }
+        100% { left: 100%; width: 40%; }
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        LoadingService.OnChange += HandleChange;
+    }
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        LoadingService.OnChange -= HandleChange;
+    }
+}

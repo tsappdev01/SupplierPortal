@@ -1,0 +1,73 @@
+@page "/admin/business-units"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject BusinessUnitService BusinessUnitService
+
+<PageTitle>Business Units - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Business Units</h1>
+    <a class="btn btn-primary" href="/admin/business-units/new">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+            <path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" />
+        </svg>
+        Add Business Unit
+    </a>
+</div>
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Code</th>
+            <th>Business Unit Name</th>
+            <th>Domain</th>
+            <th>Created</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var businessUnit in businessUnits)
+        {
+            <tr>
+                <td style="width: 44px;">
+                    @if (businessUnit.Logo is not null)
+                    {
+                        <img src="/business-units/@businessUnit.Id/thumbnail" alt="" class="di-bu-logo" />
+                    }
+                </td>
+                <td>@businessUnit.Code</td>
+                <td>@businessUnit.Name</td>
+                <td>@(string.IsNullOrWhiteSpace(businessUnit.Domain) ? "—" : businessUnit.Domain)</td>
+                <td>@businessUnit.CreatedAt.ToLocalTime().ToString("g")</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-secondary" href="/admin/business-units/edit/@businessUnit.Id" title="Edit">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5ZM3.51 10.658l-1.8 4.5 1.8-4.5.001 0Z" />
+                        </svg>
+                    </a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<style>
+    .di-bu-logo {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+</style>
+
+@code {
+    private List<BusinessUnit> businessUnits = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        businessUnits = await BusinessUnitService.GetAllAsync();
+    }
+}

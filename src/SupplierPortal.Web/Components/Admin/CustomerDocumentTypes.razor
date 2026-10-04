@@ -1,0 +1,167 @@
+@page "/admin/customer-documents"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@inject CustomerDocumentService DocumentService
+@inject CustomerFieldConfigService FieldConfigService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Customer Document Types - CST Portal</PageTitle>
+
+<h1>Customer Document Types</h1>
+<p class="text-muted">
+    The KYC document checklist customers are asked to upload. Mark each document <strong>Required</strong> or
+    optional, add a short requirement note, control the display order, and hide a type by turning off
+    <strong>Active</strong>. Required documents must be uploaded before a registration can be submitted.
+</p>
+
+@if (savedMessage is not null)
+{
+    <div class="alert alert-success">@savedMessage</div>
+}
+
+@if (types is null)
+{
+    <LoadingIndicator Message="Loading document types…" />
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save changes")</button>
+        <button class="btn btn-outline-secondary" @onclick="AddRow" disabled="@saving">+ Add document type</button>
+        <span class="text-muted">@types.Count type(s)</span>
+    </div>
+
+    <div class="di-field-settings-section mb-3">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">Document Name</th>
+                        <th>Requirement note</th>
+                        <th style="min-width: 300px;">Depends On (optional)</th>
+                        <th style="width: 76px;">Order</th>
+                        <th style="width: 84px;" class="text-center">Required</th>
+                        <th style="width: 76px;" class="text-center">Active</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in types)
+                    {
+                        <tr>
+                            <td><input class="form-control form-control-sm" @bind="t.Name" placeholder="e.g. Emirates ID" /></td>
+                            <td><input class="form-control form-control-sm" @bind="t.Requirement" placeholder="Short hint shown to the customer" /></td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <select class="form-select form-select-sm" style="max-width: 190px;"
+                                            value="@(t.ControllingFieldKey ?? "")" @onchange="e => OnControllingChanged(t, (string?)e.Value)">
+                                        <option value="">— always required —</option>
+                                        @foreach (var f in controllingFields)
+                                        {
+                                            <option value="@f.FieldKey">@f.DisplayLabel</option>
+                                        }
+                                    </select>
+                                    @if (!string.IsNullOrWhiteSpace(t.ControllingFieldKey))
+                                    {
+                                        @if (IsYesNo(t.ControllingFieldKey))
+                                        {
+                                            <select class="form-select form-select-sm" style="max-width: 110px;" @bind="t.ControllingValue">
+                                                <option value="true">is Yes</option>
+                                                <option value="false">is No</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <input class="form-control form-control-sm" style="max-width: 130px;" @bind="t.ControllingValue"
+                                                   placeholder="equals… (e.g. Others)" />
+                                        }
+                                    }
+                                </div>
+                            </td>
+                            <td><input type="number" class="form-control form-control-sm" @bind="t.Sequence" /></td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox" role="switch" @bind="t.IsRequired" />
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox" role="switch" @bind="t.IsActive" />
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-danger" title="Remove" @onclick="() => Remove(t)">&times;</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (types.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-muted text-center">No document types. Use “Add document type”.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save changes")</button>
+}
+
+@code {
+    private List<CustomerDocumentType>? types;
+    private string currentUser = "unknown";
+    private string? savedMessage;
+    private bool saving;
+
+    // Customer fields that can drive a document's conditional rule: Yes/No and LOV (lookup) fields.
+    private List<CustomerFieldConfig> controllingFields = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        types = await DocumentService.GetAllTypesAsync();
+        controllingFields = (await FieldConfigService.GetAllForAdminAsync())
+            .Where(f => !f.IsRemoved && (f.FieldKind == "yesno" || f.FieldKind == "lookup"))
+            .OrderBy(f => f.Section == "Account" ? 0 : 1).ThenBy(f => f.Sequence)
+            .ToList();
+    }
+
+    private bool IsYesNo(string? fieldKey) =>
+        controllingFields.FirstOrDefault(f => f.FieldKey == fieldKey)?.FieldKind == "yesno";
+
+    private void OnControllingChanged(CustomerDocumentType t, string? fieldKey)
+    {
+        savedMessage = null;
+        t.ControllingFieldKey = string.IsNullOrWhiteSpace(fieldKey) ? null : fieldKey;
+        // Default the trigger value: Yes for a Yes/No field; clear for an LOV so the admin types the option.
+        t.ControllingValue = t.ControllingFieldKey is null ? null
+            : (IsYesNo(t.ControllingFieldKey) ? "true" : "");
+    }
+
+    private void AddRow()
+    {
+        savedMessage = null;
+        var nextSeq = types!.Count == 0 ? 1 : types.Max(t => t.Sequence) + 1;
+        types.Add(new CustomerDocumentType { Sequence = nextSeq, IsActive = true });
+    }
+
+    private void Remove(CustomerDocumentType t)
+    {
+        savedMessage = null;
+        types!.Remove(t);
+    }
+
+    private async Task SaveAsync()
+    {
+        saving = true;
+        savedMessage = null;
+        await DocumentService.SaveTypesAsync(types!, currentUser);
+        types = await DocumentService.GetAllTypesAsync();
+        saving = false;
+        savedMessage = "Document types saved.";
+    }
+}

@@ -1,0 +1,286 @@
+@page "/supplier/edit/{Id:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierService SupplierService
+@inject UserService UserService
+@inject SupplierAccessTokenService SupplierAccessTokenService
+@inject SupplierDocumentService SupplierDocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
+<PageTitle>Edit Supplier - Supplier Portal</PageTitle>
+
+<div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="/supplier/dashboard">
+        &#8592; Back to Supplier List
+    </a>
+</div>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">Supplier not found.</div>
+}
+else if (forbidden)
+{
+    <div class="alert alert-danger">You do not have access to this supplier.</div>
+}
+else if (supplier is null)
+{
+    <LoadingIndicator Message="Supplier information is being retrieved, please wait…" />
+}
+else
+{
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.Details ? "active" : "")" @onclick="() => activeTab = Tab.Details">
+                Supplier Details
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.Documents ? "active" : "")" @onclick="ShowDocumentsAsync">
+                Documents@(documentsLoaded && documents.Count > 0 ? $" ({documents.Count})" : "")
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == Tab.EmailHistory ? "active" : "")" @onclick="ShowEmailHistoryAsync">
+                Email History@(emailHistory.Count > 0 ? $" ({emailHistory.Count})" : "")
+            </button>
+        </li>
+    </ul>
+
+    <div style="display:@(activeTab == Tab.Details ? "block" : "none")">
+        <SupplierForm Supplier="supplier" IsCreateMode="false" CurrentUser="currentUser" OnComplete="HandleComplete" />
+    </div>
+
+    <div style="display:@(activeTab == Tab.Documents ? "block" : "none")">
+        <h2 class="h5">Attached Documents</h2>
+        @if (!documentsLoaded)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (documents.Count == 0)
+        {
+            <p><em>No documents have been attached for this supplier.</em></p>
+        }
+        else
+        {
+            var current = documents[currentDocIndex];
+            <div class="d-flex gap-2 mb-2 flex-wrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.pdf" target="_blank">Download images as PDF</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/suppliers/@supplier.Id/documents.xlsx">Download images as Excel</a>
+                <a class="btn btn-sm btn-dark" href="/suppliers/@supplier.Id/documents.zip">Download all (zip)</a>
+            </div>
+
+            <div class="di-doc-viewer" tabindex="0" @ref="viewerRef" @onkeydown="OnViewerKeyDown" @onkeydown:preventDefault="true">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <button class="btn btn-sm btn-outline-primary" @onclick="PrevDoc" disabled="@(currentDocIndex == 0)">&larr; Previous</button>
+                    <span class="fw-semibold text-truncate px-2">
+                        @(currentDocIndex + 1) / @documents.Count &mdash; @current.FileName
+                        <span class="badge bg-light text-dark">@SplitType(current.DocumentType)</span>
+                    </span>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="NextDoc" disabled="@(currentDocIndex == documents.Count - 1)">Next &rarr;</button>
+                </div>
+
+                <div class="text-center di-doc-stage">
+                    @if (IsImage(current))
+                    {
+                        <img src="/suppliers/documents/@current.Id" alt="@current.FileName" class="di-doc-image" />
+                    }
+                    else
+                    {
+                        <iframe src="/suppliers/documents/@current.Id" class="di-doc-frame" title="@current.FileName"></iframe>
+                    }
+                </div>
+
+                <div class="d-flex gap-2 mt-2 flex-wrap">
+                    @if (IsImage(current))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="() => PrintCurrentAsync(current.Id)">Print</button>
+                    }
+                    <a class="btn btn-sm btn-outline-secondary" href="/suppliers/documents/@current.Id" target="_blank">Open / download original</a>
+                </div>
+                <div class="small text-muted mt-1">Tip: use the &larr; and &rarr; arrow keys to move between documents.</div>
+            </div>
+        }
+    </div>
+
+    <div style="display:@(activeTab == Tab.EmailHistory ? "block" : "none")">
+        <h2 class="h5">Notification Email History</h2>
+        <p class="text-muted">Every self-service notification email sent for this supplier.</p>
+
+        @if (!emailHistoryLoaded)
+        {
+            <p><em>Loading...</em></p>
+        }
+        else if (emailHistory.Count == 0)
+        {
+            <p><em>No notification emails have been sent for this supplier yet.</em></p>
+        }
+        else
+        {
+            <div style="overflow-x: auto;">
+                <table class="table table-striped table-sm">
+                    <thead>
+                        <tr>
+                            <th>Sent On</th>
+                            <th>Sent By</th>
+                            <th>Type</th>
+                            <th>Code Verified</th>
+                            <th>Submitted</th>
+                            <th>Link Expires</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in emailHistory)
+                        {
+                            <tr>
+                                <td>@Local(entry.CreatedAt)</td>
+                                <td>@entry.CreatedBy</td>
+                                <td>@(entry.IsAdminTest ? "Admin test" : "Supplier")</td>
+                                <td>@(entry.OtpVerifiedAt is null ? "—" : Local(entry.OtpVerifiedAt.Value))</td>
+                                <td>@(entry.UsedAt is null ? "—" : Local(entry.UsedAt.Value))</td>
+                                <td>@Local(entry.ExpiresAt)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .di-doc-viewer { outline: none; }
+    .di-doc-stage { background: #f6f7f9; border: 1px solid #e2e5ea; border-radius: 6px; padding: 8px; }
+    .di-doc-image { max-width: 100%; max-height: 70vh; object-fit: contain; }
+    .di-doc-frame { width: 100%; height: 70vh; border: 0; }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private enum Tab { Details, Documents, EmailHistory }
+
+    private Supplier? supplier;
+    private bool notFound;
+    private bool forbidden;
+    private string currentUser = "unknown";
+    private Tab activeTab = Tab.Details;
+
+    private List<SupplierDocument> documents = [];
+    private bool documentsLoaded;
+    private int currentDocIndex;
+    private ElementReference viewerRef;
+    private bool focusViewerPending;
+
+    private List<SupplierAccessToken> emailHistory = [];
+    private bool emailHistoryLoaded;
+
+    /// <summary>Formats a stored UTC timestamp in the server's local time zone.</summary>
+    private static string Local(DateTime utc) =>
+        DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+    private SupplierDocument CurrentDoc => documents[currentDocIndex];
+    private static bool IsImage(SupplierDocument d) => d.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    private static string SplitType(SupplierDocumentType t) =>
+        System.Text.RegularExpressions.Regex.Replace(t.ToString(), "(?<!^)([A-Z])", " $1");
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        var isAdministrator = state.User.IsAdministrator();
+        var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        // Only an administrator with no business-unit assignment sees every business unit; a user
+        // (administrator or not) assigned to specific business units is scoped to those.
+        var seesAllBusinessUnits = isAdministrator && userBusinessUnitIds.Count == 0;
+
+        var loaded = await SupplierService.GetByIdAsync(Id);
+        if (loaded is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        // Enforce the same visibility scope as the dashboard list (BU + assigned-to-me OR my-department for
+        // non-admins), not just the business unit — otherwise a non-admin could open a supplier by direct URL
+        // that the list would never show them.
+        var userId = state.User.GetUserId();
+        var buScope = seesAllBusinessUnits ? (IReadOnlyCollection<int>?)null : userBusinessUnitIds;
+        int? assigneeScope = isAdministrator ? null : (userId > 0 ? userId : -1);
+        int? departmentScope = isAdministrator || userId <= 0
+            ? null
+            : (await UserService.GetByIdAsync(userId))?.DepartmentId;
+
+        if (!await SupplierService.IsSupplierAccessibleAsync(Id, buScope, assigneeScope, departmentScope))
+        {
+            forbidden = true;
+            return;
+        }
+
+        supplier = loaded;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusViewerPending)
+        {
+            focusViewerPending = false;
+            try { await viewerRef.FocusAsync(); } catch { /* element not ready; harmless */ }
+        }
+    }
+
+    private async Task ShowDocumentsAsync()
+    {
+        activeTab = Tab.Documents;
+        if (!documentsLoaded && supplier is not null)
+        {
+            documents = await SupplierDocumentService.GetDocumentsAsync(supplier.Id);
+            currentDocIndex = 0;
+            documentsLoaded = true;
+        }
+        focusViewerPending = documents.Count > 0;   // focus so arrow keys work
+    }
+
+    private void PrevDoc()
+    {
+        if (currentDocIndex > 0) { currentDocIndex--; }
+    }
+
+    private void NextDoc()
+    {
+        if (currentDocIndex < documents.Count - 1) { currentDocIndex++; }
+    }
+
+    private void OnViewerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "ArrowRight" || e.Key == "PageDown") { NextDoc(); }
+        else if (e.Key == "ArrowLeft" || e.Key == "PageUp") { PrevDoc(); }
+    }
+
+    private async Task PrintCurrentAsync(int documentId)
+    {
+        await JS.InvokeVoidAsync("printImageUrl", $"/suppliers/documents/{documentId}");
+    }
+
+    private async Task ShowEmailHistoryAsync()
+    {
+        activeTab = Tab.EmailHistory;
+        if (!emailHistoryLoaded && supplier is not null)
+        {
+            emailHistory = await SupplierAccessTokenService.GetHistoryForSupplierAsync(supplier.Id);
+            emailHistoryLoaded = true;
+        }
+    }
+
+    private void HandleComplete(Supplier _)
+    {
+        NavigationManager.NavigateTo("/supplier/dashboard");
+    }
+}

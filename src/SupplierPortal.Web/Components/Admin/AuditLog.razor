@@ -1,0 +1,175 @@
+@page "/admin/audit-log"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Services
+@inject AuditService AuditService
+
+<PageTitle>Audit Log - Supplier Portal</PageTitle>
+
+<h1>Audit Log</h1>
+<p class="text-muted">
+    @if (total == 0)
+    {
+        <text>No activity matches the current filter.</text>
+    }
+    else
+    {
+        <text>Showing @RangeStart–@RangeEnd of @total system activity events.</text>
+    }
+</p>
+
+<div class="row g-2 mb-3 align-items-end no-print">
+    <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">User</label>
+        <select class="form-select form-select-sm" style="min-width: 220px" @bind="selectedUser" @bind:after="ApplyFiltersAsync">
+            <option value="">All users</option>
+            @foreach (var u in users)
+            {
+                <option value="@u">@u</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">From</label>
+        <input type="date" class="form-control form-control-sm" @bind="fromDate" @bind:after="ApplyFiltersAsync" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">To</label>
+        <input type="date" class="form-control form-control-sm" @bind="toDate" @bind:after="ApplyFiltersAsync" />
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1 small fw-semibold">Sort by date</label>
+        <select class="form-select form-select-sm" @bind="newestFirst" @bind:after="ApplyFiltersAsync">
+            <option value="true">Newest first</option>
+            <option value="false">Oldest first</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFiltersAsync">Clear filters</button>
+    </div>
+</div>
+
+<div style="overflow-x: auto;">
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>Timestamp</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Entity</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var entry in entries)
+        {
+            <tr>
+                <td>@entry.Timestamp.ToLocalTime().ToString("g")</td>
+                <td>@entry.ActorUsername</td>
+                <td>@entry.Action</td>
+                <td>@entry.EntityType@(entry.EntityId.HasValue ? $" #{entry.EntityId}" : "")</td>
+                <td>@entry.Details</td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@if (total == 0)
+{
+    <p><em>No activity recorded for the selected filters.</em></p>
+}
+else if (TotalPages > 1)
+{
+    <nav class="no-print">
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item @(page == 1 ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoToAsync(page - 1)">Prev</button>
+            </li>
+            @foreach (var pg in PageWindow)
+            {
+                <li class="page-item @(pg == page ? "active" : "")">
+                    <button class="page-link" @onclick="() => GoToAsync(pg)">@pg</button>
+                </li>
+            }
+            <li class="page-item @(page == TotalPages ? "disabled" : "")">
+                <button class="page-link" @onclick="() => GoToAsync(page + 1)">Next</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    private List<Models.AuditLog> entries = [];
+    private List<string> users = [];
+    private string selectedUser = "";
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private bool newestFirst = true;
+    private int page = 1;
+    private int total;
+    private const int PageSize = 50;
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
+    private int RangeStart => total == 0 ? 0 : (page - 1) * PageSize + 1;
+    private int RangeEnd => Math.Min(page * PageSize, total);
+
+    // Sliding 5-number window around the current page.
+    private IEnumerable<int> PageWindow
+    {
+        get
+        {
+            var start = Math.Max(1, page - 2);
+            var end = Math.Min(TotalPages, start + 4);
+            start = Math.Max(1, end - 4);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+
+    // Timestamps are stored UTC; the date pickers are server-local dates. Convert the selected local
+    // day boundaries to UTC (To is exclusive of the following midnight so the whole day is included).
+    private DateTime? FromUtc => fromDate.HasValue
+        ? DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
+        : null;
+    private DateTime? ToUtc => toDate.HasValue
+        ? DateTime.SpecifyKind(toDate.Value.Date.AddDays(1), DateTimeKind.Local).ToUniversalTime()
+        : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await AuditService.GetDistinctActorsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await AuditService.QueryAsync(
+            string.IsNullOrWhiteSpace(selectedUser) ? null : selectedUser,
+            FromUtc, ToUtc, newestFirst, page, PageSize);
+        entries = result.Items;
+        total = result.TotalCount;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        selectedUser = "";
+        fromDate = null;
+        toDate = null;
+        newestFirst = true;
+        page = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoToAsync(int target)
+    {
+        page = Math.Clamp(target, 1, TotalPages);
+        await LoadAsync();
+    }
+}

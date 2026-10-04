@@ -1,0 +1,180 @@
+@page "/customer/self-service/{Token}"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.SelfService
+@inject ICustomerSelfServiceAccessGateway Access
+@inject PublicBrandingState PublicBranding
+@inject ToastService ToastService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Verify Your Identity - Customer Portal</PageTitle>
+
+<div class="di-otp-card">
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (link is null || !link.Valid)
+    {
+        <div class="di-ss-status">
+            <div class="di-ss-status-icon" aria-hidden="true">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5M12 16h.01" />
+                </svg>
+            </div>
+            <h1 class="di-ss-status-title">Link Not Available</h1>
+            <p class="di-ss-status-text">
+                This customer information update link is invalid or has expired. Please contact us
+                @if (!string.IsNullOrWhiteSpace(link?.BusinessUnitEmail))
+                {
+                    <text>at <a class="di-ss-status-mail" href="mailto:@link!.BusinessUnitEmail">@link!.BusinessUnitEmail</a> </text>
+                }
+                to request a new link.
+            </p>
+        </div>
+    }
+    else
+    {
+        <h1>Verify Your Identity</h1>
+        <p class="text-muted">
+            We've sent a 6-digit verification code to the email address on file for
+            <strong>@link.CustomerName</strong>@if (!string.IsNullOrWhiteSpace(link.MaskedRecipient)) {<text> (<strong>@link.MaskedRecipient</strong>)</text>}. Enter it below to continue.
+        </p>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label class="form-label">Verification Code</label>
+            <input class="form-control di-otp-input" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+                   @bind="enteredCode" @bind:event="oninput" placeholder="000000" />
+        </div>
+
+        <button class="btn btn-primary w-100 mb-2" disabled="@(verifying || enteredCode.Length != 6)" @onclick="VerifyAsync">
+            @(verifying ? "Verifying..." : "Verify Code")
+        </button>
+        <button class="btn btn-link w-100" disabled="@resending" @onclick="ResendAsync">
+            @(resending ? "Sending..." : "Resend code")
+        </button>
+    }
+</div>
+
+<style>
+    .di-otp-card {
+        width: 100%;
+        max-width: 440px;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e6e9f0;
+        box-shadow: 0 18px 48px rgba(11, 37, 69, 0.12);
+        padding: 2.25rem 2rem;
+    }
+
+    .di-otp-input {
+        font-size: 1.5rem;
+        letter-spacing: 0.5rem;
+        text-align: center;
+    }
+
+    .di-ss-status { text-align: center; padding: 0.5rem 0.25rem; }
+    .di-ss-status-icon {
+        width: 68px; height: 68px; margin: 0 auto 1.1rem;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; color: #b7791f; background: #fdf6e7; border: 1px solid #f0e2bf;
+    }
+    .di-ss-status-title { font-size: 1.55rem; font-weight: 700; color: #0b2545; margin: 0 0 0.6rem; }
+    .di-ss-status-text { color: #5b6675; font-size: 0.98rem; line-height: 1.6; margin: 0 auto; max-width: 340px; }
+    .di-ss-status-mail { color: #274a7d; font-weight: 600; text-decoration: none; }
+    .di-ss-status-mail:hover { text-decoration: underline; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+
+    private SsCustomerLinkInfo? link;
+    private bool loading = true;
+    private bool verifying;
+    private bool resending;
+    private string enteredCode = "";
+    private string? errorMessage;
+
+    /// <summary>The per-recipient link tag ("p" = Primary Email, "c" = contact Email) from the emailed link's
+    /// <c>?r=</c> query, so the verification code is sent back to the same inbox that opened the link.</summary>
+    private string? recipientKey;
+
+    protected override async Task OnInitializedAsync()
+    {
+        recipientKey = ReadRecipientKey();
+        link = await Access.ResolveAsync(Token, recipientKey);
+
+        // Brand the header whenever the logo could be resolved, including the invalid/expired case.
+        if (!string.IsNullOrWhiteSpace(link.LogoSrc))
+        {
+            PublicBranding.SetLogo(link.LogoSrc);
+        }
+
+        if (link.Valid)
+        {
+            if (link.NeedsFreshOtp)
+            {
+                var (success, error) = await Access.SendOtpAsync(Token, recipientKey);
+                if (!success)
+                {
+                    errorMessage = error;
+                }
+            }
+        }
+
+        loading = false;
+    }
+
+    private string? ReadRecipientKey()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        return q.TryGetValue("r", out var r) ? r.ToString() : null;
+    }
+
+    private async Task VerifyAsync()
+    {
+        if (link is null || !link.Valid) return;
+
+        verifying = true;
+        errorMessage = null;
+
+        var (success, error, sessionToken) = await Access.VerifyOtpAsync(Token, enteredCode);
+        if (success && sessionToken is not null)
+        {
+            NavigationManager.NavigateTo($"/customer/self-service/{Token}/form?s={sessionToken}");
+            return;
+        }
+
+        errorMessage = error;
+        verifying = false;
+    }
+
+    private async Task ResendAsync()
+    {
+        if (link is null || !link.Valid) return;
+
+        resending = true;
+        errorMessage = null;
+
+        var (success, error) = await Access.SendOtpAsync(Token, recipientKey);
+        if (success)
+        {
+            ToastService.ShowSuccess("A new verification code has been sent.");
+        }
+        else
+        {
+            errorMessage = error;
+        }
+
+        resending = false;
+    }
+}

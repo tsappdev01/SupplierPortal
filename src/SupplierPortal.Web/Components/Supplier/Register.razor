@@ -1,0 +1,82 @@
+@page "/supplier/register"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Register Supplier - Supplier Portal</PageTitle>
+
+@if (supplier is null && businessUnits.Count > 0)
+{
+    <div class="mb-3" style="max-width: 300px;">
+        <label class="form-label">Business Unit</label>
+        <select class="form-select" @bind="selectedBusinessUnitId" @bind:after="OnBusinessUnitChosen">
+            <option value="0">-- Select --</option>
+            @foreach (var businessUnit in businessUnits)
+            {
+                <option value="@businessUnit.Id">@businessUnit.Name</option>
+            }
+        </select>
+    </div>
+}
+else if (supplier is not null)
+{
+    <SupplierForm Supplier="supplier" IsCreateMode="true" CurrentUser="currentUser" OnComplete="HandleComplete" />
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@code {
+    private bool isAdministrator;
+    private int selectedBusinessUnitId;
+    private List<BusinessUnit> businessUnits = [];
+    private Supplier? supplier;
+    private string? errorMessage;
+    private string currentUser = "unknown";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAdministrator = state.User.IsAdministrator();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        // Only an administrator with no business-unit assignment sees all; a user (admin or not)
+        // assigned to specific business units is scoped to those.
+        var userBusinessUnitIds = state.User.GetBusinessUnitIds();
+        var seesAll = isAdministrator && userBusinessUnitIds.Count == 0;
+        var allBusinessUnits = await BusinessUnitService.GetAllAsync();
+        businessUnits = seesAll ? allBusinessUnits : allBusinessUnits.Where(b => userBusinessUnitIds.Contains(b.Id)).ToList();
+
+        if (!seesAll)
+        {
+            if (businessUnits.Count == 1)
+            {
+                supplier = new Supplier { BusinessUnitId = businessUnits[0].Id, CreatedBy = currentUser };
+            }
+            else if (businessUnits.Count == 0)
+            {
+                errorMessage = "Your account is not linked to a business unit yet. Contact an administrator.";
+            }
+        }
+    }
+
+    private void OnBusinessUnitChosen()
+    {
+        if (selectedBusinessUnitId > 0)
+        {
+            supplier = new Supplier { BusinessUnitId = selectedBusinessUnitId, CreatedBy = currentUser };
+        }
+    }
+
+    private void HandleComplete(Supplier _)
+    {
+        NavigationManager.NavigateTo("/supplier/dashboard");
+    }
+}

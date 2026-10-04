@@ -1,0 +1,21 @@
+@using SupplierPortal.Web.Services
+@implements IDisposable
+@inject PublicBrandingState Branding
+
+@* Interactive header island: shows the current business unit's logo (set by the page) in the public
+   layout's navy bar, falling back to the default Dubai Investments logo. It is its own interactive
+   component so it can react to PublicBrandingState even though the surrounding layout is static SSR. *@
+<div class="public-header">
+    <img src="@LogoSrc" alt="Business Partners Portal" class="public-brand-logo" />
+</div>
+
+@code {
+    private string LogoSrc =>
+        string.IsNullOrWhiteSpace(Branding.LogoSrc) ? "/images/di-logo.png" : Branding.LogoSrc!;
+
+    protected override void OnInitialized() => Branding.OnChange += OnBrandingChanged;
+
+    private void OnBrandingChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Branding.OnChange -= OnBrandingChanged;
+}

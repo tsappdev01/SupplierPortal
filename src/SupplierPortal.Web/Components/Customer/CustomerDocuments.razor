@@ -1,0 +1,383 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.SelfService
+@inject CustomerDocumentService DocumentService
+@inject ToastService ToastService
+@inject IJSRuntime JS
+@implements IDisposable
+
+@* KYC document checklist: one card per master document type, with upload + view/download/remove.
+   Required types are flagged; the parent wizard blocks submit until they are uploaded. *@
+<div class="di-docs-grid">
+    @foreach (var type in types.Where(t => IsApplicable is null || IsApplicable(t)))
+    {
+        var doc = documents.FirstOrDefault(d => d.DocumentType == type.Name);
+        var inputId = $"cust-doc-{type.Id}";
+        <div class="di-doc-card @(doc is not null ? "is-done" : (type.IsRequired ? "is-required" : ""))">
+            <div class="di-doc-head">
+                <span class="di-doc-name">
+                    @type.Name
+                    @if (type.IsRequired) { <span class="di-doc-req">*</span> }
+                </span>
+                @if (doc is not null)
+                {
+                    <span class="di-doc-badge">Uploaded</span>
+                }
+                else if (type.IsRequired)
+                {
+                    <span class="di-doc-badge di-doc-badge-req">Required</span>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(type.Requirement))
+            {
+                <div class="di-doc-hint">@type.Requirement</div>
+            }
+
+            @if (doc is not null)
+            {
+                @if (busyType == type.Name)
+                {
+                    @ProgressBar
+                }
+                else
+                {
+                    <div class="di-doc-file">
+                        <span class="di-doc-file-name" title="@doc.FileName">@doc.FileName</span>
+                    </div>
+                    <div class="di-doc-actions">
+                        <button type="button" class="di-doc-btn" @onclick="() => ViewAsync(doc)">View</button>
+                        <button type="button" class="di-doc-btn" @onclick="() => DownloadAsync(doc)">Download</button>
+                        @if (!ReadOnly)
+                        {
+                            <button type="button" class="di-doc-btn di-doc-btn-danger" @onclick="() => RemoveAsync(doc)">Remove</button>
+                        }
+                    </div>
+                }
+            }
+            else if (!ReadOnly)
+            {
+                @if (busyType == type.Name)
+                {
+                    @ProgressBar
+                }
+                else
+                {
+                    <label class="di-doc-choose" for="@inputId">
+                        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/></svg>
+                        <span>Upload</span>
+                    </label>
+                }
+                @* The InputFile MUST stay mounted at a stable position for the whole upload: the chunked read
+                   below reports progress with StateHasChanged, and if this element were removed mid-read (e.g. by
+                   swapping to a progress-only branch) Blazor's readFileData loses the browser file reference and
+                   throws "Cannot read properties of null (reading '_blazorFilesById')". So it lives OUTSIDE the
+                   busy toggle above — only the label is swapped for the progress bar. *@
+                <InputFile id="@inputId" class="di-doc-input" accept=".pdf,.jpg,.jpeg,.png"
+                           OnChange="e => UploadAsync(type.Name, e)" />
+            }
+            else
+            {
+                <div class="di-doc-empty">Not uploaded</div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .di-docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .di-doc-card { border: 1px solid #e2e5ea; border-left: 3px solid #c3ccdb; border-radius: 10px; padding: 14px 16px; background: #fff; display: flex; flex-direction: column; gap: 8px; }
+    .di-doc-card.is-done { border-left-color: #2f9e44; }
+    .di-doc-card.is-required { border-left-color: #c0392b; }
+    .di-doc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .di-doc-name { font-weight: 700; font-size: 14.5px; color: #1a2233; }
+    .di-doc-req { color: #c0392b; margin-left: 2px; }
+    .di-doc-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #e7f7ee; color: #12a150; flex: none; }
+    .di-doc-badge-req { background: #fdecec; color: #c0392b; }
+    .di-doc-hint { font-size: 12px; color: #7b8697; line-height: 1.4; }
+    .di-doc-file { display: flex; align-items: center; gap: 6px; background: #eef8f1; border: 1px solid #cbe9d5; border-radius: 8px; padding: 6px 10px; }
+    .di-doc-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: #16632a; }
+    .di-doc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .di-doc-btn { border: 1px solid #1e7e34; color: #1e7e34; background: #fff; border-radius: 6px; padding: 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .di-doc-btn:hover { background: #1e7e34; color: #fff; }
+    .di-doc-btn-danger { border-color: #c0392b; color: #c0392b; }
+    .di-doc-btn-danger:hover { background: #c0392b; color: #fff; }
+    .di-doc-choose { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: #3b5bdb; color: #fff; border-radius: 8px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+    .di-doc-choose:hover { background: #2f4bc4; }
+    .di-doc-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+    .di-doc-empty { font-size: 13px; color: #97a1b3; font-style: italic; }
+    .di-doc-progress { display: flex; flex-direction: column; gap: 5px; }
+    .di-doc-progress-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: #3b5bdb; }
+    .di-doc-progress-sub { font-size: 11.5px; color: #7b8697; }
+    .di-doc-bar { height: 8px; background: #e8edf6; border-radius: 999px; overflow: hidden; }
+    .di-doc-bar-fill { height: 100%; background: #3b5bdb; border-radius: 999px; transition: width .15s ease; }
+    .di-doc-bar.is-indeterminate .di-doc-bar-fill { width: 40% !important; animation: di-doc-indeterminate 1.1s ease-in-out infinite; }
+    @@keyframes di-doc-indeterminate { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public int CustomerId { get; set; }
+    [Parameter] public string CurrentUser { get; set; } = "unknown";
+    /// <summary>When true, view/download go through the JS blob path instead of the authorized endpoint
+    /// (used on the public self-service page where the customer has no cookie session).</summary>
+    [Parameter] public bool SelfService { get; set; }
+    /// <summary>When true, uploads/removes are hidden (read-only review).</summary>
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    /// <summary>When set, all document operations route through the self-service data gateway (DMZ = internal API,
+    /// Internal = database) instead of the injected <see cref="CustomerDocumentService"/>. Set together with
+    /// <see cref="SsToken"/>/<see cref="SsSession"/> on the public self-service page so the DMZ build stays database-less.</summary>
+    [Parameter] public ICustomerSelfServiceDataGateway? SsGateway { get; set; }
+    [Parameter] public string? SsToken { get; set; }
+    [Parameter] public string? SsSession { get; set; }
+    /// <summary>Master document types. When supplied (from the self-service form bundle) they are used as-is so the
+    /// component does not hit the database on the DMZ; otherwise they are loaded via the document service.</summary>
+    [Parameter] public List<CustomerDocumentType>? Types { get; set; }
+
+    /// <summary>Optional predicate deciding whether a document type currently applies to this customer (its
+    /// conditional "Depends On" rule is satisfied). Non-applicable types are hidden from the checklist. The
+    /// parent supplies it because the controlling values live on the customer/contact it owns. Null = show all.</summary>
+    [Parameter] public Func<CustomerDocumentType, bool>? IsApplicable { get; set; }
+
+    /// <summary>Linear progress bar for the file transfer (upload = determinate %; download = indeterminate).
+    /// Shared by the has-document (download) and no-document (upload) branches.</summary>
+    private RenderFragment ProgressBar => __builder =>
+    {
+        <div class="di-doc-progress">
+            <div class="di-doc-progress-top">
+                <span>@(busyIsDownload ? "Downloading…" : "Uploading…")</span>
+                @if (upTotal > 0) { <span>@UpPct%</span> }
+            </div>
+            <div class="di-doc-bar @(busyIsDownload && upTotal == 0 ? "is-indeterminate" : null)">
+                <div class="di-doc-bar-fill" style="width:@(busyIsDownload && upTotal == 0 ? 100 : UpPct)%"></div>
+            </div>
+            @if (upTotal > 0)
+            {
+                <div class="di-doc-progress-sub">@FmtMB(upRead) of @FmtMB(upTotal)</div>
+            }
+        </div>
+    };
+
+    private bool ViaGateway => SsGateway is not null;
+
+    private List<CustomerDocumentType> types = [];
+    private List<CustomerDocument> documents = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        types = Types ?? await DocumentService.GetTypesAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        documents = ViaGateway
+            ? await SsGateway!.ListDocumentsAsync(SsToken ?? "", SsSession ?? "")
+            : await DocumentService.GetDocumentsAsync(CustomerId);
+        await OnChanged.InvokeAsync();
+    }
+
+    // ---- Transfer progress (linear bar) ----
+    private const long MaxUploadBytes = 20 * 1024 * 1024;
+    private string? busyType;            // the document type currently uploading/downloading
+    private bool busyIsDownload;
+    private long upRead;
+    private long upTotal;
+    private int UpPct => upTotal > 0 ? (int)Math.Min(100, upRead * 100 / upTotal) : 0;
+    private static string FmtMB(long bytes) => $"{bytes / 1024d / 1024d:0.0} MB";
+
+    private async Task UploadAsync(string documentType, InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file.Size > MaxUploadBytes)
+        {
+            ToastService.ShowError("File exceeds the 20 MB size limit.");
+            return;
+        }
+
+        // Read the file browser→server in chunks so the customer sees real upload progress (the slow hop on
+        // their connection). Standard: Linear Progress Bar for a file upload with a known size.
+        byte[] bytes;
+        busyType = documentType;
+        busyIsDownload = false;
+        upTotal = file.Size;
+        upRead = 0;
+        StateHasChanged();
+        try
+        {
+            using var ms = new MemoryStream();
+            await using var stream = file.OpenReadStream(maxAllowedSize: MaxUploadBytes);
+            var buffer = new byte[64 * 1024];
+            var lastReport = 0L;
+            int read;
+            while ((read = await stream.ReadAsync(buffer)) > 0)
+            {
+                await ms.WriteAsync(buffer.AsMemory(0, read));
+                upRead += read;
+                if (upRead - lastReport >= 128 * 1024 || upRead >= upTotal)
+                {
+                    lastReport = upRead;
+                    StateHasChanged();
+                    await Task.Delay(1);   // let the circuit flush the bar to the browser
+                }
+            }
+            bytes = ms.ToArray();
+        }
+        catch (Exception ex)
+        {
+            busyType = null;
+            ToastService.ShowError($"Upload failed: {ex.Message}");
+            return;
+        }
+
+        bool ok;
+        string? err;
+        if (ViaGateway)
+        {
+            var r = await SsGateway!.UploadDocumentAsync(
+                SsToken ?? "", SsSession ?? "", documentType, file.Name, file.ContentType, bytes);
+            ok = r.Success;
+            err = r.Error;
+        }
+        else
+        {
+            (ok, err) = await DocumentService.UploadBytesAsync(
+                CustomerId, documentType, bytes, file.Name,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType, CurrentUser);
+        }
+
+        busyType = null;
+        if (ok)
+        {
+            ToastService.ShowSuccess($"{documentType} uploaded.");
+            await ReloadAsync();
+        }
+        else
+        {
+            ToastService.ShowError(err ?? "Upload failed.");
+        }
+    }
+
+    private async Task RemoveAsync(CustomerDocument doc)
+    {
+        if (ViaGateway)
+        {
+            var r = await SsGateway!.DeleteDocumentAsync(SsToken ?? "", SsSession ?? "", doc.Id);
+            if (!r.Success)
+            {
+                ToastService.ShowError(r.Error ?? "Remove failed.");
+                return;
+            }
+        }
+        else
+        {
+            await DocumentService.DeleteAsync(doc.Id, CurrentUser);
+        }
+        ToastService.ShowInfo($"{doc.DocumentType} removed.");
+        await ReloadAsync();
+    }
+
+    private async Task ViewAsync(CustomerDocument doc)
+    {
+        if (SelfService)
+        {
+            var (bytes, contentType, _) = await LoadFileAsync(doc.Id);
+            if (bytes is not null)
+            {
+                await JS.InvokeVoidAsync("ssDoc.open", contentType, Convert.ToBase64String(bytes));
+            }
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("open", $"/customers/documents/{doc.Id}", "_blank");
+        }
+    }
+
+    private DotNetObjectReference<CustomerDocuments>? dlRef;
+
+    private async Task DownloadAsync(CustomerDocument doc)
+    {
+        if (SelfService)
+        {
+            // Self-service fetches the file through the data gateway (no cookie session) and returns it whole,
+            // so a byte-accurate percentage isn't available — show an indeterminate linear bar while it loads.
+            busyType = doc.DocumentType;
+            busyIsDownload = true;
+            upRead = 0;
+            upTotal = 0;
+            StateHasChanged();
+            try
+            {
+                var (bytes, contentType, fileName) = await LoadFileAsync(doc.Id);
+                if (bytes is not null)
+                {
+                    await JS.InvokeVoidAsync("ssDoc.download", fileName, contentType, Convert.ToBase64String(bytes));
+                }
+                else
+                {
+                    ToastService.ShowError("Could not load the document.");
+                }
+            }
+            finally
+            {
+                busyType = null;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            // Internal: the endpoint is cookie-authorized and sends Content-Length, so stream it with a real
+            // determinate linear progress bar (Standard: Linear Progress Bar for a file download).
+            busyType = doc.DocumentType;
+            busyIsDownload = true;
+            upRead = 0;
+            upTotal = 0;
+            dlRef ??= DotNetObjectReference.Create(this);
+            StateHasChanged();
+            await JS.InvokeVoidAsync("ssDoc.downloadWithProgress",
+                $"/customers/documents/{doc.Id}?download=1", doc.FileName, dlRef);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnDownloadProgress(int percent, long received, long total)
+    {
+        upTotal = total;
+        upRead = received;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadComplete(string fileName)
+    {
+        busyType = null;
+        ToastService.ShowSuccess($"Downloaded {fileName}");
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnDownloadError(string message)
+    {
+        busyType = null;
+        ToastService.ShowError(string.IsNullOrWhiteSpace(message) ? "Download failed." : message);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() => dlRef?.Dispose();
+
+    private async Task<(byte[]? Bytes, string ContentType, string FileName)> LoadFileAsync(int documentId)
+    {
+        if (ViaGateway)
+        {
+            var f = await SsGateway!.GetDocumentFileAsync(SsToken ?? "", SsSession ?? "", documentId);
+            return f is null ? (null, "", "") : (Convert.FromBase64String(f.BytesBase64), f.ContentType, f.FileName);
+        }
+
+        var file = await DocumentService.GetFileAsync(documentId);
+        return file is null ? (null, "", "") : (file.Value.Bytes, file.Value.ContentType, file.Value.FileName);
+    }
+}

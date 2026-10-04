@@ -1,0 +1,491 @@
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+table, .table {
+    font-family: Calibri, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 12pt;
+}
+
+table th, table td, .table th, .table td {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+label, input, select, textarea, button,
+.form-control, .form-select, .form-check-input,
+.form-check-label, .form-label, .btn {
+    font-size: 13pt;
+}
+
+a, .btn-link {
+    color: #006bb7;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #1b6ec2;
+    border-color: #1861ac;
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+h1:focus {
+    outline: none;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid #e50000;
+}
+
+.validation-message {
+    color: #e50000;
+}
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+.darker-border-checkbox.form-check-input {
+    border-color: #929292;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}
+/* ============================================================
+   Dubai Investments corporate theme (navy + gold)
+   ============================================================ */
+:root {
+    --di-navy: #1a2233;
+    --di-navy-2: #26324a;
+    --di-gold: #c8a24a;
+    --di-gold-dark: #a8842f;
+    --di-page-bg: #f4f6f9;
+    --di-border: #e2e5ea;
+    /* semantic tokens (flip in dark) */
+    --di-surface: #ffffff;
+    --di-surface-2: #f4f6f9;
+    --di-text: #26303f;
+    --di-text-soft: #5a6678;
+    --di-heading: #1a2233;      /* page titles / labels — must stay readable on the page ground */
+    --di-row-hover: #fbf6ea;    /* faint gold tint */
+    --di-link: #26324a;
+}
+
+/* ---- Dark theme: our custom chrome. Bootstrap components flip via data-bs-theme="dark". ---- */
+[data-theme="dark"] {
+    --di-page-bg: #0e1626;
+    --di-border: #26314a;
+    --di-surface: #151f33;
+    --di-surface-2: #1b2740;
+    --di-text: #e6ecf6;
+    --di-text-soft: #9aa7bd;
+    --di-heading: #e9eef7;
+    --di-row-hover: #1d2942;
+    --di-link: #8fb6ff;
+    /* nudge Bootstrap's own surfaces to our palette so its dark mode matches the chrome */
+    --bs-body-bg: #0e1626;
+    --bs-body-color: #e6ecf6;
+    --bs-border-color: #26314a;
+}
+
+body {
+    background-color: var(--di-page-bg);
+    color: var(--di-text);
+}
+
+/* Headings in corporate navy with a gold underline accent on page titles */
+h1, h2, h3, .h1, .h2, .h3 {
+    color: var(--di-heading);
+}
+
+main > article.content > h1:first-child,
+.di-form-title {
+    border-bottom: 3px solid var(--di-gold);
+    padding-bottom: 0.35rem;
+    display: inline-block;
+}
+
+.form-label {
+    color: var(--di-heading);
+    font-weight: 600;
+}
+
+/* Primary buttons -> corporate navy; add a gold-accented variant */
+.btn-primary {
+    background-color: var(--di-navy);
+    border-color: var(--di-navy);
+}
+
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background-color: var(--di-navy-2) !important;
+    border-color: var(--di-navy-2) !important;
+}
+
+.btn-outline-primary {
+    color: var(--di-navy);
+    border-color: var(--di-navy);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--di-navy);
+    border-color: var(--di-navy);
+    color: #fff;
+}
+
+a, .btn-link { color: var(--di-link); }
+
+/* Data grid: navy header, subtle striping, gold row hover */
+.table > thead th,
+table thead th {
+    background-color: var(--di-navy);
+    color: #fff;
+    border-color: var(--di-navy) !important;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.table > tbody tr:hover > * {
+    background-color: var(--di-row-hover);   /* faint gold tint on hover (light) / navy tint (dark) */
+}
+
+.table {
+    border: 1px solid var(--di-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Manage Supplier: keep the action toolbar (Generate Template / Print / Notify / Register / Upload)
+   pinned to the top while scrolling. */
+.di-toolbar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--di-page-bg);
+    padding: 8px 0;
+}
+
+/* Manage Supplier list: scroll the table area and keep the navy header row pinned to the top so
+   column names stay visible while scrolling the list. The header already has a solid navy
+   background so it fully covers the rows scrolling underneath it. */
+.di-supplier-scroll {
+    overflow: auto;
+    max-height: calc(100vh - 320px);
+    border: 1px solid var(--di-border);
+    border-radius: 8px;
+}
+/* The base .table rule sets overflow:hidden (to clip its rounded corners), which makes the table
+   its own scroll container and prevents the sticky header from pinning to .di-supplier-scroll.
+   Let the scroll wrapper own the border/rounding and clear the table's overflow so sticky works. */
+.di-supplier-scroll > table.table {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+}
+.di-supplier-scroll table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+@media print {
+    /* Never clip the list when printing — show every row. */
+    .di-supplier-scroll { overflow: visible; max-height: none; }
+}
+
+/* Tabs: navy active text with a gold underline */
+.nav-tabs .nav-link {
+    color: #5a6678;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--di-navy);
+    font-weight: 700;
+    border-bottom: 2px solid var(--di-gold);
+}
+
+/* Dark-mode contrast fixes: outline buttons and tab labels use the fixed navy/grey which are
+   near-invisible on the dark surface. Re-map them to light theme tokens in dark mode. */
+[data-theme="dark"] .btn-outline-primary { color: var(--di-link); border-color: var(--di-link); }
+[data-theme="dark"] .btn-outline-primary:hover { background-color: var(--di-link); border-color: var(--di-link); color: #0e1626; }
+[data-theme="dark"] .btn-outline-secondary { color: var(--di-text); border-color: var(--di-border); }
+[data-theme="dark"] .btn-outline-secondary:hover { background-color: var(--di-surface-2); border-color: var(--di-text-soft); color: var(--di-text); }
+[data-theme="dark"] .nav-tabs .nav-link { color: var(--di-text-soft); }
+[data-theme="dark"] .nav-tabs .nav-link.active { color: var(--di-heading); }
+
+/* Cards / panels pick up a soft shadow so they lift off the grey page */
+.di-stat-tile,
+.di-field-settings-section,
+.di-form-page,
+.card {
+    box-shadow: 0 1px 3px rgba(26, 34, 51, 0.06);
+}
+
+/* Gold corporate action button */
+.btn-di-gold {
+    background-color: var(--di-gold);
+    border-color: var(--di-gold);
+    color: #1a2233;
+    font-weight: 600;
+}
+.btn-di-gold:hover, .btn-di-gold:focus, .btn-di-gold:active {
+    background-color: var(--di-gold-dark) !important;
+    border-color: var(--di-gold-dark) !important;
+    color: #fff !important;
+}
+
+/* Icon-style export/print buttons on the Manage Supplier dashboard */
+.di-export-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 64px;
+    padding: 6px 4px;
+    border-radius: 8px;
+    background: var(--di-surface);
+    border: 1px solid var(--di-border);
+    color: var(--di-text-soft);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+
+.di-export-btn:hover,
+.di-export-btn:focus-visible {
+    border-color: var(--di-gold, #c8a24a);
+    box-shadow: 0 2px 8px rgba(26, 34, 51, 0.12);
+    transform: translateY(-1px);
+    color: #1a2233;
+}
+
+.di-export-btn svg {
+    display: block;
+    pointer-events: none;
+}
+
+/* Icon + label action cards (Notify All / Register / Upload) on the Manage Supplier dashboard */
+.di-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--di-surface);
+    border: 1px solid var(--di-border);
+    color: var(--di-heading);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+
+.di-action-btn:hover:not(:disabled),
+.di-action-btn:focus-visible {
+    box-shadow: 0 2px 10px rgba(26, 34, 51, 0.14);
+    transform: translateY(-1px);
+    color: var(--di-navy);
+    text-decoration: none;
+}
+
+.di-action-btn:disabled {
+    opacity: .6;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+}
+
+.di-action-btn svg {
+    display: block;
+    flex: 0 0 auto;
+    pointer-events: none;
+}
+
+/* Per-action accent: a tinted resting border that deepens to the corporate colour on hover */
+.di-action-btn.is-notify { border-color: #bfe6ef; }
+.di-action-btn.is-notify:hover:not(:disabled),
+.di-action-btn.is-notify:focus-visible { border-color: #0aa2c0; }
+
+.di-action-btn.is-register { border-color: #c7d1ea; }
+.di-action-btn.is-register:hover,
+.di-action-btn.is-register:focus-visible { border-color: var(--di-navy); }
+
+.di-action-btn.is-upload { border-color: #ecd9a6; }
+.di-action-btn.is-upload:hover,
+.di-action-btn.is-upload:focus-visible { border-color: var(--di-gold); }
+
+/* Top bar (holds the supplier-activity + notification icons) */
+.di-topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 1.5rem 0;
+}
+
+/* Top-bar activity / notification widgets (per-portal) */
+.di-notif { display: inline-flex; align-items: center; gap: 6px; }
+.di-notif-wrap { position: relative; }
+.di-notif-btn {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--di-border); background: var(--di-surface);
+    color: var(--di-text); cursor: pointer; text-decoration: none; transition: border-color .12s, box-shadow .12s;
+}
+.di-notif-btn:hover { border-color: var(--di-gold); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+.di-notif-badge {
+    position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 9px; background: #c0392b; color: #fff; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.di-notif-panel {
+    position: absolute; right: 0; top: 46px; width: 340px; max-height: 60vh; overflow: auto;
+    background: var(--di-surface); border: 1px solid var(--di-border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(26,34,51,.18); z-index: 2500;
+}
+.di-notif-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; background: var(--di-navy); color: #fff; font-weight: 700;
+    border-radius: 10px 10px 0 0; position: sticky; top: 0;
+}
+.di-notif-count { background: var(--di-gold); color: #1a2233; border-radius: 10px; padding: 1px 9px; font-size: 12px; }
+.di-notif-empty { padding: 18px 14px; color: var(--di-text-soft); font-size: 14px; }
+.di-notif-list { display: flex; flex-direction: column; }
+.di-notif-item {
+    display: flex; align-items: stretch;
+    background: var(--di-surface); border-bottom: 1px solid var(--di-border);
+}
+.di-notif-item:hover { background: var(--di-surface-2); }
+.di-notif-item-main {
+    flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left;
+    padding: 10px 6px 10px 14px; background: transparent; border: none; cursor: pointer; min-width: 0;
+}
+.di-notif-name { font-weight: 700; color: var(--di-heading); font-size: 14px; }
+.di-notif-meta { color: var(--di-text-soft); font-size: 12px; }
+.di-notif-dismiss {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; background: transparent; border: none; border-left: 1px solid var(--di-border);
+    color: var(--di-text-soft); cursor: pointer; transition: color .12s, background .12s;
+}
+.di-notif-dismiss:hover { color: #c0392b; background: rgba(192,57,43,.12); }
+.di-notif-foot-row { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--di-border); }
+.di-notif-dismiss-all {
+    padding: 10px 14px; background: transparent; border: none; color: var(--di-text-soft);
+    font-weight: 700; font-size: 13px; cursor: pointer; transition: color .12s, background .12s;
+}
+.di-notif-dismiss-all:hover { color: #c0392b; background: var(--di-surface-2); }
+.di-notif-foot { display: block; text-align: center; padding: 10px 14px; color: var(--di-link); font-weight: 700; font-size: 13px; text-decoration: none; }
+.di-notif-foot:hover { background: var(--di-surface-2); }
+
+/* KPI stat tiles (Manage Supplier / Manage Customer dashboards) */
+.di-stat-row { display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.di-stat-tile { background: var(--di-surface); border: 1px solid var(--di-border);
+    border-top: 3px solid var(--di-navy, #1a2233); border-radius: 10px; padding: 1rem 1.4rem; min-width: 160px; }
+.di-stat-value { font-size: 1.9rem; font-weight: 700; color: var(--di-heading); line-height: 1.2; }
+.di-stat-label { font-size: .8rem; color: var(--di-text-soft); margin-top: .15rem; }
+.di-stat-total { border-top-color: #1a2233; }
+.di-stat-new { border-top-color: #6c757d; } .di-stat-new .di-stat-value { color: #6c757d; }
+.di-stat-await { border-top-color: #2f80b5; } .di-stat-await .di-stat-value { color: #2f80b5; }
+.di-stat-review { border-top-color: #c8a24a; } .di-stat-review .di-stat-value { color: #a8842f; }
+.di-stat-complete { border-top-color: #2e7d46; } .di-stat-complete .di-stat-value { color: #2e7d46; }
+[data-theme="dark"] .di-stat-total { border-top-color: #8fa0c4; }
+/* Brighten the accent values so they stay legible on the dark surface. */
+[data-theme="dark"] .di-stat-new .di-stat-value { color: #aeb7c4; }
+[data-theme="dark"] .di-stat-await .di-stat-value { color: #5aa6e0; }
+[data-theme="dark"] .di-stat-review .di-stat-value { color: #e0b45a; }
+[data-theme="dark"] .di-stat-complete .di-stat-value { color: #5cc489; }
+
+/* Toggle switch (used on Field Settings + user forms) */
+.di-switch { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; }
+.di-switch input { opacity: 0; width: 0; height: 0; }
+.di-switch-slider { position: absolute; cursor: pointer; inset: 0; background-color: #c34; border-radius: 24px; transition: background-color .15s ease; }
+.di-switch-slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform .15s ease; }
+.di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+.di-switch input:checked + .di-switch-slider::before { transform: translateX(20px); }
+.di-switch input:disabled + .di-switch-slider { opacity: .45; cursor: not-allowed; }
+
+/* Per-tab read-only banner (customer form; shown when a tab is edit-restricted to other users) */
+.di-tab-readonly-note { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #f2d99b; border-radius: 10px; background: #fff8e8; color: #8a5b06; font-size: 13px; font-weight: 500; }
+.di-tab-readonly-note svg { flex: none; color: #b07d1a; }
+
+/* Light / dark theme toggle in the top bar */
+.di-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    border: 1px solid var(--di-border);
+    background: var(--di-surface);
+    color: var(--di-text-soft);
+    cursor: pointer;
+    transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.di-theme-toggle:hover,
+.di-theme-toggle:focus-visible {
+    color: var(--di-gold);
+    border-color: var(--di-gold);
+}
+.di-theme-toggle svg { display: block; width: 18px; height: 18px; }
+/* show the sun in dark mode, the moon in light mode */
+.di-theme-toggle .di-ico-sun { display: none; }
+.di-theme-toggle .di-ico-moon { display: block; }
+[data-theme="dark"] .di-theme-toggle .di-ico-sun { display: block; }
+[data-theme="dark"] .di-theme-toggle .di-ico-moon { display: none; }
+
+/* Collapsible left navigation (hide/show the sidebar so content goes full width).
+   Driven by data-sidebar on the document root; the flex layout reflows <main> to fill
+   the freed space automatically (the sidebar has no content margin tied to it). */
+.sidebar { transition: width .18s ease; }
+/* Only collapse on desktop; below 641px the sidebar row carries the mobile hamburger, so it must stay. */
+@media (min-width: 641px) {
+    :root[data-sidebar="collapsed"] .sidebar {
+        width: 0 !important;
+        min-width: 0;
+        border-right: 0;
+        overflow: hidden;
+    }
+}
+/* Toggle icon: show the "hide" (close-panel) icon when expanded, the "show" (open-panel) icon when collapsed */
+.di-sidebar-toggle .di-ico-navshow { display: none; }
+.di-sidebar-toggle .di-ico-navhide { display: block; }
+:root[data-sidebar="collapsed"] .di-sidebar-toggle .di-ico-navshow { display: block; }
+:root[data-sidebar="collapsed"] .di-sidebar-toggle .di-ico-navhide { display: none; }
+
+/* A couple of custom surfaces that hardcode white so they follow the theme */
+[data-theme="dark"] .di-stat-tile,
+[data-theme="dark"] .di-form-page,
+[data-theme="dark"] .di-field-settings-section {
+    background-color: var(--di-surface);
+    color: var(--di-text);
+    border-color: var(--di-border);
+}
+[data-theme="dark"] .text-muted { color: var(--di-text-soft) !important; }

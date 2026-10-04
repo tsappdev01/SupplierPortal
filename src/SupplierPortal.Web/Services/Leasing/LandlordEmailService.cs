@@ -1,0 +1,219 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SupplierPortal.Web.Data.Leasing;
+
+namespace SupplierPortal.Web.Services.Leasing;
+
+/// <summary>
+/// Sends the Landlord-registration notification emails (FRD §28) through the shared <see cref="EmailDispatcher"/>
+/// (Microsoft Graph → SMTP → SQL Server Database Mail, chosen centrally), exactly like the supplier and customer
+/// services. Each email is sent from the record's Business Unit email address (its configured sender) and shows
+/// the white / logo header. Mail is best-effort and never blocks the workflow transition that triggered it.
+/// </summary>
+public class LandlordEmailService(
+    IDbContextFactory<LeasingDbContext> dbFactory, IOptions<LeasingOptions> options,
+    SupplierPortal.Web.Services.EmailBrandingService branding,
+    SupplierPortal.Web.Services.EmailDispatcher emailDispatcher, ILogger<LandlordEmailService> logger)
+{
+    private string MailProfileName => options.Value.MailProfile;
+
+    private static string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+    /// <summary>Resolves the Business Unit's brand name + logo and builds the branded HTML shell (white header).</summary>
+    private async Task<string> BrandAsync(string? actorUsername, int? businessUnitId,
+        string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
+    {
+        var header = await HeaderAsync(actorUsername, businessUnitId);
+        return Wrap(header, heading, bodyHtml, ctaText, ctaUrl, footnote);
+    }
+
+    /// <summary>Builds the white email header — the Business Unit logo when available, else its name as text,
+    /// in navy (mirrors the supplier/customer white header).</summary>
+    private async Task<string> HeaderAsync(string? actorUsername, int? businessUnitId)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        var org = string.IsNullOrWhiteSpace(brand) ? "Dubai Investments" : brand;
+        var logo = await branding.GetBusinessUnitLogoSrcAsync(businessUnitId);
+        var brandBlock = string.IsNullOrWhiteSpace(logo)
+            ? $"<div style=\"color:#092F56;font-size:18px;font-weight:700;letter-spacing:.02em\">{E(org)}</div>"
+            : $"<img src=\"{logo}\" alt=\"{E(org)}\" style=\"max-height:48px;max-width:220px;display:block\" />";
+        return brandBlock +
+            "<div style=\"color:#5C6670;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin-top:4px\">Business Centre · Leasing</div>";
+    }
+
+    public async Task SendInviteAsync(string toEmail, string legalOrCompany, string link, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        await SendAsync(toEmail, "Landlord Registration – Action Required",
+            await BrandAsync(actorUsername, businessUnitId, "Landlord Registration",
+                $"<p style=\"margin:0 0 14px\">Dear Landlord,</p>" +
+                $"<p style=\"margin:0 0 14px\">{E(brand)} Business Centre invites you to complete/update the landlord " +
+                $"registration for <strong>{E(legalOrCompany)}</strong>. The process takes a few minutes and lets you " +
+                $"provide your contact details, upload the required documents and confirm your authorised signatories.</p>" +
+                $"<p style=\"margin:0 0 6px;color:#5C6670;font-size:13px\">You will be asked for a one-time verification code sent to this email address.</p>",
+                "Complete Registration", link,
+                "This link is confidential and unique to you — please do not share it. It expires in 30 days."),
+            businessUnitId, actorUsername);
+    }
+
+    public async Task SendCorrectionAsync(string toEmail, string propertyCode, string comment, string link, string? actorUsername = null, int? businessUnitId = null) =>
+        await SendAsync(toEmail, "Action Required – Landlord Registration",
+            await BrandAsync(actorUsername, businessUnitId, "Additional Information Required",
+                "<p style=\"margin:0 0 14px\">Business Centre has reviewed your registration and needs a small correction " +
+                "before it can be completed.</p>" +
+                $"{Note("Reviewer comment", comment)}" +
+                $"<p style=\"margin:14px 0 6px\">Please reopen your registration for property <strong>{E(propertyCode)}</strong>, " +
+                "make the update and resubmit.</p>",
+                "Update Registration", link,
+                "You will be asked to verify with a one-time code when you open the link."),
+            businessUnitId, actorUsername);
+
+    public async Task SendRejectionAsync(string toEmail, string propertyCode, string reason, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        await SendAsync(toEmail, "Landlord Registration – Not Accepted",
+            await BrandAsync(actorUsername, businessUnitId, "Registration Not Accepted",
+                $"<p style=\"margin:0 0 14px\">We were unable to accept the landlord registration for property " +
+                $"<strong>{E(propertyCode)}</strong>.</p>{Note("Reason", reason)}" +
+                "<p style=\"margin:14px 0 0\">If the registration is to proceed, Business Centre will restart the process " +
+                "and send you a fresh link.</p>", null, null,
+                $"Please contact {E(brand)} Business Centre if you have any questions."),
+            businessUnitId, actorUsername);
+    }
+
+    public async Task SendSubmittedToLandlordAsync(string toEmail, string propertyCode, string? reference, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        await SendAsync(toEmail, "Landlord Registration Submitted",
+            await BrandAsync(actorUsername, businessUnitId, "Registration Submitted Successfully",
+                $"<p style=\"margin:0 0 14px\">Thank you — your landlord registration for property " +
+                $"<strong>{E(propertyCode)}</strong> has been <strong>submitted successfully</strong>.</p>" +
+                $"<p style=\"margin:0 0 14px\">The {E(brand)} Business Centre team will now review your submission " +
+                "and will get back to you if any clarification is required.</p>" +
+                "<p style=\"margin:0\">No further action is needed from you at this stage.</p>" +
+                (string.IsNullOrWhiteSpace(reference) ? "" : Note("Reference", reference)),
+                null, null,
+                "You will receive a further email once your registration has been reviewed."),
+            businessUnitId, actorUsername);
+    }
+
+    public async Task SendCompletionToLandlordAsync(string toEmail, string propertyCode, string? actorUsername = null, int? businessUnitId = null)
+    {
+        var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        await SendAsync(toEmail, "Landlord Registration Completed",
+            await BrandAsync(actorUsername, businessUnitId, "Registration Completed",
+                $"<p style=\"margin:0 0 14px\">Good news — your landlord registration for property " +
+                $"<strong>{E(propertyCode)}</strong> has been reviewed and <strong>completed</strong> by Business Centre.</p>" +
+                $"<p style=\"margin:0\">No further action is required. Thank you for registering with {E(brand)}.</p>",
+                null, null, null),
+            businessUnitId, actorUsername);
+    }
+
+    public async Task SendCompletionToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string completedBy, DateTime completedAt, string? initiatedBy = null, int? businessUnitId = null)
+    {
+        var initiatedRow = string.IsNullOrWhiteSpace(initiatedBy) ? ""
+            : $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Initiated By</td><td style=\"padding:4px 0\">{E(initiatedBy)}</td></tr>";
+        var rows =
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            initiatedRow +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Completed By</td><td style=\"padding:4px 0\">{E(completedBy)}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Completion Date</td><td style=\"padding:4px 0\">{completedAt:yyyy-MM-dd HH:mm} UTC</td></tr>";
+        var body = await BrandAsync(completedBy, businessUnitId, "Landlord Registration Completed",
+            "<p style=\"margin:0 0 14px\">A landlord registration you are responsible for has been completed:</p>" +
+            $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>", null, null, null);
+        await Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
+            .Select(e => SendAsync(e, $"Landlord Registration Completed – {propertyCode}", body, businessUnitId)));
+    }
+
+    public async Task SendSubmittedToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string? reference, string initiatedBy, string? link, int? businessUnitId = null)
+    {
+        var rows =
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Reference</td><td style=\"padding:4px 0\">{E(reference ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Initiated By</td><td style=\"padding:4px 0\">{E(initiatedBy)}</td></tr>";
+        var body = await BrandAsync(initiatedBy, businessUnitId, "Landlord Registration Submitted",
+            "<p style=\"margin:0 0 14px\">A landlord has submitted their registration and it is ready for review. " +
+            "A PDF summary of the full submission (contacts, signatories and attached documents) has been saved " +
+            "against the registration.</p>" +
+            $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>",
+            link is null ? null : "Open Registration", link,
+            "Open the registration in the Business Centre portal to review and complete it.");
+        await Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
+            .Select(e => SendAsync(e, $"Landlord Registration Submitted – {propertyCode}", body, businessUnitId)));
+    }
+
+    public async Task SendSignedToStaffAsync(IEnumerable<string> staffEmails, string propertyCode, string? company, string? signedBy, DateTime signedAt, string? initiatedBy = null, int? businessUnitId = null)
+    {
+        var rows =
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Property Code</td><td style=\"padding:4px 0\"><strong>{E(propertyCode)}</strong></td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Company</td><td style=\"padding:4px 0\">{E(company ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Signed By</td><td style=\"padding:4px 0\">{E(signedBy ?? "—")}</td></tr>" +
+            $"<tr><td style=\"padding:4px 12px 4px 0;color:#5C6670\">Signed On</td><td style=\"padding:4px 0\">{signedAt:yyyy-MM-dd HH:mm} UTC</td></tr>";
+        var body = await BrandAsync(initiatedBy, businessUnitId, "Landlord Registration Signed",
+            "<p style=\"margin:0 0 14px\">The primary contact has <strong>signed</strong> the landlord registration document via Circularo. " +
+            "The signed copy is available on the registration.</p>" +
+            $"<table style=\"border-collapse:collapse;font-size:14px\">{rows}</table>", null, null, null);
+        await Task.WhenAll(staffEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Distinct()
+            .Select(e => SendAsync(e, $"Landlord Registration Signed – {propertyCode}", body, businessUnitId)));
+    }
+
+    /// <summary>Wraps content in a branded, email-client-safe HTML shell (inline styles, table layout) with a
+    /// white header (logo or brand name in navy), matching the supplier/customer emails. <paramref name="headerHtml"/>
+    /// is the pre-built header block from <see cref="HeaderAsync"/>.</summary>
+    private static string Wrap(string headerHtml, string heading, string bodyHtml, string? ctaText, string? ctaUrl, string? footnote)
+    {
+        var cta = ctaText is not null && ctaUrl is not null
+            ? $"<tr><td style=\"padding:22px 28px 4px\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#092F56;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 26px;border-radius:4px\">{E(ctaText)}</a></td></tr>"
+            : "";
+        var foot = footnote is not null
+            ? $"<tr><td style=\"padding:6px 28px 0;color:#8A929A;font-size:12px\">{E(footnote)}</td></tr>"
+            : "";
+        return
+$@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Segoe UI,Arial,sans-serif"">
+  <table role=""presentation"" width=""100%"" style=""background:#06213D;padding:24px 0"">
+    <tr><td align=""center"">
+      <table role=""presentation"" width=""600"" style=""max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden"">
+        <tr><td style=""background:#ffffff;padding:20px 28px;border-bottom:1px solid #e2e5ea"">
+          {headerHtml}
+        </td></tr>
+        <tr><td style=""padding:24px 28px 4px""><h1 style=""margin:0 0 14px;font-size:20px;color:#092F56"">{E(heading)}</h1>{bodyHtml}</td></tr>
+        {cta}
+        {foot}
+        <tr><td style=""padding:24px 28px 22px;color:#8A929A;font-size:12px;border-top:1px solid #E2DCD4;margin-top:16px"">
+          This is an automated message from Business Centre. Please do not reply to this email.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>";
+    }
+
+    private static string Note(string label, string text) =>
+        $@"<table role=""presentation"" width=""100%"" style=""background:#F6F3EF;border-left:3px solid #706259;border-radius:4px;margin:4px 0""><tr><td style=""padding:12px 14px"">
+            <div style=""font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#706259;font-weight:600;margin-bottom:4px"">{E(label)}</div>
+            <div style=""font-size:14px;color:#20262D"">{E(text)}</div></td></tr></table>";
+
+    /// <summary>Sends through the shared dispatcher (Graph → SMTP → Database Mail). The email is sent from the
+    /// Business Unit's Landlord-portal sender address (falling back to the BU's generic email) with the BU brand as
+    /// the display name; when neither is configured the dispatcher's default sender is used. Best-effort — a failure
+    /// is logged, not thrown.</summary>
+    private async Task SendAsync(string toEmail, string subject, string body, int? businessUnitId = null, string? actorUsername = null)
+    {
+        if (string.IsNullOrWhiteSpace(toEmail)) { logger.LogWarning("Landlord email skipped: no recipient address."); return; }
+        var fromEmail = await branding.GetPortalSenderEmailAsync(businessUnitId, Models.PortalType.Landlord);
+        var fromName = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
+        var (ok, error) = await emailDispatcher.SendHtmlAsync(toEmail, subject, body, fromEmail: fromEmail, fromName: fromName);
+        if (ok)
+        {
+            logger.LogInformation("Landlord email sent to {Email}: {Subject}", toEmail, subject);
+        }
+        else
+        {
+            // Best-effort: a mail outage must never block the workflow transition — but log it so the failure
+            // is visible rather than silently swallowed.
+            logger.LogError("Landlord email FAILED to {Email}: {Subject} — {Error}", toEmail, subject, error);
+        }
+    }
+}

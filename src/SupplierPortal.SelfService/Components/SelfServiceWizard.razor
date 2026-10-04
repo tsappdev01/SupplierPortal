@@ -1,0 +1,1294 @@
+@inject SupplierApiClient Api
+@inject IJSRuntime JS
+@inject ToastService Toast
+
+<div class="di-form-page">
+    @if (!submitted)
+    {
+    <div class="di-form-topbar">
+        <div class="di-form-headings">
+            <div class="di-form-title">Supplier Registration</div>
+            <div class="di-form-sub">Dubai Investments Entities &mdash; Review &amp; update your details</div>
+        </div>
+        <div class="di-progress" title="@ProgressPct% complete">
+            <svg class="di-progress-ring" viewBox="0 0 36 36">
+                <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(System.Globalization.CultureInfo.InvariantCulture) 100"></circle>
+            </svg>
+            <div class="di-progress-center">
+                <span class="di-progress-pct">@ProgressPct%</span>
+                <span class="di-progress-word">Complete</span>
+            </div>
+        </div>
+    </div>
+    <div class="di-legend">
+        <div><span class="di-req">*</span> Required field (set by Settings &gt; Supplier Fields)</div>
+    </div>
+
+    <div class="di-stepper">
+        @for (var i = 0; i < displayTabs.Count; i++)
+        {
+            var idx = i;
+            var tab = displayTabs[idx];
+            <button type="button" class="di-stepper-item @(currentIndex == idx ? "active" : "") reached"
+                    @onclick="() => GoToIndex(idx)">
+                <span class="di-stepper-num">@(idx + 1)</span>
+                <span class="di-stepper-label">@tab.Title</span>
+            </button>
+            @if (i < displayTabs.Count - 1)
+            {
+                <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
+                </svg>
+            }
+        }
+    </div>
+    }
+
+    @if (submitted)
+    {
+        <div class="di-thankyou-wrap">
+            <div class="di-thankyou-card">
+                <div class="di-thankyou-check" aria-hidden="true">
+                    <svg width="34" height="34" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13.5 4.5 6.5 11.5 3 8" />
+                    </svg>
+                </div>
+                <h1 class="di-thankyou-title">Thank You</h1>
+                <p class="di-thankyou-text">
+                    Your supplier information has been submitted successfully. Our team will review the
+                    changes shortly.
+                </p>
+                <p class="di-thankyou-note">You may now close this window.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="model">
+            @if (uploadingDocument)
+            {
+                <div class="ss-upload-progress" role="status">
+                    <span class="ss-spinner" aria-hidden="true"></span>
+                    <span>Uploading@(string.IsNullOrEmpty(uploadingFileName) ? "" : $" '{uploadingFileName}'")… please wait.</span>
+                    <span class="ss-progress-track"><span class="ss-progress-bar"></span></span>
+                </div>
+            }
+
+            @for (var i = 0; i < displayTabs.Count; i++)
+            {
+                var idx = i;
+                var tab = displayTabs[idx];
+                <div class="di-section" style="display:@(currentIndex == idx ? "block" : "none")">
+                    @foreach (var step in tab.Steps)
+                    {
+                    <div class="di-section-header">
+                        <span class="di-section-icon">@SectionIcon(step)</span>
+                        <span class="di-section-heading">
+                            <span class="di-section-title">@SectionTitle(step)</span>
+                            <span class="di-section-desc">@SectionDesc(step)</span>
+                        </span>
+                    </div>
+                    <div class="di-section-body">
+                        @if (step == 1)
+                        {
+                            <div class="di-field">
+                                <label>Supplier Number</label>
+                                <input type="text" value="@(string.IsNullOrWhiteSpace(model.SupplierNumber) ? "System generated" : model.SupplierNumber)" disabled />
+                            </div>
+                        }
+                        @foreach (var key in KeysForStep(step))
+                        {
+                            @fieldFragments[key]
+                        }
+
+                        @if (step == 2)
+                        {
+                            <!-- Is the address above the same as on the Trade License and VAT Certificate?
+                                 When "No", the supplier must give the alternate address per their VAT Certificate. -->
+                            <div class="di-field di-full">
+                                <label>Is your address the same as your Trade License and VAT Certificate?</label>
+                                <div class="di-switch-wrap">
+                                    <button type="button" role="switch"
+                                            aria-checked="@(model.AddressSameAsTradeLicense == true ? "true" : "false")"
+                                            class="di-switch @(model.AddressSameAsTradeLicense == true ? "on" : "") @(model.AddressSameAsTradeLicense == false ? "off" : "")"
+                                            @onclick="ToggleAddressSameAsTradeLicense">
+                                        <span class="di-switch-knob"></span>
+                                    </button>
+                                    <span class="di-switch-text">@(model.AddressSameAsTradeLicense == true ? "Yes" : model.AddressSameAsTradeLicense == false ? "No" : "—")</span>
+                                </div>
+                            </div>
+                            @if (model.AddressSameAsTradeLicense == false)
+                            {
+                                <div class="di-field di-full">
+                                    <div class="di-subsection-header">
+                                        <svg class="di-subsection-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
+                                        Address (As per VAT Certificate)
+                                    </div>
+                                </div>
+                                <div class="di-field di-full">
+                                    <label>Address Line 1<span class="di-req">*</span></label>
+                                    <InputText @bind-Value="model.VatAddressLine1" />
+                                </div>
+                                <div class="di-field di-full">
+                                    <label>Address Line 2</label>
+                                    <InputText @bind-Value="model.VatAddressLine2" />
+                                </div>
+                                <div class="di-field">
+                                    <label>Country<span class="di-req">*</span></label>
+                                    <InputSelect @bind-Value="model.VatCountryId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field">
+                                    <label>City / Emirate<span class="di-req">*</span></label>
+                                    @if (IsVatUaeCountry)
+                                    {
+                                        <InputSelect @bind-Value="model.VatCityId">
+                                            <option value="">— Select Emirate —</option>
+                                            @foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}
+                                        </InputSelect>
+                                    }
+                                    else
+                                    {
+                                        <InputText @bind-Value="model.VatCityText" placeholder="Enter city" />
+                                    }
+                                </div>
+                                <div class="di-field">
+                                    <label>PO Box / Postal Code</label>
+                                    <InputText @bind-Value="model.VatPostalCode" />
+                                </div>
+                            }
+                        }
+
+                        @if (step == 1 && IsVatGroupSelected)
+                        {
+                            <div class="di-field di-full di-vatgroup">
+                                <div class="di-vatgroup-head">
+                                    <span class="di-vatgroup-title">VAT Group</span>@Help("VatGroup")
+                                    <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
+                                        <span>Add Row</span>
+                                    </button>
+                                </div>
+                                <p class="di-vatgroup-note">Please enter details of entities part of the VAT Tax Group as per VAT Tax Group certificate dealing with @CompanyName.</p>
+                                <div class="di-vatgroup-scroll">
+                                    <table class="di-vatgroup-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Business Legal Name*</th>
+                                                <th>Address*@Help("VatGroupAddress")</th>
+                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2)*</th>
+                                                <th>TRN Number*@Help("VatGroupTrn")</th>
+                                                <th>TIN Number*@Help("VatGroupTin")</th>
+                                                <th>Bus. Location Type<br />(Mainland/Free Zone)*</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (model.VatGroupEntities.Count == 0)
+                                            {
+                                                <tr><td colspan="7" class="di-vatgroup-empty">No entities added yet. Click "Add Row" to list a VAT group entity.</td></tr>
+                                            }
+                                            @foreach (var entity in model.VatGroupEntities)
+                                            {
+                                                <tr>
+                                                    <td><input type="text" @bind="entity.BusinessLegalName" /></td>
+                                                    <td><input type="text" @bind="entity.Address" /></td>
+                                                    <td>
+                                                        <select @bind="entity.EInvoicingWaveId">
+                                                            <option value="">Select</option>
+                                                            @foreach (var lov in eInvoicingWaves){<option value="@lov.Id">@lov.DisplayName</option>}
+                                                        </select>
+                                                    </td>
+                                                    <td><input type="text" @bind="entity.TrnNumber" maxlength="15" inputmode="numeric" title="15 digits" /></td>
+                                                    <td><input type="text" @bind="entity.TinNumber" maxlength="10" inputmode="numeric" title="10 digits" /></td>
+                                                    <td>
+                                                        <select @bind="entity.BusinessLocationTypeId">
+                                                            <option value="">Select</option>
+                                                            @foreach (var lov in businessLocationTypes){<option value="@lov.Id">@lov.DisplayName</option>}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove entity" @onclick="() => RemoveVatGroupEntity(entity)">
+                                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+
+                        @if (step == 1)
+                        {
+                            <div class="di-documents-grid">
+                                @DocCard("Trade License", SelfServiceDocumentType.TradeLicense, "di-thumb-red", true, !HasTradeLicenseDocument(), "Required — attach the Trade License before submitting.")
+                                @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", IsVatRegistered, RequiresVatCertificate(), "Required — attach the VAT Certificate because VAT Registered is set to Yes.")
+                                <div class="di-doccard">
+                                    <div class="di-doccard-thumb di-thumb-amber">
+                                        <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+                                        <span class="di-doccard-ext">FILES</span>
+                                    </div>
+                                    <div class="di-doccard-main">
+                                        <div class="di-doccard-title">Other Documents</div>
+                                        @if (!OtherDocuments.Any())
+                                        {
+                                            <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var doc in OtherDocuments)
+                                            {
+                                                <div class="di-doccard-chip">
+                                                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                                                    <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                                    <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                    <div class="di-doccard-upload">
+                                        <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="docfile-Other">
+                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                            <span>Choose File</span>
+                                            <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+                                        </label>
+                                        <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
+                                        <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        @if (step == 5)
+                        {
+                            <div class="di-documents-grid">
+                                @DocCard("Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
+                            </div>
+                        }
+                    </div>
+                    }
+                </div>
+            }
+
+            <div class="di-actions">
+                @if (currentIndex > 0)
+                {
+                    <button class="di-btn di-btn-secondary" type="button" @onclick="Back" disabled="@isSaving">Back</button>
+                }
+                @if (currentIndex < displayTabs.Count - 1)
+                {
+                    <button class="di-btn di-btn-primary" type="button" @onclick="NextAsync" disabled="@isSaving">Next</button>
+                }
+                else
+                {
+                    <button class="di-btn di-btn-primary" type="button" @onclick="SubmitAsync" disabled="@isSaving">Proceed</button>
+                }
+            </div>
+        </EditForm>
+    }
+
+    @if (helpKey is not null && fieldHelp.TryGetValue(helpKey, out var help))
+    {
+        <div class="di-help-backdrop" @onclick="CloseHelp">
+            <div class="di-help-pop" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+                <div class="di-help-head">
+                    <h3 class="di-help-title">@help.Title</h3>
+                    <button type="button" class="di-help-close" title="Close" @onclick="CloseHelp">&times;</button>
+                </div>
+                <p class="di-help-body">@help.Body</p>
+            </div>
+        </div>
+    }
+
+    @if (viewerUrl is not null)
+    {
+        <div class="di-viewer-backdrop" @onclick="CloseViewer">
+            <div class="di-viewer" @onclick:stopPropagation="true">
+                <div class="di-viewer-head">
+                    <span class="di-viewer-name">@viewerName</span>
+                    <button type="button" class="di-viewer-close" title="Close" @onclick="CloseViewer">&times;</button>
+                </div>
+                <iframe class="di-viewer-frame" src="@viewerUrl" title="Document preview"></iframe>
+            </div>
+        </div>
+    }
+
+    @if (showDeclaration)
+    {
+        <div class="di-decl-backdrop">
+            <div class="di-decl" role="dialog" aria-modal="true">
+                <div class="di-decl-head">
+                    <h2 class="di-decl-title">@DeclarationTitle</h2>
+                    <div class="di-decl-subtitle">@DeclarationSubtitle</div>
+                </div>
+                <div class="di-decl-body">
+                    <p class="di-decl-section">Declaration (For true and correct information provided):</p>
+                    <p>@GeneralDeclaration</p>
+
+                    @if (!IsVatRegistered)
+                    {
+                        <p class="di-decl-section">Declaration &ndash; Non-Registration for VAT:</p>
+                        @foreach (var para in VatNonRegistrationParagraphs)
+                        {
+                            <p>@para</p>
+                        }
+                    }
+
+                    <p class="di-decl-certify">@DeclarationCertify</p>
+
+                    <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
+                    <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
+                           placeholder="Type your full name here" />
+
+                    <label class="di-decl-siglabel" style="margin-top:14px;">Sign here <span class="di-req">*</span></label>
+                    <div class="di-sigpad-wrap">
+                        <canvas id="di-sigpad" @ref="sigCanvas" class="di-sigpad"></canvas>
+                        <button type="button" class="di-sigpad-clear" @onclick="ClearSignatureAsync" title="Clear signature">Clear</button>
+                    </div>
+                    <div class="di-sigpad-hint">Draw your signature in the box using your mouse (or finger on a touch screen).</div>
+                </div>
+                <div class="di-decl-actions">
+                    <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@isSaving">Cancel</button>
+                    <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmDeclarationAsync"
+                            disabled="@(isSaving || string.IsNullOrWhiteSpace(declarationSignature))">
+                        Agree &amp; Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SupplierFormBootstrapDto Bootstrap { get; set; } = default!;
+    [Parameter, EditorRequired] public string SessionToken { get; set; } = "";
+
+    private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute EmailValidator = new();
+
+    // Email fields validated per SETTINGS step number.
+    private static readonly Dictionary<int, (string Key, string Label)[]> EmailFieldsByStep = new()
+    {
+        [2] = [("Email", "Business E-Mail")],
+        [3] = [("ContactEmail", "Contacts E-Mail")],
+        [5] = [("RemitAdviceEmail", "Remit Advice Email")]
+    };
+
+    private SupplierDto model = new();
+    private int currentIndex;
+    private bool isSaving;
+    private bool submitted;
+    private bool uploadingDocument;
+    private string? uploadingFileName;
+    private bool viewingDocument;
+    private string? viewerUrl;
+    private string? viewerName;
+
+    // Declaration / signature (shown on Submit, matching the internal supplier form).
+    private bool showDeclaration;
+    private bool sigInitialized;
+    private string declarationSignature = "";
+    private ElementReference sigCanvas;
+
+    // Write-through to the toast queue: setting errorMessage/statusMessage raises a toast. Getters null.
+    private string? errorMessage { get => null; set => Toast.ShowError(value); }
+    private string? statusMessage { get => null; set => Toast.ShowSuccess(value); }
+
+    private List<LookupItemDto> taxOrgTypes = [], supplierTypes = [], countries = [], countriesWithPhoneCode = [],
+        businessRelationships = [], provinces = [], vatCodes = [], paymentMethods = [], paymentTerms = [],
+        prefixes = [], communicationMethods = [], currencies = [], licensingAuthorities = [],
+        vatRegistrationTypes = [], businessPartnerTypes = [], businessLocationTypes = [], eInvoicingWaves = [];
+    private List<BankDto> banks = [];
+    private List<BusinessUnitDto> businessUnits = [];
+    private List<SupplierDocumentDto> documents = [];
+
+    private List<TabSettingDto> visibleTabs = [];
+    // The tabs actually shown in the wizard. Address (step 2) and Contact Information (step 3) are merged
+    // into a single "Address & Contact Information" tab; every other visible step is its own tab.
+    private List<WizardTab> displayTabs = [];
+    private Dictionary<int, string> stepTitles = new();
+    private Dictionary<string, RenderFragment> fieldFragments = new();
+
+    /// <summary>A wizard tab, carrying one or more underlying SETTINGS steps (the Address+Contact tab carries two).</summary>
+    private sealed record WizardTab(string Title, List<int> Steps);
+
+    private HashSet<string> mandatoryKeys = [];
+    private HashSet<string> hiddenKeys = [];
+    private HashSet<string> changedKeys = [];
+    private int? originalBankId;
+    private string? originalAccountNumber;
+
+    private List<BankBranchDto> SelectedBankBranches => banks.FirstOrDefault(b => b.Id == model.BankId)?.Branches ?? [];
+    private List<SupplierDocumentDto> OtherDocuments => documents.Where(d => d.DocumentType == SelfServiceDocumentType.Other).ToList();
+    private SupplierDocumentDto? GetDocument(SelfServiceDocumentType type) => documents.FirstOrDefault(d => d.DocumentType == type);
+
+    // VAT Registered is a nullable bool rendered as a Yes/No/— select.
+    private string VatRegisteredStr
+    {
+        get => model.VatRegistered switch { true => "true", false => "false", _ => "" };
+        set => model.VatRegistered = value switch { "true" => true, "false" => false, _ => (bool?)null };
+    }
+
+    protected override void OnInitialized()
+    {
+        model = Bootstrap.Supplier;
+        List<LookupItemDto> L(string k) => Bootstrap.Lookups.TryGetValue(k, out var v) ? v : [];
+        taxOrgTypes = L("TaxOrganizationType"); supplierTypes = L("SupplierType"); countries = L("Country");
+        provinces = L("Province"); vatCodes = L("VatCode"); paymentMethods = L("PaymentMethod");
+        paymentTerms = L("PaymentTerms"); prefixes = L("Prefix"); currencies = L("Currency");
+        businessRelationships = L("BusinessRelationship"); communicationMethods = L("CommunicationMethod");
+        licensingAuthorities = L("LicensingAuthority"); vatRegistrationTypes = L("VatRegistrationType");
+        businessPartnerTypes = L("BusinessPartnerType"); businessLocationTypes = L("BusinessLocationType");
+        eInvoicingWaves = L("EInvoicingWave");
+        countriesWithPhoneCode = countries.Where(c => !string.IsNullOrWhiteSpace(c.PhoneCode)).ToList();
+
+        banks = Bootstrap.Banks;
+        businessUnits = Bootstrap.BusinessUnits;
+        documents = Bootstrap.Documents;
+        mandatoryKeys = Bootstrap.FieldSettings.Where(f => f.IsMandatory && f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+        hiddenKeys = Bootstrap.FieldSettings.Where(f => !f.IsVisibleToSupplier).Select(f => f.FieldKey).ToHashSet();
+        changedKeys = Bootstrap.PendingEditedFieldKeys.ToHashSet();
+
+        // Visible tabs, in configured order. Fall back to the steps that actually carry visible fields
+        // (with generic titles) if no tab settings were provided.
+        visibleTabs = Bootstrap.Tabs.Where(t => t.IsVisible).OrderBy(t => t.Step).ToList();
+        if (visibleTabs.Count == 0)
+        {
+            visibleTabs = Bootstrap.FieldSettings
+                .Where(f => f.IsVisibleToSupplier)
+                .Select(f => f.Step).Distinct().OrderBy(s => s)
+                .Select(s => new TabSettingDto { Step = s, Title = $"Section {s}", IsVisible = true })
+                .ToList();
+        }
+
+        stepTitles = visibleTabs
+            .GroupBy(t => t.Step)
+            .ToDictionary(g => g.Key, g => g.First().Title);
+        displayTabs = BuildDisplayTabs(visibleTabs);
+
+        BuildFragments();
+
+        originalBankId = model.BankId;
+        originalAccountNumber = model.AccountNumber;
+    }
+
+    // Merge the Address (step 2) and Contact Information (step 3) sections into one tab; keep every other
+    // visible step as its own tab, preserving the configured order.
+    private static List<WizardTab> BuildDisplayTabs(List<TabSettingDto> tabs)
+    {
+        var result = new List<WizardTab>();
+        WizardTab? addressContact = null;
+        foreach (var t in tabs)
+        {
+            if (t.Step is 2 or 3)
+            {
+                if (addressContact is null)
+                {
+                    addressContact = new WizardTab("Address & Contact Information", []);
+                    result.Add(addressContact);
+                }
+                addressContact.Steps.Add(t.Step);
+            }
+            else
+            {
+                result.Add(new WizardTab(t.Title, [t.Step]));
+            }
+        }
+        return result;
+    }
+
+    // The section heading for a step: the admin-configured tab title when present, else a sensible default.
+    private string SectionTitle(int step) =>
+        stepTitles.TryGetValue(step, out var t) && !string.IsNullOrWhiteSpace(t)
+            ? t
+            : step switch
+            {
+                1 => "Business / Organization",
+                2 => "Address",
+                3 => "Contact Information",
+                4 => "Site / Business Unit",
+                5 => "Payment / Banking",
+                _ => $"Section {step}"
+            };
+
+    // Fields assigned to a step, in Sequence order, that are visible to the supplier and that this form
+    // knows how to render (has a fragment for). Drives the exact set + order the admin configured.
+    private IEnumerable<string> KeysForStep(int step) =>
+        Bootstrap.FieldSettings
+            .Where(f => f.Step == step && f.IsVisibleToSupplier && fieldFragments.ContainsKey(f.FieldKey))
+            .OrderBy(f => f.Sequence)
+            .Select(f => f.FieldKey);
+
+    private string FieldClass(string key)
+    {
+        var classes = changedKeys.Contains(key) ? "di-field-changed" : "";
+        if (hiddenKeys.Contains(key))
+        {
+            classes = string.IsNullOrEmpty(classes) ? "di-hidden-field" : classes + " di-hidden-field";
+        }
+        return classes;
+    }
+
+    private bool IsHidden(string key) => hiddenKeys.Contains(key);
+
+    private bool IsOthersIssuingBody() =>
+        licensingAuthorities.FirstOrDefault(l => l.Id == model.TradeLicenseIssuingBodyId)?.DisplayName?
+            .Contains("Other", StringComparison.OrdinalIgnoreCase) == true;
+
+    // ----- VAT Group table (structured entity list, shown when the VAT Registration Type is a VAT Group) -----
+    private bool IsVatGroupSelected =>
+        vatRegistrationTypes.FirstOrDefault(v => v.Id == model.VatRegistrationTypeId)?
+            .DisplayName.Contains("Group", StringComparison.OrdinalIgnoreCase) == true;
+
+    private void AddVatGroupEntity() => model.VatGroupEntities.Add(new VatGroupEntityDto());
+    private void RemoveVatGroupEntity(VatGroupEntityDto entity) => model.VatGroupEntities.Remove(entity);
+
+    private static bool IsBlankVatRow(VatGroupEntityDto e) =>
+        e.Id == 0 && string.IsNullOrWhiteSpace(e.BusinessLegalName) && string.IsNullOrWhiteSpace(e.Address)
+        && e.EInvoicingWaveId is null && string.IsNullOrWhiteSpace(e.TrnNumber) && string.IsNullOrWhiteSpace(e.TinNumber)
+        && e.BusinessLocationTypeId is null;
+
+    private static bool IsCompleteVatRow(VatGroupEntityDto e) =>
+        !string.IsNullOrWhiteSpace(e.BusinessLegalName) && !string.IsNullOrWhiteSpace(e.Address)
+        && e.EInvoicingWaveId is not null && !string.IsNullOrWhiteSpace(e.TrnNumber) && !string.IsNullOrWhiteSpace(e.TinNumber)
+        && e.BusinessLocationTypeId is not null;
+
+    private RenderFragment Req(string key) => builder =>
+    {
+        if (mandatoryKeys.Contains(key))
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "di-req");
+            // Inline style: this span is built programmatically, so Blazor's scoped CSS (.di-req[b-..])
+            // does not target it — inline keeps the required asterisk visibly red.
+            builder.AddAttribute(2, "style", "color:#d64545;font-weight:700;margin-left:2px;");
+            builder.AddContent(3, "*");
+            builder.CloseElement();
+        }
+    };
+
+    // ----- Field help pop-ups (same wording as the internal supplier form, sourced from the business Excel) -----
+    private string? helpKey;
+    private void ShowHelp(string fieldKey) => helpKey = fieldKey;
+    private void CloseHelp() => helpKey = null;
+
+    private static readonly Dictionary<string, (string Title, string Body)> fieldHelp = new()
+    {
+        ["SupplierName"] = ("Supplier Name (Legal Name)",
+            "Enter name as per valid Trade License"),
+        ["TaxRegistrationNumber"] = ("Tax Registration Number",
+            "Tax Registration Number mentioned in the VAT Registration certificate"),
+        ["VatRegistrationTypeId"] = ("VAT Registration Type",
+            "Please select whether the supplier is part of a VAT Tax group or not"),
+        ["VatGroup"] = ("VAT Group",
+            "Number of Entities if VAT Group: Please mention number of entities part of the VAT tax group dealing with DI PJSC.\n\n" +
+            "Legal Names of all Entities under the VAT Group: Please enter details of entities part of the VAT Tax Group as per " +
+            "VAT Tax Group certificate dealing with DI PJSC."),
+        ["VatGroupAddress"] = ("Address",
+            "As per Trade License of Group entity"),
+        ["VatGroupTrn"] = ("TRN Number",
+            "As per VAT Tax Group Certificate"),
+        ["VatGroupTin"] = ("TIN Number",
+            "Obtained from the Emaratax Portal of the respective Entity mentioned.\n\n" +
+            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+            "How to obtain TIN from Emaratax Portal\n\n" +
+            "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
+            "2. View the profile of your entity.\n" +
+            "3. From the left-side menu, click on E-Invoicing.\n" +
+            "4. Your TIN (Tax Identification Number) will be displayed there for reference. 10 Digit number"),
+        ["SupplierTin"] = ("Supplier TIN",
+            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+            "How to obtain TIN from Emaratax Portal\n\n" +
+            "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
+            "2. View the profile of your entity.\n" +
+            "3. From the left-side menu, click on E-Invoicing.\n" +
+            "4. Your TIN (Tax Identification Number) will be displayed there for reference. 10 Digit number"),
+        ["EInvoicingWaveId"] = ("eINvoicing Wave Applicability",
+            "Revenue greater than or equal to AED 50million - Wave 1\n" +
+            "Revenue less than AED 50million - Wave 2"),
+        ["TradeLicenseIssuingBodyId"] = ("Trade License Issuing Body",
+            "As per valid Trade License"),
+        ["AddressLine1"] = ("Address Line 1",
+            "Address as per valid Trade License"),
+        ["AddressLine2"] = ("Address Line 2",
+            "Address as per valid Trade License"),
+        ["CityId"] = ("City",
+            "As per valid Trade License"),
+        ["CountryId"] = ("Country",
+            "As per valid Trade License"),
+    };
+
+    /// <summary>Renders a small "info" icon next to a label when help text exists for that field. The icon
+    /// is a real image (/images/info-icon.svg) inside an inline-styled button — this fragment is built
+    /// programmatically, so Blazor's scoped CSS never targets it; an image + inline styles guarantee it
+    /// renders as a proper icon rather than an unstyled empty box.</summary>
+    private RenderFragment Help(string fieldKey) => builder =>
+    {
+        if (!fieldHelp.ContainsKey(fieldKey)) { return; }
+        builder.OpenElement(0, "button");
+        builder.AddAttribute(1, "type", "button");
+        builder.AddAttribute(2, "class", "di-help-btn");
+        builder.AddAttribute(3, "style",
+            "border:none;background:none;padding:0;margin:0 0 0 6px;cursor:pointer;line-height:0;vertical-align:-3px;");
+        builder.AddAttribute(4, "title", "What's this?");
+        builder.AddAttribute(5, "aria-label", "What's this?");
+        builder.AddAttribute(6, "onclick", EventCallback.Factory.Create(this, () => ShowHelp(fieldKey)));
+        builder.AddEventStopPropagationAttribute(7, "onclick", true);
+        builder.AddEventPreventDefaultAttribute(8, "onclick", true);
+        builder.AddMarkupContent(9,
+            "<img src=\"/images/info-icon.svg\" alt=\"Info\" width=\"16\" height=\"16\" " +
+            "style=\"display:block;width:16px;height:16px;\" />");
+        builder.CloseElement();
+    };
+
+    private bool BankAccountChanged() =>
+        model.BankId != originalBankId ||
+        !string.Equals((model.AccountNumber ?? "").Trim(), (originalAccountNumber ?? "").Trim(), StringComparison.Ordinal);
+
+    private bool HasTradeLicenseDocument() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.TradeLicense);
+    private bool HasBankFieldsVisible() => visibleTabs.Any(t => t.Step == 5);
+    private bool RequiresBankConfirmationLetter() =>
+        HasBankFieldsVisible() && BankAccountChanged() && !documents.Any(d => d.DocumentType == SelfServiceDocumentType.BankConfirmationLetter);
+
+    private void OnBankChanged() => model.BankBranchId = null;
+    private void Back() => currentIndex = Math.Max(0, currentIndex - 1);
+    private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, displayTabs.Count - 1);
+
+    private bool HasVatCertificateDocument() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.VatCertification);
+    // When the supplier is VAT registered, a VAT Certificate document must be attached before submitting.
+    private bool RequiresVatCertificate() => IsVatRegistered && !HasVatCertificateDocument();
+
+    // Formats validation errors for a toast: a single message as-is, several as a readable bulleted list
+    // (rendered on separate lines by the toast's white-space:pre-line styling).
+    private static string FormatErrors(IEnumerable<string> errors)
+    {
+        var list = errors.ToList();
+        return list.Count <= 1 ? (list.FirstOrDefault() ?? "") : string.Join("\n", list.Select(e => "• " + e));
+    }
+
+    // Fields only meaningful / required when the supplier is VAT registered (same rule as the internal form).
+    private static readonly HashSet<string> VatDependentKeys =
+        ["TaxRegistrationNumber", "VatRegistrationTypeId", "NumberOfVatGroupEntities", "VatGroupEntityNames", "SupplierTin"];
+
+    private int? UaeCountryId =>
+        countries.FirstOrDefault(c => c.DisplayName.Contains("United Arab Emirates", StringComparison.OrdinalIgnoreCase))?.Id;
+
+    // UAE test for the alternate VAT-certificate address (drives its Emirate-LOV vs free-text city).
+    private bool IsVatUaeCountry => model.VatCountryId is null || model.VatCountryId == UaeCountryId;
+
+    // Cycles the "address same as Trade License / VAT Certificate" toggle: unset (—) → Yes → No → Yes …
+    // Clears the alternate VAT-certificate address whenever the answer is not "No".
+    private void ToggleAddressSameAsTradeLicense()
+    {
+        model.AddressSameAsTradeLicense = model.AddressSameAsTradeLicense switch
+        {
+            true => false,
+            false => true,
+            null => true,
+        };
+        if (model.AddressSameAsTradeLicense != false)
+        {
+            model.VatAddressLine1 = null;
+            model.VatAddressLine2 = null;
+            model.VatCityId = null;
+            model.VatCityText = null;
+            model.VatCountryId = null;
+            model.VatPostalCode = null;
+        }
+    }
+
+    // True when the value is exactly <length> digits (spaces/dashes ignored) — matches the internal form.
+    private static bool IsDigits(string value, int length)
+    {
+        var d = value.Replace(" ", "").Replace("-", "");
+        return d.Length == length && d.All(char.IsDigit);
+    }
+
+    // Circular progress: position within the displayed tabs (matches the internal supplier form).
+    private int ProgressPct =>
+        displayTabs.Count == 0 ? 0
+        : (int)Math.Round(Math.Clamp(currentIndex + 1, 1, displayTabs.Count) / (double)displayTabs.Count * 100);
+
+    // Per-step section description (mirrors the internal supplier form's di-section-desc text).
+    private static string SectionDesc(int step) => step switch
+    {
+        1 => "Provide accurate business details as per your trade license and official documents.",
+        2 => "Where the business is located and how it should be contacted.",
+        3 => "Primary and additional people we should reach out to.",
+        4 => "Assign the supplier to business units and select site usages.",
+        5 => "Bank account and payment details used to settle invoices.",
+        _ => ""
+    };
+
+    // Per-step section icon (same glyphs as the internal supplier form's di-section-icon).
+    private RenderFragment SectionIcon(int step) => step switch
+    {
+        2 => @<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>,
+        3 => @<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4Zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10Z" /></svg>,
+        4 => @<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z" /></svg>,
+        5 => @<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>,
+        _ => @<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 5.5a.5.5 0 1 0-1 0 .5.5 0 0 0 1 0Zm-1 2a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Zm2.5-.5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0ZM8 5a.5.5 0 1 0 0 1 .5.5 0 0 0 0-1Zm2 .5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0Z" /><path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14h.5a.5.5 0 0 1 0 1H.5a.5.5 0 0 1 0-1H2V1Zm2 2v1h1V3H4Zm1 2H4v1h1V5Zm1 0v1h1V5H6Zm1-1V3H6v1h1Zm1 0h1V3H8v1Zm1 1H8v1h1V5Zm1-2v1h1V3h-1Zm1 2h-1v1h1V5ZM4 8v1h1V8H4Zm1 2H4v1h1v-1Zm1 0v1h1v-1H6Zm1-1V8H6v1h1Zm1 0h1V8H8v1Zm1 1H8v1h1v-1Zm1-2v1h1V8h-1Zm1 2h-1v1h1v-1ZM4 14h3v-3H4v3Zm5 0h3v-3H9v3Z" /></svg>
+    };
+
+    private List<string> ValidateStep(int step)
+    {
+        var errors = new List<string>();
+        foreach (var f in Bootstrap.FieldSettings.Where(f => f.Step == step && f.IsMandatory && f.IsVisibleToSupplier))
+        {
+            // VAT-dependent fields (TRN, VAT type, TIN, VAT-group) are never required when not VAT registered.
+            if (VatDependentKeys.Contains(f.FieldKey) && model.VatRegistered != true) { continue; }
+            // Only enforce fields this form can actually collect (a property on SupplierDto with a fragment).
+            var prop = typeof(SupplierDto).GetProperty(f.FieldKey);
+            if (prop is null || !fieldFragments.ContainsKey(f.FieldKey)) { continue; }
+            var value = prop.GetValue(model);
+            if (value is null || (value is string s && string.IsNullOrWhiteSpace(s)))
+            {
+                errors.Add($"{f.DisplayLabel} is required.");
+            }
+        }
+        if (EmailFieldsByStep.TryGetValue(step, out var emailFields))
+        {
+            foreach (var (key, label) in emailFields)
+            {
+                if (IsHidden(key)) { continue; }
+                var value = typeof(SupplierDto).GetProperty(key)?.GetValue(model) as string;
+                if (!string.IsNullOrWhiteSpace(value) && !EmailValidator.IsValid(value))
+                {
+                    errors.Add($"{label} is not a valid email address.");
+                }
+            }
+        }
+
+        // Format checks (data-quality) — same rules as the internal form. Supplier TIN exactly 10 digits;
+        // TRN/VAT Registration Number exactly 15 digits (only when VAT registered). Fire only when a value
+        // is present and the field belongs to this step.
+        if (IsFieldOnStep("SupplierTin", step) && !IsHidden("SupplierTin")
+            && !string.IsNullOrWhiteSpace(model.SupplierTin) && !IsDigits(model.SupplierTin, 10))
+        {
+            errors.Add("Supplier TIN must be exactly 10 digits.");
+        }
+        if (IsFieldOnStep("TaxRegistrationNumber", step) && IsVatRegistered
+            && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
+        {
+            errors.Add("TRN/VAT Registration Number must be exactly 15 digits.");
+        }
+
+        // Trade-license date sanity (same as the internal form): issue can't be in the future; expiry can't
+        // precede the issue date.
+        if (IsFieldOnStep("TradeLicenseIssueDate", step))
+        {
+            if (model.TradeLicenseIssueDate is DateTime iss && iss.Date > DateTime.Today)
+            {
+                errors.Add("Trade License Issue Date cannot be a future date.");
+            }
+            if (model.TradeLicenseIssueDate is DateTime i2 && model.TradeLicenseExpiryDate is DateTime exp && exp.Date < i2.Date)
+            {
+                errors.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+            }
+        }
+
+        // VAT Group: when the VAT Registration Type is a VAT Group, at least one fully-completed entity row
+        // is required (step 1).
+        if (step == 1 && IsVatGroupSelected)
+        {
+            var rows = model.VatGroupEntities.Where(e => !IsBlankVatRow(e)).ToList();
+            if (rows.Count == 0)
+            {
+                errors.Add("Please list at least one entity within your VAT group.");
+            }
+            else if (rows.Any(e => !IsCompleteVatRow(e)))
+            {
+                errors.Add("Complete every column (Business Legal Name, Address, E-Invoicing Wave, TRN Number, TIN Number, Bus. Location Type) for each VAT group entity.");
+            }
+            // Format checks per row: TRN exactly 15 digits, TIN exactly 10 digits (reported once each).
+            if (rows.Any(e => !string.IsNullOrWhiteSpace(e.TrnNumber) && !IsDigits(e.TrnNumber, 15)))
+            {
+                errors.Add("VAT Group: each TRN Number must be exactly 15 digits.");
+            }
+            if (rows.Any(e => !string.IsNullOrWhiteSpace(e.TinNumber) && !IsDigits(e.TinNumber, 10)))
+            {
+                errors.Add("VAT Group: each TIN Number must be exactly 10 digits.");
+            }
+        }
+
+        // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
+        // address is mandatory (matches the internal form's step-2 rule).
+        if (step == 2 && model.AddressSameAsTradeLicense == false)
+        {
+            if (string.IsNullOrWhiteSpace(model.VatAddressLine1))
+            {
+                errors.Add("Address (As per VAT Certificate): Address Line 1 is required.");
+            }
+            if (model.VatCountryId is null)
+            {
+                errors.Add("Address (As per VAT Certificate): Country is required.");
+            }
+            var vatIsUae = model.VatCountryId is null || model.VatCountryId == UaeCountryId;
+            if (vatIsUae ? model.VatCityId is null : string.IsNullOrWhiteSpace(model.VatCityText))
+            {
+                errors.Add("Address (As per VAT Certificate): City / Emirate is required.");
+            }
+        }
+        return errors;
+    }
+
+    private bool IsFieldOnStep(string key, int step) =>
+        Bootstrap.FieldSettings.Any(f => f.FieldKey == key && f.Step == step && f.IsVisibleToSupplier);
+
+    private async Task<bool> PersistAsync()
+    {
+        var result = await Api.SaveAsync(SessionToken, model);
+        if (!result.Success)
+        {
+            errorMessage = string.Join(" ", result.Errors);
+            return false;
+        }
+        if (result.Supplier is not null) { model = result.Supplier; }
+        changedKeys = result.PendingEditedFieldKeys.ToHashSet();
+        return true;
+    }
+
+    private async Task NextAsync()
+    {
+        // Validate every underlying step in the current tab (the Address+Contact tab carries two).
+        var tab = displayTabs[currentIndex];
+        var errors = tab.Steps.SelectMany(ValidateStep).ToList();
+        if (errors.Count > 0) { errorMessage = FormatErrors(errors); return; }
+
+        // Document requirements whose upload lives on a step within this tab — enforced on Next (not only on
+        // Proceed) so the supplier can't move past the tab that carries a required, still-missing document.
+        if (tab.Steps.Contains(1) && !HasTradeLicenseDocument())
+        {
+            errorMessage = "Please attach the Trade License document before continuing.";
+            return;
+        }
+        if (tab.Steps.Contains(1) && RequiresVatCertificate())
+        {
+            errorMessage = "Please attach the VAT Certificate — it is required because VAT Registered is set to \"Yes\".";
+            return;
+        }
+        if (tab.Steps.Contains(5) && RequiresBankConfirmationLetter())
+        {
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            if (await PersistAsync()) { currentIndex = Math.Min(currentIndex + 1, displayTabs.Count - 1); }
+        }
+        finally { isSaving = false; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        // Re-check every mandatory field across all tabs. Jump to the first tab that has errors and show
+        // just that tab's errors as a readable bulleted list.
+        for (var i = 0; i < displayTabs.Count; i++)
+        {
+            var tabErrors = displayTabs[i].Steps.SelectMany(ValidateStep).ToList();
+            if (tabErrors.Count > 0)
+            {
+                currentIndex = i;
+                errorMessage = "Please complete all required fields before submitting:\n"
+                    + string.Join("\n", tabErrors.Select(e => "• " + e));
+                return;
+            }
+        }
+        if (!HasTradeLicenseDocument())
+        {
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(1));
+            if (i >= 0) { currentIndex = i; }
+            errorMessage = "A Trade License document must be attached before submitting.";
+            return;
+        }
+        if (RequiresVatCertificate())
+        {
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(1));
+            if (i >= 0) { currentIndex = i; }
+            errorMessage = "A VAT Certificate must be attached because VAT Registered is set to \"Yes\".";
+            return;
+        }
+        if (RequiresBankConfirmationLetter())
+        {
+            var i = displayTabs.FindIndex(t => t.Steps.Contains(5));
+            if (i >= 0) { currentIndex = i; }
+            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
+            return;
+        }
+
+        // Save the current tab's data, then have the supplier sign the declaration before the final submit.
+        isSaving = true;
+        try
+        {
+            if (!await PersistAsync()) { return; }
+        }
+        finally { isSaving = false; }
+
+        declarationSignature = "";
+        sigInitialized = false;
+        showDeclaration = true;
+    }
+
+    private void CancelDeclaration()
+    {
+        showDeclaration = false;
+        sigInitialized = false;
+    }
+
+    private async Task ClearSignatureAsync()
+    {
+        try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { /* best-effort */ }
+    }
+
+    private async Task ConfirmDeclarationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(declarationSignature))
+        {
+            errorMessage = "Please type your full name as your signature.";
+            return;
+        }
+
+        string dataUrl = "";
+        try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
+        if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
+        {
+            errorMessage = "Please draw your signature in the box before submitting.";
+            return;
+        }
+        var comma = dataUrl.IndexOf(',');
+        var imageB64 = comma >= 0 ? dataUrl[(comma + 1)..] : "";
+
+        var request = new SubmitRequest
+        {
+            SignatureName = declarationSignature.Trim(),
+            SignatureImageBase64 = imageB64,
+            DeclarationText = DeclarationFullText()
+        };
+
+        isSaving = true;
+        try
+        {
+            var submit = await Api.SubmitAsync(SessionToken, request);
+            if (!submit.Success) { errorMessage = submit.Error ?? "Could not submit. Please try again."; return; }
+            showDeclaration = false;
+            submitted = true;
+        }
+        catch (Exception)
+        {
+            // Never leave the button silently dead — always tell the supplier what to do next.
+            errorMessage = "Could not submit your details. Please check your connection and try again.";
+        }
+        finally { isSaving = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Initialise the drawn-signature canvas once the declaration pop-up is on screen.
+        if (showDeclaration && !sigInitialized)
+        {
+            sigInitialized = true;
+            try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { /* best-effort */ }
+        }
+    }
+
+    private async Task UploadDocumentAsync(InputFileChangeEventArgs e, SelfServiceDocumentType documentType)
+    {
+        uploadingDocument = true;
+        try
+        {
+            const long maxBytes = 10 * 1024 * 1024;
+            if (e.File.Size > maxBytes)
+            {
+                errorMessage = $"'{e.File.Name}' is {e.File.Size / (1024 * 1024)} MB, over the 10 MB limit. Please attach a smaller file.";
+                return;
+            }
+
+            uploadingFileName = e.File.Name;
+            Toast.ShowInfo($"Uploading '{e.File.Name}'…");
+            StateHasChanged();
+
+            await using var stream = e.File.OpenReadStream(maxBytes);
+            var result = await Api.UploadDocumentAsync(SessionToken, documentType, stream, e.File.Name, e.File.ContentType);
+            if (!result.Success) { errorMessage = result.Error ?? "Upload failed."; return; }
+
+            documents = result.Documents;
+            var message = $"'{e.File.Name}' uploaded successfully.";
+            if (result.ExtractedNumber is not null)
+            {
+                if (documentType == SelfServiceDocumentType.VatCertification)
+                {
+                    model.TaxRegistrationNumber = result.ExtractedNumber;
+                    message += $" Tax Registration Number '{result.ExtractedNumber}' was read from the document.";
+                }
+                else if (documentType == SelfServiceDocumentType.TradeLicense)
+                {
+                    model.TradeLicenseNumber = result.ExtractedNumber;
+                    message += $" Trade License Number '{result.ExtractedNumber}' was read from the document.";
+                }
+            }
+            if (documentType == SelfServiceDocumentType.TradeLicense && result.DunsNumber is not null)
+            {
+                model.DunsNumber = result.DunsNumber;
+                message += $" D-U-N-S Number '{result.DunsNumber}' was read from the document.";
+            }
+            statusMessage = message;
+        }
+        catch (Exception)
+        {
+            errorMessage = $"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.";
+        }
+        finally { uploadingDocument = false; uploadingFileName = null; }
+    }
+
+    private async Task ViewDocumentAsync(int documentId)
+    {
+        viewingDocument = true;
+        try
+        {
+            await CloseViewer();
+            var file = await Api.GetDocumentAsync(SessionToken, documentId);
+            if (file is null)
+            {
+                errorMessage = "Could not open the document. Please try again.";
+                return;
+            }
+            viewerUrl = await JS.InvokeAsync<string>("ssDoc.makeUrl", file.Value.Bytes, file.Value.ContentType);
+            viewerName = file.Value.FileName;
+        }
+        catch (Exception)
+        {
+            errorMessage = "Could not open the document. Please try again.";
+        }
+        finally { viewingDocument = false; }
+    }
+
+    private async Task CloseViewer()
+    {
+        if (viewerUrl is not null)
+        {
+            try { await JS.InvokeVoidAsync("ssDoc.revoke", viewerUrl); } catch { /* ignore */ }
+            viewerUrl = null;
+            viewerName = null;
+        }
+    }
+
+    private async Task RemoveDocumentAsync(int documentId)
+    {
+        var result = await Api.DeleteDocumentAsync(SessionToken, documentId);
+        if (result.Success) { documents = result.Documents; statusMessage = "Document removed."; }
+        else { errorMessage = result.Error ?? "Could not remove the document."; }
+    }
+
+    private const int MaxUploadMb = 10;
+
+    private static string FileExtLabel(string fileName)
+    {
+        var ext = System.IO.Path.GetExtension(fileName).TrimStart('.').ToUpperInvariant();
+        return string.IsNullOrEmpty(ext) ? "FILE" : ext;
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1048576 ? $"{bytes / 1048576.0:0.#} MB"
+        : bytes >= 1024 ? $"{bytes / 1024.0:0} KB"
+        : $"{bytes} B";
+
+    // A rich upload card for a single-document slot (Trade License, VAT Certificate, Bank Confirmation
+    // Letter), matching the internal supplier form: coloured file thumbnail, uploaded file with date/size,
+    // a View action and a branded Choose File button with supported-format hints.
+    private RenderFragment DocCard(string title, SelfServiceDocumentType type, string thumbClass, bool showStar, bool showRequiredMsg, string requiredMsg)
+    {
+        return @<div class="di-doccard">
+        @{
+            var doc = GetDocument(type);
+            var inputId = $"docfile-{type}";
+        }
+        <div class="di-doccard-thumb @thumbClass">
+            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+            <span class="di-doccard-ext">@(doc is null ? "FILE" : FileExtLabel(doc.FileName))</span>
+        </div>
+        <div class="di-doccard-main">
+            <div class="di-doccard-title">@title @if (showStar){<span class="di-req">*</span>}</div>
+            @if (doc is not null)
+            {
+                <div class="di-doccard-chip">
+                    <span class="di-doccard-uplabel">Uploaded:</span>
+                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                </div>
+                <div class="di-doccard-meta">
+                    <span>Uploaded on: @doc.UploadedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                    <span class="di-doccard-sep"></span>
+                    <span>Size: @FormatSize(doc.FileSizeBytes)</span>
+                </div>
+            }
+            else
+            {
+                <div class="di-doccard-meta di-doccard-empty">No file uploaded yet.</div>
+            }
+            @if (showRequiredMsg)
+            {
+                <div class="di-doccard-required">@requiredMsg</div>
+            }
+        </div>
+        @if (doc is not null)
+        {
+            <div class="di-doccard-actions">
+                <button type="button" class="di-doccard-viewbtn" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
+                    View
+                </button>
+            </div>
+        }
+        <div class="di-doccard-upload">
+            <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="@inputId">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                <span>Choose File</span>
+                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+            </label>
+            <InputFile id="@inputId" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, type)" disabled="@uploadingDocument" />
+            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+        </div>
+    </div>;
+    }
+
+    // ----- Declaration text (mirrors the internal supplier form) -----
+    private bool IsVatRegistered => model.VatRegistered == true;
+    private string DeclarationTitle => "Supplier Declaration";
+    private string DeclarationSubtitle => "Supplier Data Gathering Portal";
+    private string CompanyName => string.IsNullOrWhiteSpace(Bootstrap.BusinessUnit?.Name) ? "the Company" : Bootstrap.BusinessUnit!.Name.Trim();
+    private string SupplierDisplayName => string.IsNullOrWhiteSpace(model.SupplierName) ? "the Supplier" : model.SupplierName.Trim();
+
+    private string GeneralDeclaration =>
+        "I/We hereby declare that the information and data provided in this form are true, correct, and " +
+        "complete to the best of our knowledge, and are furnished in compliance with the applicable UAE " +
+        "e-invoicing requirements issued by the Ministry of Finance/Federal Tax Authority. We undertake " +
+        $"to promptly inform {CompanyName} of any changes to the above.";
+
+    private string[] VatNonRegistrationParagraphs =>
+    [
+        $"I/We, the undersigned, being an authorized signatory of {SupplierDisplayName} (\"the Supplier\"), " +
+        "hereby declare that our taxable supplies and imports have not exceeded the mandatory VAT " +
+        "registration threshold of AED 375,000 during the previous 12 months, and we have therefore not " +
+        "obtained registration for Value Added Tax (VAT) with the Federal Tax Authority (FTA) under UAE " +
+        "Federal Decree-Law No. 8 of 2017 (as amended).",
+
+        $"We undertake to immediately notify {CompanyName} in writing, and to obtain VAT registration " +
+        "within the timeline prescribed by law, should our taxable supplies and imports exceed the mandatory " +
+        "registration threshold at any point in the future. Until such registration is obtained, we confirm " +
+        $"that we shall not charge VAT on any supplies made to {CompanyName}.",
+
+        "We confirm that the above is true and correct to the best of our knowledge."
+    ];
+
+    private string DeclarationCertify =>
+        "By signing below, I/We acknowledge and accept the declaration(s) set out above.";
+
+    private string DeclarationFullText()
+    {
+        var parts = new List<string>
+        {
+            DeclarationTitle,
+            DeclarationSubtitle,
+            "Declaration (For true and correct information provided):",
+            GeneralDeclaration
+        };
+        if (!IsVatRegistered)
+        {
+            parts.Add("Declaration – Non-Registration for VAT:");
+            parts.AddRange(VatNonRegistrationParagraphs);
+        }
+        parts.Add(DeclarationCertify);
+        return string.Join("\n\n", parts);
+    }
+
+    // ----- Field fragments (one per field key; rendered per tab in the admin-configured order) -----
+    private void BuildFragments()
+    {
+        var f = new Dictionary<string, RenderFragment>();
+
+        // Step 1 — Business / Organization
+        f["SupplierName"] = @<div class="di-field @FieldClass("SupplierName")"><label>Supplier Name@(Req("SupplierName"))@Help("SupplierName")</label><InputText @bind-Value="model.SupplierName" /></div>;
+        // Frozen for the supplier — the business sets the Tax Organization Type; suppliers see it read-only.
+        f["TaxOrganizationTypeId"] = @<div class="di-field @FieldClass("TaxOrganizationTypeId")"><label>Tax Organization Type@(Req("TaxOrganizationTypeId"))</label><InputSelect @bind-Value="model.TaxOrganizationTypeId" disabled="true" class="di-frozen"><option value="">— Select —</option>@foreach (var l in taxOrgTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["SupplierTypeId"] = @<div class="di-field @FieldClass("SupplierTypeId")"><label>Supplier Type@(Req("SupplierTypeId"))</label><InputSelect @bind-Value="model.SupplierTypeId"><option value="">— Select —</option>@foreach (var l in supplierTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TaxpayerCountryId"] = @<div class="di-field @FieldClass("TaxpayerCountryId")"><label>Taxpayer Country@(Req("TaxpayerCountryId"))</label><InputSelect @bind-Value="model.TaxpayerCountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TaxRegistrationNumber"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("TaxRegistrationNumber")"><label>TRN/VAT Registration Number@(Req("TaxRegistrationNumber"))@Help("TaxRegistrationNumber")</label><InputText @bind-Value="model.TaxRegistrationNumber" maxlength="15" inputmode="numeric" pattern="[0-9]*" title="15 digits" /></div>}</text>;
+        f["VatRegistered"] = @<div class="di-field @FieldClass("VatRegistered")"><label>VAT Registered?@(Req("VatRegistered"))</label><select class="form-select" @bind="VatRegisteredStr"><option value="">— Select —</option><option value="true">Yes</option><option value="false">No</option></select></div>;
+        f["VatRegistrationTypeId"] = @<text>@if (IsVatRegistered){<div class="di-field @FieldClass("VatRegistrationTypeId")"><label>VAT Registration Type@(Req("VatRegistrationTypeId"))@Help("VatRegistrationTypeId")</label><InputSelect @bind-Value="model.VatRegistrationTypeId"><option value="">— Select —</option>@foreach (var l in vatRegistrationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>}</text>;
+        f["NumberOfVatGroupEntities"] = @<div class="di-field @FieldClass("NumberOfVatGroupEntities")"><label>Number of Entities if VAT Group@(Req("NumberOfVatGroupEntities"))@Help("VatGroup")</label><InputNumber @bind-Value="model.NumberOfVatGroupEntities" /></div>;
+        f["VatGroupEntityNames"] = @<div class="di-field di-full @FieldClass("VatGroupEntityNames")"><label>Legal Names of all Entities under the VAT Group@(Req("VatGroupEntityNames"))</label><InputTextArea @bind-Value="model.VatGroupEntityNames" /></div>;
+        f["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")"><label>Supplier TIN@(Req("SupplierTin"))@Help("SupplierTin")</label><InputText @bind-Value="model.SupplierTin" maxlength="10" inputmode="numeric" pattern="[0-9]*" title="10 digits" /></div>;
+        f["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")"><label>Business Partner Type@(Req("BusinessPartnerTypeId"))</label><InputSelect @bind-Value="model.BusinessPartnerTypeId"><option value="">— Select —</option>@foreach (var l in businessPartnerTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["BusinessLocationTypeId"] = @<div class="di-field @FieldClass("BusinessLocationTypeId")"><label>Business Location Type@(Req("BusinessLocationTypeId"))</label><InputSelect @bind-Value="model.BusinessLocationTypeId"><option value="">— Select —</option>@foreach (var l in businessLocationTypes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["EInvoicingWaveId"] = @<div class="di-field @FieldClass("EInvoicingWaveId")"><label>eInvoicing Wave Applicability@(Req("EInvoicingWaveId"))@Help("EInvoicingWaveId")</label><InputSelect @bind-Value="model.EInvoicingWaveId"><option value="">— Select —</option>@foreach (var l in eInvoicingWaves){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["TradeLicenseNumber"] = @<div class="di-field @FieldClass("TradeLicenseNumber")"><label>Trade License Number@(Req("TradeLicenseNumber"))</label><InputText @bind-Value="model.TradeLicenseNumber" /></div>;
+        f["TradeLicenseIssueDate"] = @<div class="di-field @FieldClass("TradeLicenseIssueDate")"><label>Trade License Issue Date@(Req("TradeLicenseIssueDate"))</label><InputDate @bind-Value="model.TradeLicenseIssueDate" /></div>;
+        f["TradeLicenseExpiryDate"] = @<div class="di-field @FieldClass("TradeLicenseExpiryDate")"><label>Trade License Expiry Date@(Req("TradeLicenseExpiryDate"))</label><InputDate @bind-Value="model.TradeLicenseExpiryDate" /></div>;
+        f["TradeLicenseIssuingBodyId"] = @<div class="di-field @FieldClass("TradeLicenseIssuingBodyId")"><label>Trade License Issuing Body@(Req("TradeLicenseIssuingBodyId"))@Help("TradeLicenseIssuingBodyId")</label><InputSelect @bind-Value="model.TradeLicenseIssuingBodyId"><option value="">— Select —</option>@foreach (var l in licensingAuthorities){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["IssuingBodyIfOthers"] = @<div class="di-field @FieldClass("IssuingBodyIfOthers")" style="display:@(IsOthersIssuingBody() ? "flex" : "none")"><label>Issuing Body (if Others)@(Req("IssuingBodyIfOthers"))</label><InputText @bind-Value="model.IssuingBodyIfOthers" /></div>;
+        f["VatCodeId"] = @<div class="di-field @FieldClass("VatCodeId")"><label>VAT Code@(Req("VatCodeId"))</label><InputSelect @bind-Value="model.VatCodeId"><option value="">— Select —</option>@foreach (var l in vatCodes){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>;
+        f["BusinessRelationshipId"] = @<div class="di-field @FieldClass("BusinessRelationshipId")"><label>Business Relationship@(Req("BusinessRelationshipId"))</label><InputSelect @bind-Value="model.BusinessRelationshipId"><option value="">— Select —</option>@foreach (var l in businessRelationships){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["DunsNumber"] = @<div class="di-field @FieldClass("DunsNumber")"><label>D-U-N-S Number@(Req("DunsNumber"))</label><InputText @bind-Value="model.DunsNumber" /></div>;
+        f["IsOneTimeSupplier"] = @<div class="di-checkbox-row @FieldClass("IsOneTimeSupplier")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOneTimeSupplier" id="oneTime" /><label for="oneTime" style="margin:0;">One-time supplier</label></div></div>;
+
+        // Step 2 — Address
+        f["AddressName"] = @<div class="di-field @FieldClass("AddressName")"><label>Address Name@(Req("AddressName"))</label><InputText @bind-Value="model.AddressName" /></div>;
+        f["AddressLine1"] = @<div class="di-field @FieldClass("AddressLine1")"><label>Address Line 1@(Req("AddressLine1"))@Help("AddressLine1")</label><InputText @bind-Value="model.AddressLine1" /></div>;
+        f["AddressLine2"] = @<div class="di-field @FieldClass("AddressLine2")"><label>Address Line 2@(Req("AddressLine2"))@Help("AddressLine2")</label><InputText @bind-Value="model.AddressLine2" /></div>;
+        f["CityId"] = @<div class="di-field @FieldClass("CityId")"><label>City / Emirate@(Req("CityId"))@Help("CityId")</label><InputSelect @bind-Value="model.CityId"><option value="">— Select —</option>@foreach (var l in provinces){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["CountryId"] = @<div class="di-field @FieldClass("CountryId")"><label>Country@(Req("CountryId"))@Help("CountryId")</label><InputSelect @bind-Value="model.CountryId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["PostalCode"] = @<div class="di-field @FieldClass("PostalCode")"><label>PO Box / Postal Code@(Req("PostalCode"))</label><InputText @bind-Value="model.PostalCode" /></div>;
+        f["State"] = @<div class="di-field @FieldClass("State")"><label>State@(Req("State"))</label><InputText @bind-Value="model.State" /></div>;
+        f["CorporateWebSite"] = @<div class="di-field @FieldClass("CorporateWebSite")"><label>Corporate Web Site@(Req("CorporateWebSite"))</label><InputText @bind-Value="model.CorporateWebSite" placeholder="https://" /></div>;
+        f["Email"] = @<div class="di-field @FieldClass("Email")"><label>Business E-Mail@(Req("Email"))</label><InputText @bind-Value="model.Email" /></div>;
+        f["BusinessPhone"] = @<div class="di-field @FieldClass("BusinessPhone")"><label>Business Contact Number@(Req("BusinessPhone"))</label><InputText @bind-Value="model.BusinessPhone" /></div>;
+        f["AddressPurposeOrdering"] = @<div class="di-checkbox-row @FieldClass("AddressPurposeOrdering")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeOrdering" id="apOrd" /><label for="apOrd" style="margin:0;">Address Purpose — Ordering</label></div></div>;
+        f["AddressPurposeRemitTo"] = @<div class="di-checkbox-row @FieldClass("AddressPurposeRemitTo")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeRemitTo" id="apRemit" /><label for="apRemit" style="margin:0;">Address Purpose — Remit to</label></div></div>;
+        f["AddressPurposeRfqBidding"] = @<div class="di-checkbox-row @FieldClass("AddressPurposeRfqBidding")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AddressPurposeRfqBidding" id="apRfq" /><label for="apRfq" style="margin:0;">Address Purpose — RFQ or Bidding</label></div></div>;
+
+        // Step 3 — Contact Information
+        f["PrefixId"] = @<div class="di-field @FieldClass("PrefixId")"><label>Prefix@(Req("PrefixId"))</label><InputSelect @bind-Value="model.PrefixId"><option value="">— Select —</option>@foreach (var l in prefixes){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["FirstName"] = @<div class="di-field @FieldClass("FirstName")"><label>First Name@(Req("FirstName"))</label><InputText @bind-Value="model.FirstName" /></div>;
+        f["MiddleName"] = @<div class="di-field @FieldClass("MiddleName")"><label>Middle Name@(Req("MiddleName"))</label><InputText @bind-Value="model.MiddleName" /></div>;
+        f["LastName"] = @<div class="di-field @FieldClass("LastName")"><label>Last Name@(Req("LastName"))</label><InputText @bind-Value="model.LastName" /></div>;
+        f["AdministrativeContact"] = @<div class="di-field @FieldClass("AdministrativeContact")"><label>Administrative Contact@(Req("AdministrativeContact"))</label><InputText @bind-Value="model.AdministrativeContact" placeholder="Defaults to First Name if left blank" /></div>;
+        f["ContactEmail"] = @<div class="di-field @FieldClass("ContactEmail")"><label>Contacts E-Mail@(Req("ContactEmail"))</label><InputText @bind-Value="model.ContactEmail" /></div>;
+        // Phone and Mobile are compound controls (country dial code + area code + number in one bordered
+        // group), matching the internal SupplierForm. The separate PhoneCountryCode/PhoneAreaCode /
+        // MobileCountryCode/MobileAreaCode fields are absorbed here, so they have no standalone fragment
+        // (that also removes them from KeysForStep rendering and the mandatory loop, which gate on the map).
+        f["Phone"] = @<div class="di-field @FieldClass("Phone")"><label>Phone@(Req("Phone"))</label><PhoneField Countries="countriesWithPhoneCode" @bind-CountryCodeId="model.PhoneCountryCodeId" @bind-AreaCode="model.PhoneAreaCode" @bind-Number="model.Phone" ShowAreaCode="true" Placeholder="888 6998" /></div>;
+        f["Mobile"] = @<div class="di-field @FieldClass("Mobile")"><label>Mobile@(Req("Mobile"))</label><PhoneField Countries="countriesWithPhoneCode" @bind-CountryCodeId="model.MobileCountryCodeId" @bind-AreaCode="model.MobileAreaCode" @bind-Number="model.Mobile" ShowAreaCode="true" Placeholder="50 123 4567" /></div>;
+
+        // Step 4 — Site / Business Unit
+        f["ProcurementBuId"] = @<div class="di-field @FieldClass("ProcurementBuId")"><label>Procurement BU@(Req("ProcurementBuId"))</label><InputSelect @bind-Value="model.ProcurementBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["ClientBuId"] = @<div class="di-field @FieldClass("ClientBuId")"><label>Client BU@(Req("ClientBuId"))</label><InputSelect @bind-Value="model.ClientBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["BillToBuId"] = @<div class="di-field @FieldClass("BillToBuId")"><label>Bill-to BU@(Req("BillToBuId"))</label><InputSelect @bind-Value="model.BillToBuId"><option value="">— Select —</option>@foreach (var bu in businessUnits){<option value="@bu.Id">@bu.Name</option>}</InputSelect></div>;
+        f["PaymentMethodId"] = @<div class="di-field @FieldClass("PaymentMethodId")"><label>Payment Method@(Req("PaymentMethodId"))</label><InputSelect @bind-Value="model.PaymentMethodId"><option value="">— Select —</option>@foreach (var l in paymentMethods){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["PaymentTermsId"] = @<div class="di-field @FieldClass("PaymentTermsId")"><label>Payment Terms@(Req("PaymentTermsId"))</label><InputSelect @bind-Value="model.PaymentTermsId"><option value="">— Select —</option>@foreach (var l in paymentTerms){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["IsRfqOrBidding"] = @<div class="di-checkbox-row @FieldClass("IsRfqOrBidding")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsRfqOrBidding" id="rfq" /><label for="rfq" style="margin:0;">RFQ or Bidding</label></div></div>;
+        f["IsOrdering"] = @<div class="di-checkbox-row @FieldClass("IsOrdering")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsOrdering" id="ordering" /><label for="ordering" style="margin:0;">Ordering</label></div></div>;
+        f["IsSourcingOnly"] = @<div class="di-checkbox-row @FieldClass("IsSourcingOnly")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsSourcingOnly" id="sourcing" /><label for="sourcing" style="margin:0;">Sourcing only</label></div></div>;
+        f["IsPurchasing"] = @<div class="di-checkbox-row @FieldClass("IsPurchasing")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPurchasing" id="purchasing" /><label for="purchasing" style="margin:0;">Purchasing</label></div></div>;
+        f["IsPay"] = @<div class="di-checkbox-row @FieldClass("IsPay")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPay" id="pay" /><label for="pay" style="margin:0;">Pay</label></div></div>;
+        f["IsPrimaryPay"] = @<div class="di-checkbox-row @FieldClass("IsPrimaryPay")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.IsPrimaryPay" id="primaryPay" /><label for="primaryPay" style="margin:0;">Primary Pay</label></div></div>;
+
+        // Step 5 — Payment / Banking
+        f["BankId"] = @<div class="di-field @FieldClass("BankId")"><label>Bank Name@(Req("BankId"))</label><InputSelect @bind-Value="model.BankId" @bind-Value:after="OnBankChanged"><option value="">— Select —</option>@foreach (var b in banks){<option value="@b.Id">@b.Name</option>}</InputSelect></div>;
+        f["BankBranchId"] = @<div class="di-field @FieldClass("BankBranchId")"><label>Branch Name@(Req("BankBranchId"))</label><InputSelect @bind-Value="model.BankBranchId" disabled="@(model.BankId is null)"><option value="">— Select —</option>@foreach (var br in SelectedBankBranches){<option value="@br.Id">@br.Name</option>}</InputSelect></div>;
+        f["AccountCountryCodeId"] = @<div class="di-field @FieldClass("AccountCountryCodeId")"><label>Account Country Code@(Req("AccountCountryCodeId"))</label><InputSelect @bind-Value="model.AccountCountryCodeId"><option value="">— Select —</option>@foreach (var l in countries){<option value="@l.Id">@l.DisplayName</option>}</InputSelect></div>;
+        f["AccountName"] = @<div class="di-field @FieldClass("AccountName")"><label>Account Name@(Req("AccountName"))</label><InputText @bind-Value="model.AccountName" /></div>;
+        f["AccountNumber"] = @<div class="di-field @FieldClass("AccountNumber")"><label>Account Number@(Req("AccountNumber"))</label><InputText @bind-Value="model.AccountNumber" /></div>;
+        f["AccountCurrencyCodeId"] = @<div class="di-field @FieldClass("AccountCurrencyCodeId")"><label>Account Currency Code@(Req("AccountCurrencyCodeId"))</label><InputSelect @bind-Value="model.AccountCurrencyCodeId"><option value="">— Select —</option>@foreach (var l in currencies){<option value="@l.Id">@l.Code - @l.DisplayName</option>}</InputSelect></div>;
+        f["SwiftCode"] = @<div class="di-field @FieldClass("SwiftCode")"><label>Swift Code / BIC Code@(Req("SwiftCode"))</label><InputText @bind-Value="model.SwiftCode" /></div>;
+        f["Iban"] = @<div class="di-field @FieldClass("Iban")"><label>IBAN@(Req("Iban"))</label><InputText @bind-Value="model.Iban" /></div>;
+        f["AccountStartDate"] = @<div class="di-field @FieldClass("AccountStartDate")"><label>Account Start Date@(Req("AccountStartDate"))</label><InputDate @bind-Value="model.AccountStartDate" /></div>;
+        f["RemitAdviceEmail"] = @<div class="di-field @FieldClass("RemitAdviceEmail")"><label>Remit Advice Email@(Req("RemitAdviceEmail"))</label><InputText @bind-Value="model.RemitAdviceEmail" /></div>;
+        f["AllowInternationalPayments"] = @<div class="di-checkbox-row @FieldClass("AllowInternationalPayments")"><div class="di-checkbox-item"><InputCheckbox @bind-Value="model.AllowInternationalPayments" id="intlPay" /><label for="intlPay" style="margin:0;">Allow International Payments</label></div></div>;
+
+        fieldFragments = f;
+    }
+}

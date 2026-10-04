@@ -1,0 +1,418 @@
+@page "/admin/land-register"
+@attribute [Authorize(Policy = "Portal.Landlord")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Leasing
+@inject LandRegisterService LandRegisterService
+@inject LandlordService LandlordService
+@inject LoadingService Loading
+@inject ToastService Toast
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Property List - Supplier Portal</PageTitle>
+
+<h1 class="mb-1">Property List</h1>
+<p class="text-muted">Initiate and track landlord registrations. Company, contact and email are read from the Property View; the invitation is always sent to that email.</p>
+
+<div class="row g-2 mb-3">
+    <div class="col-sm-3">
+        <label class="form-label small mb-0">Zone</label>
+        <select class="form-select form-select-sm" @bind="zone" @bind:after="LoadAsync">
+            <option value="__all">All zones</option>
+            @foreach (var z in LandRegisterService.Zones)
+            {
+                <option value="@z">@z</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label small mb-0">Category</label>
+        <select class="form-select form-select-sm" @bind="category" @bind:after="LoadAsync">
+            <option value="">All</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c">@c</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label small mb-0">Status</label>
+        <select class="form-select form-select-sm" @bind="statusText" @bind:after="LoadAsync">
+            <option value="">All</option>
+            <option value="__none">Not started</option>
+            @foreach (var g in Landlords.kpiGroups)
+            {
+                <option value="@g.Label">@g.Label</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label small mb-0">Search</label>
+        <input class="form-control form-control-sm" placeholder="Code, company, contact, email…" value="@search" @oninput="OnSearchInput" />
+    </div>
+</div>
+
+@if (loading)
+{
+    <LoadingIndicator Message="Loading properties…" />
+}
+else if (rows.Count == 0)
+{
+    <div class="alert alert-light border">No properties match the current filter.</div>
+}
+else
+{
+    @Pager
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="di-thead">
+                <tr>
+                    <th>PropertyCode</th>
+                    <th>CompanyName</th>
+                    <th>ContactName</th>
+                    <th>EmailAddress</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in PageRows)
+                {
+                    <tr>
+                        <td class="text-nowrap">@r.PropertyCode</td>
+                        <td>@(r.CompanyName ?? "—")</td>
+                        <td>@(r.ContactName ?? "—")</td>
+                        <td>@(r.EmailAddress ?? "—")</td>
+                        <td>
+                            @if (r.Status is LandlordStatus s)
+                            {
+                                <span class="badge @Landlords.StatusClass(s)">@Landlords.Label(s)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">Not started</span>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap di-iconacts">
+                            @{ var rid = r.RegistrationId; }
+                            @* Edit / view details *@
+                            @if (rid is int eid)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" href="/admin/landlords/@eid" title="View / edit all details">@IconEdit</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" title="Initiate registration" @onclick="() => EditAsync(r)">@IconEdit</button>
+                            }
+                            @* Notify / email invite *@
+                            <button class="btn btn-sm btn-outline-primary" title="Notify (send secure link)"
+                                    disabled="@(!CanNotify(r))" @onclick="() => NotifyAsync(r)">@IconMail</button>
+                            @* Attachments *@
+                            @if (rid is int aid)
+                            {
+                                <a class="btn btn-sm btn-outline-dark" href="/admin/landlords/@aid" title="View attachments">@IconClip</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-dark" title="No attachments yet" disabled>@IconClip</button>
+                            }
+                            @* Review *@
+                            @if (rid is int vid && CanReview(r))
+                            {
+                                <a class="btn btn-sm btn-outline-info" href="/admin/landlords/@vid" title="Review submission">@IconReview</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-info" title="No submission to review" disabled>@IconReview</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @Pager
+}
+
+@if (initiating is not null)
+{
+    <div class="di-modal-backdrop" @onclick="CancelInitiate">
+        <div class="di-modal" @onclick:stopPropagation="true">
+            <h5 class="mb-3">Initiate Landlord Registration</h5>
+            <dl class="row small mb-3">
+                <dt class="col-5">Property Code</dt><dd class="col-7">@initiating.PropertyCode</dd>
+                <dt class="col-5">Company</dt><dd class="col-7">@(initiating.CompanyName ?? "—")</dd>
+                <dt class="col-5">Invitation Email</dt><dd class="col-7 fw-semibold">@(initiating.EmailAddress ?? "—")</dd>
+            </dl>
+            <p class="small text-muted">The invitation will be sent to the email held against this property in the Property View. It cannot be changed here.</p>
+            <div class="mb-3">
+                <label class="form-label">Agreement Type</label>
+                <select class="form-select" @bind="initiateType">
+                    <option value="@LandlordType.Company">Company</option>
+                    <option value="@LandlordType.Individual">Individual</option>
+                </select>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-link" @onclick="CancelInitiate">Cancel</button>
+                <button class="btn btn-primary" disabled="@initiateBusy" @onclick="ConfirmInitiateAsync">
+                    @(initiateBusy ? "Creating…" : (initiateThenNotify ? "Create & Notify" : "Create & Open"))
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---- Send-invite confirmation ---- *@
+@if (confirmNotifyRow is not null)
+{
+    <div class="di-confirm-backdrop" @onclick="CancelNotify">
+        <div class="di-confirm-card" @onclick:stopPropagation role="dialog" aria-modal="true">
+            <button type="button" class="di-confirm-x" title="Close" @onclick="CancelNotify">&times;</button>
+            <div class="di-confirm-badge">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="2.5" y="4.75" width="19" height="14.5" rx="2.5" fill="#ffffff" stroke="#0b2545" stroke-width="1.6"/>
+                    <path d="M3.5 6.5 12 12.5l8.5-6" stroke="#0b2545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="19" cy="6" r="4.4" fill="#c9a227" stroke="#ffffff" stroke-width="1.4"/>
+                    <path d="M19 4.3v3.4M17.3 6h3.4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <h3 class="di-confirm-title">Send invitation email?</h3>
+            <p class="di-confirm-sub">We'll send the landlord registration link to:</p>
+            <div class="di-confirm-target">
+                <div class="di-confirm-avatar">@NotifyInitials(confirmNotifyRow.CompanyName ?? confirmNotifyRow.ContactName)</div>
+                <div class="di-confirm-who">
+                    <span class="di-confirm-name">@(confirmNotifyRow.CompanyName ?? confirmNotifyRow.ContactName ?? confirmNotifyRow.PropertyCode)</span>
+                    @if (!string.IsNullOrWhiteSpace(confirmNotifyRow.EmailAddress))
+                    {
+                        <span class="di-confirm-email">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/></svg>
+                            @confirmNotifyRow.EmailAddress
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="di-confirm-actions">
+                <button type="button" class="di-confirm-btn di-confirm-cancel" @onclick="CancelNotify">Cancel</button>
+                <button type="button" class="di-confirm-btn di-confirm-send" @onclick="ConfirmNotifyAsync">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/></svg>
+                    <span>Send Email</span>
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-thead th { background: #1a5276; color: #fff; }
+    .di-actions a { color: #b8860b; font-weight: 600; text-decoration: none; margin: 0 .15rem; }
+    .di-actions a:hover { text-decoration: underline; }
+    .di-actions a.di-disabled { color: #b7bcc4; pointer-events: none; }
+    .di-actions a.di-attach { margin-left: .5rem; vertical-align: middle; }
+    .di-iconacts .btn { margin-left: 4px; }
+    .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 3000; }
+    .di-modal { width: 100%; max-width: 460px; background: var(--bs-body-bg); border-radius: .6rem; box-shadow: 0 12px 40px rgba(0,0,0,.3); padding: 1.25rem 1.5rem; }
+
+    /* ---- Send-email confirmation dialog (mirrors the Supplier dashboard) ---- */
+    .di-confirm-backdrop { position: fixed; inset: 0; z-index: 3100; background: rgba(11, 37, 69, 0.55); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: di-confirm-fade 0.15s ease; }
+    .di-confirm-card { position: relative; background: #fff; width: min(430px, 100%); border-radius: 18px; padding: 30px 28px 24px; text-align: center; box-shadow: 0 24px 60px rgba(11, 37, 69, 0.35); animation: di-confirm-pop 0.18s cubic-bezier(.2,.9,.3,1.2); }
+    .di-confirm-x { position: absolute; top: 12px; right: 14px; border: none; background: transparent; font-size: 24px; line-height: 1; color: #9aa6b8; cursor: pointer; padding: 2px 6px; border-radius: 8px; }
+    .di-confirm-x:hover { background: #f1f4f9; color: #46618f; }
+    .di-confirm-badge { width: 76px; height: 76px; margin: 0 auto 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 30% 25%, #eaf1fb, #d7e5f7); box-shadow: 0 0 0 8px rgba(11, 37, 69, 0.06); }
+    .di-confirm-title { margin: 0 0 6px; font-size: 20px; font-weight: 800; color: #0b2545; }
+    .di-confirm-sub { margin: 0 0 16px; font-size: 13.5px; color: #7b8697; }
+    .di-confirm-target { display: flex; align-items: center; gap: 12px; text-align: left; background: #f6f8fc; border: 1px solid #e6ecf5; border-radius: 12px; padding: 12px 14px; margin-bottom: 22px; }
+    .di-confirm-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #0b2545; color: #c9a227; font-weight: 800; font-size: 14px; }
+    .di-confirm-who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .di-confirm-name { font-weight: 700; font-size: 14.5px; color: #1a2233; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #46618f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-confirm-email svg { flex: none; opacity: 0.75; }
+    .di-confirm-actions { display: flex; gap: 12px; }
+    .di-confirm-btn { flex: 1; border-radius: 10px; padding: 11px 16px; font-size: 14.5px; font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: all 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .di-confirm-cancel { background: #fff; border-color: #d3dae6; color: #46618f; }
+    .di-confirm-cancel:hover { background: #f1f4f9; }
+    .di-confirm-send { background: linear-gradient(135deg, #14396b, #0b2545); color: #fff; box-shadow: 0 6px 16px rgba(11,37,69,0.28); }
+    .di-confirm-send:hover { transform: translateY(-1px); box-shadow: 0 9px 22px rgba(11,37,69,0.36); }
+    @@keyframes di-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes di-confirm-pop { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+</style>
+
+@code {
+    private readonly RenderFragment IconEdit = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5Z" /></svg>;
+    private readonly RenderFragment IconMail = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z" /></svg>;
+    private readonly RenderFragment IconClip = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3Z" /></svg>;
+    private readonly RenderFragment IconReview = @<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5h3Z" /><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-12Zm7.354 4.854-3 3a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L7 9.293l2.646-2.647a.5.5 0 0 1 .708.708Z" /></svg>;
+
+    private string zone = "";
+    private string category = "";
+    private string statusText = "";
+    private string search = "";
+    private bool loading = true;
+    private List<PropertyListRow> rows = [];
+    private List<string> categories = [];
+    private CancellationTokenSource? debounceCts;
+
+    private RenderFragment Pager => @<div class="d-flex justify-content-between align-items-center my-2">
+        <span class="small text-muted">Showing @(rows.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, rows.Count) of @rows.Count</span>
+        @if (TotalPages > 1)
+        {
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(page == 1 ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page - 1)">Prev</button></li>
+                    @foreach (var pg in PageWindow)
+                    {
+                        <li class="page-item @(pg == page ? "active" : "")"><button class="page-link" @onclick="() => GoTo(pg)">@pg</button></li>
+                    }
+                    <li class="page-item @(page == TotalPages ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page + 1)">Next</button></li>
+                </ul>
+            </nav>
+        }
+    </div>;
+
+    private const int PageSize = 25;
+    private int page = 1;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(rows.Count / (double)PageSize));
+    private IEnumerable<PropertyListRow> PageRows => rows.Skip((page - 1) * PageSize).Take(PageSize);
+    private IEnumerable<int> PageWindow
+    {
+        get
+        {
+            var start = Math.Max(1, page - 2);
+            var end = Math.Min(TotalPages, start + 4);
+            start = Math.Max(1, end - 4);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+    private void GoTo(int p) { if (p >= 1 && p <= TotalPages) page = p; }
+
+    private PropertyListRow? initiating;
+    private LandlordType initiateType = LandlordType.Company;
+    private bool initiateBusy;
+    private bool initiateThenNotify;
+
+    private string currentUser = "unknown";
+    private int businessUnitId;
+
+    // Selected status group (by label) resolved to its underlying statuses; "__none" = not-started rows.
+    private LandlordStatus[]? StatusFilter =>
+        Landlords.kpiGroups.FirstOrDefault(g => g.Label == statusText)?.Statuses;
+    private bool NotStartedOnly => statusText == "__none";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        businessUnitId = state.User.GetBusinessUnitIds().FirstOrDefault();
+        zone = LandRegisterService.ResolveZone(null);
+        categories = await LandRegisterService.GetCategoriesAsync(zone);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        await Loading.RunAsync(async () =>
+        {
+            categories = await LandRegisterService.GetCategoriesAsync(zone);
+            rows = await LandRegisterService.GetPropertyListAsync(zone, category, StatusFilter, NotStartedOnly, search, take: 100000);
+        });
+        page = 1;
+        loading = false;
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+        debounceCts?.Cancel();
+        debounceCts = new CancellationTokenSource();
+        var token = debounceCts.Token;
+        try { await Task.Delay(300, token); await LoadAsync(); StateHasChanged(); }
+        catch (TaskCanceledException) { }
+    }
+
+    private static bool CanNotify(PropertyListRow r) =>
+        !string.IsNullOrWhiteSpace(r.EmailAddress)
+        && r.Status is not (LandlordStatus.RegistrationComplete or LandlordStatus.Rejected);
+    private static bool CanReview(PropertyListRow r) =>
+        r.RegistrationId is not null && r.Status is LandlordStatus.Submitted or LandlordStatus.UnderReview;
+
+    // Edit: open the registration if one exists, otherwise initiate then open.
+    private async Task EditAsync(PropertyListRow r)
+    {
+        if (r.RegistrationId is int id) { Nav.NavigateTo($"/admin/landlords/{id}"); return; }
+        if (string.IsNullOrWhiteSpace(r.EmailAddress)) { Toast.ShowError("This property has no email in the Property View."); return; }
+        initiateThenNotify = false;
+        initiating = r;
+        initiateType = LandlordType.Company;
+    }
+
+    // Notify: send the secure link, initiating first if there is no registration yet.
+    private void NotifyAsync(PropertyListRow r)
+    {
+        if (!CanNotify(r)) return;
+        if (r.RegistrationId is not null)
+        {
+            // Existing registration — confirm before sending the invite.
+            confirmNotifyRow = r;
+            return;
+        }
+        // No registration yet — the Initiate modal doubles as the confirmation (Create & Notify).
+        initiateThenNotify = true;
+        initiating = r;
+        initiateType = LandlordType.Company;
+    }
+
+    private PropertyListRow? confirmNotifyRow;
+    private void CancelNotify() => confirmNotifyRow = null;
+
+    private async Task ConfirmNotifyAsync()
+    {
+        var r = confirmNotifyRow;
+        confirmNotifyRow = null;
+        if (r?.RegistrationId is not int id) return;
+        var (ok, error, _) = await Loading.RunAsync(() => LandlordService.InviteAsync(id, currentUser, Nav.BaseUri));
+        if (!ok) { Toast.ShowError(error ?? "Could not send the invitation."); return; }
+        Toast.ShowSuccess($"Invitation sent to {r.EmailAddress}.");
+        await LoadAsync();
+    }
+
+    private static string NotifyInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "–";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1 ? parts[0][..1].ToUpperInvariant()
+            : (parts[0][..1] + parts[^1][..1]).ToUpperInvariant();
+    }
+
+    private async Task ReviewAsync(PropertyListRow r)
+    {
+        if (!CanReview(r)) { Toast.ShowInfo("There is no submitted registration to review yet."); return; }
+        Nav.NavigateTo($"/admin/landlords/{r.RegistrationId}");
+    }
+
+    private void CancelInitiate() => initiating = null;
+
+    private async Task ConfirmInitiateAsync()
+    {
+        if (initiating is null) return;
+        initiateBusy = true;
+        var (ok, error, id) = await Loading.RunAsync(
+            () => LandlordService.InitiateFromPropertyAsync(initiating.PremisesId, initiateType, businessUnitId, currentUser));
+        if (!ok) { initiateBusy = false; Toast.ShowError(error ?? "Could not initiate registration."); return; }
+
+        if (initiateThenNotify)
+        {
+            var (sent, err, _) = await LandlordService.InviteAsync(id, currentUser, Nav.BaseUri);
+            initiateBusy = false;
+            if (!sent) { Toast.ShowError(err ?? "Registration created but the invitation could not be sent."); Nav.NavigateTo($"/admin/landlords/{id}"); return; }
+            Toast.ShowSuccess("Registration created and invitation sent.");
+            Nav.NavigateTo($"/admin/landlords/{id}");
+            return;
+        }
+        initiateBusy = false;
+        Nav.NavigateTo($"/admin/landlords/{id}");
+    }
+}

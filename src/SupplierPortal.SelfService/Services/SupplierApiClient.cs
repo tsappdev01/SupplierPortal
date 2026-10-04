@@ -1,0 +1,222 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using SupplierPortal.Contracts;
+
+namespace SupplierPortal.SelfService.Services;
+
+/// <summary>
+/// The portal's only door to supplier data. Every call carries the portal client-credentials token
+/// (Authorization: Bearer) and, for data operations, the supplier session token (X-Supplier-Session).
+/// This class holds no supplier data of its own and no database access — it just marshals DTOs to and
+/// from the internal API.
+/// </summary>
+public class SupplierApiClient(
+    IHttpClientFactory httpClientFactory, PortalTokenProvider tokenProvider, ILogger<SupplierApiClient> logger)
+{
+    private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+
+    private static T? Deserialize<T>(string body)
+    {
+        try { return string.IsNullOrWhiteSpace(body) ? default : JsonSerializer.Deserialize<T>(body, JsonOpts); }
+        catch { return default; }
+    }
+
+    private static string Trim(string? s, int max) =>
+        string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max] + "…");
+
+    private async Task<HttpClient> AuthedClientAsync(string? sessionToken = null)
+    {
+        var http = httpClientFactory.CreateClient("Api");
+        var token = await tokenProvider.GetTokenAsync();
+        if (token is not null)
+        {
+            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        if (sessionToken is not null)
+        {
+            http.DefaultRequestHeaders.Add("X-Supplier-Session", sessionToken);
+        }
+        return http;
+    }
+
+    public async Task<OtpRequestResponse> RequestOtpAsync(string linkToken, bool resend = false)
+    {
+        try
+        {
+            var http = await AuthedClientAsync();
+            var res = await http.PostAsJsonAsync("/api/selfservice/otp/request", new OtpRequestRequest { LinkToken = linkToken, Resend = resend });
+            if (!res.IsSuccessStatusCode)
+            {
+                logger.LogError("Supplier RequestOtp failed: HTTP {Status}. Body: {Body}",
+                    (int)res.StatusCode, await res.Content.ReadAsStringAsync());
+                return new OtpRequestResponse { Success = false, Error = $"The service is temporarily unavailable (HTTP {(int)res.StatusCode}). Please try again." };
+            }
+            return await res.Content.ReadFromJsonAsync<OtpRequestResponse>() ?? Fail();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "RequestOtp failed");
+            return new OtpRequestResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+        }
+
+        static OtpRequestResponse Fail() => new() { Success = false, Error = "Unexpected response from the service." };
+    }
+
+    /// <summary>Branding + business-unit support email for a link, resolvable even when the session has
+    /// expired (used to brand the "session expired" screen). Never throws; returns null on any failure.</summary>
+    public async Task<LinkInfoResponse?> GetLinkInfoAsync(string linkToken)
+    {
+        try
+        {
+            var http = await AuthedClientAsync();
+            var res = await http.GetAsync($"/api/selfservice/link-info?token={Uri.EscapeDataString(linkToken)}");
+            return res.IsSuccessStatusCode ? await res.Content.ReadFromJsonAsync<LinkInfoResponse>() : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetLinkInfo failed");
+            return null;
+        }
+    }
+
+    public async Task<OtpVerifyResponse> VerifyOtpAsync(string linkToken, string code)
+    {
+        try
+        {
+            var http = await AuthedClientAsync();
+            var res = await http.PostAsJsonAsync("/api/selfservice/otp/verify",
+                new OtpVerifyRequest { LinkToken = linkToken, Code = code });
+            if (!res.IsSuccessStatusCode)
+            {
+                return new OtpVerifyResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+            }
+            return await res.Content.ReadFromJsonAsync<OtpVerifyResponse>()
+                   ?? new OtpVerifyResponse { Success = false, Error = "Unexpected response from the service." };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "VerifyOtp failed");
+            return new OtpVerifyResponse { Success = false, Error = "The service is temporarily unavailable. Please try again." };
+        }
+    }
+
+    public async Task<SupplierFormBootstrapDto?> GetBootstrapAsync(string sessionToken)
+    {
+        var http = await AuthedClientAsync(sessionToken);
+        var res = await http.GetAsync("/api/selfservice/supplier");
+        return res.IsSuccessStatusCode ? await res.Content.ReadFromJsonAsync<SupplierFormBootstrapDto>() : null;
+    }
+
+    public async Task<SaveSupplierResponse> SaveAsync(string sessionToken, SupplierDto supplier)
+    {
+        try
+        {
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.PutAsJsonAsync("/api/selfservice/supplier", supplier);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                // Log the FULL server response (status + body) to the Partner Connect logs, and surface a
+                // trimmed version to the page so the real cause is visible during testing.
+                logger.LogError("Self-service SaveAsync failed: HTTP {Status}. Response body: {Body}",
+                    (int)res.StatusCode, Trim(body, 4000));
+                return new SaveSupplierResponse
+                {
+                    Success = false,
+                    Errors = [$"Could not save (HTTP {(int)res.StatusCode}). {Trim(body, 500)}"]
+                };
+            }
+            return Deserialize<SaveSupplierResponse>(body)
+                   ?? new SaveSupplierResponse { Success = false, Errors = ["Unexpected response."] };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Self-service SaveAsync request threw");
+            return new SaveSupplierResponse { Success = false, Errors = [$"Could not save: {ex.Message}"] };
+        }
+    }
+
+    public async Task<DocumentUploadResponse> UploadDocumentAsync(
+        string sessionToken, SelfServiceDocumentType type, Stream content, string fileName, string contentType)
+    {
+        var http = await AuthedClientAsync(sessionToken);
+        using var form = new MultipartFormDataContent();
+        var fileContent = new StreamContent(content);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType);
+        form.Add(fileContent, "file", fileName);
+        form.Add(new StringContent(((int)type).ToString()), "documentType");
+
+        var res = await http.PostAsync("/api/selfservice/documents", form);
+        if (!res.IsSuccessStatusCode)
+        {
+            return new DocumentUploadResponse { Success = false, Error = "Upload failed. Please try again." };
+        }
+        return await res.Content.ReadFromJsonAsync<DocumentUploadResponse>()
+               ?? new DocumentUploadResponse { Success = false, Error = "Unexpected response." };
+    }
+
+    /// <summary>Fetches a document's bytes for in-form preview. The internal API enforces that the
+    /// document belongs to this session's supplier. Returns null on any failure.</summary>
+    public async Task<(byte[] Bytes, string ContentType, string FileName)?> GetDocumentAsync(string sessionToken, int documentId)
+    {
+        try
+        {
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.GetAsync($"/api/selfservice/documents/{documentId}");
+            if (!res.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var bytes = await res.Content.ReadAsByteArrayAsync();
+            var contentType = res.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            var fileName = res.Content.Headers.ContentDisposition?.FileNameStar
+                ?? res.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+                ?? "document";
+            return (bytes, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetDocument failed");
+            return null;
+        }
+    }
+
+    public async Task<DocumentUploadResponse> DeleteDocumentAsync(string sessionToken, int documentId)
+    {
+        var http = await AuthedClientAsync(sessionToken);
+        var res = await http.DeleteAsync($"/api/selfservice/documents/{documentId}");
+        if (!res.IsSuccessStatusCode)
+        {
+            return new DocumentUploadResponse { Success = false, Error = "Could not remove the document." };
+        }
+        return await res.Content.ReadFromJsonAsync<DocumentUploadResponse>()
+               ?? new DocumentUploadResponse { Success = false, Error = "Unexpected response." };
+    }
+
+    public async Task<SubmitResponse> SubmitAsync(string sessionToken, SubmitRequest declaration)
+    {
+        try
+        {
+            var http = await AuthedClientAsync(sessionToken);
+            var res = await http.PostAsJsonAsync("/api/selfservice/submit", declaration);
+            var body = await res.Content.ReadAsStringAsync();
+            if (!res.IsSuccessStatusCode)
+            {
+                logger.LogError("Self-service SubmitAsync failed: HTTP {Status}. Response body: {Body}",
+                    (int)res.StatusCode, Trim(body, 4000));
+                return new SubmitResponse { Success = false, Error = $"Could not submit (HTTP {(int)res.StatusCode}). {Trim(body, 500)}" };
+            }
+            return Deserialize<SubmitResponse>(body)
+                   ?? new SubmitResponse { Success = false, Error = "Unexpected response." };
+        }
+        catch (Exception ex)
+        {
+            // Network error, timeout, or a dropped session — surface a friendly message instead of letting
+            // the exception bubble up and leave the Submit button silently dead.
+            logger.LogError(ex, "Submit failed");
+            return new SubmitResponse { Success = false, Error = "Could not submit. Please check your connection and try again." };
+        }
+    }
+}

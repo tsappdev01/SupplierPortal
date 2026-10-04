@@ -1,0 +1,267 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserService UserService
+
+<PageTitle>Supplier Portal</PageTitle>
+
+@if (user is not null)
+{
+    <div class="di-home-profile">
+        @if (hasPhoto)
+        {
+            <img src="/users/@user.Id/photo" alt="" class="di-home-photo" />
+        }
+        else
+        {
+            <span class="di-home-photo di-home-initials">@GetInitials(user.FullName ?? user.Username)</span>
+        }
+        <div>
+            <div class="di-home-name">Welcome, @(user.FullName ?? user.Username)</div>
+            <div class="di-home-designation">Choose an application to continue</div>
+        </div>
+    </div>
+
+    <div class="di-launch">
+        @if (canSupplier)
+        {
+            <a class="di-launch-card di-launch-supplier" href="/supplier/dashboard">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7l8 4 8-4Z"/><path d="M4 7v10l8 4 8-4V7"/><path d="m12 11 0 10"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Supplier Portal</span>
+                    <span class="di-launch-sub">Manage suppliers, notifications and self-service.</span>
+                </span>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
+
+        @if (canLandlord)
+        {
+            <a class="di-launch-card di-launch-landlord" href="/admin/land-register">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Landlord Portal</span>
+                    <span class="di-launch-sub">Property list, landlord registrations and reviews.</span>
+                </span>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
+
+        @if (canBroker)
+        {
+            <div class="di-launch-card di-launch-broker di-launch-soon" role="button" aria-disabled="true">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Broker Portal</span>
+                    <span class="di-launch-sub">Broker onboarding, listings and commissions.</span>
+                </span>
+                <span class="di-launch-badge">Coming soon</span>
+            </div>
+        }
+
+        @if (canCustomer)
+        {
+            <a class="di-launch-card di-launch-customer" href="/admin/customers">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Customer Portal</span>
+                    <span class="di-launch-sub">Customer accounts &amp; onboarding — managed by Business Relation.</span>
+                </span>
+                <span class="di-launch-cta">Launch <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
+
+        @if (isAdministrator)
+        {
+            <a class="di-launch-card di-launch-admin" href="/admin/users">
+                <span class="di-launch-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+                </span>
+                <span class="di-launch-body">
+                    <span class="di-launch-title">Administration</span>
+                    <span class="di-launch-sub">Users, business units, supplier fields and audit log.</span>
+                </span>
+                <span class="di-launch-cta">Open <span class="di-launch-arrow">→</span></span>
+            </a>
+        }
+    </div>
+
+    @if (!hasAnyPortal && !isAdministrator)
+    {
+        <div class="alert alert-info">
+            You don't have access to any portal yet. Please contact your administrator to be granted access.
+        </div>
+    }
+}
+
+<style>
+    .di-launch {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .di-launch-card {
+        flex: 1 1 320px;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.4rem;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #fff;
+        background: linear-gradient(135deg, #1a2233 0%, #2b3855 100%);
+        box-shadow: 0 6px 18px rgba(26, 34, 51, .18);
+        transition: transform .12s ease, box-shadow .12s ease;
+    }
+
+    .di-launch-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 26px rgba(26, 34, 51, .28);
+        color: #fff;
+    }
+
+    .di-launch-landlord {
+        background: linear-gradient(135deg, #0e3a66 0%, #164a7b 100%);
+    }
+
+    .di-launch-broker {
+        background: linear-gradient(135deg, #3d2c56 0%, #5a4080 100%);
+    }
+
+    .di-launch-customer {
+        background: linear-gradient(135deg, #14504a 0%, #1f7a70 100%);
+    }
+
+    .di-launch-soon {
+        cursor: default;
+        opacity: .8;
+    }
+
+    .di-launch-soon:hover {
+        transform: none;
+        box-shadow: 0 6px 18px rgba(26, 34, 51, .18);
+    }
+
+    .di-launch-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        font-size: .95rem;
+        white-space: nowrap;
+    }
+
+    .di-launch-badge {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        background: rgba(255, 255, 255, .18);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, .35);
+        border-radius: 999px;
+        padding: 4px 10px;
+        white-space: nowrap;
+    }
+
+    .di-launch-ico {
+        flex: none;
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, .12);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #c8a24a;
+    }
+
+    .di-launch-ico svg { width: 28px; height: 28px; }
+    .di-launch-body { flex: 1; display: flex; flex-direction: column; }
+    .di-launch-title { font-size: 1.15rem; font-weight: 700; }
+    .di-launch-sub { font-size: .85rem; color: rgba(255, 255, 255, .75); margin-top: 2px; }
+    .di-launch-arrow { font-size: 1.4rem; opacity: .8; }
+
+    .di-home-profile {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .di-home-photo {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .di-home-initials {
+        background: #1a2233;
+        color: #b5892f;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .di-home-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #1a2233;
+    }
+
+    .di-home-designation {
+        font-size: 0.9rem;
+        color: #7b8697;
+    }
+</style>
+
+@code {
+    private User? user;
+    private bool hasPhoto;
+    private bool isAdministrator;
+    private bool canSupplier;
+    private bool canLandlord;
+    private bool canBroker;
+    private bool canCustomer;
+    private bool hasAnyPortal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = state.User.GetUserId();
+        user = await UserService.GetByIdAsync(userId);
+        hasPhoto = state.User.HasPhoto();
+        isAdministrator = state.User.IsAdministrator();
+        canSupplier = state.User.CanAccessPortal(PortalAccess.Supplier);
+        canLandlord = state.User.CanAccessPortal(PortalAccess.Landlord);
+        canBroker = state.User.CanAccessPortal(PortalAccess.Broker);
+        canCustomer = state.User.CanAccessPortal(PortalAccess.Customer);
+        hasAnyPortal = canSupplier || canLandlord || canBroker || canCustomer;
+    }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2 ? name[..2].ToUpperInvariant() : name.ToUpperInvariant();
+    }
+}

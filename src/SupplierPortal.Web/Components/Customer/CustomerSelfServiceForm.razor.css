@@ -1,0 +1,490 @@
+/* Customer wizard styled to match the Supplier form (SupplierForm.razor.css): same navy/blue palette,
+   pill stepper, card sections and black-text inputs, so the two portals look and feel identical. */
+.di-form-page {
+    --navy: #1a2233;
+    --blue: #3b5bdb;
+    --text: #3a4457;
+    --label: #46618f;
+    --border: #e2e5ea;
+    --bg: #f4f6f9;
+    --required: #c0392b;
+    --gold: #b5892f;
+    color: var(--text);
+    max-width: 1240px;
+}
+
+.di-form-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 0 20px;
+}
+
+.di-form-headings { min-width: 0; }
+
+.di-form-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--navy);
+    margin: 0 0 6px;
+}
+
+.di-form-sub {
+    font-size: 15px;
+    color: #7b8697;
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.di-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+/* ---- Stepper (pills) ---- */
+.di-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 24px;
+    flex-wrap: wrap;
+}
+
+.di-stepper-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px 6px 6px;
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: #97a1b3;
+    cursor: pointer;
+}
+
+.di-stepper-item.reached {
+    color: var(--navy);
+    cursor: pointer;
+}
+
+.di-stepper-item.active {
+    border-color: var(--blue);
+    background: #eef1ff;
+    color: var(--blue);
+}
+
+.di-stepper-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg);
+    color: #97a1b3;
+    font-size: 13.5px;
+    flex: none;
+}
+
+.di-stepper-item.reached .di-stepper-num {
+    background: var(--navy);
+    color: #fff;
+}
+
+.di-stepper-item.active .di-stepper-num {
+    background: var(--blue);
+    color: #fff;
+}
+
+.di-stepper-chevron {
+    color: #c3cad6;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+
+/* ---- Section cards ---- */
+.di-section {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: visible;
+}
+
+.di-section-header {
+    background: linear-gradient(180deg, #fbfcfe 0%, #f5f7fc 100%);
+    border-bottom: 1px solid var(--border);
+    color: var(--navy);
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-radius: 8px 8px 0 0;
+}
+
+.di-section-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #eef1ff;
+    color: var(--blue);
+    flex-shrink: 0;
+}
+
+.di-section-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.di-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--navy);
+}
+
+.di-section-desc {
+    font-size: 13px;
+    font-weight: 400;
+    color: #7b8697;
+}
+
+.di-section-body {
+    padding: 20px 20px 8px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+}
+
+@media (min-width: 768px) {
+    .di-section-body {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* ---- Fields ---- */
+/* Full-width sub-section heading inside a step's field grid (e.g. Passport / Visa / Government ID). */
+.di-subheading {
+    grid-column: 1 / -1;
+    margin: 8px 0 2px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    color: var(--blue);
+}
+.di-subheading:first-child { margin-top: 0; }
+
+.di-field { display: flex; flex-direction: column; min-width: 0; }
+.di-field input, .di-field select { min-width: 0; max-width: 100%; }
+
+.di-field label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 5px;
+}
+
+.di-req { color: var(--required); margin-left: 2px; }
+
+/* Inline highlight for a mandatory field flagged by tab-level validation. */
+.di-field-invalid input, .di-field-invalid select, .di-field-invalid .di-switch, .di-field-invalid .di-datepick {
+    border-color: #c0392b !important;
+    box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.15);
+}
+.di-field-invalid > label { color: #c0392b; }
+.di-field-invalid::after {
+    content: "Required — please complete this field.";
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #c0392b;
+}
+
+.di-lov-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #e9edfb;
+    color: var(--blue);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    vertical-align: middle;
+}
+
+.di-field input[type=text],
+.di-field input[type=email],
+.di-field input[type=date],
+.di-field input[type=number],
+.di-field select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    /* Field values in solid black to match the label colour. */
+    color: #000;
+    background: #fff;
+    font-family: inherit;
+    width: 100%;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.di-field input[type=text]:hover:not(:disabled),
+.di-field input[type=email]:hover:not(:disabled),
+.di-field input[type=date]:hover:not(:disabled),
+.di-field select:hover:not(:disabled) {
+    border-color: #c3ccdb;
+}
+
+.di-field input[type=text]:focus,
+.di-field input[type=email]:focus,
+.di-field input[type=date]:focus,
+.di-field input[type=number]:focus,
+.di-field select:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15);
+}
+
+.di-field input:disabled,
+.di-field select:disabled {
+    background: var(--bg);
+    color: #97a1b3;
+}
+
+/* Yes/No switch toggle: green = Yes (knob right), red = No (knob left), grey = not set. */
+.di-switch-wrap { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding-top: 4px; }
+
+.di-switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    flex: none;
+    border: none;
+    border-radius: 999px;
+    background: #c7ccd6;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease;
+}
+
+.di-switch.on { background: #2f9e44; }
+.di-switch.off { background: #c0392b; }
+
+.di-switch-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: left 0.15s ease;
+}
+
+.di-switch.on .di-switch-knob { left: 23px; }
+
+.di-switch-text { font-size: 14px; font-weight: 600; color: #46506b; min-width: 26px; }
+
+/* Frozen (read-only) control — e.g. a field the business marked Read-only for this role. */
+.di-frozen {
+    background: #eef1f6 !important;
+    color: #55606f !important;
+    cursor: not-allowed;
+}
+
+/* ---- Review step ---- */
+.di-review-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.di-review-label { font-size: 12.5px; color: #7b8697; }
+.di-review-value { font-size: 14.5px; color: #111; word-break: break-word; }
+.di-review-empty { grid-column: 1 / -1; color: #97a1b3; font-style: italic; }
+
+/* ---- Footer / buttons ---- */
+.di-form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 40px;
+    flex-wrap: wrap;
+}
+
+.di-form-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.di-saved-tick { color: #2f9e44; font-size: 13.5px; font-weight: 600; }
+
+.di-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+
+.di-btn:disabled { opacity: 0.6; cursor: default; }
+.di-btn:active:not(:disabled) { transform: translateY(1px); }
+.di-btn-sm { padding: 5px 12px; font-size: 13px; }
+
+.di-btn-primary { background: var(--blue); color: #fff; box-shadow: 0 1px 2px rgba(59, 91, 219, 0.3); }
+.di-btn-primary:hover:not(:disabled) { background: #2f4bc4; }
+.di-btn-secondary { background: #fff; color: var(--navy); border: 1px solid var(--border); }
+.di-btn-secondary:hover:not(:disabled) { background: #f5f7fc; border-color: #c3ccdb; }
+.di-btn-gold { background: var(--gold); color: #fff; }
+.di-btn-gold:hover:not(:disabled) { background: #a07622; }
+.di-btn-success { background: #2f9e44; color: #fff; }
+.di-btn-success:hover:not(:disabled) { background: #278038; }
+.di-btn-danger { background: #fff; color: var(--required); border: 1px solid #f0c4be; }
+.di-btn-danger:hover:not(:disabled) { background: #fdf3f2; }
+
+/* ---- Mobile ---- */
+@media (max-width: 640px) {
+    .di-form-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .di-form-title { font-size: 20px; }
+
+    .di-section-body {
+        grid-template-columns: 1fr;
+        padding: 16px 14px 6px;
+    }
+
+    .di-section-header { padding: 12px 14px; }
+    .di-section-desc { display: none; }
+
+    .di-form-footer .di-btn,
+    .di-form-footer-right .di-btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
+
+/* ---- Header progress ring (matches SupplierForm.razor.css) ---- */
+.di-form-topbar-right { display: flex; align-items: center; gap: 16px; }
+.di-progress { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.di-progress-ring { width: 64px; height: 64px; transform: rotate(-90deg); }
+.di-progress-bg { fill: none; stroke: #e9edf5; stroke-width: 3.2; }
+.di-progress-bar { fill: none; stroke: var(--blue); stroke-width: 3.2; stroke-linecap: round; transition: stroke-dasharray 0.45s ease; }
+.di-progress-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; }
+.di-progress-pct { font-size: 15px; font-weight: 700; color: var(--navy); }
+.di-progress-word { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8a94a6; }
+
+/* ---- Declaration pop-up + signature pad (matches the supplier submit) ---- */
+.di-decl-backdrop { --navy: #1a2233; --blue: #3b5bdb; --border: #e2e5ea; --gold: #b5892f; --required: #c0392b; position: fixed; inset: 0; background: rgba(15, 22, 35, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 20px; }
+.di-decl { background: #fff; border-radius: 10px; width: min(640px, 100%); max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35); }
+.di-decl-head { padding: 18px 22px 10px; border-bottom: 1px solid #e2e5ea; text-align: center; }
+.di-decl-title { margin: 0; font-size: 17px; font-weight: 700; color: #3b5bdb; text-transform: uppercase; letter-spacing: 0.02em; }
+.di-decl-subtitle { font-size: 12.5px; font-style: italic; color: #7b8697; margin-top: 4px; }
+.di-decl-body { padding: 16px 22px; overflow-y: auto; font-size: 13.5px; line-height: 1.5; color: #3a4457; }
+.di-decl-body p { margin: 0 0 10px; }
+.di-decl-section { font-weight: 700; color: #1a2233; }
+.di-decl-certify { font-style: italic; }
+.di-decl-siglabel { display: block; font-weight: 700; color: #1a2233; margin: 14px 0 5px; font-size: 13.5px; }
+.di-decl-sig { width: 100%; padding: 10px 12px; border: 1px solid #e2e5ea; border-radius: 6px; font-size: 15px; font-family: inherit; }
+.di-decl-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px 18px; border-top: 1px solid #e2e5ea; }
+.di-sigpad-wrap { position: relative; margin-top: 6px; }
+.di-sigpad { display: block; width: 100%; height: 150px; border: 1.5px dashed #b7c2d6; border-radius: 10px; background: #fbfcfe; cursor: crosshair; touch-action: none; }
+.di-sigpad-clear { position: absolute; top: 8px; right: 8px; border: 1px solid #d3dae6; background: #fff; color: #46618f; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.di-sigpad-clear:hover { background: #f1f4f9; }
+.di-sigpad-hint { font-size: 12px; color: #7b8697; margin-top: 6px; }
+@media (max-width: 640px) { .di-decl-actions { flex-wrap: wrap; } .di-decl-actions .di-btn { flex: 1 1 auto; justify-content: center; } }
+
+/* ---- Date fields: whole box acts as a calendar trigger (typing is disabled in markup) ---- */
+.di-field input[type=date].di-datepick { cursor: pointer; }
+.di-field input[type=date].di-datepick::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.75; }
+
+/* ---- Dark-mode readability (mirrors the internal Customer form) ---- */
+[data-theme="dark"] .di-form-page {
+    --navy: var(--di-heading);
+    --text: var(--di-text);
+    --label: var(--di-text-soft);
+    --border: var(--di-border);
+    --bg: var(--di-surface-2);
+}
+[data-theme="dark"] .di-form-sub,
+[data-theme="dark"] .di-section-desc { color: var(--di-text-soft); }
+[data-theme="dark"] .di-section { background: var(--di-surface); }
+[data-theme="dark"] .di-section-header { background: var(--di-surface-2); }
+[data-theme="dark"] .di-section-icon { background: rgba(59, 91, 219, 0.22); }
+[data-theme="dark"] .di-stepper-item { background: var(--di-surface); }
+[data-theme="dark"] .di-stepper-item.active { background: rgba(59, 91, 219, 0.22); }
+[data-theme="dark"] .di-field input[type=text],
+[data-theme="dark"] .di-field input[type=email],
+[data-theme="dark"] .di-field input[type=date],
+[data-theme="dark"] .di-field input[type=number],
+[data-theme="dark"] .di-field textarea,
+[data-theme="dark"] .di-field select {
+    background: var(--di-surface);
+    color: var(--di-text);
+    border-color: var(--di-border);
+}
+[data-theme="dark"] .di-field input[type=date]::-webkit-calendar-picker-indicator { filter: invert(0.9); }
+[data-theme="dark"] .di-field input:disabled,
+[data-theme="dark"] .di-field select:disabled,
+[data-theme="dark"] .di-field .di-frozen { background: var(--di-surface-2); color: var(--di-text-soft); }
+[data-theme="dark"] .di-btn-secondary { background: var(--di-surface); color: var(--di-text); border-color: var(--di-border); }
+[data-theme="dark"] .di-progress-bg { stroke: #2b3752; }
+
+.di-help-icon { display: inline-block; margin-left: 5px; color: #8a94a6; cursor: help; font-size: 13px; font-style: normal; vertical-align: baseline; }
+
+/* ---- VAT Group entities (repeatable table shown when VAT Structure = "VAT Group") ---- */
+.di-vatgroup { grid-column: 1 / -1; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border, #e3e8f0); }
+.di-vatgroup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.di-vatgroup-title { font-weight: 700; font-size: 15px; color: var(--navy, #16244a); }
+.di-vatgroup-note { font-size: 13px; color: #7b8697; margin: 0 0 10px; }
+.di-vatgroup-scroll { overflow-x: auto; }
+.di-vatgroup-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+.di-vatgroup-table th { text-align: left; font-size: 12.5px; font-weight: 700; color: var(--label, #55627a); background: #f5f7fc; padding: 8px 10px; border-bottom: 1px solid var(--border, #e3e8f0); white-space: nowrap; }
+.di-vatgroup-table td { padding: 6px 8px; vertical-align: top; }
+.di-vatgroup-table input, .di-vatgroup-table select { width: 100%; max-width: 100%; min-width: 0; color: #000; padding: 8px 10px; border: 1px solid var(--border, #e3e8f0); border-radius: 6px; font-family: inherit; font-size: 14px; background: #fff; }
+.di-vatgroup-table input:focus, .di-vatgroup-table select:focus { outline: none; border-color: var(--blue, #3b5bdb); box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.15); }
+.di-vatgroup-empty { font-size: 13px; color: #97a1b3; padding: 10px 0; }
+.di-add-contact { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 16px; border: 1px dashed var(--navy, #16244a); border-radius: 6px; background: #fff; color: var(--navy, #16244a); font-weight: 600; font-size: 13px; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.di-add-contact:hover { background: var(--navy, #16244a); color: #fff; }
+.di-add-contact svg { flex-shrink: 0; }
+.di-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #6b7280; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.di-icon-btn:hover { background: #fff; }
+.di-icon-btn-danger:hover { color: #c0392b; border-color: #f0c4be; background: #fdf3f2; }
+
+/* ---- Field help: clickable info icon + popup ---- */
+.di-help-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 5px; padding: 0; width: 18px; height: 18px; border: none; background: none; color: #8a94a6; cursor: pointer; font-size: 14px; font-style: normal; line-height: 1; vertical-align: middle; }
+.di-help-icon:hover { color: var(--blue, #3b5bdb); }
+.di-help-backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.45); display: flex; align-items: center; justify-content: center; z-index: 1090; padding: 16px; }
+.di-help-modal { background: #fff; border-radius: 10px; max-width: 440px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.25); overflow: hidden; }
+.di-help-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border, #e3e8f0); background: #f5f7fc; }
+.di-help-modal-title { font-weight: 700; color: var(--navy, #16244a); font-size: 15px; }
+.di-help-modal-close { background: none; border: none; font-size: 24px; line-height: 1; color: #6b7280; cursor: pointer; padding: 0 4px; }
+.di-help-modal-close:hover { color: #c0392b; }
+.di-help-modal-body { padding: 18px; color: #333; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }

@@ -1,0 +1,48 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject SelfServiceBranding Branding
+
+<div class="public-layout">
+    <div class="public-header">
+        @if (!string.IsNullOrWhiteSpace(Branding.LogoUrl))
+        {
+            <img src="@Branding.LogoUrl" alt="Business unit logo" class="public-brand-logo"
+                 onerror="this.onerror=null;this.src='/images/di-logo.png';" />
+        }
+        else
+        {
+            <img src="/images/di-logo.png" alt="Dubai Investments" class="public-brand-logo" />
+        }
+        <span class="public-title">Self-Service</span>
+    </div>
+    <div class="public-content">
+        @Body
+    </div>
+</div>
+
+<Toaster />
+
+<style>
+    .public-layout { min-height: 100vh; background-color: #f4f6f9; }
+
+    .public-header {
+        background-color: #1a2233;
+        padding: 0.9rem 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .public-brand-logo { height: 2.5rem; width: auto; }
+    .public-title { color: #c8a24a; font-weight: 700; letter-spacing: 0.04em; }
+
+    .public-content { display: flex; justify-content: center; padding: 2.5rem 1rem; }
+</style>
+
+@code {
+    protected override void OnInitialized() => Branding.OnChange += OnBrandingChanged;
+
+    private async void OnBrandingChanged() => await InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Branding.OnChange -= OnBrandingChanged;
+}

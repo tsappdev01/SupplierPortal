@@ -1,0 +1,466 @@
+@page "/admin/supplier-fields"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject SupplierFieldSettingService SupplierFieldSettingService
+@inject UserService UserService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Supplier Field Manager - Supplier Portal</PageTitle>
+
+<h1>Supplier Field Manager</h1>
+<p class="text-muted">
+    Manage the supplier form's fields and tabs. Reorder fields within a tab, move a field to another
+    tab, hide it from the form, mark it Mandatory, or remove it entirely. Toggling <strong>Show on
+    Form</strong> off hides the field on every form (internal Register/Edit and the supplier
+    self-service portal); these settings drive both.
+</p>
+
+@if (savedMessage is not null)
+{
+    <div class="alert alert-success">@savedMessage</div>
+}
+
+<div class="di-field-settings-section">
+    <div class="di-field-settings-header">Dashboard Display</div>
+    <div class="p-3">
+        <label class="form-label mb-1">Records to display per page (Manage Supplier)</label>
+        <input type="number" min="1" max="500" class="form-control" style="max-width: 160px;" @bind="pageSize" />
+        <div class="form-text">How many supplier rows are shown per page on the Manage Supplier screen.</div>
+    </div>
+</div>
+
+@if (tabs.Count > 0)
+{
+    <div class="di-field-settings-section">
+        <div class="di-field-settings-header">Wizard Tabs</div>
+        <div class="p-3">
+            <p class="text-muted mb-2" style="font-size: 13px;">
+                Rename or hide the supplier form's tabs. A hidden tab is skipped entirely (its fields
+                are not shown or required). <strong>Address Information</strong> and
+                <strong>Contact Information</strong> are shown together on one page (both expanded).
+            </p>
+            <p class="text-muted mb-2" style="font-size: 13px;">
+                <strong>Editable by</strong> restricts who may <em>change</em> a tab on the internal supplier
+                edit form. Leave it as <em>Anyone</em> for no restriction (the default). When you pick one or
+                more users, every other internal user can still <em>view</em> the tab but its fields become
+                read-only for them. This does not affect the supplier self-service portal.
+            </p>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Tab</th>
+                        <th>Title</th>
+                        <th style="width: 110px;">Visible</th>
+                        <th style="width: 280px;">Editable by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tab in tabs.OrderBy(t => t.Step))
+                    {
+                        var editors = EditorsFor(tab.Step);
+                        <tr>
+                            <td>@tab.Step</td>
+                            <td><input class="form-control form-control-sm" @bind="tab.Title" maxlength="150" /></td>
+                            <td>
+                                <label class="di-switch">
+                                    <input type="checkbox" checked="@tab.IsVisible"
+                                           @onchange="e => tab.IsVisible = (bool)e.Value!" />
+                                    <span class="di-switch-slider"></span>
+                                </label>
+                            </td>
+                            <td>
+                                @if (editableUsers.Count == 0)
+                                {
+                                    <span class="text-muted fst-italic">No Supplier-portal users</span>
+                                }
+                                else
+                                {
+                                    <div class="di-editors">
+                                        <div class="di-editors-summary">
+                                            @(editors.Count == 0 ? "Anyone (no restriction)"
+                                                : $"{editors.Count} user(s) only")
+                                        </div>
+                                        <div class="di-editors-list">
+                                            @foreach (var u in editableUsers)
+                                            {
+                                                <label class="di-editor-item">
+                                                    <input type="checkbox" checked="@editors.Contains(u.Id)"
+                                                           @onchange="e => ToggleEditor(tab.Step, u.Id, (bool)e.Value!)" />
+                                                    <span>@(string.IsNullOrWhiteSpace(u.FullName) ? u.Username : u.FullName)</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (rows.Count == 0)
+{
+    <LoadingIndicator Message="Loading field settings…" />
+}
+else
+{
+    @foreach (var step in TabSteps)
+    {
+        var tabRows = ActiveRowsForStep(step);
+        <div class="di-field-settings-section">
+            <div class="di-field-settings-header">@StepLabel(step) <span class="di-tab-count">@tabRows.Count field(s)</span></div>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 90px;">Order</th>
+                        <th>Field</th>
+                        <th style="width: 170px;">Move to Tab</th>
+                        <th style="width: 120px;">Show on Form</th>
+                        <th style="width: 110px;">Mandatory</th>
+                        <th style="width: 90px;">Remove</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (tabRows.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-muted fst-italic">No fields on this tab.</td></tr>
+                    }
+                    @for (var i = 0; i < tabRows.Count; i++)
+                    {
+                        var row = tabRows[i];
+                        var index = i;
+                        <tr>
+                            <td>
+                                @if (row.IsFixed)
+                                {
+                                    <span class="di-fixed-badge" title="Composite field — fixed position">fixed</span>
+                                }
+                                else
+                                {
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-secondary" title="Move up"
+                                                disabled="@(index == 0)" @onclick="() => MoveUp(step, index)">↑</button>
+                                        <button class="btn btn-outline-secondary" title="Move down"
+                                                disabled="@(index == tabRows.Count - 1)" @onclick="() => MoveDown(step, index)">↓</button>
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @row.DisplayLabel
+                                <div class="di-field-key">@row.FieldKey</div>
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" value="@row.Step"
+                                        disabled="@row.IsFixed"
+                                        @onchange="e => MoveToTab(row, int.Parse((string)e.Value!))">
+                                    @foreach (var s in TabSteps)
+                                    {
+                                        <option value="@s" selected="@(s == row.Step)">@StepLabel(s)</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <label class="di-switch">
+                                    <input type="checkbox" checked="@row.IsVisibleToSupplier"
+                                           @onchange="e => OnVisibilityChanged(row, (bool)e.Value!)" />
+                                    <span class="di-switch-slider"></span>
+                                </label>
+                            </td>
+                            <td>
+                                <label class="di-switch">
+                                    <input type="checkbox" checked="@row.IsMandatory"
+                                           disabled="@(!row.IsVisibleToSupplier)"
+                                           @onchange="e => row.IsMandatory = (bool)e.Value!" />
+                                    <span class="di-switch-slider"></span>
+                                </label>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" title="Remove field from the form"
+                                        @onclick="() => RemoveField(row)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (RemovedRows.Count > 0)
+    {
+        <div class="di-field-settings-section">
+            <div class="di-field-settings-header di-removed-header">Removed Fields</div>
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th style="width: 170px;">Originally on Tab</th>
+                        <th style="width: 120px;">Restore</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in RemovedRows)
+                    {
+                        <tr>
+                            <td>@row.DisplayLabel<div class="di-field-key">@row.FieldKey</div></td>
+                            <td>@StepLabel(row.Step)</td>
+                            <td><button class="btn btn-sm btn-outline-success" @onclick="() => RestoreField(row)">Restore</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <button class="btn btn-primary mt-2" @onclick="SaveAsync" disabled="@isSaving">Save Field Layout</button>
+}
+
+<style>
+    .di-field-settings-section {
+        background: #fff;
+        border: 1px solid #e2e5ea;
+        border-radius: 8px;
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+    }
+
+    .di-field-settings-header {
+        background: #1a2233;
+        color: #fff;
+        padding: 0.6rem 1rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .di-removed-header { background: #7a1f2b; }
+
+    .di-tab-count { font-weight: 500; opacity: 0.75; text-transform: none; letter-spacing: 0; }
+
+    .di-editors-summary { font-size: 0.72rem; font-weight: 600; color: #46506b; margin-bottom: 4px; }
+    .di-editors-list { max-height: 108px; overflow-y: auto; border: 1px solid #e2e5ea; border-radius: 6px; padding: 4px 8px; background: #fff; }
+    .di-editor-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; cursor: pointer; }
+    .di-editor-item input { width: 15px; height: 15px; accent-color: #2f6fed; }
+
+    .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
+
+    .di-fixed-badge {
+        font-size: 0.68rem;
+        color: #6b7280;
+        background: #eef0f4;
+        border-radius: 4px;
+        padding: 2px 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .di-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+        vertical-align: middle;
+    }
+
+    .di-switch input { opacity: 0; width: 0; height: 0; }
+
+    .di-switch-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #dc3545;
+        border-radius: 22px;
+        transition: background-color 0.15s ease;
+    }
+
+    .di-switch-slider::before {
+        content: "";
+        position: absolute;
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        border-radius: 50%;
+        transition: transform 0.15s ease;
+    }
+
+    .di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+
+    .di-switch input:checked + .di-switch-slider::before { transform: translateX(18px); }
+</style>
+
+@code {
+    private static readonly int[] TabSteps = [1, 2, 3, 4, 5];
+
+    private List<SupplierTabSetting> tabs = [];
+
+    // Internal users who may be granted per-tab edit rights, and the per-tab selection (keyed by step).
+    private List<User> editableUsers = [];
+    private readonly Dictionary<int, HashSet<int>> tabEditors = [];
+
+    private HashSet<int> EditorsFor(int step) =>
+        tabEditors.TryGetValue(step, out var set) ? set : (tabEditors[step] = []);
+
+    private void ToggleEditor(int step, int userId, bool on)
+    {
+        var set = EditorsFor(step);
+        if (on) { set.Add(userId); } else { set.Remove(userId); }
+    }
+
+    private string StepLabel(int step)
+    {
+        var t = tabs.FirstOrDefault(x => x.Step == step);
+        return t is not null && !string.IsNullOrWhiteSpace(t.Title)
+            ? t.Title
+            : SupplierFieldSettingService.DefaultTabTitles.GetValueOrDefault(step, $"Tab {step}");
+    }
+
+    private sealed class FieldRow
+    {
+        public string FieldKey { get; init; } = "";
+        public string DisplayLabel { get; init; } = "";
+        public bool IsFixed { get; init; }
+        public int Step { get; set; }
+        public int Sequence { get; set; }
+        public bool IsVisibleToSupplier { get; set; }
+        public bool IsMandatory { get; set; }
+        public bool IsRemoved { get; set; }
+    }
+
+    private List<FieldRow> rows = [];
+    private string currentUser = "unknown";
+    private bool isSaving;
+    private string? savedMessage;
+    private int pageSize = 50;
+
+    private List<FieldRow> RemovedRows => rows.Where(r => r.IsRemoved).OrderBy(r => r.Step).ThenBy(r => r.DisplayLabel).ToList();
+
+    private List<FieldRow> ActiveRowsForStep(int step) =>
+        rows.Where(r => !r.IsRemoved && r.Step == step).OrderBy(r => r.Sequence).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        tabs = await SupplierFieldSettingService.GetTabsAsync();
+
+        editableUsers = await UserService.GetSupplierAssignableUsersAsync();
+        foreach (var tab in tabs)
+        {
+            tabEditors[tab.Step] = SupplierFieldSettingService.ParseEditorUserIds(tab.EditableByUserIdsCsv);
+        }
+
+        var settings = await SupplierFieldSettingService.GetAllForAdminAsync();
+        rows = settings.Select(f => new FieldRow
+        {
+            FieldKey = f.FieldKey,
+            DisplayLabel = f.DisplayLabel,
+            IsFixed = SupplierFieldSettingService.FixedPositionKeys.Contains(f.FieldKey),
+            Step = f.Step,
+            Sequence = f.Sequence,
+            IsVisibleToSupplier = f.IsVisibleToSupplier,
+            IsMandatory = f.IsMandatory,
+            IsRemoved = f.IsRemoved
+        }).ToList();
+        NormalizeSequences();
+
+        pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
+    }
+
+    // Hiding a field from the supplier makes it optional automatically, so clear Mandatory too.
+    private void OnVisibilityChanged(FieldRow row, bool isVisible)
+    {
+        row.IsVisibleToSupplier = isVisible;
+        if (!isVisible)
+        {
+            row.IsMandatory = false;
+        }
+    }
+
+    private void MoveUp(int step, int index)
+    {
+        var list = ActiveRowsForStep(step);
+        if (index <= 0) return;
+        (list[index].Sequence, list[index - 1].Sequence) = (list[index - 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveDown(int step, int index)
+    {
+        var list = ActiveRowsForStep(step);
+        if (index >= list.Count - 1) return;
+        (list[index].Sequence, list[index + 1].Sequence) = (list[index + 1].Sequence, list[index].Sequence);
+    }
+
+    private void MoveToTab(FieldRow row, int newStep)
+    {
+        if (row.IsFixed || row.Step == newStep) return;
+        row.Step = newStep;
+        // Place at the end of the destination tab.
+        var maxSeq = rows.Where(r => !r.IsRemoved && r.Step == newStep && r != row)
+            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
+        row.Sequence = maxSeq + 1;
+    }
+
+    private void RemoveField(FieldRow row)
+    {
+        row.IsRemoved = true;
+        row.IsMandatory = false;
+    }
+
+    private void RestoreField(FieldRow row)
+    {
+        row.IsRemoved = false;
+        var maxSeq = rows.Where(r => !r.IsRemoved && r.Step == row.Step && r != row)
+            .Select(r => r.Sequence).DefaultIfEmpty(0).Max();
+        row.Sequence = maxSeq + 1;
+    }
+
+    // Renumber each tab's active fields to contiguous 1..n so up/down swaps are unambiguous.
+    private void NormalizeSequences()
+    {
+        foreach (var step in TabSteps)
+        {
+            var seq = 1;
+            foreach (var row in rows.Where(r => !r.IsRemoved && r.Step == step).OrderBy(r => r.Sequence).ThenBy(r => r.DisplayLabel))
+            {
+                row.Sequence = seq++;
+            }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            NormalizeSequences();
+            var layouts = rows.Select(r => new SupplierFieldSettingService.FieldLayout(
+                r.FieldKey, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
+            await SupplierFieldSettingService.SaveLayoutAsync(layouts, currentUser);
+
+            var tabLayouts = tabs.Select(t => new SupplierFieldSettingService.TabLayout(
+                t.Step, t.Title, t.IsVisible,
+                EditorsFor(t.Step).Count == 0 ? null : string.Join(",", EditorsFor(t.Step))));
+            await SupplierFieldSettingService.SaveTabsAsync(tabLayouts, currentUser);
+
+            await SupplierFieldSettingService.SetListPageSizeAsync(pageSize, currentUser);
+            savedMessage = "Field layout saved.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

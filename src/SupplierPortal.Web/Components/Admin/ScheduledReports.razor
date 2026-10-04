@@ -1,0 +1,1111 @@
+@page "/admin/scheduled-reports"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.Reporting
+@inject ScheduledReportService ReportService
+@inject ReportDefinitionService DefService
+@inject ReportSchemaService SchemaService
+@inject NotificationGroupService GroupService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Scheduled Reports - Supplier Portal</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start mb-1">
+    <div>
+        <h1 class="mb-0">Scheduled Reports</h1>
+        <p class="text-muted mb-0">
+            Build a report from any table or view, then email it (PDF/Excel) to a notification group's active
+            members on a schedule. Times are in @ReportTimeZone.DisplayName.
+        </p>
+    </div>
+    @if (!building)
+    {
+        <button class="btn btn-primary" @onclick="StartNew">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" /></svg>
+            New Report
+        </button>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger mt-3">@error</div>
+}
+@if (message is not null)
+{
+    <div class="alert alert-success py-2 mt-3">@message</div>
+}
+
+@if (building)
+{
+    <div class="card mt-3 di-rb-card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">@(editScheduleId is null ? "New" : "Edit") Report &amp; Schedule</h5>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelBuild">Cancel</button>
+            </div>
+
+            <!-- Stepper -->
+            <div class="di-rb-steps mb-4">
+                @foreach (var s in Steps)
+                {
+                    var n = s.Key;
+                    <button type="button" class="di-rb-step @(wizStep == n ? "active" : "") @(wizStep > n ? "done" : "")"
+                            @onclick="() => GoStep(n)">
+                        <span class="di-rb-step-num">@n</span>
+                        <span class="di-rb-step-label">@s.Value</span>
+                    </button>
+                }
+            </div>
+
+            @if (loadingCols || saving)
+            {
+                <div class="di-rb-progress" role="progressbar" aria-label="Working">
+                    <div class="di-rb-progress-bar"></div>
+                </div>
+                <div class="text-muted small mb-2">@(saving ? "Saving…" : "Reading table columns and related fields…")</div>
+            }
+
+            @if (stepError is not null)
+            {
+                <div class="alert alert-warning py-2">@stepError</div>
+            }
+
+            @* ---------- Step 1: Table Source ---------- *@
+            @if (wizStep == 1)
+            {
+                <div class="row g-3">
+                    @if (definitions.Count > 0)
+                    {
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Reuse a saved report definition (optional)</label>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" @bind="reuseDefId" style="max-width:420px;">
+                                    <option value="0">— Start from scratch —</option>
+                                    @foreach (var d in definitions)
+                                    {
+                                        <option value="@d.Id">@d.Name (@d.SchemaName.@d.TableName)</option>
+                                    }
+                                </select>
+                                <button class="btn btn-outline-primary" @onclick="ReuseDefinitionAsync" disabled="@(reuseDefId == 0)">Load</button>
+                            </div>
+                            <div class="form-text">Loads that definition's source, columns, filters and format so you only set the schedule.</div>
+                            <hr />
+                        </div>
+                    }
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Table or View</label>
+                        <select class="form-select" @bind="wizTableKey" @bind:after="OnTableChangedAsync">
+                            <option value="">— Select a table or view —</option>
+                            @foreach (var grp in tables.GroupBy(t => t.Schema).OrderBy(g => g.Key))
+                            {
+                                <optgroup label="@grp.Key">
+                                    @foreach (var t in grp.OrderBy(t => t.Name))
+                                    {
+                                        <option value="@t.Schema|@t.Name">@t.Name @(t.IsView ? "(view)" : "")</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                        <div class="form-text">@tables.Count object(s) available. Sensitive columns (passwords, secrets) are hidden automatically.</div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="text-muted small">@(string.IsNullOrEmpty(wizTable) ? "" : $"{availableColumns.Count} selectable column(s) in {wizSchema}.{wizTable}.")</div>
+                    </div>
+                </div>
+            }
+
+            @* ---------- Step 2: Columns ---------- *@
+            @if (wizStep == 2)
+            {
+                @if (loadingCols)
+                {
+                    <div class="text-muted">Loading columns…</div>
+                }
+                else if (availableColumns.Count == 0)
+                {
+                    <div class="alert alert-warning py-2">No selectable columns — go back and choose a table/view.</div>
+                }
+                else
+                {
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Available fields</label>
+                            <input class="form-control form-control-sm mb-2" placeholder="Filter fields…" @bind="colFilter" @bind:event="oninput" />
+                            <div class="border rounded di-rb-scroll">
+                                <div class="px-3 py-1 di-rb-grouphdr">@wizTable</div>
+                                @foreach (var c in availableColumns.Where(c => MatchesFilter(c.Name)))
+                                {
+                                    <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
+                                        <input type="checkbox" checked="@wizColumns.Contains(c.Name)" @onchange="() => ToggleColumn(c.Name)" />
+                                        <span class="fw-semibold">@c.Name</span>
+                                        <span class="text-muted small ms-auto">@c.DataType</span>
+                                    </label>
+                                }
+                                @{ var lookups = LookupFields().Where(l => MatchesFilter(l.Label)).ToList(); }
+                                @if (lookups.Count > 0)
+                                {
+                                    <div class="px-3 py-1 di-rb-grouphdr">Lookups (display value)</div>
+                                    @foreach (var l in lookups)
+                                    {
+                                        <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
+                                            <input type="checkbox" checked="@wizColumns.Contains(l.Key)" @onchange="() => ToggleColumn(l.Key)" />
+                                            <span class="fw-semibold">@l.Label</span>
+                                            <span class="text-muted small ms-auto">text</span>
+                                        </label>
+                                    }
+                                }
+                                @foreach (var g in relatedGroups)
+                                {
+                                    var visible = g.Cols.Where(c => MatchesFilter(c.Name) || MatchesFilter(g.Rel.Label)).ToList();
+                                    @if (visible.Count > 0)
+                                    {
+                                        <div class="px-3 py-1 di-rb-grouphdr">
+                                            @g.Rel.Label <span class="text-muted fw-normal">→ @g.Rel.RefTable (via @g.Rel.FkColumn)</span>
+                                        </div>
+                                        @foreach (var c in visible)
+                                        {
+                                            var key = ReportSchemaService.EncodeRelated(g.Rel.FkColumn, c.Name);
+                                            <label class="d-flex align-items-center gap-2 px-3 py-1 border-bottom di-rb-colrow">
+                                                <input type="checkbox" checked="@wizColumns.Contains(key)" @onchange="() => ToggleColumn(key)" />
+                                                <span class="fw-semibold">@g.Rel.Label.@c.Name</span>
+                                                <span class="text-muted small ms-auto">@c.DataType</span>
+                                            </label>
+                                        }
+                                    }
+                                }
+                            </div>
+                            <div class="form-text">Fields under a relationship (e.g. <em>@(relatedGroups.FirstOrDefault().Rel?.Label ?? "User").Name</em>) are pulled from the related table via its foreign key.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Selected columns &amp; order (@wizColumns.Count)</label>
+                            <div class="border rounded di-rb-scroll">
+                                @if (wizColumns.Count == 0)
+                                {
+                                    <div class="px-3 py-2 text-muted small">No columns selected yet.</div>
+                                }
+                                @for (var i = 0; i < wizColumns.Count; i++)
+                                {
+                                    var idx = i;
+                                    var name = wizColumns[idx];
+                                    <div class="d-flex align-items-center gap-2 px-3 py-1 border-bottom">
+                                        <span class="text-muted small" style="width:22px;">@(idx + 1).</span>
+                                        <span class="fw-semibold">@FieldLabel(name)</span>
+                                        <span class="ms-auto d-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Up" disabled="@(idx == 0)" @onclick="() => MoveColumn(idx, -1)">↑</button>
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1" title="Down" disabled="@(idx == wizColumns.Count - 1)" @onclick="() => MoveColumn(idx, 1)">↓</button>
+                                            <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remove" @onclick="() => ToggleColumn(name)">×</button>
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            @* ---------- Step 3: Filters ---------- *@
+            @if (wizStep == 3)
+            {
+                <div class="mb-2 d-flex align-items-center gap-3">
+                    <span class="fw-semibold">Match</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn @(wizMatch == FilterMatch.And ? "btn-primary" : "btn-outline-primary")" @onclick="() => wizMatch = FilterMatch.And">ALL (AND)</button>
+                        <button type="button" class="btn @(wizMatch == FilterMatch.Or ? "btn-primary" : "btn-outline-primary")" @onclick="() => wizMatch = FilterMatch.Or">ANY (OR)</button>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary ms-auto" @onclick="AddFilter">+ Add filter</button>
+                </div>
+                @if (wizFilters.Count == 0)
+                {
+                    <div class="text-muted small">No filters — all rows are included.</div>
+                }
+                @foreach (var f in wizFilters)
+                {
+                    var cond = f;
+                    <div class="d-flex gap-2 mb-2 align-items-center">
+                        <select class="form-select form-select-sm" style="max-width:260px;" @bind="cond.Column">
+                            <option value="">— Field —</option>
+                            <optgroup label="@wizTable">
+                                @foreach (var c in availableColumns)
+                                {
+                                    <option value="@c.Name">@c.Name</option>
+                                }
+                            </optgroup>
+                            @{ var lookupOpts = LookupFields().ToList(); }
+                            @if (lookupOpts.Count > 0)
+                            {
+                                <optgroup label="Lookups (display value)">
+                                    @foreach (var l in lookupOpts)
+                                    {
+                                        <option value="@l.Key">@l.Label</option>
+                                    }
+                                </optgroup>
+                            }
+                            @foreach (var g in relatedGroups)
+                            {
+                                <optgroup label="@g.Rel.Label → @g.Rel.RefTable">
+                                    @foreach (var c in g.Cols)
+                                    {
+                                        <option value="@ReportSchemaService.EncodeRelated(g.Rel.FkColumn, c.Name)">@g.Rel.Label.@c.Name</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                        <select class="form-select form-select-sm" style="max-width:170px;" @bind="cond.Operator">
+                            @foreach (var op in Enum.GetValues<FilterOperator>())
+                            {
+                                <option value="@op">@OperatorLabel(op)</option>
+                            }
+                        </select>
+                        @if (cond.Operator != FilterOperator.IsEmpty && cond.Operator != FilterOperator.IsNotEmpty)
+                        {
+                            <input class="form-control form-control-sm" style="max-width:240px;" placeholder="Value" @bind="cond.Value" />
+                        }
+                        else
+                        {
+                            <span class="text-muted small" style="min-width:240px;">(no value)</span>
+                        }
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => wizFilters.Remove(cond)">Remove</button>
+                    </div>
+                }
+            }
+
+            @* ---------- Step 4: Report ---------- *@
+            @if (wizStep == 4)
+            {
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Report Name (internal)</label>
+                        <input class="form-control" @bind="wizName" placeholder="e.g. Monthly Supplier Master" />
+                        <div class="form-text">Used to identify the definition and schedule.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Report Title (printed on the report)</label>
+                        <input class="form-control" @bind="wizTitle" placeholder="e.g. Supplier Master Report" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Output format</label>
+                        <select class="form-select" @bind="wizFormat">
+                            <option value="@ReportFormat.Pdf">PDF</option>
+                            <option value="@ReportFormat.Excel">Excel</option>
+                            <option value="@ReportFormat.PdfAndExcel">PDF + Excel</option>
+                        </select>
+                    </div>
+                </div>
+            }
+
+            @* ---------- Step 5: Notification Group ---------- *@
+            @if (wizStep == 5)
+            {
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Notification Group</label>
+                        <select class="form-select" @bind="wizGroupId">
+                            <option value="0">— Select a group —</option>
+                            @foreach (var g in groups)
+                            {
+                                <option value="@g.Id">@g.Name@(g.IsActive ? "" : " (disabled)")</option>
+                            }
+                        </select>
+                        <div class="form-text">Only <strong>active</strong> members of an <strong>active</strong> group receive the report.</div>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        @if (SelectedGroup is { } sg)
+                        {
+                            <div>
+                                <span class="badge rounded-pill text-bg-success">@sg.Users.Count(u => u.IsActive) active member(s)</span>
+                                @if (!sg.IsActive)
+                                {
+                                    <span class="badge rounded-pill text-bg-danger ms-1">group disabled</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ---------- Step 6: Schedule ---------- *@
+            @if (wizStep == 6)
+            {
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Frequency</label>
+                        <select class="form-select" @bind="wizFreq">
+                            <option value="@ReportFrequency.Daily">Daily</option>
+                            <option value="@ReportFrequency.Weekly">Weekly</option>
+                            <option value="@ReportFrequency.Monthly">Monthly</option>
+                            <option value="@ReportFrequency.Quarterly">Quarterly</option>
+                            <option value="@ReportFrequency.Yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">@(wizFreq == ReportFrequency.Weekly ? "Time of day" : "Start / Next Run") (@ReportTimeZone.DisplayName)</label>
+                        <input type="datetime-local" class="form-control"
+                               value="@wizStart.ToString("yyyy-MM-ddTHH:mm")" @onchange="OnStartChanged" />
+                        <div class="form-text">
+                            @if (wizFreq == ReportFrequency.Weekly)
+                            {
+                                <text>Runs on the selected days below, at this time on each day.</text>
+                            }
+                            else
+                            {
+                                <text>First run at this time, then repeats @wizFreq.ToString().ToLower().</text>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <div>
+                            <label class="di-switch" title="@(wizActive ? "Enabled" : "Disabled")">
+                                <input type="checkbox" checked="@wizActive" @onchange="e => wizActive = (bool)e.Value!" />
+                                <span class="di-switch-slider"></span>
+                            </label>
+                            <span class="ms-2 small fw-semibold @(wizActive ? "text-success" : "text-danger")">@(wizActive ? "Enabled" : "Disabled")</span>
+                        </div>
+                    </div>
+                    @if (wizFreq == ReportFrequency.Weekly)
+                    {
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Run on these days</label>
+                            <div class="di-daypicker">
+                                @foreach (var d in WeekDayOrder)
+                                {
+                                    <button type="button" class="di-day @(wizWeekDays.Contains(d) ? "on" : "")"
+                                            @onclick="() => ToggleWeekDay(d)">@DayShort(d)</button>
+                                }
+                            </div>
+                            <div class="form-text">The report is emailed on each selected day at the time above.</div>
+                        </div>
+                    }
+                    <div class="col-12">
+                        <div class="alert alert-light border small mb-0">
+                            <strong>Summary:</strong> @wizName — @wizSchema.@wizTable, @wizColumns.Count column(s),
+                            @wizFilters.Count filter(s), @FormatLabel(wizFormat), to
+                            @(SelectedGroup?.Name ?? "—"),
+                            @(wizFreq == ReportFrequency.Weekly
+                                ? (wizWeekDays.Count > 0 ? "Weekly on " + string.Join(", ", WeekDayOrder.Where(wizWeekDays.Contains).Select(DayShort)) : "Weekly (select day(s))")
+                                : wizFreq.ToString()).
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Wizard actions -->
+            <div class="mt-4 d-flex gap-2">
+                @if (wizStep > 1)
+                {
+                    <button class="btn btn-outline-secondary" @onclick="Prev" disabled="@saving">Back</button>
+                }
+                @if (wizStep < 6)
+                {
+                    <button class="btn btn-primary" @onclick="NextAsync" disabled="@(saving || loadingCols)">
+                        @if (loadingCols)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Loading…</span>
+                        }
+                        else
+                        {
+                            <span>Next</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-success" @onclick="SaveAsync" disabled="@saving">@(saving ? "Saving…" : "Save Schedule")</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (!building)
+{
+    @* ===== Toolbar: search + filters ===== *@
+    <div class="di-sr-toolbar mt-3">
+        <div class="di-sr-search">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" /></svg>
+            <input type="text" placeholder="Search reports or groups…" @bind="search" @bind:event="oninput" />
+        </div>
+        <select class="form-select form-select-sm di-sr-filter" @bind="statusFilter">
+            <option value="">All statuses</option>
+            <option value="Sent">Sent</option>
+            <option value="Partial">Partial</option>
+            <option value="Skipped">Skipped</option>
+            <option value="Failed">Failed</option>
+            <option value="Never">Never run</option>
+        </select>
+        <select class="form-select form-select-sm di-sr-filter" @bind="freqFilter">
+            <option value="">All frequencies</option>
+            @foreach (var f in Enum.GetValues<ReportFrequency>())
+            {
+                <option value="@f">@f</option>
+            }
+        </select>
+    </div>
+
+    @* ===== Bulk action bar ===== *@
+    @if (selectedIds.Count > 0)
+    {
+        <div class="di-sr-bulk">
+            <span class="fw-semibold">@selectedIds.Count selected</span>
+            <button class="btn btn-sm btn-light" @onclick="() => BulkSetActiveAsync(true)">Enable</button>
+            <button class="btn btn-sm btn-light" @onclick="() => BulkSetActiveAsync(false)">Disable</button>
+            <button class="btn btn-sm btn-light" @onclick="BulkRunAsync">Run now</button>
+            <button class="btn btn-sm btn-link ms-auto text-white" @onclick="ClearSelection">Clear</button>
+        </div>
+    }
+
+    <div class="di-sr-table-wrap mt-2">
+        <table class="table align-middle di-sr-table mb-0">
+            <thead>
+                <tr>
+                    <th style="width:38px;"><input type="checkbox" checked="@AllVisibleSelected" @onchange="ToggleSelectAll" /></th>
+                    <th style="width:28px;"></th>
+                    <th>Report</th>
+                    <th>Recipients</th>
+                    <th>Format</th>
+                    <th>Frequency</th>
+                    <th>Next Run</th>
+                    <th>Last Run</th>
+                    <th class="text-center" style="width: 90px;">Enabled</th>
+                    <th class="text-end" style="width: 140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in FilteredReports)
+                {
+                    var rid = r.Id;
+                    <tr class="@(r.IsActive ? null : "di-sr-inactive") @(selectedIds.Contains(rid) ? "di-sr-selected" : null)">
+                        <td><input type="checkbox" checked="@selectedIds.Contains(rid)" @onchange="() => ToggleSelect(rid)" /></td>
+                        <td>
+                            <button type="button" class="di-sr-expand @(expandedId == rid ? "open" : "")" title="Run history" @onclick="() => ToggleExpandAsync(rid)">▸</button>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">@r.Name</div>
+                            <div class="text-muted small">@(r.ReportDefinition is { } d ? $"from {d.SchemaName}.{d.TableName}" : "supplier export")</div>
+                        </td>
+                        <td>
+                            @if (r.NotificationGroup is { } g)
+                            {
+                                <span class="fw-semibold">@g.Name</span>
+                                @if (!g.IsActive)
+                                {
+                                    <span class="badge rounded-pill text-bg-danger ms-1">group disabled</span>
+                                }
+                            }
+                            else { <span class="text-muted small">—</span> }
+                        </td>
+                        <td><span class="badge rounded-pill text-bg-light border">@FormatLabel(r.Format)</span></td>
+                        <td>@r.Frequency</td>
+                        <td class="small">@ReportTimeZone.ToLocal(r.NextRunUtc).ToString("dd MMM yyyy HH:mm")</td>
+                        <td class="small">
+                            @if (r.LastRunUtc is null)
+                            {
+                                <span class="badge rounded-pill text-bg-light border">Never</span>
+                            }
+                            else
+                            {
+                                <div><span class="badge rounded-pill @LastRunClass(r.LastRunStatus)">@r.LastRunStatus</span></div>
+                                <span class="text-muted">@ReportTimeZone.ToLocal(r.LastRunUtc.Value).ToString("dd MMM HH:mm")</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            <label class="di-switch" title="@(r.IsActive ? "Enabled — click to disable" : "Disabled — click to enable")">
+                                <input type="checkbox" checked="@r.IsActive" @onchange="e => ToggleActiveAsync(r, (bool)e.Value!)" />
+                                <span class="di-switch-slider"></span>
+                            </label>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex align-items-center gap-1">
+                                <button class="btn btn-sm btn-outline-success di-sr-run" title="Run now" @onclick="() => RunNowAsync(r)">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11a.5.5 0 0 0 .77.42l8.5-5.5a.5.5 0 0 0 0-.84l-8.5-5.5A.5.5 0 0 0 4 2.5z"/></svg>
+                                    Run
+                                </button>
+                                <div class="di-menu">
+                                    <button class="di-menu-btn" title="More actions" @onclick="() => ToggleMenu(rid)">⋯</button>
+                                    @if (openMenuId == rid)
+                                    {
+                                        <div class="di-menu-pop" @onclick:stopPropagation="true">
+                                            <button @onclick="() => StartEditAsync(r)">Edit</button>
+                                            <button @onclick="() => DuplicateAsync(r)">Duplicate</button>
+                                            <a href="/admin/reports/@rid/preview?format=pdf" target="_blank" rel="noopener" @onclick="CloseMenu">Preview PDF</a>
+                                            <a href="/admin/reports/@rid/preview?format=xlsx" target="_blank" rel="noopener" @onclick="CloseMenu">Preview Excel</a>
+                                            <div class="di-menu-sep"></div>
+                                            <button class="di-menu-danger" @onclick="() => DeleteAsync(r)">Delete</button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    @if (expandedId == rid)
+                    {
+                        <tr class="di-sr-historyrow">
+                            <td colspan="10">
+                                <div class="di-timeline">
+                                    <div class="di-timeline-title">Run history</div>
+                                    @if (expandedRuns.Count == 0)
+                                    {
+                                        <div class="text-muted small">No runs recorded yet — use <strong>Run</strong> to send it now.</div>
+                                    }
+                                    @foreach (var run in expandedRuns)
+                                    {
+                                        <div class="di-tl-item">
+                                            <span class="di-tl-dot" style="background:@RunColor(run.Status)"></span>
+                                            <div class="di-tl-body">
+                                                <span class="badge rounded-pill @LastRunClass(run.Status)">@run.Status</span>
+                                                <span class="text-muted small ms-1">@ReportTimeZone.ToLocal(run.RunAtUtc).ToString("dd MMM yyyy HH:mm")</span>
+                                                @if (!string.IsNullOrWhiteSpace(run.Detail))
+                                                {
+                                                    <div class="text-muted small">@run.Detail</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (FilteredReports.Count == 0)
+                {
+                    <tr><td colspan="10" class="text-center text-muted py-4"><em>@(reports.Count == 0 ? "No scheduled reports yet. Use \"New Report\" to build one." : "No reports match your search / filters.")</em></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (openMenuId is not null)
+    {
+        <div class="di-menu-backdrop" @onclick="CloseMenu"></div>
+    }
+}
+
+<style>
+    /* Weekly day picker — one toggle button per day of the week (Saturday-first). */
+    .di-daypicker { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .di-day { min-width: 46px; padding: 8px 10px; border: 1px solid #d9e0ec; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .12s ease; }
+    .di-day:hover { border-color: #3b5bdb; color: #1e3a8a; }
+    .di-day.on { background: #0b2545; border-color: #0b2545; color: #fff; }
+
+    /* overflow must stay visible so the row actions "…" dropdown isn't clipped; corners are rounded on the header cells instead. */
+    .di-sr-table-wrap { border: 1px solid var(--bs-border-color, #e2e5ea); border-radius: 12px; overflow: visible; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .di-sr-table thead th { background: #0b2545; color: #fff; font-weight: 600; font-size: 13px; border: none; padding: 12px 14px; }
+    .di-sr-table thead th:first-child { border-top-left-radius: 11px; }
+    .di-sr-table thead th:last-child { border-top-right-radius: 11px; }
+    .di-sr-table tbody td { padding: 12px 14px; vertical-align: middle; }
+    .di-sr-table tbody tr { border-bottom: 1px solid #eef1f5; }
+    .di-sr-table tbody tr:last-child { border-bottom: none; }
+    .di-sr-inactive td { opacity: .55; }
+    .di-sr-selected td { background: #eef4ff !important; }
+
+    /* Toolbar */
+    .di-sr-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .di-sr-search { position: relative; flex: 1 1 280px; max-width: 460px; }
+    .di-sr-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .di-sr-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #d9e0ec; border-radius: 10px; font-size: 14px; background: #fff; }
+    .di-sr-search input:focus { outline: none; border-color: #3b5bdb; box-shadow: 0 0 0 3px rgba(59,91,219,.12); }
+    .di-sr-filter { max-width: 190px; border-radius: 10px; }
+
+    /* Bulk bar */
+    .di-sr-bulk { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 14px; border-radius: 10px;
+        background: linear-gradient(135deg, #0b2545, #274a7d); color: #fff; box-shadow: 0 4px 14px rgba(11,37,69,.22); }
+
+    /* Expand + run-history timeline */
+    .di-sr-expand { border: none; background: none; cursor: pointer; color: #64748b; font-size: 13px; line-height: 1;
+        transition: transform .15s ease; padding: 4px; }
+    .di-sr-expand.open { transform: rotate(90deg); color: #3b5bdb; }
+    .di-sr-historyrow td { background: #f8fafc; padding: 0 !important; }
+    .di-timeline { padding: 14px 22px 16px 46px; }
+    .di-timeline-title { font-weight: 700; color: #33477a; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
+    .di-tl-item { position: relative; padding: 0 0 12px 20px; border-left: 2px solid #e2e8f0; }
+    .di-tl-item:last-child { border-left-color: transparent; padding-bottom: 0; }
+    .di-tl-dot { position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #e2e8f0; }
+
+    /* Run button */
+    .di-sr-run { display: inline-flex; align-items: center; gap: 4px; }
+
+    /* Row actions "…" menu */
+    .di-menu { position: relative; display: inline-block; }
+    .di-menu-btn { border: 1px solid #d9e0ec; background: #fff; border-radius: 8px; width: 30px; height: 30px; cursor: pointer;
+        color: #475569; font-size: 16px; line-height: 1; }
+    .di-menu-btn:hover { background: #f1f5f9; }
+    .di-menu-pop { position: absolute; right: 0; top: 34px; z-index: 30; min-width: 168px; background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 10px; box-shadow: 0 12px 30px rgba(15,23,42,.18); padding: 6px; text-align: left; }
+    .di-menu-pop button, .di-menu-pop a { display: block; width: 100%; text-align: left; border: none; background: none; padding: 8px 10px;
+        border-radius: 7px; font-size: 13.5px; color: #1e293b; cursor: pointer; text-decoration: none; }
+    .di-menu-pop button:hover, .di-menu-pop a:hover { background: #f1f5f9; }
+    .di-menu-danger { color: #b42318 !important; }
+    .di-menu-sep { height: 1px; background: #eef1f5; margin: 4px 2px; }
+    .di-menu-backdrop { position: fixed; inset: 0; z-index: 20; background: transparent; }
+    .di-rb-card { border: 1px solid #e2e5ea; border-radius: 12px; box-shadow: 0 1px 3px rgba(15,23,42,.06); }
+    .di-rb-scroll { max-height: 300px; overflow-y: auto; }
+    /* Indeterminate progress bar shown while loading columns / saving */
+    .di-rb-progress { height: 4px; border-radius: 3px; background: #e8edf7; overflow: hidden; margin-bottom: 6px; }
+    .di-rb-progress-bar { height: 100%; width: 40%; border-radius: 3px; background: linear-gradient(90deg, #3b5bdb, #6b8cff);
+        animation: di-rb-indeterminate 1.1s ease-in-out infinite; }
+    @@keyframes di-rb-indeterminate { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+    .di-rb-colrow { cursor: pointer; }
+    .di-rb-colrow:hover { background: #f4f6fb; }
+    .di-rb-grouphdr { background: #eef2fb; color: #33477a; font-weight: 700; font-size: 12px; position: sticky; top: 0; }
+
+    .di-rb-steps { display: flex; flex-wrap: wrap; gap: 8px; }
+    .di-rb-step { display: flex; align-items: center; gap: 8px; border: 1px solid #dbe2ee; background: #fff; border-radius: 999px;
+        padding: 6px 14px 6px 6px; cursor: pointer; color: #64748b; font-size: 13px; }
+    .di-rb-step.active { border-color: #3b5bdb; color: #1e293b; box-shadow: 0 0 0 2px rgba(59,91,219,.12); }
+    .di-rb-step.done { color: #1e7d52; }
+    .di-rb-step-num { width: 24px; height: 24px; border-radius: 50%; background: #eef2fb; color: #33477a; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+    .di-rb-step.active .di-rb-step-num { background: #3b5bdb; color: #fff; }
+    .di-rb-step.done .di-rb-step-num { background: #1e7d52; color: #fff; }
+
+    .di-switch { position: relative; display: inline-block; width: 40px; height: 22px; vertical-align: middle; margin: 0; }
+    .di-switch input { opacity: 0; width: 0; height: 0; }
+    .di-switch-slider { position: absolute; cursor: pointer; inset: 0; background-color: #dc3545; border-radius: 22px; transition: background-color .15s ease; }
+    .di-switch-slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: transform .15s ease; }
+    .di-switch input:checked + .di-switch-slider { background-color: #28a745; }
+    .di-switch input:checked + .di-switch-slider::before { transform: translateX(18px); }
+</style>
+
+@code {
+    private static readonly Dictionary<int, string> Steps = new()
+    {
+        [1] = "Table Source", [2] = "Columns", [3] = "Filters", [4] = "Report", [5] = "Notification Group", [6] = "Schedule"
+    };
+
+    private List<ScheduledReport> reports = [];
+    private List<NotificationGroup> groups = [];
+    private List<ReportDefinition> definitions = [];
+    private List<ReportTable> tables = [];
+    private string currentUser = "unknown";
+    private string? error;
+    private string? message;
+
+    // List view: search / filter / bulk / expand / row menu
+    private string search = "";
+    private string statusFilter = "";
+    private string freqFilter = "";
+    private HashSet<int> selectedIds = [];
+    private int? openMenuId;
+    private int? expandedId;
+    private List<ScheduledReportRun> expandedRuns = [];
+
+    private List<ScheduledReport> FilteredReports => reports.Where(r =>
+        (string.IsNullOrWhiteSpace(search)
+            || r.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || (r.NotificationGroup?.Name?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false))
+        && (string.IsNullOrWhiteSpace(statusFilter)
+            || (statusFilter == "Never" ? r.LastRunUtc is null
+                : string.Equals(r.LastRunStatus, statusFilter, StringComparison.OrdinalIgnoreCase)))
+        && (string.IsNullOrWhiteSpace(freqFilter) || r.Frequency.ToString() == freqFilter)
+    ).ToList();
+
+    private bool AllVisibleSelected
+    {
+        get { var f = FilteredReports; return f.Count > 0 && f.All(r => selectedIds.Contains(r.Id)); }
+    }
+
+    private void ToggleSelect(int id) { if (!selectedIds.Remove(id)) { selectedIds.Add(id); } }
+    private void ToggleSelectAll()
+    {
+        var f = FilteredReports;
+        if (AllVisibleSelected) { foreach (var r in f) { selectedIds.Remove(r.Id); } }
+        else { foreach (var r in f) { selectedIds.Add(r.Id); } }
+    }
+    private void ClearSelection() => selectedIds.Clear();
+    private void ToggleMenu(int id) => openMenuId = openMenuId == id ? null : id;
+    private void CloseMenu() => openMenuId = null;
+
+    private async Task ToggleExpandAsync(int id)
+    {
+        if (expandedId == id) { expandedId = null; expandedRuns = []; return; }
+        expandedId = id;
+        expandedRuns = await ReportService.GetRunsAsync(id);
+    }
+
+    private static string RunColor(string? status) => status switch
+    {
+        "Sent" => "#1e7d52", "Partial" => "#b7791f", "Skipped" => "#6b7280", "Failed" => "#b42318", _ => "#94a3b8"
+    };
+
+    private async Task BulkSetActiveAsync(bool active)
+    {
+        error = message = null; CloseMenu();
+        var n = await ReportService.SetActiveManyAsync(selectedIds, active, currentUser);
+        ClearSelection();
+        await ReloadAsync();
+        message = $"{n} schedule(s) {(active ? "enabled" : "disabled")}.";
+    }
+
+    private async Task BulkRunAsync()
+    {
+        error = message = null; CloseMenu();
+        var n = await ReportService.TriggerManyAsync(selectedIds, currentUser);
+        ClearSelection();
+        await ReloadAsync();
+        message = $"{n} schedule(s) queued to run — they will be sent within a minute.";
+    }
+
+    private async Task DuplicateAsync(ScheduledReport r)
+    {
+        error = message = null; CloseMenu();
+        var (ok, err, _) = await ReportService.DuplicateAsync(r.Id, currentUser);
+        if (!ok) { error = err; return; }
+        await ReloadAsync();
+        message = $"'{r.Name}' duplicated (created disabled — enable it when ready).";
+    }
+
+    // Wizard state
+    private bool building;
+    private int wizStep = 1;
+    private int? editScheduleId;
+    private int? editDefId;
+    private bool saving;
+    private string? stepError;
+
+    private int reuseDefId;
+    private string wizSchema = "dbo";
+    private string wizTable = "";
+    private string wizTableKey = "";          // "schema|table" for the dropdown
+    private List<ReportColumn> availableColumns = [];
+    private List<(ReportRelation Rel, List<ReportColumn> Cols)> relatedGroups = [];
+    private Dictionary<string, string> lookupDisplayByFk = new(StringComparer.OrdinalIgnoreCase); // FK column -> display column
+    private bool loadingCols;
+
+    // Column names (in priority order) used as the readable "display value" of a looked-up (FK) row.
+    private static readonly string[] DisplayColPrefs = ["DisplayName", "Name", "Title", "Label", "Code", "Description"];
+
+    private static string? DisplayColumnFor(List<ReportColumn> cols)
+    {
+        foreach (var pref in DisplayColPrefs)
+        {
+            var m = cols.FirstOrDefault(c => string.Equals(c.Name, pref, StringComparison.OrdinalIgnoreCase));
+            if (m is not null) { return m.Name; }
+        }
+        return cols.FirstOrDefault(c => c.DataType.Contains("char", StringComparison.OrdinalIgnoreCase))?.Name;
+    }
+
+    // The convenience "display value" lookup fields (one per FK that has a display column), e.g. Status, City.
+    private IEnumerable<(string Key, string Label)> LookupFields() =>
+        relatedGroups
+            .Where(g => lookupDisplayByFk.ContainsKey(g.Rel.FkColumn))
+            .Select(g => (ReportSchemaService.EncodeRelated(g.Rel.FkColumn, lookupDisplayByFk[g.Rel.FkColumn]), g.Rel.Label));
+    private string colFilter = "";
+    private List<string> wizColumns = [];
+    private FilterMatch wizMatch = FilterMatch.And;
+    private List<ReportFilterCondition> wizFilters = [];
+    private string wizName = "";
+    private string wizTitle = "";
+    private ReportFormat wizFormat = ReportFormat.Pdf;
+    private int wizGroupId;
+    private ReportFrequency wizFreq = ReportFrequency.Monthly;
+    private DateTime wizStart = DateTime.Now;
+    private HashSet<DayOfWeek> wizWeekDays = [];
+
+    // Display order for the day picker (UAE convention: Saturday-first).
+    private static readonly DayOfWeek[] WeekDayOrder =
+        [DayOfWeek.Saturday, DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
+
+    private static string DayShort(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Sunday => "Sun", DayOfWeek.Monday => "Mon", DayOfWeek.Tuesday => "Tue", DayOfWeek.Wednesday => "Wed",
+        DayOfWeek.Thursday => "Thu", DayOfWeek.Friday => "Fri", _ => "Sat"
+    };
+
+    private void ToggleWeekDay(DayOfWeek d) { if (!wizWeekDays.Remove(d)) { wizWeekDays.Add(d); } }
+
+    private int WizWeekDaysMask => wizWeekDays.Aggregate(0, (m, d) => m | (1 << (int)d));
+    private bool wizActive = true;
+
+    private NotificationGroup? SelectedGroup => groups.FirstOrDefault(g => g.Id == wizGroupId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        groups = await GroupService.GetAllAsync();
+        reports = await ReportService.GetAllAsync();
+        definitions = await DefService.GetAllAsync();
+        if (tables.Count == 0)
+        {
+            try { tables = await SchemaService.GetTablesAsync(); }
+            catch (Exception ex) { error = "Could not read database metadata: " + ex.Message; }
+        }
+    }
+
+    private static string FormatLabel(ReportFormat f) => f switch
+    {
+        ReportFormat.Excel => "Excel", ReportFormat.PdfAndExcel => "PDF + Excel", _ => "PDF"
+    };
+
+    private static string OperatorLabel(FilterOperator op) => op switch
+    {
+        FilterOperator.Equals => "equals", FilterOperator.NotEquals => "not equals",
+        FilterOperator.Contains => "contains", FilterOperator.NotContains => "does not contain",
+        FilterOperator.StartsWith => "starts with", FilterOperator.GreaterThan => "greater than",
+        FilterOperator.LessThan => "less than", FilterOperator.IsEmpty => "is empty",
+        FilterOperator.IsNotEmpty => "is not empty", _ => op.ToString()
+    };
+
+    private static string LastRunClass(string? status) => status switch
+    {
+        "Sent" => "text-bg-success", "Partial" => "text-bg-warning",
+        "Skipped" => "text-bg-secondary", "Failed" => "text-bg-danger", _ => "text-bg-light border"
+    };
+
+    private void StartNew()
+    {
+        editScheduleId = null; editDefId = null; reuseDefId = 0;
+        wizSchema = "dbo"; wizTable = ""; wizTableKey = ""; availableColumns = []; colFilter = "";
+        wizColumns = []; wizMatch = FilterMatch.And; wizFilters = [];
+        wizName = ""; wizTitle = ""; wizFormat = ReportFormat.Pdf;
+        wizGroupId = groups.FirstOrDefault(g => g.IsActive)?.Id ?? groups.FirstOrDefault()?.Id ?? 0;
+        wizFreq = ReportFrequency.Monthly; wizActive = true; wizWeekDays = [];
+        var now = DateTime.Now;
+        wizStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0).AddHours(1);
+        error = message = stepError = null; wizStep = 1; building = true;
+    }
+
+    private async Task StartEditAsync(ScheduledReport r)
+    {
+        StartNew();
+        editScheduleId = r.Id;
+        wizGroupId = r.NotificationGroupId;
+        wizFreq = r.Frequency == ReportFrequency.Once ? ReportFrequency.Monthly : r.Frequency;
+        wizStart = ReportTimeZone.ToLocal(r.NextRunUtc);
+        wizWeekDays = Enum.GetValues<DayOfWeek>().Where(d => ScheduledReportService.IsDaySelected(r.WeekDaysMask, d)).ToHashSet();
+        wizActive = r.IsActive;
+        wizFormat = r.Format;
+        wizName = r.Name;
+        if (r.ReportDefinitionId is { } defId)
+        {
+            var def = await DefService.GetByIdAsync(defId);
+            if (def is not null) { await LoadDefinitionAsync(def); }
+        }
+        building = true;
+    }
+
+    private async Task LoadDefinitionAsync(ReportDefinition def)
+    {
+        editDefId = def.Id;
+        wizSchema = def.SchemaName; wizTable = def.TableName; wizTableKey = $"{def.SchemaName}|{def.TableName}";
+        wizName = def.Name; wizTitle = def.Title; wizFormat = def.Format;
+        await OnTableChangedAsync();
+        wizColumns = def.GetColumns().Where(IsFieldAvailable).ToList();
+        var f = def.GetFilters();
+        wizMatch = f.Match;
+        wizFilters = f.Conditions.Select(c => new ReportFilterCondition { Column = c.Column, Operator = c.Operator, Value = c.Value }).ToList();
+    }
+
+    private async Task ReuseDefinitionAsync()
+    {
+        var def = definitions.FirstOrDefault(d => d.Id == reuseDefId);
+        if (def is null) { return; }
+        await LoadDefinitionAsync(def);
+        editDefId = null; // reuse creates a NEW definition unless we're editing that schedule's own def
+        message = $"Loaded '{def.Name}'. Adjust as needed and continue.";
+    }
+
+    private void CancelBuild() { building = false; error = stepError = null; }
+
+    private async Task OnTableChangedAsync()
+    {
+        stepError = null;
+        var parts = (wizTableKey ?? "").Split('|', 2);
+        wizSchema = parts.Length == 2 ? parts[0] : "dbo";
+        wizTable = parts.Length == 2 ? parts[1] : "";
+        availableColumns = []; relatedGroups = [];
+        if (string.IsNullOrEmpty(wizTable)) { return; }
+        loadingCols = true;
+        StateHasChanged();
+        try
+        {
+            // One batched call: base columns + FK relations + related tables' columns (few round-trips).
+            var source = await SchemaService.GetSourceAsync(wizSchema, wizTable);
+            availableColumns = source.Columns;
+            relatedGroups = source.Related;
+            // Surface each FK's readable display value (e.g. Status, City) as a direct table field.
+            lookupDisplayByFk = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in relatedGroups)
+            {
+                var dc = DisplayColumnFor(g.Cols);
+                if (dc is not null) { lookupDisplayByFk[g.Rel.FkColumn] = dc; }
+            }
+        }
+        catch (Exception ex) { stepError = "Could not read columns: " + ex.Message; }
+        finally { loadingCols = false; }
+        // Drop any selected fields / filters that no longer resolve against this source.
+        wizColumns = wizColumns.Where(IsFieldAvailable).ToList();
+        wizFilters = wizFilters.Where(f => string.IsNullOrEmpty(f.Column) || IsFieldAvailable(f.Column)).ToList();
+    }
+
+    private bool MatchesFilter(string text) =>
+        string.IsNullOrWhiteSpace(colFilter) || text.Contains(colFilter, StringComparison.OrdinalIgnoreCase);
+
+    private bool IsFieldAvailable(string field)
+    {
+        if (ReportSchemaService.TryDecodeRelated(field, out var fk, out var refCol))
+        {
+            return relatedGroups.Any(g => string.Equals(g.Rel.FkColumn, fk, StringComparison.OrdinalIgnoreCase)
+                && g.Cols.Any(c => string.Equals(c.Name, refCol, StringComparison.OrdinalIgnoreCase)));
+        }
+        return availableColumns.Any(c => string.Equals(c.Name, field, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string FieldLabel(string field)
+    {
+        if (ReportSchemaService.TryDecodeRelated(field, out var fk, out var refCol))
+        {
+            var rel = relatedGroups.FirstOrDefault(g => string.Equals(g.Rel.FkColumn, fk, StringComparison.OrdinalIgnoreCase)).Rel;
+            if (rel is null) { return $"{fk}.{refCol}"; }
+            // The FK's display value is shown as just the relationship label (e.g. "Status"), not "Status.DisplayName".
+            return lookupDisplayByFk.TryGetValue(fk, out var dc) && string.Equals(dc, refCol, StringComparison.OrdinalIgnoreCase)
+                ? rel.Label : $"{rel.Label}.{refCol}";
+        }
+        return field;
+    }
+
+    private void ToggleColumn(string name)
+    {
+        if (!wizColumns.Remove(name)) { wizColumns.Add(name); }
+    }
+
+    private void MoveColumn(int idx, int delta)
+    {
+        var j = idx + delta;
+        if (j < 0 || j >= wizColumns.Count) { return; }
+        (wizColumns[idx], wizColumns[j]) = (wizColumns[j], wizColumns[idx]);
+    }
+
+    private void AddFilter() => wizFilters.Add(new ReportFilterCondition { Operator = FilterOperator.Equals });
+
+    private void OnStartChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt)) { wizStart = dt; }
+    }
+
+    private string? ValidateStep(int step) => step switch
+    {
+        1 => string.IsNullOrEmpty(wizTable) ? "Select a table or view." : null,
+        2 => wizColumns.Count == 0 ? "Select at least one column." : null,
+        4 => string.IsNullOrWhiteSpace(wizName) ? "Enter a report name."
+             : string.IsNullOrWhiteSpace(wizTitle) ? "Enter a report title." : null,
+        5 => wizGroupId == 0 ? "Select a notification group." : null,
+        6 => wizFreq == ReportFrequency.Weekly && wizWeekDays.Count == 0
+             ? "Select at least one day of the week." : null,
+        _ => null
+    };
+
+    private void GoStep(int n)
+    {
+        // Allow going back freely; going forward validates the steps in between.
+        if (n <= wizStep) { wizStep = n; stepError = null; return; }
+        for (var s = wizStep; s < n; s++)
+        {
+            var err = ValidateStep(s);
+            if (err is not null) { stepError = err; wizStep = s; return; }
+        }
+        stepError = null; wizStep = n;
+    }
+
+    private async Task NextAsync()
+    {
+        var err = ValidateStep(wizStep);
+        if (err is not null) { stepError = err; return; }
+        stepError = null;
+        if (wizStep == 1) { await OnTableChangedAsync(); }
+        wizStep = Math.Min(6, wizStep + 1);
+    }
+
+    private void Prev() { stepError = null; wizStep = Math.Max(1, wizStep - 1); }
+
+    private async Task SaveAsync()
+    {
+        error = message = stepError = null;
+        for (var s = 1; s <= 6; s++)
+        {
+            var err = ValidateStep(s);
+            if (err is not null) { wizStep = s; stepError = err; return; }
+        }
+
+        saving = true;
+        try
+        {
+            var filters = new ReportFilterModel
+            {
+                Match = wizMatch,
+                Conditions = wizFilters.Where(f => !string.IsNullOrWhiteSpace(f.Column)).ToList()
+            };
+            var input = new ReportDefinitionInput(wizName, wizTitle, wizSchema, wizTable, wizColumns, filters, wizFormat);
+
+            int defId;
+            if (editDefId is { } existing)
+            {
+                var (ok, err) = await DefService.UpdateAsync(existing, input, currentUser);
+                if (!ok) { stepError = err; wizStep = 4; return; }
+                defId = existing;
+            }
+            else
+            {
+                var (ok, err, id) = await DefService.CreateAsync(input, currentUser);
+                if (!ok) { stepError = err; wizStep = 4; return; }
+                defId = id;
+            }
+
+            var sched = new ScheduledReportInput(
+                wizName, wizFormat, wizFreq, wizStart, null, wizGroupId, wizActive, defId,
+                WeekDaysMask: WizWeekDaysMask);
+            if (editScheduleId is { } sid)
+            {
+                var (ok, err) = await ReportService.UpdateAsync(sid, sched, currentUser);
+                if (!ok) { stepError = err; wizStep = 6; return; }
+                message = $"Schedule '{wizName}' updated.";
+            }
+            else
+            {
+                var (ok, err, _) = await ReportService.CreateAsync(sched, currentUser);
+                if (!ok) { stepError = err; wizStep = 6; return; }
+                message = $"Report '{wizName}' scheduled.";
+            }
+
+            building = false;
+            await ReloadAsync();
+        }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleActiveAsync(ScheduledReport r, bool isActive)
+    {
+        error = message = null;
+        await ReportService.SetActiveAsync(r.Id, isActive, currentUser);
+        await ReloadAsync();
+        message = $"Schedule '{r.Name}' {(isActive ? "enabled" : "disabled")}.";
+    }
+
+    private async Task RunNowAsync(ScheduledReport r)
+    {
+        error = message = null;
+        await ReportService.TriggerNowAsync(r.Id, currentUser);
+        await ReloadAsync();
+        message = $"'{r.Name}' has been queued to run — it will be sent within a minute.";
+    }
+
+    private async Task DeleteAsync(ScheduledReport r)
+    {
+        error = message = null;
+        if (await ReportService.DeleteAsync(r.Id, currentUser))
+        {
+            message = $"Schedule '{r.Name}' deleted.";
+            await ReloadAsync();
+        }
+    }
+}

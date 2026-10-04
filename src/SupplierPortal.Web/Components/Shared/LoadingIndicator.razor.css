@@ -1,0 +1,54 @@
+.di-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+    width: 100%;
+}
+
+.di-loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.75);
+    z-index: 20;
+    border-radius: 8px;
+}
+
+.di-loading-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #46506b;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.di-loading-hourglass {
+    font-size: 1.6rem;
+    line-height: 1;
+    display: inline-block;
+    animation: di-hourglass-flip 1.2s ease-in-out infinite;
+    transform-origin: center;
+}
+
+.di-loading-text {
+    white-space: normal;
+}
+
+@keyframes di-hourglass-flip {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(180deg); }
+    60% { transform: rotate(180deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .di-loading-hourglass {
+        animation: di-hourglass-fade 1.4s ease-in-out infinite;
+    }
+
+    @keyframes di-hourglass-fade {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+}

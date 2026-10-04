@@ -1,0 +1,310 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using SupplierPortal.Web.Data;
+using SupplierPortal.Web.Models;
+using SupplierPortal.Web.Models.Customer;
+
+namespace SupplierPortal.Web.Services;
+
+/// <summary>Issues and validates the opaque link tokens and 4-digit OTP codes that protect the customer
+/// self-service flow. Mirrors <see cref="SupplierAccessTokenService"/>: the link token is hashed
+/// deterministically (SHA-256) for lookup, while the OTP code reuses the app's salted password hasher.</summary>
+public class CustomerAccessTokenService(
+    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, IWebHostEnvironment env,
+    EmailBrandingService branding, EmailDispatcher emailDispatcher)
+{
+    private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(14);
+    private static readonly TimeSpan OtpValidity = TimeSpan.FromMinutes(10);
+    private const int MaxOtpAttempts = 5;
+    private const int MaxOtpSends = 5;
+    private const string MailProfileName = "BP";
+    private const string OtpTemplateRelativePath = "doc/customer_otp_code.html";
+
+    private static readonly User HasherContext = new();
+
+    /// <summary>The email to reach the customer on: the account Primary Email, else the contact's Email.
+    /// Used for the masked-recipient hint; delivery goes to every address from <see cref="RecipientsFor"/>.</summary>
+    public static string? EmailFor(Customer c) =>
+        !string.IsNullOrWhiteSpace(c.PrimaryEmail) ? c.PrimaryEmail : c.Contact?.Email;
+
+    /// <summary>Every distinct address to deliver customer emails to: the account Primary Email (Contact &amp;
+    /// Address) and the contact's Email (Personal Data). Blanks dropped, de-duplicated case-insensitively so a
+    /// customer whose two emails match only receives one copy.</summary>
+    public static IReadOnlyList<string> RecipientsFor(Customer c) =>
+        new[] { c.PrimaryEmail, c.Contact?.Email }
+            .Select(e => e?.Trim())
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>The notification recipients, each paired with the link tag ("p" = Primary Email, "c" = contact
+    /// Email) that a later OTP is routed back to — so the verification code reaches the same inbox that opened
+    /// the link. Primary first, then the contact; blanks dropped and the two de-duplicated (when both addresses
+    /// match, only the Primary-tagged link is sent).</summary>
+    public static IReadOnlyList<(string Key, string Email)> RecipientLinksFor(Customer c)
+    {
+        var list = new List<(string Key, string Email)>();
+        void Add(string key, string? email)
+        {
+            var e = email?.Trim();
+            if (!string.IsNullOrWhiteSpace(e) && !list.Any(x => string.Equals(x.Email, e, StringComparison.OrdinalIgnoreCase)))
+            {
+                list.Add((key, e!));
+            }
+        }
+        Add("p", c.PrimaryEmail);
+        Add("c", c.Contact?.Email);
+        return list;
+    }
+
+    /// <summary>Resolves a per-recipient link tag to the single address an OTP should be delivered to:
+    /// "p" = Primary Email, "c" = contact Email (each falling back to the other when blank). Any other value
+    /// (null/empty/unknown — e.g. an older untagged link) means "all recipients", preserving the previous
+    /// behaviour of sending to both.</summary>
+    public static IReadOnlyList<string> RecipientsFor(Customer c, string? recipientKey)
+    {
+        switch (recipientKey?.Trim().ToLowerInvariant())
+        {
+            case "p":
+                var p = !string.IsNullOrWhiteSpace(c.PrimaryEmail) ? c.PrimaryEmail : c.Contact?.Email;
+                return string.IsNullOrWhiteSpace(p) ? [] : new[] { p!.Trim() };
+            case "c":
+                var ct = !string.IsNullOrWhiteSpace(c.Contact?.Email) ? c.Contact?.Email : c.PrimaryEmail;
+                return string.IsNullOrWhiteSpace(ct) ? [] : new[] { ct!.Trim() };
+            default:
+                return RecipientsFor(c);
+        }
+    }
+
+    /// <summary>The masked address for the "we've sent a code to …" hint, for the recipient the link was opened
+    /// from (p/c); falls back to the primary-preferred address when the tag is absent.</summary>
+    public static string? MaskedEmailFor(Customer c, string? recipientKey)
+    {
+        var list = RecipientsFor(c, recipientKey);
+        return SupplierAccessTokenService.MaskEmail(list.Count > 0 ? list[0] : EmailFor(c));
+    }
+
+    public async Task<string> CreateTokenAsync(int customerId, string createdBy, bool isAdminTest = false, string? recipient = null)
+    {
+        var raw = GenerateRawToken();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.CustomerAccessTokens.Add(new CustomerAccessToken
+        {
+            CustomerId = customerId,
+            TokenHash = Hash(raw),
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.Add(LinkValidity),
+            CreatedBy = createdBy,
+            IsAdminTest = isAdminTest,
+            Recipient = recipient
+        });
+        await db.SaveChangesAsync();
+        return raw;
+    }
+
+    /// <summary>All self-service notification emails ever sent for a customer (most recent first), for the
+    /// Email History tab on the customer edit screen.</summary>
+    public async Task<List<CustomerAccessToken>> GetHistoryForCustomerAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CustomerAccessTokens
+            .Where(t => t.CustomerId == customerId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<CustomerAccessToken?> GetValidTokenAsync(string rawToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hash = Hash(rawToken);
+        var token = await db.CustomerAccessTokens
+            .Include(t => t.Customer).ThenInclude(c => c!.Contact)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash);
+        return token is null || token.ExpiresAt < DateTime.UtcNow ? null : token;
+    }
+
+    /// <summary>Looks up a link token for DISPLAY only (e.g. to brand the "link expired" page), returning the
+    /// token with its Customer even when expired; null only when the token was never issued.</summary>
+    public async Task<CustomerAccessToken?> GetTokenForDisplayAsync(string rawToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hash = Hash(rawToken);
+        return await db.CustomerAccessTokens
+            .Include(t => t.Customer).ThenInclude(c => c!.Contact)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash);
+    }
+
+    /// <summary>Generate, persist and email a fresh OTP for a link. When <paramref name="recipientKey"/> is a
+    /// per-recipient link tag ("p" = Primary Email, "c" = contact Email), the code is sent only to that address
+    /// — so it reaches the same inbox that opened the link. Null/unknown sends to every recipient (legacy links).</summary>
+    public async Task<(bool Success, string? Error)> GenerateAndSendOtpAsync(int tokenId, string? recipientKey = null)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.CustomerAccessTokens
+            .Include(t => t.Customer).ThenInclude(c => c!.Contact)
+            .FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null)
+        {
+            return (false, "Link not found.");
+        }
+        // The token's own Recipient (stamped at send time) is authoritative, so routing works even if the DMZ
+        // app did not forward the link's ?r= tag. Fall back to the caller-supplied key, then to all recipients.
+        var key = !string.IsNullOrWhiteSpace(token.Recipient) ? token.Recipient : recipientKey;
+        var recipients = token.Customer is null ? [] : RecipientsFor(token.Customer, key);
+        if (recipients.Count == 0)
+        {
+            return (false, "This customer has no email address on file.");
+        }
+        if (token.OtpSendCount >= MaxOtpSends)
+        {
+            return (false, "Too many verification code requests for this link. Please contact us for assistance.");
+        }
+
+        var templatePath = Path.Combine(env.WebRootPath, "doc", "customer_otp_code.html");
+        if (!File.Exists(templatePath))
+        {
+            return (false, $"Email template not found at wwwroot/{OtpTemplateRelativePath}.");
+        }
+        var body = await File.ReadAllTextAsync(templatePath);
+
+        var code = RandomNumberGenerator.GetInt32(0, 1000000).ToString("D6");
+
+        var brand = System.Net.WebUtility.HtmlEncode(
+            await branding.GetBusinessUnitNameAsync(token.Customer!.BusinessUnitId) ?? EmailBrandingService.DefaultBrandName);
+        var brandLine = $"<div style=\"color:#0b2545;font-size:16px;font-weight:700;letter-spacing:.02em;margin-bottom:10px\">{brand}</div>";
+        var logo = await branding.GetBusinessUnitLogoSrcAsync(token.Customer.BusinessUnitId);
+        var brandBlock = string.IsNullOrWhiteSpace(logo)
+            ? brandLine
+            : $"<img src=\"{logo}\" alt=\"{brand}\" style=\"max-height:48px;max-width:220px;display:block\" />";
+        body = body
+            .Replace("{CompanyLogo}", brandBlock)
+            .Replace("{Customer Name}", System.Net.WebUtility.HtmlEncode(token.Customer.LegalName ?? "Customer"))
+            .Replace("{OTP Code}", code)
+            .Replace("{Expiry Minutes}", ((int)OtpValidity.TotalMinutes).ToString());
+
+        // Send FIRST; only record the code as "sent" (and count it against the send cap) once delivery actually
+        // succeeds. Persisting before the send would make a FAILED send look successful — the verify page's
+        // auto-send would then not retry and the error would be hidden, so the customer never receives a code.
+        var fromEmail = await branding.GetPortalSenderEmailAsync(token.Customer.BusinessUnitId, Models.PortalType.Customer);
+        // Send the code to the resolved recipient(s) — the single address the link was opened from when tagged,
+        // otherwise every recipient — one clean address per send; success when at least one copy is delivered.
+        var anySent = false;
+        string? error = null;
+        foreach (var to in recipients)
+        {
+            var (ok, err) = await emailDispatcher.SendHtmlAsync(to, "Your Verification Code", body, fromEmail: fromEmail, fromName: brand);
+            if (ok) anySent = true; else error = err;
+        }
+        if (!anySent)
+        {
+            return (false, error ?? "We couldn't send the verification code. Please try again in a moment.");
+        }
+
+        token.OtpCodeHash = hasher.HashPassword(HasherContext, code);
+        token.OtpGeneratedAt = DateTime.UtcNow;
+        token.OtpExpiresAt = DateTime.UtcNow.Add(OtpValidity);
+        token.OtpAttemptCount = 0;
+        token.OtpSendCount++;
+        await db.SaveChangesAsync();
+
+        return (true, null);
+    }
+
+    public async Task<(bool Success, string? Error, string? SessionToken)> VerifyOtpAsync(int tokenId, string enteredCode)
+    {
+        // Guard against a null/blank code (e.g. a raw API body with code:null) before Trim() below.
+        if (string.IsNullOrWhiteSpace(enteredCode))
+        {
+            return (false, "Please enter the code from your email.", null);
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.CustomerAccessTokens.FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null)
+        {
+            return (false, "Link not found.", null);
+        }
+        if (token.OtpCodeHash is null || token.OtpExpiresAt is null || token.OtpExpiresAt < DateTime.UtcNow)
+        {
+            return (false, "Your code has expired. Please request a new one.", null);
+        }
+        if (token.OtpAttemptCount >= MaxOtpAttempts)
+        {
+            return (false, "Too many incorrect attempts. Please request a new code.", null);
+        }
+
+        var result = hasher.VerifyHashedPassword(HasherContext, token.OtpCodeHash, enteredCode.Trim());
+        if (result == PasswordVerificationResult.Failed)
+        {
+            token.OtpAttemptCount++;
+            await db.SaveChangesAsync();
+            return (false, "Incorrect code. Please try again.", null);
+        }
+
+        var sessionRaw = GenerateRawToken();
+        token.OtpVerifiedAt = DateTime.UtcNow;
+        token.SessionTokenHash = Hash(sessionRaw);
+        token.SessionExpiresAt = token.ExpiresAt;
+        await db.SaveChangesAsync();
+
+        return (true, null, sessionRaw);
+    }
+
+    public async Task<CustomerAccessToken?> ValidateSessionAsync(string rawToken, string rawSession)
+    {
+        var token = await GetValidTokenAsync(rawToken);
+        if (token is null || token.OtpVerifiedAt is null)
+        {
+            return null;
+        }
+        if (token.SessionTokenHash is null || token.SessionExpiresAt is null || token.SessionExpiresAt < DateTime.UtcNow)
+        {
+            return null;
+        }
+        return token.SessionTokenHash == Hash(rawSession) ? token : null;
+    }
+
+    /// <summary>Expires every still-valid self-service link (and session) for a customer — used once the
+    /// record is completed, so the emailed link can no longer be opened.</summary>
+    public async Task ExpireTokensForCustomerAsync(int customerId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+        var tokens = await db.CustomerAccessTokens
+            .Where(t => t.CustomerId == customerId && (t.ExpiresAt > now || (t.SessionExpiresAt != null && t.SessionExpiresAt > now)))
+            .ToListAsync();
+        foreach (var t in tokens)
+        {
+            t.ExpiresAt = now;
+            t.SessionExpiresAt = now;
+        }
+        if (tokens.Count > 0)
+        {
+            await db.SaveChangesAsync();
+        }
+    }
+
+    public async Task MarkUsedAsync(int tokenId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var token = await db.CustomerAccessTokens.FirstOrDefaultAsync(t => t.Id == tokenId);
+        if (token is null)
+        {
+            return;
+        }
+        token.UsedAt = DateTime.UtcNow;
+        // Final submit invalidates the link and session so a completed record can't be reopened and
+        // re-submitted (re-sending notifications) within the remaining link window. MarkUsedAsync is only
+        // called on the completing submit, so expiring here is correct.
+        token.ExpiresAt = DateTime.UtcNow;
+        token.SessionExpiresAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
+    private static string GenerateRawToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+
+    private static string Hash(string raw) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();
+}

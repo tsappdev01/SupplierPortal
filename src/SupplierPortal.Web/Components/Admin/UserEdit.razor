@@ -1,0 +1,362 @@
+@page "/admin/users/edit/{Id:int}"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject UserService UserService
+@inject LoadingService Loading
+@inject BusinessUnitService BusinessUnitService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit User - Supplier Portal</PageTitle>
+
+<h1>Edit User</h1>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">User not found.</div>
+}
+else if (Input is null)
+{
+    <LoadingIndicator Message="Loading user…" />
+}
+else
+{
+    <EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="edit-user" style="max-width: 640px;">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <InputText class="form-control" @bind-Value="Input.Username" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <InputText class="form-control" @bind-Value="Input.FullName" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Designation</label>
+            <InputText class="form-control" @bind-Value="Input.Designation" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <InputText class="form-control" @bind-Value="Input.Email" />
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="useLdap" @bind="UseLdap" />
+            <label class="form-check-label" for="useLdap">Authenticate using LDAP (Active Directory)</label>
+            <div class="form-text">When ticked, the user signs in with their AD account instead of a local password.</div>
+        </div>
+        @if (UseLdap)
+        {
+            <div class="mb-3">
+                <label class="form-label">Active Directory Login</label>
+                <InputText class="form-control" @bind-Value="Input.AdLogin" placeholder="sAMAccountName, user@dipark.local or DIPARK\user" />
+                <div class="form-text">The user signs in with this AD account &mdash; no local password is used.</div>
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label">New Password</label>
+                <InputText type="password" class="form-control" @bind-Value="Input.NewPassword" />
+                <div class="form-text">Leave blank to keep the current password.</div>
+            </div>
+        }
+        <div class="mb-3">
+            <label class="form-label">Profile Photo</label>
+            <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
+            @if (photoPreview is not null)
+            {
+                <img src="@photoPreview" alt="Preview" class="mt-2" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;" />
+            }
+            else if (hasExistingPhoto)
+            {
+                <img src="/users/@Id/photo" alt="Current photo" class="mt-2" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover;" />
+            }
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Role</label>
+            <InputSelect class="form-select" style="max-width: 260px;" @bind-Value="Input.UserType">
+                <option value="@UserType.NormalUser">Normal User</option>
+                <option value="@UserType.Administrator">Administrator</option>
+            </InputSelect>
+            <div class="form-text">Administrators also see the Settings area (users, business units, audit log).</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Portal Access</label>
+            <div class="di-bu-checklist">
+                @foreach (var portal in AllPortals)
+                {
+                    <label class="di-bu-check">
+                        <input type="checkbox" checked="@selectedPortals.Contains(portal)"
+                               @onchange="e => TogglePortal(portal, (bool)e.Value!)" />
+                        @portal
+                    </label>
+                }
+            </div>
+            <div class="form-text">The portals this user can open. Only granted portals appear on their home page and sidebar.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Company</label>
+            <InputSelect class="form-select" style="max-width: 360px;" @bind-Value="Input.CompanyBusinessUnitId">
+                <option value="">— Select —</option>
+                @foreach (var businessUnit in businessUnits)
+                {
+                    <option value="@businessUnit.Id">@businessUnit.Name</option>
+                }
+            </InputSelect>
+            <div class="form-text">The business unit / company this user belongs to.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Department</label>
+            <InputSelect class="form-select" style="max-width: 360px;" @bind-Value="Input.DepartmentId">
+                <option value="">— Select —</option>
+                @foreach (var department in departments)
+                {
+                    <option value="@department.Id">@department.Name</option>
+                }
+            </InputSelect>
+            <div class="form-text">The department this user belongs to; used to scope which suppliers they manage.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Business Unit(s)</label>
+            <div class="di-bu-checklist">
+                @foreach (var businessUnit in businessUnits)
+                {
+                    <label class="di-bu-check">
+                        <input type="checkbox" checked="@selectedBusinessUnitIds.Contains(businessUnit.Id)"
+                               @onchange="e => ToggleBusinessUnit(businessUnit.Id, (bool)e.Value!)" />
+                        @businessUnit.Name
+                    </label>
+                }
+            </div>
+            <div class="form-text">Additional business units whose suppliers this user can see.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label d-block">Status</label>
+            <label class="di-switch">
+                <input type="checkbox" @bind="Input.IsActive" />
+                <span class="di-switch-slider"></span>
+            </label>
+            <span class="ms-2">@(Input.IsActive ? "Active" : "Inactive")</span>
+        </div>
+
+        @if (errorMessage is not null)
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a class="btn btn-secondary" href="/admin/users">Cancel</a>
+    </EditForm>
+}
+
+<style>
+    .di-bu-checklist {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+    }
+
+    .di-bu-check {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: normal;
+        margin-bottom: 0;
+    }
+
+    .di-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        vertical-align: middle;
+    }
+
+    .di-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .di-switch-slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background-color: #dc3545;
+        border-radius: 24px;
+        transition: background-color 0.15s ease;
+    }
+
+    .di-switch-slider::before {
+        content: "";
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        border-radius: 50%;
+        transition: transform 0.15s ease;
+    }
+
+    .di-switch input:checked + .di-switch-slider {
+        background-color: #28a745;
+    }
+
+    .di-switch input:checked + .di-switch-slider::before {
+        transform: translateX(20px);
+    }
+</style>
+
+@code {
+    private const long MaxPhotoSize = 2 * 1024 * 1024;
+
+    [Parameter] public int Id { get; set; }
+
+    private static readonly PortalAccess[] AllPortals =
+        [PortalAccess.Supplier, PortalAccess.Landlord, PortalAccess.Broker, PortalAccess.Customer];
+
+    private List<BusinessUnit> businessUnits = [];
+    private List<Department> departments = [];
+    private HashSet<int> selectedBusinessUnitIds = [];
+    private HashSet<PortalAccess> selectedPortals = [];
+    private string currentUser = "unknown";
+    private bool notFound;
+    private bool hasExistingPhoto;
+    private string? errorMessage;
+    private string? photoPreview;
+    private byte[]? photoBytes;
+    private string? photoContentType;
+
+    private UserModel? Input { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+
+        businessUnits = await BusinessUnitService.GetAllAsync();
+        departments = await UserService.GetDepartmentsAsync();
+
+        var user = await UserService.GetByIdAsync(Id);
+        if (user is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        hasExistingPhoto = user.ProfilePhoto is not null;
+        selectedBusinessUnitIds = user.BusinessUnits.Select(b => b.Id).ToHashSet();
+        selectedPortals = AllPortals.Where(p => user.PortalAccess.HasFlag(p)).ToHashSet();
+        Input = new UserModel
+        {
+            Username = user.Username,
+            FullName = user.FullName ?? "",
+            Designation = user.Designation,
+            Email = user.Email,
+            UserType = user.UserType,
+            IsActive = user.IsActive,
+            AuthSource = user.AuthSource,
+            AdLogin = user.AdLogin,
+            CompanyBusinessUnitId = user.CompanyBusinessUnitId,
+            DepartmentId = user.DepartmentId
+        };
+    }
+
+    private void ToggleBusinessUnit(int businessUnitId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            selectedBusinessUnitIds.Add(businessUnitId);
+        }
+        else
+        {
+            selectedBusinessUnitIds.Remove(businessUnitId);
+        }
+    }
+
+    private void TogglePortal(PortalAccess portal, bool isChecked)
+    {
+        if (isChecked) selectedPortals.Add(portal);
+        else selectedPortals.Remove(portal);
+    }
+
+    private PortalAccess SelectedPortalAccess =>
+        selectedPortals.Aggregate(PortalAccess.None, (acc, p) => acc | p);
+
+    private async Task OnPhotoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxPhotoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        photoBytes = memoryStream.ToArray();
+        photoContentType = file.ContentType;
+        photoPreview = $"data:{photoContentType};base64,{Convert.ToBase64String(photoBytes)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Input is null)
+        {
+            return;
+        }
+
+        var (success, error) = await Loading.RunAsync(() => UserService.UpdateUserAsync(
+            Id, Input.Username, Input.FullName, Input.Designation, Input.Email, Input.UserType,
+            selectedBusinessUnitIds.ToList(), Input.IsActive, photoBytes, photoContentType, Input.NewPassword,
+            Input.AuthSource, Input.AdLogin, currentUser, SelectedPortalAccess, Input.CompanyBusinessUnitId, Input.DepartmentId));
+
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin/users");
+    }
+
+    // Checkbox <-> AuthSource: ticked means the account authenticates against Active Directory (LDAP).
+    private bool UseLdap
+    {
+        get => Input?.AuthSource == AuthSource.ActiveDirectory;
+        set { if (Input is not null) { Input.AuthSource = value ? AuthSource.ActiveDirectory : AuthSource.Local; } }
+    }
+
+    private sealed class UserModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Username { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FullName { get; set; } = "";
+
+        public string? Designation { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        public string? NewPassword { get; set; }
+
+        public AuthSource AuthSource { get; set; } = AuthSource.Local;
+
+        public string? AdLogin { get; set; }
+
+        public UserType UserType { get; set; } = UserType.NormalUser;
+
+        public int? CompanyBusinessUnitId { get; set; }
+        public int? DepartmentId { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

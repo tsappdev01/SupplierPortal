@@ -1,0 +1,106 @@
+@page "/landlord/{Token}/uaepass"
+@layout Layout.PublicLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using SupplierPortal.Web.Models.Leasing
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordAccessTokenService AccessTokenService
+@inject IUaePassService UaePass
+@inject NavigationManager Nav
+
+<PageTitle>UAE Pass Verification - Landlord Portal</PageTitle>
+
+<div class="di-uaep-card">
+    @if (loading)
+    {
+        <p><em>Loading…</em></p>
+    }
+    else if (token is null)
+    {
+        <h1>Link Not Available</h1>
+        <p class="text-muted">This verification session is no longer valid. Please use the link from your email again.</p>
+    }
+    else
+    {
+        <div class="di-uaep-brand">
+            <span class="di-uaep-logo">UAE&nbsp;PASS</span>
+            <span class="di-uaep-tag">National Digital Identity</span>
+        </div>
+        <h1>Verify with UAE Pass</h1>
+        <p class="text-muted">
+            Your identity is confirmed through UAE Pass for
+            <strong>@(token.Landlord?.CompanyName ?? token.Landlord?.PropertyCode)</strong>.
+            Your name, email and mobile number are taken from your UAE Pass account and used to
+            complete the registration — these details cannot be edited in the form.
+        </p>
+
+        @if (error is not null)
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+        @if (!UaePass.Enabled)
+        {
+            <div class="di-uaep-sim">Running in verification-simulation mode (UAE Pass credentials not yet configured).</div>
+        }
+
+        <button class="btn di-uaep-btn w-100" disabled="@busy" @onclick="ContinueAsync">
+            @(busy ? "Contacting UAE Pass…" : "Continue with UAE Pass")
+        </button>
+    }
+</div>
+
+<style>
+    .di-uaep-card { width: 100%; max-width: 440px; background: #fff; border-radius: 10px; border: 1px solid #e2e5ea; box-shadow: 0 1px 6px rgba(0,0,0,.07); padding: 2rem; }
+    .di-uaep-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+    .di-uaep-logo { font-weight: 800; letter-spacing: .04em; color: #fff; background: #000; border-radius: 6px; padding: 6px 12px; font-size: 1rem; }
+    .di-uaep-tag { color: #6b7280; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; }
+    .di-uaep-card h1 { font-size: 1.35rem; color: #092F56; margin-bottom: .5rem; }
+    .di-uaep-sim { background: #fff8e1; border: 1px solid #f0d98a; color: #7a5b00; border-radius: 6px; padding: 8px 12px; font-size: .82rem; margin-bottom: 1rem; }
+    .di-uaep-btn { background: #000; color: #fff; font-weight: 600; padding: 12px; border-radius: 6px; }
+    .di-uaep-btn:hover { background: #1a1a1a; color: #fff; }
+    .di-uaep-btn:disabled { opacity: .6; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private LandlordAccessToken? token;
+    private bool loading = true, busy;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SessionToken))
+            token = await AccessTokenService.ValidateSessionAsync(Token, SessionToken);
+
+        // If UAE Pass was already completed on this session, skip straight to the form.
+        if (token?.UaePassVerifiedAt is not null)
+        {
+            Nav.NavigateTo($"/landlord/continue/{token.Id}?s={SessionToken}");
+            return;
+        }
+        loading = false;
+    }
+
+    private async Task ContinueAsync()
+    {
+        if (token is null) return;
+        busy = true;
+        error = null;
+
+        if (UaePass.Enabled)
+        {
+            var state = await AccessTokenService.StartUaePassAsync(token.Id);
+            if (state is null) { error = "Could not start UAE Pass verification. Please try again."; busy = false; return; }
+            var redirectUri = $"{Nav.BaseUri}landlord/uaepass/callback";
+            Nav.NavigateTo(UaePass.BuildAuthorizeUrl(redirectUri, state), forceLoad: true);
+            return;
+        }
+
+        // Simulation mode: derive the profile locally and continue to the form.
+        var profile = UaePass.Simulate(token.Landlord!);
+        var session = await AccessTokenService.StoreUaePassProfileAsync(token.Id, profile);
+        if (session is null) { error = "Verification could not be completed. Please try again."; busy = false; return; }
+        Nav.NavigateTo($"/landlord/continue/{token.Id}?s={session}");
+    }
+}

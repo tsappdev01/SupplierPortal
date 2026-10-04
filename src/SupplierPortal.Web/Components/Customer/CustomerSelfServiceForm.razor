@@ -1,0 +1,987 @@
+@page "/customer/self-service/{Token}/form"
+@layout Layout.PublicLayout
+@rendermode InteractiveServer
+@using SupplierPortal.Web.Models.Customer
+@using SupplierPortal.Web.Services
+@using SupplierPortal.Web.Services.SelfService
+@inject ICustomerSelfServiceDataGateway DataGateway
+@inject PublicBrandingState PublicBranding
+@inject ToastService ToastService
+@inject IJSRuntime JS
+
+<PageTitle>Customer Information - Customer Portal</PageTitle>
+
+<SupplierPortal.Web.Components.Shared.BlockingOverlay Visible="blocking"
+    Title="Submitting your information…" Message="Please do not close or refresh this page." />
+
+<div class="di-selfservice-wrap">
+    @if (loading)
+    {
+        <LoadingIndicator Message="Loading your information…" />
+    }
+    else if (customer is null)
+    {
+        <div class="di-ss-card">
+            <h1>Session Expired</h1>
+            <p class="text-muted">
+                Your verification session is no longer valid. Please use the link from your email
+                again to restart verification.
+            </p>
+        </div>
+    }
+    else if (completed)
+    {
+        <div class="di-ss-card">
+            <h1>Thank You</h1>
+            <p class="text-muted">
+                Your information has been submitted successfully. Our team will review the changes shortly.
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="di-form-page">
+            <div class="di-form-topbar">
+                <div class="di-form-headings">
+                    <h1 class="di-form-title">@(string.IsNullOrWhiteSpace(customer.LegalName) ? "Your Information" : customer.LegalName)</h1>
+                    <p class="di-form-sub">Please review and update your information below.</p>
+                </div>
+                <div class="di-progress" title="@ProgressPct% complete">
+                    <svg class="di-progress-ring" viewBox="0 0 36 36">
+                        <circle class="di-progress-bg" cx="18" cy="18" r="15.9155"></circle>
+                        <circle class="di-progress-bar" cx="18" cy="18" r="15.9155" style="stroke-dasharray:@ProgressPct.ToString(System.Globalization.CultureInfo.InvariantCulture) 100"></circle>
+                    </svg>
+                    <div class="di-progress-center">
+                        <span class="di-progress-pct">@ProgressPct%</span>
+                        <span class="di-progress-word">Complete</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="di-stepper">
+                @for (var i = 0; i < steps.Count; i++)
+                {
+                    var idx = i;
+                    var reached = idx <= current;
+                    <button type="button"
+                            class="di-stepper-item @(idx == current ? "active" : "") @(reached ? "reached" : "")"
+                            @onclick="() => JumpToAsync(idx)">
+                        <span class="di-stepper-num">@(idx < current ? "✓" : (idx + 1).ToString())</span>
+                        <span class="di-stepper-label">@steps[idx].Title</span>
+                    </button>
+                }
+            </div>
+
+            @if (message is not null)
+            {
+                <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+            }
+
+            @{ var step = steps[current]; }
+
+            @if (step.IsDocuments)
+            {
+                <div class="di-section">
+                    <div class="di-section-header">
+                        <div class="di-section-heading">
+                            <span class="di-section-title">KYC Documents</span>
+                            <span class="di-section-desc">Please upload the required identity &amp; verification documents.</span>
+                        </div>
+                    </div>
+                    <div class="di-section-body" style="grid-template-columns: 1fr;">
+                        <CustomerDocuments CustomerId="customer.Id" SelfService="true" CurrentUser="@currentUser"
+                                           Types="docTypes" IsApplicable="DocApplies"
+                                           SsGateway="DataGateway" SsToken="@activeToken" SsSession="@activeSession" OnChanged="OnDocsChanged" />
+                    </div>
+                </div>
+            }
+            else if (!step.IsReview)
+            {
+                <div class="di-section">
+                    <div class="di-section-header">
+                        <div class="di-section-heading">
+                            <span class="di-section-title">@step.Title</span>
+                        </div>
+                    </div>
+                    <div class="di-section-body">
+                        @{ var lastSub = (string?)null; }
+                        @foreach (var f in FieldsFor(step))
+                        {
+                            var cfg = f;
+                            if (cfg.Section == "Account" && cfg.FieldKey == "CountryName") { continue; }
+                            // VAT-group legal names is a flat import/export-only column; the VAT Group grid
+                            // captures this data on the form, so don't render it as a standalone field.
+                            if (cfg.Section == "Account" && cfg.FieldKey == "VatGroupLegalNames") { continue; }
+                            var target = cfg.Section == "Account" ? (object)customer : contact;
+                            var isCombinedCountry = cfg.Section == "Account" && cfg.FieldKey == "CountryCode";
+                            var isCity = cfg.FieldKey == "EmirateCity";
+                            var cityCountryIsUae = isCity && string.Equals(
+                                cfg.Section == "Account" ? CustomerFieldAccessor.GetString(customer, "CountryName")
+                                                         : CustomerFieldAccessor.GetString(contact, "Country"),
+                                CustomerLookups.UaeCountryName, StringComparison.OrdinalIgnoreCase);
+                            var editable = !string.Equals(cfg.CustomerControl, CustomerFieldControls.Readonly, StringComparison.OrdinalIgnoreCase);
+                            var cur = CustomerFieldAccessor.GetString(target, cfg.FieldKey);
+                            var sub = Subcategory(cfg.FieldKey);
+                            if (sub is not null && sub != lastSub)
+                            {
+                                lastSub = sub;
+                                <div class="di-subheading">@sub</div>
+                            }
+                            <div class="di-field @(IsInvalidField(cfg) ? "di-field-invalid" : "")" id="di-f-@cfg.Section-@cfg.FieldKey">
+                                <label>
+                                    @(isCombinedCountry ? "Country" : cfg.DisplayLabel)
+                                    @if (cfg.IsRequiredForCustomer) { <span class="di-req">*</span> }
+                                    @if (!string.IsNullOrWhiteSpace(cfg.HelpText)) { <button type="button" class="di-help-icon" @onclick='() => ShowHelp(isCombinedCountry ? "Country" : cfg.DisplayLabel, cfg.HelpText)' aria-label="Show help">&#9432;</button> }
+                                </label>
+                                @if (!editable)
+                                {
+                                    <input type="text" class="di-frozen" value="@CustomerFieldAccessor.GetDisplay(target, cfg.FieldKey)" disabled />
+                                }
+                                else if (cfg.FieldKind == "date")
+                                {
+                                    @* Calendar-only: clicking the field opens the native picker; typing is blocked;
+                                       past-only fields cap at today. *@
+                                    <input type="date" class="di-datepick" value="@cur" max="@DateMax(cfg.FieldKey)"
+                                           onkeydown="return false" onpaste="return false"
+                                           onclick="try { this.showPicker(); } catch (e) {}"
+                                           @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                                else if (cfg.FieldKind == "phone")
+                                {
+                                    <SupplierPortal.Web.Components.Shared.CustomerPhoneField
+                                        Value="@cur" ValueChanged="v => OnChange(target, cfg.FieldKey, v)" />
+                                }
+                                else if (cfg.FieldKind == "yesno")
+                                {
+                                    <div class="di-switch-wrap">
+                                        <button type="button" role="switch" aria-checked="@(cur == "true" ? "true" : "false")"
+                                                class="di-switch @(cur == "true" ? "on" : "") @(cur == "false" ? "off" : "")"
+                                                @onclick='() => OnChange(target, cfg.FieldKey, cur == "true" ? "false" : "true")'>
+                                            <span class="di-switch-knob"></span>
+                                        </button>
+                                        <span class="di-switch-text">@(cur == "true" ? "Yes" : cur == "false" ? "No" : "—")</span>
+                                    </div>
+                                }
+                                else if (isCombinedCountry)
+                                {
+                                    <select value="@cur" @onchange="e => OnCountryChange(target, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var c in CustomerLookups.Countries)
+                                        {
+                                            <option value="@c.Code" selected="@(c.Code == cur)">@c.Code - @c.Name</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.Countries.Any(c => c.Code == cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else if (isCity && cityCountryIsUae)
+                                {
+                                    <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @foreach (var em in CustomerLookups.UaeEmirates)
+                                        {
+                                            <option value="@em" selected="@(em == cur)">@em</option>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cur) && !CustomerLookups.UaeEmirates.Contains(cur))
+                                        {
+                                            <option value="@cur" selected>@cur</option>
+                                        }
+                                    </select>
+                                }
+                                else if (cfg.FieldKind == "lookup")
+                                {
+                                    var coded = CustomerLookups.CodedOptions(cfg.Section, cfg.FieldKey);
+                                    <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="">— Select —</option>
+                                        @if (coded is not null)
+                                        {
+                                            @foreach (var o in coded)
+                                            {
+                                                <option value="@o.Value" selected="@(string.Equals(o.Value, cur, StringComparison.OrdinalIgnoreCase))">@o.Text</option>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(cur) && !coded.Any(o => string.Equals(o.Value, cur, StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <option value="@cur" selected>@CustomerLookups.CodedDisplay(cfg.Section, cfg.FieldKey, cur)</option>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            var opts = CustomerLookups.For(cfg.Section, cfg.FieldKey);
+                                            @foreach (var o in opts)
+                                            {
+                                                <option value="@o" selected="@(o == cur)">@o</option>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(cur) && !opts.Contains(cur))
+                                            {
+                                                <option value="@cur" selected>@cur</option>
+                                            }
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="text" value="@cur"
+                                           maxlength="@(cfg.MaxLength ?? MaxLenFor(cfg.FieldKey))"
+                                           inputmode="@(MaxLenFor(cfg.FieldKey) is null ? null : "numeric")"
+                                           @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())" />
+                                }
+                            </div>
+                        }
+                        @{
+                            var stepHasVatStructure = FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure");
+                        }
+                        @if (stepHasVatStructure && IsVatGroupSelected)
+                        {
+                            <div class="di-field di-full di-vatgroup">
+                                <div class="di-vatgroup-head">
+                                    <span class="di-vatgroup-title">VAT Group</span>
+                                    <button type="button" class="di-add-contact" @onclick="AddVatGroupEntity">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z" /></svg>
+                                        <span>Add Row</span>
+                                    </button>
+                                </div>
+                                <p class="di-vatgroup-note">
+                                    Please list all entities registered under your VAT Group that are conducting business with our company.
+                                </p>
+                                <div class="di-vatgroup-scroll">
+                                    <table class="di-vatgroup-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Business Legal Name <span class="di-req">*</span></th>
+                                                <th>Address <span class="di-req">*</span></th>
+                                                <th>E-Invoicing Wave<br />(Wave 1/Wave 2) <span class="di-req">*</span></th>
+                                                <th>TRN Number <span class="di-req">*</span></th>
+                                                <th>TIN Number <span class="di-req">*</span></th>
+                                                <th>Bus. Location Type<br />(Mainland/Free Zone) <span class="di-req">*</span></th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @if (customer.VatGroupEntities.Count == 0)
+                                            {
+                                                <tr><td colspan="7" class="di-vatgroup-empty">No entities added yet. Click "Add Row" to list a VAT group entity.</td></tr>
+                                            }
+                                            @foreach (var entity in customer.VatGroupEntities)
+                                            {
+                                                <tr>
+                                                    <td><input type="text" @bind="entity.BusinessLegalName" /></td>
+                                                    <td><input type="text" @bind="entity.Address" /></td>
+                                                    <td>
+                                                        <select @bind="entity.EInvoicingWave">
+                                                            <option value="">Select</option>
+                                                            @foreach (var w in CustomerLookups.EInvoicingWaves) { <option value="@w">@w</option> }
+                                                        </select>
+                                                    </td>
+                                                    <td><input type="text" @bind="entity.TrnNumber" /></td>
+                                                    <td><input type="text" @bind="entity.TinNumber" /></td>
+                                                    <td>
+                                                        <select @bind="entity.BusinessLocationType">
+                                                            <option value="">Select</option>
+                                                            @foreach (var l in CustomerLookups.BusinessLocationTypes) { <option value="@l">@l</option> }
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <button type="button" class="di-icon-btn di-icon-btn-danger" title="Remove entity" @onclick="() => RemoveVatGroupEntity(entity)">
+                                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z" /><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3V2h11v1h-11Z" /></svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="di-form-sub mb-3">Review everything captured, then submit.</p>
+                @foreach (var g in steps.Where(s => !s.IsReview && !s.IsDocuments))
+                {
+                    object Ent(CustomerFieldConfig f) => f.Section == "Account" ? (object)customer : contact;
+                    var filled = FieldsFor(g).Where(f => !string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(Ent(f), f.FieldKey))).ToList();
+                    <div class="di-section">
+                        <div class="di-section-header">
+                            <div class="di-section-heading"><span class="di-section-title">@g.Title</span></div>
+                            <button type="button" class="di-btn di-btn-secondary di-btn-sm ms-auto" @onclick="() => JumpToAsync(steps.IndexOf(g))">Edit</button>
+                        </div>
+                        <div class="di-section-body">
+                            @if (filled.Count == 0)
+                            {
+                                <div class="di-review-empty">Nothing entered.</div>
+                            }
+                            else
+                            {
+                                @foreach (var f in filled)
+                                {
+                                    <div class="di-review-item">
+                                        <div class="di-review-label">@f.DisplayLabel</div>
+                                        <div class="di-review-value">@CustomerFieldAccessor.GetDisplay(Ent(f), f.FieldKey)</div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+                @if (IsVatGroupSelected && customer.VatGroupEntities.Count > 0)
+                {
+                    <div class="di-section">
+                        <div class="di-section-header">
+                            <div class="di-section-heading"><span class="di-section-title">VAT Group</span></div>
+                        </div>
+                        <div class="di-section-body">
+                            <div class="di-vatgroup-scroll">
+                                <table class="di-vatgroup-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Business Legal Name</th><th>Address</th><th>E-Invoicing Wave</th>
+                                            <th>TRN Number</th><th>TIN Number</th><th>Bus. Location Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var e in customer.VatGroupEntities.OrderBy(x => x.SortOrder))
+                                        {
+                                            <tr>
+                                                <td>@(string.IsNullOrWhiteSpace(e.BusinessLegalName) ? "—" : e.BusinessLegalName)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(e.Address) ? "—" : e.Address)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(e.EInvoicingWave) ? "—" : e.EInvoicingWave)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(e.TrnNumber) ? "—" : e.TrnNumber)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(e.TinNumber) ? "—" : e.TinNumber)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(e.BusinessLocationType) ? "—" : e.BusinessLocationType)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="di-form-footer">
+                <button type="button" class="di-btn di-btn-secondary" disabled="@(current == 0 || busy)" @onclick="BackAsync">← Back</button>
+                <div class="di-form-footer-right">
+                    @if (savedTick) { <span class="di-saved-tick">Saved ✓</span> }
+                    @if (!steps[current].IsReview)
+                    {
+                        <button type="button" class="di-btn di-btn-primary" disabled="@busy" @onclick="NextAsync">Save &amp; Next →</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="di-btn di-btn-gold" disabled="@busy" @onclick="SubmitAsync">Submit</button>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (helpText is not null)
+{
+    <div class="di-help-backdrop" @onclick="CloseHelp">
+        <div class="di-help-modal" @onclick:stopPropagation="true">
+            <div class="di-help-modal-head">
+                <span class="di-help-modal-title">@helpTitle</span>
+                <button type="button" class="di-help-modal-close" @onclick="CloseHelp" aria-label="Close">&times;</button>
+            </div>
+            <div class="di-help-modal-body">@helpText</div>
+        </div>
+    </div>
+}
+
+@if (showDeclaration && customer is not null)
+{
+    <div class="di-decl-backdrop">
+        <div class="di-decl" role="dialog" aria-modal="true">
+            <div class="di-decl-head">
+                <h2 class="di-decl-title">@DeclarationTitle</h2>
+                <div class="di-decl-subtitle">@DeclarationSubtitle</div>
+            </div>
+            <div class="di-decl-body">
+                <p class="di-decl-section">Declaration (For true and correct information provided):</p>
+                <p>@GeneralDeclaration</p>
+                <p class="di-decl-certify">@DeclarationCertify</p>
+
+                <label class="di-decl-siglabel">Full Name (Digital Signature)</label>
+                <input type="text" class="di-decl-sig" @bind="declarationSignature" @bind:event="oninput"
+                       placeholder="Type your full name here" />
+
+                <label class="di-decl-siglabel" style="margin-top:14px;">Sign here <span class="di-req">*</span></label>
+                <div class="di-sigpad-wrap">
+                    <canvas @ref="sigCanvas" class="di-sigpad"></canvas>
+                    <button type="button" class="di-sigpad-clear" @onclick="ClearSignatureAsync" title="Clear signature">Clear</button>
+                </div>
+                <div class="di-sigpad-hint">Draw your signature in the box using your mouse (or finger on a touch screen).</div>
+            </div>
+            <div class="di-decl-actions">
+                <button type="button" class="di-btn di-btn-secondary" @onclick="CancelDeclaration" disabled="@busy">Cancel</button>
+                <button type="button" class="di-btn di-btn-primary" @onclick="ConfirmDeclarationAsync"
+                        disabled="@(busy || string.IsNullOrWhiteSpace(declarationSignature))">
+                    Agree &amp; Submit
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-selfservice-wrap { width: 100%; display: flex; justify-content: center; }
+    .di-selfservice-wrap .di-form-page { width: 100%; max-width: 1000px; }
+    .di-ss-card { width: 100%; max-width: 420px; background: #fff; border-radius: 8px; border: 1px solid #e2e5ea; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 2rem; }
+</style>
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "s")] public string? SessionToken { get; set; }
+
+    private record Step(string Title, IReadOnlyList<(string Section, string Group)> Groups, bool IsReview)
+    {
+        public bool IsDocuments => Groups.Count == 1 && Groups[0].Group == "Documents";
+    }
+
+    private Customer? customer;
+    private CustomerContact contact = new();
+    private List<CustomerFieldConfig> config = [];
+    private List<SsCustomerTab> tabs = [];
+    private List<CustomerDocumentType> docTypes = [];
+    private List<Step> steps = [];
+    private int current;
+
+    /// <summary>Percent complete for the header progress ring (current step of total), matching the supplier form.</summary>
+    private int ProgressPct => steps.Count == 0
+        ? 0 : (int)Math.Round(Math.Clamp(current + 1, 1, steps.Count) / (double)steps.Count * 100);
+    private string currentUser = "Customer Self-Service";
+    private string? message;
+    private bool isError;
+    private bool busy;
+    private bool savedTick;
+    private bool loading = true;
+    private bool completed;
+
+    // Pin the link + session from the first (query-bound) render. A later interactive re-render can re-bind
+    // [SupplyParameterFromQuery] to null without re-running OnInitializedAsync (so the form stays visible),
+    // which would blank the session passed to gateway calls and surface a spurious "session expired" on
+    // document upload/save. Passing these stable copies keeps every gateway call on the loaded session.
+    private string activeToken = "";
+    private string activeSession = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        activeToken = Token;
+        activeSession = SessionToken ?? "";
+
+        // All data comes through the gateway — the database on the internal side, or the internal API on
+        // the DMZ. No direct database access here.
+        SsCustomerFormData? bundle = null;
+        if (!string.IsNullOrWhiteSpace(activeSession))
+        {
+            bundle = await DataGateway.LoadFormAsync(activeToken, activeSession);
+        }
+
+        if (bundle is not null)
+        {
+            customer = bundle.Customer;
+            config = bundle.Config;
+            tabs = bundle.Tabs;
+            docTypes = bundle.DocTypes;
+            contact = customer.Contact ??= new CustomerContact { CustomerId = customer.Id };
+            currentUser = $"Customer Self-Service ({CustomerAccessTokenService.EmailFor(customer)})";
+            PublicBranding.SetLogo(bundle.LogoSrc);
+            BuildSteps();
+        }
+
+        loading = false;
+    }
+
+    private void BuildSteps()
+    {
+        // Honour the admin-configured tabs (title, order, visibility) sent in the bundle. Fall back to
+        // deriving tabs from the field config's groups if none were sent.
+        var orderedTabs = (tabs.Count > 0
+                ? tabs.Where(t => t.IsVisible)
+                : config.Where(f => f.IsVisible)
+                    .GroupBy(f => new { f.Section, f.GroupName })
+                    .Select(g => new SsCustomerTab(g.Key.Section, g.Key.GroupName, g.Key.GroupName, g.Min(x => x.Sequence), true)))
+            .Where(t => config.Any(f => f.IsVisible && f.Section == t.Section && f.GroupName == t.GroupName))
+            .ToList();
+
+        // Tabs sharing a Title merge into one step (spanning their groups, across sections). Order is driven
+        // purely by the admin-configured tab Sequence, so a Contact-section tab (e.g. "Personal Data") can be
+        // placed between Account tabs; GroupName / Title break ties when sequences are equal.
+        static int Rank(SsCustomerTab t) => t.Sequence;
+        var list = orderedTabs
+            .GroupBy(t => t.Title.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new
+            {
+                g.First().Title,
+                Groups = (IReadOnlyList<(string, string)>)g.OrderBy(Rank).ThenBy(t => t.GroupName).Select(t => (t.Section, t.GroupName)).ToList(),
+                Order = g.Min(Rank)
+            })
+            .OrderBy(x => x.Order)
+            .ThenBy(x => x.Title)
+            .Select(x => new Step(x.Title, x.Groups, false))
+            .ToList();
+        list.Add(new Step("Documents", new[] { ("", "Documents") }, false));
+        list.Add(new Step("Review & Submit", Array.Empty<(string, string)>(), true));
+        steps = list;
+    }
+
+    private IEnumerable<CustomerFieldConfig> FieldsFor(Step step) =>
+        step.Groups.SelectMany(g =>
+            config.Where(f => f.IsVisible && f.Section == g.Section && f.GroupName == g.Group)
+                  .Where(IsConditionallyVisible)
+                  .OrderBy(f => f.Sequence));
+
+    /// <summary>A conditional field is shown only while its controlling Yes/No field holds the configured
+    /// value; otherwise it is hidden (and cleared on save). Fields with no rule are always shown.</summary>
+    private bool IsConditionallyVisible(CustomerFieldConfig cfg)
+    {
+        if (string.IsNullOrWhiteSpace(cfg.ControllingFieldKey)) return true;
+        object? entity = cfg.Section == "Account" ? customer : contact;
+        if (entity is null) return true;
+        var current = CustomerFieldAccessor.GetString(entity, cfg.ControllingFieldKey);
+        return string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Whether a document type currently applies (its conditional "Depends On" rule is satisfied) —
+    /// drives which cards show on the KYC checklist for the customer.</summary>
+    private bool DocApplies(CustomerDocumentType t) =>
+        customer is not null && CustomerDocRules.Applies(t, customer, contact, config);
+
+    private void ClearHiddenConditionalFields()
+    {
+        foreach (var f in config.Where(f => !string.IsNullOrWhiteSpace(f.ControllingFieldKey) && !IsConditionallyVisible(f)))
+        {
+            object? entity = f.Section == "Account" ? customer : contact;
+            if (entity is not null) CustomerFieldAccessor.SetString(entity, f.FieldKey, null);
+        }
+    }
+
+    private static string? Subcategory(string fieldKey) => fieldKey switch
+    {
+        "Passport" or "PassportNumber" or "PassportIssueDate" or "PassportExpiryDate"
+            or "PassportIssueCountryCode" or "PassportIssuePlaceCountry"
+            or "DualPassport" or "DualPassportNumber" or "DualPassportIssueDate" or "DualPassportExpiryDate"
+            => "Passport Information",
+        "VISAExpiryDate" or "VISANumber" => "Visa Information",
+        "TypeOfID" or "CountryGovtIDNumber" or "CountryGovtIDIssueDate" or "CountryGovtIDExpiryDate"
+            or "EmirateID" or "EmirateIDExpiryDate" or "EmiratesIDIssueDate" or "IssueCountry"
+            => "Government / National ID",
+        _ => null
+    };
+
+    private void OnChange(object entity, string key, string? value) => CustomerFieldAccessor.SetString(entity, key, value);
+
+    /// <summary>True when the account's VAT Structure is "VAT Group" — the trigger for the VAT-group entities grid.</summary>
+    private bool IsVatGroupSelected =>
+        customer is not null && string.Equals(customer.VATStructure, "VAT Group", StringComparison.OrdinalIgnoreCase);
+
+    private void AddVatGroupEntity()
+    {
+        if (customer is null) return;
+        customer.VatGroupEntities.Add(new CustomerVatGroupEntity
+        {
+            CustomerId = customer.Id,
+            SortOrder = customer.VatGroupEntities.Count
+        });
+    }
+
+    private void RemoveVatGroupEntity(CustomerVatGroupEntity entity) => customer?.VatGroupEntities.Remove(entity);
+
+    /// <summary>When VAT Structure = "VAT Group": at least one entity and every column of every row is required.</summary>
+    private List<string> VatGroupErrors()
+    {
+        var errs = new List<string>();
+        if (customer is null || !IsVatGroupSelected) return errs;
+        if (customer.VatGroupEntities.Count == 0)
+        {
+            errs.Add("VAT Group: add at least one entity.");
+            return errs;
+        }
+        var i = 1;
+        foreach (var e in customer.VatGroupEntities.OrderBy(x => x.SortOrder))
+        {
+            if (string.IsNullOrWhiteSpace(e.BusinessLegalName) || string.IsNullOrWhiteSpace(e.Address)
+                || string.IsNullOrWhiteSpace(e.EInvoicingWave) || string.IsNullOrWhiteSpace(e.TrnNumber)
+                || string.IsNullOrWhiteSpace(e.TinNumber) || string.IsNullOrWhiteSpace(e.BusinessLocationType))
+            {
+                errs.Add($"VAT Group row {i}: all columns are required.");
+            }
+            i++;
+        }
+        return errs;
+    }
+
+    // ---- Field help popup ----
+    private string? helpTitle;
+    private string? helpText;
+    private void ShowHelp(string title, string? text) { helpTitle = title; helpText = text; }
+    private void CloseHelp() { helpText = null; helpTitle = null; }
+
+    private void OnDocsChanged() => StateHasChanged();
+
+    private void OnCountryChange(object entity, string? code)
+    {
+        CustomerFieldAccessor.SetString(entity, "CountryCode", code);
+        var name = CustomerLookups.Countries.FirstOrDefault(c => c.Code == code).Name;
+        CustomerFieldAccessor.SetString(entity, "CountryName", string.IsNullOrWhiteSpace(code) ? null : name);
+    }
+
+    private async Task SaveAsync(bool silent)
+    {
+        if (customer is null) return;
+        busy = true;
+        if (!silent) message = null;
+        ClearHiddenConditionalFields();
+        customer.Contact = contact;
+        var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: false);
+        // Sync the 1:1 contact's database id so a subsequent save updates the same row.
+        if (result.Success && result.Saved?.Contact is { Id: > 0 } savedContact)
+        {
+            contact.Id = savedContact.Id;
+        }
+        busy = false;
+        savedTick = true;
+    }
+
+    private async Task NextAsync()
+    {
+        await SaveAsync(true);
+        if (!ValidateStep(steps[current])) return;
+        if (current < steps.Count - 1) current++;
+        message = null;
+    }
+
+    /// <summary>All validation problems for a step WITHOUT mutating highlight state — safe to call for any step
+    /// (e.g. checking earlier steps before a forward jump or submit).</summary>
+    private List<string> StepProblems(Step step)
+    {
+        var problems = MissingRequiredConfigs(step).Select(m => $"{m.DisplayLabel} is required.")
+            .Concat(DateErrorsForStep(step))
+            .Concat(FormatErrors(FieldsFor(step))).ToList();
+        if (FieldsFor(step).Any(f => f.Section == "Account" && f.FieldKey == "VATStructure"))
+        {
+            problems.AddRange(VatGroupErrors());
+        }
+        return problems;
+    }
+
+    /// <summary>Validates one tab: flags the missing mandatory fields (for inline highlight), toasts the
+    /// problems, and points the cursor at the first field needing input. Returns true when the tab is complete.</summary>
+    private bool ValidateStep(Step step)
+    {
+        invalidKeys.Clear();
+        foreach (var f in MissingRequiredConfigs(step)) invalidKeys.Add(f.FieldKey);
+
+        var problems = StepProblems(step);
+        if (problems.Count > 0)
+        {
+            ToastService.ShowErrors(problems);
+            RequestFocusFirstInvalid(step);
+            return false;
+        }
+        return true;
+    }
+
+    // The field the cursor should move to after a failed validation (first field needing input).
+    private string? pendingFocusFieldId;
+
+    /// <summary>Validates every non-review step before <paramref name="targetIndex"/>. If one is incomplete the
+    /// user is moved there, its fields flagged, its errors shown and the cursor pointed at the first field
+    /// needing input — returning false. Returns true when every earlier step is complete.</summary>
+    private bool EnsureStepsComplete(int targetIndex)
+    {
+        for (var i = 0; i < targetIndex && i < steps.Count; i++)
+        {
+            if (steps[i].IsReview) continue;
+            var problems = StepProblems(steps[i]);
+            if (problems.Count > 0)
+            {
+                current = i;
+                invalidKeys.Clear();
+                foreach (var f in MissingRequiredConfigs(steps[i])) invalidKeys.Add(f.FieldKey);
+                ToastService.ShowErrors(problems);
+                RequestFocusFirstInvalid(steps[i]);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void RequestFocusFirstInvalid(Step step)
+    {
+        var fields = FieldsFor(step).ToList();
+        var target = fields.FirstOrDefault(f => invalidKeys.Contains(f.FieldKey) && FieldStillMissing(f))
+                     ?? fields.FirstOrDefault(f => FormatErrors(new[] { f }).Count > 0);
+        pendingFocusFieldId = target is null ? null : $"di-f-{target.Section}-{target.FieldKey}";
+    }
+
+    // Stricter than DataAnnotations' EmailAddressAttribute (which accepts "a@b" with no domain dot):
+    // requires a local part, "@", and a domain with a dot and a 2+ character TLD.
+    private static readonly System.Text.RegularExpressions.Regex EmailRegex = new(
+        @"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$",
+        System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static bool IsValidEmail(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && EmailRegex.IsMatch(value.Trim());
+
+    /// <summary>Input maxlength for the fixed-length numeric identifiers (null = no cap, attribute omitted):
+    /// Buyer TIN is 10 digits, the TRN 15 digits.</summary>
+    private static int? MaxLenFor(string fieldKey) => fieldKey switch
+    {
+        "CustomerBuyerTIN" => 10,
+        "TRNNumber" => 15,
+        _ => null
+    };
+
+    private static bool IsDigits(string value, int length)
+    {
+        var d = value.Replace(" ", "").Replace("-", "");
+        return d.Length == length && d.All(char.IsDigit);
+    }
+
+    private List<string> FormatErrors(IEnumerable<CustomerFieldConfig> fields)
+    {
+        var errs = new List<string>();
+        if (customer is null) return errs;
+        foreach (var f in fields)
+        {
+            var entity = f.Section == "Account" ? (object)customer : contact;
+            var val = CustomerFieldAccessor.GetString(entity, f.FieldKey);
+            if (string.IsNullOrWhiteSpace(val)) continue;
+            if (f.FieldKey.Contains("Email", StringComparison.OrdinalIgnoreCase) && !IsValidEmail(val))
+            {
+                errs.Add($"{f.DisplayLabel} is not a valid email address.");
+            }
+            else if (f.FieldKey == "CustomerBuyerTIN" && !IsDigits(val, 10))
+            {
+                errs.Add("Customer/Buyer TIN must be exactly 10 digits.");
+            }
+            else if (f.FieldKey == "TRNNumber" && !IsDigits(val, 15))
+            {
+                errs.Add("TRN Number must be exactly 15 digits.");
+            }
+            errs.AddRange(LengthErrors(f, val));
+        }
+        return errs;
+    }
+
+    /// <summary>Configurable min/max character-length validation for editable text fields.</summary>
+    private static List<string> LengthErrors(CustomerFieldConfig f, string? value)
+    {
+        var errs = new List<string>();
+        var isText = string.IsNullOrEmpty(f.FieldKind) || f.FieldKind == "text";
+        if (!isText || string.IsNullOrEmpty(value)) return errs;
+        var len = value.Trim().Length;
+        if (f.MinLength is int min && min > 0 && len < min)
+            errs.Add($"{f.DisplayLabel} must be at least {min} character{(min == 1 ? "" : "s")}.");
+        if (f.MaxLength is int max && max > 0 && len > max)
+            errs.Add($"{f.DisplayLabel} must be at most {max} character{(max == 1 ? "" : "s")}.");
+        return errs;
+    }
+
+    private List<string> MissingRequired(Step step) =>
+        MissingRequiredConfigs(step).Select(f => f.DisplayLabel).ToList();
+
+    /// <summary>The visible, conditionally-shown, required-for-customer fields on a step that are still empty.</summary>
+    private List<CustomerFieldConfig> MissingRequiredConfigs(Step step)
+    {
+        if (step.IsReview || customer is null) return [];
+        return step.Groups.SelectMany(g => config
+            .Where(f => f.IsVisible && f.IsRequiredForCustomer && f.Section == g.Section && f.GroupName == g.Group)
+            .Where(IsConditionallyVisible)
+            .Where(f => !(f.Section == "Account" && (f.FieldKey == "CountryName" || f.FieldKey == "VatGroupLegalNames")))
+            .Where(f => string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+                f.Section == "Account" ? (object)customer : contact, f.FieldKey))))
+            .ToList();
+    }
+
+    // Field keys flagged by the last tab-level validation; used to inline-highlight the offending fields. A
+    // highlight clears automatically once the field is filled (StillMissing re-checked on each render).
+    private readonly HashSet<string> invalidKeys = new();
+
+    private bool FieldStillMissing(CustomerFieldConfig cfg)
+    {
+        if (customer is null) return false;
+        if (!cfg.IsVisible || !cfg.IsRequiredForCustomer || !IsConditionallyVisible(cfg)) return false;
+        if (cfg.Section == "Account" && (cfg.FieldKey == "CountryName" || cfg.FieldKey == "VatGroupLegalNames")) return false;
+        return string.IsNullOrWhiteSpace(CustomerFieldAccessor.GetString(
+            cfg.Section == "Account" ? (object)customer : contact, cfg.FieldKey));
+    }
+
+    private bool IsInvalidField(CustomerFieldConfig cfg) => invalidKeys.Contains(cfg.FieldKey) && FieldStillMissing(cfg);
+
+    private static string? DateMax(string fieldKey) =>
+        (fieldKey.Contains("Issue", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("EstablishmentDate", StringComparison.OrdinalIgnoreCase)
+         || fieldKey.Equals("DateOfBirth", StringComparison.OrdinalIgnoreCase))
+            ? DateTime.Today.ToString("yyyy-MM-dd") : null;
+
+    private List<string> TradeLicenseDateErrors()
+    {
+        var errs = new List<string>();
+        if (customer is null) return errs;
+        if (customer.TradeLicenseIssueDate is DateTime issue && issue.Date > DateTime.Today)
+        {
+            errs.Add("Trade License Issue Date cannot be a future date.");
+        }
+        if (customer.TradeLicenseIssueDate is DateTime iss && customer.TradeLicenseExpiryDate is DateTime exp
+            && exp.Date < iss.Date)
+        {
+            errs.Add("Trade License Expiry Date cannot be before the Trade License Issue Date.");
+        }
+        if (customer.EstablishmentDate is DateTime est && est.Date > DateTime.Today)
+        {
+            errs.Add("Establishment Date cannot be a future date.");
+        }
+        if (customer.EstablishmentDate is DateTime e2 && customer.TradeLicenseIssueDate is DateTime i2
+            && i2.Date < e2.Date)
+        {
+            errs.Add("Trade License Issue Date cannot be before the Establishment Date.");
+        }
+        return errs;
+    }
+
+    private List<string> DateErrorsForStep(Step step)
+    {
+        if (step.IsReview) return [];
+        var onThisStep = step.Groups.Any(g => g.Section == "Account"
+            && config.Any(f => f.Section == "Account" && f.GroupName == g.Group
+                && (f.FieldKey == "TradeLicenseIssueDate" || f.FieldKey == "EstablishmentDate")));
+        return onThisStep ? TradeLicenseDateErrors() : [];
+    }
+
+    private async Task BackAsync()
+    {
+        await SaveAsync(true);
+        invalidKeys.Clear();
+        if (current > 0) current--;
+        message = null;
+    }
+
+    private async Task JumpToAsync(int index)
+    {
+        if (index == current) return;
+        await SaveAsync(true);
+        // Jumping forward (including straight to Review via the stepper) enforces EVERY step up to the target,
+        // so no incomplete tab can be skipped past — the user lands on the first one that needs input.
+        // Jumping backward is always allowed.
+        if (index > current && !EnsureStepsComplete(index)) return;
+        invalidKeys.Clear();
+        current = Math.Clamp(index, 0, steps.Count - 1);
+        message = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (customer is null) return;
+
+        // Enforce every step's mandatory fields BEFORE the declaration/signature — send the user back to the
+        // first field needing input rather than surfacing the gaps only after they sign and acknowledge.
+        if (!EnsureStepsComplete(steps.Count - 1)) return;
+
+        var haveDocs = (await DataGateway.ListDocumentsAsync(activeToken, activeSession)).Select(d => d.DocumentType).ToHashSet();
+        var missingDocs = docTypes.Where(t => CustomerDocRules.RequiredNow(t, customer, contact, config) && !haveDocs.Contains(t.Name))
+            .Select(t => t.Name).ToList();
+        if (missingDocs.Count > 0)
+        {
+            ToastService.ShowErrors(missingDocs.Select(d => $"{d} document is required."));
+            return;
+        }
+
+        // The customer must sign the declaration before the record is submitted — open the pop-up; the
+        // submission finishes only once signed (see ConfirmDeclarationAsync).
+        customer.Contact = contact;
+        showDeclaration = true;
+    }
+
+    // ---- Declaration + digital signature (mirrors the supplier self-service submit) ----
+    private bool showDeclaration;
+    private string declarationSignature = "";
+    private ElementReference sigCanvas;
+    private bool sigInitialized;
+
+    private string DeclarationTitle => "Customer Declaration";
+    private string DeclarationSubtitle => "Customer Data Gathering Portal";
+    private string GeneralDeclaration =>
+        "I/We hereby declare that the information and data provided in this form are true, correct, and " +
+        "complete to the best of our knowledge, and are furnished in compliance with the applicable UAE " +
+        "regulatory and e-invoicing requirements issued by the Ministry of Finance / Federal Tax Authority. " +
+        "We undertake to promptly inform Dubai Investments of any changes to the above.";
+    private string DeclarationCertify =>
+        "By signing below, I/We acknowledge and accept the declaration set out above.";
+
+    private string DeclarationFullText() => string.Join("\n\n", new[]
+    {
+        DeclarationTitle, DeclarationSubtitle,
+        "Declaration (For true and correct information provided):",
+        GeneralDeclaration, DeclarationCertify
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showDeclaration && !sigInitialized)
+        {
+            sigInitialized = true;
+            try { await JS.InvokeVoidAsync("sigpad.init", sigCanvas); } catch { /* best-effort */ }
+        }
+
+        // Point the cursor at the first field needing input after a failed validation.
+        if (pendingFocusFieldId is not null)
+        {
+            var id = pendingFocusFieldId;
+            pendingFocusFieldId = null;
+            try { await JS.InvokeVoidAsync("diForm.focusField", id); } catch { /* best-effort */ }
+        }
+    }
+
+    private void CancelDeclaration() { showDeclaration = false; sigInitialized = false; }
+    private async Task ClearSignatureAsync() { try { await JS.InvokeVoidAsync("sigpad.clear", sigCanvas); } catch { } }
+
+    private bool blocking;
+
+    private async Task ConfirmDeclarationAsync()
+    {
+        if (customer is null) return;
+        if (string.IsNullOrWhiteSpace(declarationSignature))
+        {
+            ToastService.ShowError("Please type your full name as your signature.");
+            return;
+        }
+        string dataUrl = "";
+        try { dataUrl = await JS.InvokeAsync<string>("sigpad.dataUrl", sigCanvas); } catch { }
+        if (string.IsNullOrWhiteSpace(dataUrl) || !dataUrl.StartsWith("data:image"))
+        {
+            ToastService.ShowError("Please draw your signature in the box before submitting.");
+            return;
+        }
+        var comma = dataUrl.IndexOf(',');
+        customer.DisclaimerSignatureImage = comma >= 0 ? Convert.FromBase64String(dataUrl[(comma + 1)..]) : null;
+        customer.DisclaimerAcknowledged = true;
+        customer.DisclaimerAcknowledgedAt = DateTime.UtcNow;
+        customer.DisclaimerAcknowledgedBy = currentUser;
+        customer.DisclaimerText = DeclarationFullText();
+        customer.DisclaimerSignature = declarationSignature.Trim();
+
+        showDeclaration = false;
+        sigInitialized = false;
+
+        busy = true; blocking = true; message = null;
+        StateHasChanged();
+        ClearHiddenConditionalFields();
+        customer.Contact = contact;
+        var result = await DataGateway.SaveAsync(activeToken, activeSession, customer, complete: true);
+        busy = false; blocking = false;
+        if (!result.Success)
+        {
+            ToastService.ShowError(result.Error ?? "Submission failed. Please try again.");
+            return;
+        }
+        completed = true;
+        ToastService.ShowSuccess("Your information has been submitted.");
+    }
+}

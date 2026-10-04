@@ -1,0 +1,65 @@
+{
+  "//": "Rename this file to appsettings.Local.json on the server and fill in real values. This file is git-ignored and must NEVER be committed. It overrides appsettings.json.",
+
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=UATWEB01;Database=BP;User Id=bpuser;Password=CHANGE_ME;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+  },
+
+  "//DefaultAdmin": "Optional: override the seeded default administrator (only used on first run, before a real Administrator exists).",
+  "DefaultAdmin": {
+    "Username": "admin",
+    "Email": "admin@supplierportal.local",
+    "Password": "Admin@12345"
+  },
+
+  "//DetailedErrors": "Set true only while troubleshooting; it exposes internal exception details to anyone who triggers an error.",
+  "DetailedErrors": false,
+
+  "//ActiveDirectory": "Internal-staff login via on-prem AD (LDAP). Set Enabled=true to turn it on. Users must be added by an administrator with Authentication = Active Directory and their AD login; the seeded local admin stays as break-glass. Use LDAPS (port 636) so passwords are never sent in clear text.",
+  "ActiveDirectory": {
+    "Enabled": false,
+    "Host": "dc01.dipark.local",
+    "Port": 636,
+    "UseLdaps": true,
+    "Domain": "dipark.local",
+    "NetbiosName": "DIPARK",
+    "LoginFormat": "UPN"
+  },
+
+  "//Ocr": "Cloud OCR for scanned/image trade-license PDFs (no embedded text). Set Provider=Azure and fill in the Azure AI Document Intelligence Endpoint + ApiKey to enable it; leave Provider empty to disable OCR. Text-based PDFs never call OCR.",
+  "Ocr": {
+    "Provider": "Azure",
+    "Endpoint": "https://YOUR-RESOURCE.cognitiveservices.azure.com",
+    "ApiKey": "CHANGE_ME",
+    "ModelId": "prebuilt-read",
+    "ApiVersion": "2024-11-30"
+  },
+
+  "//Auth": "Mode picks the sign-in method: 'Local' = username/password (and AD) login form; 'Sso' = Microsoft Entra ID. Sso needs Entra.TenantId + ClientId (+ ClientSecret); if they are missing it falls back to Local so no one is locked out. ClientSecret is a secret - keep it only here, never in committed appsettings. BootstrapAdminEmails are provisioned as Administrator on their first SSO login. DevBypassEnabled=true exposes /account/dev-login for one-click admin sign-in - only honoured while SSO is NOT the active mode; leave it false on any real server.",
+  "Auth": {
+    "Mode": "Local",
+    "Entra": {
+      "Instance": "https://login.microsoftonline.com/",
+      "TenantId": "<tenant-guid>",
+      "ClientId": "<application-client-id>",
+      "ClientSecret": "CHANGE_ME",
+      "CallbackPath": "/signin-oidc",
+      "SignedOutCallbackPath": "/signout-callback-oidc"
+    },
+    "BootstrapAdminEmails": [ "firstadmin@dubaiinvestments.com" ],
+    "DevBypassEnabled": false
+  },
+
+  "//BreakGlass": "Emergency admin access. Disabled by default. Store ONLY the Base64 SHA-256 hash of the secret (never the plaintext). Generate: [Convert]::ToBase64String([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes('your-strong-secret'))). Activate: POST /api/breakglass { \"secret\": \"your-strong-secret\" } over HTTPS.",
+  "BreakGlass": {
+    "Enabled": false,
+    "SecretHashBase64": "",
+    "PrincipalName": "Break-Glass Admin",
+    "WindowMinutes": 30
+  },
+
+  "//SelfService": "Public base URL of the supplier self-service portal. Supplier email links are built as {PortalUrl}/supplier/self-service/{token}, so set this to the host suppliers can reach (e.g. https://bps.dipark.com). Leave empty to use the URL the admin is browsing (intranet) - not reachable by external suppliers.",
+  "SelfService": {
+    "PortalUrl": "https://bps.dipark.com"
+  }
+}

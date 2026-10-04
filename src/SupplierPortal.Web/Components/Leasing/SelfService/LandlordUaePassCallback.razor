@@ -1,0 +1,71 @@
+@page "/landlord/uaepass/callback"
+@layout Layout.PublicLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using SupplierPortal.Web.Services.Leasing
+@inject LandlordAccessTokenService AccessTokenService
+@inject IUaePassService UaePass
+@inject NavigationManager Nav
+
+<PageTitle>UAE Pass - Landlord Portal</PageTitle>
+
+<div class="di-uaep-card">
+    @if (error is null)
+    {
+        <p><em>Completing UAE Pass verification…</em></p>
+    }
+    else
+    {
+        <h1>Verification Failed</h1>
+        <p class="text-muted">@error</p>
+    }
+</div>
+
+<style>
+    .di-uaep-card { width: 100%; max-width: 440px; background: #fff; border-radius: 10px; border: 1px solid #e2e5ea; box-shadow: 0 1px 6px rgba(0,0,0,.07); padding: 2rem; }
+    .di-uaep-card h1 { font-size: 1.35rem; color: #092F56; margin-bottom: .5rem; }
+</style>
+
+@code {
+    [SupplyParameterFromQuery(Name = "code")] public string? Code { get; set; }
+    [SupplyParameterFromQuery(Name = "state")] public string? State { get; set; }
+    [SupplyParameterFromQuery(Name = "error")] public string? ProviderError { get; set; }
+
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ProviderError))
+        {
+            error = "UAE Pass did not authorise the request. Please return to your email link and try again.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(Code) || string.IsNullOrWhiteSpace(State))
+        {
+            error = "The UAE Pass response was incomplete. Please try again from your email link.";
+            return;
+        }
+
+        var token = await AccessTokenService.ResolveByUaePassStateAsync(State);
+        if (token is null)
+        {
+            error = "This verification session could not be matched. Please try again from your email link.";
+            return;
+        }
+
+        var redirectUri = $"{Nav.BaseUri}landlord/uaepass/callback";
+        var profile = await UaePass.ExchangeAsync(Code!, redirectUri);
+        if (profile is null)
+        {
+            error = "We could not read your UAE Pass profile. Please try again in a few minutes.";
+            return;
+        }
+
+        var session = await AccessTokenService.StoreUaePassProfileAsync(token.Id, profile);
+        if (session is null)
+        {
+            error = "Verification could not be saved. Please try again from your email link.";
+            return;
+        }
+        Nav.NavigateTo($"/landlord/continue/{token.Id}?s={session}");
+    }
+}

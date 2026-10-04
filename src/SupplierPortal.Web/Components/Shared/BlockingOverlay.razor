@@ -1,0 +1,22 @@
+@* Full-screen blocking overlay for critical / transactional operations (Submit, Complete, Pay, Sign).
+   While visible it covers the screen so the user cannot interact or trigger the action twice, and shows a
+   clear "processing — please wait" message. Standard: Overlay / Blocking Loader. *@
+@if (Visible)
+{
+    <div class="di-block-overlay" role="alertdialog" aria-busy="true" aria-live="assertive">
+        <div class="di-block-card">
+            <div class="di-block-spinner" aria-hidden="true"></div>
+            <div class="di-block-title">@Title</div>
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <div class="di-block-sub">@Message</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Processing…";
+    [Parameter] public string Message { get; set; } = "Please do not close this page.";
+}

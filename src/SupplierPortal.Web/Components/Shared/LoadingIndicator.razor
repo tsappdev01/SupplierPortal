@@ -1,0 +1,19 @@
+@namespace SupplierPortal.Web.Components.Shared
+
+@* Prominent inline "please wait" indicator shown while data is being fetched. Renders an animated
+   hourglass with a message so the user knows information is being retrieved rather than staring at a
+   blank screen. Use it in place of a plain "Loading..." line. *@
+<div class="di-loading @(Overlay ? "di-loading-overlay" : null)" role="status" aria-live="polite">
+    <div class="di-loading-inner">
+        <span class="di-loading-hourglass" aria-hidden="true">⌛</span>
+        <span class="di-loading-text">@Message</span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Text shown next to the hourglass.</summary>
+    [Parameter] public string Message { get; set; } = "Information is being retrieved, please wait…";
+
+    /// <summary>When true, covers the whole area with a translucent backdrop (use over existing content).</summary>
+    [Parameter] public bool Overlay { get; set; }
+}
