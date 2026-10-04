@@ -371,6 +371,12 @@ public class LandlordService(
         {
             var err = ValidateContacts(contacts, update.Signatories, requireEmiratesId: true);
             if (err is not null) return (false, err, null);
+
+            // Enforce the required document uploads per contact (server-side, so it holds even if the client is
+            // stale or bypassed): Emirates ID for EVERY contact; Trade Licence for a Company owner; MOA/POA for
+            // any non-owner contact. Matches the self-service forms' per-contact document checklist.
+            var docErr = await ValidateRequiredDocumentsAsync(db, landlordId, l.Type, contacts);
+            if (docErr is not null) return (false, docErr, null);
         }
 
         // Snapshot the pre-save state so we can record exactly what the landlord changed (review highlight).
@@ -1133,6 +1139,51 @@ public class LandlordService(
         }
         foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
             if (!ContactValidation.IsValidEmail(s.Email)) return $"Signatory '{s.Name}': a valid email address is required.";
+        return null;
+    }
+
+    /// <summary>Server-side enforcement of the per-contact required document uploads at submit, mirroring the
+    /// self-service forms' checklist: Emirates ID for EVERY contact; Trade Licence for a Company owner; MOA/POA
+    /// for any non-owner contact. Documents are matched to the incoming contacts by email (the same linkage the
+    /// re-link step uses), since contact rows are replaced on each save. Returns an error message or null.</summary>
+    private static async Task<string?> ValidateRequiredDocumentsAsync(
+        LeasingDbContext db, int landlordId, LandlordType type, List<ContactInput> contacts)
+    {
+        // Email (lower-cased) -> the document types uploaded against that contact. Resolve the still-current
+        // contact rows' id→email, then group the per-contact documents by that email.
+        var emailByContactId = await db.LandlordContacts.AsNoTracking()
+            .Where(c => c.LandlordId == landlordId)
+            .ToDictionaryAsync(c => c.Id, c => (c.Email ?? "").Trim().ToLowerInvariant());
+
+        var docs = await db.LandlordDocuments.AsNoTracking()
+            .Where(d => d.LandlordId == landlordId && d.ContactId != null)
+            .Select(d => new { d.ContactId, d.DocumentType })
+            .ToListAsync();
+
+        var typesByEmail = new Dictionary<string, HashSet<LandlordDocumentType>>();
+        foreach (var d in docs)
+        {
+            if (d.ContactId is int cid && emailByContactId.TryGetValue(cid, out var em) && !string.IsNullOrWhiteSpace(em))
+            {
+                if (!typesByEmail.TryGetValue(em, out var set)) { typesByEmail[em] = set = new(); }
+                set.Add(d.DocumentType);
+            }
+        }
+
+        foreach (var c in contacts)
+        {
+            var who = c.IsPrimary ? "Primary contact" : $"Contact '{c.FullName}'";
+            var em = (c.Email ?? "").Trim().ToLowerInvariant();
+            var have = typesByEmail.TryGetValue(em, out var set) ? set : [];
+            var isOwner = c.ContactType == ContactType.Owner;
+
+            if (!have.Contains(LandlordDocumentType.EmiratesId))
+                return $"{who}: an Emirates ID document must be uploaded.";
+            if (type == LandlordType.Company && isOwner && !have.Contains(LandlordDocumentType.TradeLicense))
+                return $"{who}: a Trade Licence document must be uploaded.";
+            if (!isOwner && !have.Contains(LandlordDocumentType.MoaOrPoa))
+                return $"{who}: an MOA / POA document must be uploaded.";
+        }
         return null;
     }
 
