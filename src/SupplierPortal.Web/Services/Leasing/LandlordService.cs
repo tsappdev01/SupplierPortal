@@ -365,10 +365,11 @@ public class LandlordService(
             }
         }
 
-        // On submission, enforce valid email + UAE mobile (must match the UAE Pass account) server-side.
+        // On submission, enforce valid email + UAE mobile (must match the UAE Pass account) AND a captured,
+        // unexpired Emirates ID for every contact — server-side, so it holds regardless of the client.
         if (submit)
         {
-            var err = ValidateContacts(contacts, update.Signatories);
+            var err = ValidateContacts(contacts, update.Signatories, requireEmiratesId: true);
             if (err is not null) return (false, err, null);
         }
 
@@ -1109,7 +1110,8 @@ public class LandlordService(
     }
 
     /// <summary>Server-side validation of contact/signatory email + UAE mobile (matches the wizard rules).</summary>
-    private static string? ValidateContacts(List<ContactInput> contacts, List<SignatoryInput> signatories)
+    private static string? ValidateContacts(List<ContactInput> contacts, List<SignatoryInput> signatories,
+        bool requireEmiratesId = false)
     {
         if (contacts.Count == 0) return "At least a primary contact is required.";
         foreach (var c in contacts)
@@ -1117,6 +1119,17 @@ public class LandlordService(
             var who = c.IsPrimary ? "Primary contact" : $"Contact '{c.FullName}'";
             if (!ContactValidation.IsValidEmail(c.Email)) return $"{who}: a valid email address is required.";
             if (!ContactValidation.IsValidUaeMobile(c.Mobile)) return $"{who}: a valid UAE mobile number is required.";
+
+            // Emirates ID is mandatory for EVERY contact (every Agreement Type × Contact Type), and its details
+            // must be captured. Enforced server-side on submit so it holds even if the client is stale or bypassed.
+            if (requireEmiratesId)
+            {
+                if (string.IsNullOrWhiteSpace(c.EmiratesId)) return $"{who}: the Emirates ID number is required.";
+                if (string.IsNullOrWhiteSpace(c.EmiratesIdName)) return $"{who}: the name as printed on the Emirates ID is required.";
+                if (c.EmiratesIdExpiry is null) return $"{who}: the Emirates ID expiry date is required.";
+                if (c.EmiratesIdExpiry is { } exp && exp.Date < DateTime.UtcNow.Date)
+                    return $"{who}: the Emirates ID has expired ({exp:dd MMM yyyy}). A valid, unexpired Emirates ID is required.";
+            }
         }
         foreach (var s in signatories.Where(s => !string.IsNullOrWhiteSpace(s.Name)))
             if (!ContactValidation.IsValidEmail(s.Email)) return $"Signatory '{s.Name}': a valid email address is required.";
