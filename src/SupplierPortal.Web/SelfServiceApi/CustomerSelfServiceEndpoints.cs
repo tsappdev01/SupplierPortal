@@ -341,7 +341,8 @@ public static class CustomerSelfServiceEndpoints
         {
             if (string.IsNullOrWhiteSpace(f.ControllingFieldKey)) { return true; }
             var cur = CustomerFieldAccessor.GetString(Ent(f), f.ControllingFieldKey);
-            return string.Equals(cur, f.ControllingValue, StringComparison.OrdinalIgnoreCase);
+            var equals = string.Equals(cur, f.ControllingValue, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(f.ControllingOperator, "ne", StringComparison.OrdinalIgnoreCase) ? !equals : equals;
         }
 
         var problems = new List<string>();
@@ -463,7 +464,8 @@ public static class CustomerSelfServiceEndpoints
                 // The DMZ form is customer-facing, so "required" here means required-for-the-customer.
                 IsRequired = c.IsRequiredForCustomer,
                 ControllingFieldKey = c.ControllingFieldKey,
-                ControllingValue = c.ControllingValue
+                ControllingValue = c.ControllingValue,
+                ControllingOperator = c.ControllingOperator
             }).ToList(),
             Tabs = form.Tabs.Select(t => new CustomerTabDto
             {

@@ -183,14 +183,11 @@ else
                         }
                         else if (cfg.FieldKind == "yesno")
                         {
-                            <div class="di-switch-wrap">
-                                <button type="button" role="switch" aria-checked="@(cur == "true" ? "true" : "false")"
-                                        class="di-switch @(cur == "true" ? "on" : "") @(cur == "false" ? "off" : "")"
-                                        @onclick='() => OnChange(target, cfg.FieldKey, cur == "true" ? "false" : "true")'>
-                                    <span class="di-switch-knob"></span>
-                                </button>
-                                <span class="di-switch-text">@(cur == "true" ? "Yes" : cur == "false" ? "No" : "—")</span>
-                            </div>
+                            <select value="@cur" @onchange="e => OnChange(target, cfg.FieldKey, e.Value?.ToString())">
+                                <option value="" selected="@(cur != "true" && cur != "false")">— Select —</option>
+                                <option value="true" selected="@(cur == "true")">Yes</option>
+                                <option value="false" selected="@(cur == "false")">No</option>
+                            </select>
                         }
                         else if (isCombinedCountry)
                         {
@@ -731,7 +728,9 @@ else
         object? entity = cfg.Section == "Account" ? customer : contact;
         if (entity is null) return true;
         var current = CustomerFieldAccessor.GetString(entity, cfg.ControllingFieldKey);
-        return string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+        var equals = string.Equals(current, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+        // "ne" shows the field when the controlling value does NOT match (e.g. Nationality is not UAE); "eq" (default) when it matches.
+        return string.Equals(cfg.ControllingOperator, "ne", StringComparison.OrdinalIgnoreCase) ? !equals : equals;
     }
 
     /// <summary>Clears the stored value of every conditionally-hidden field so a stale value isn't saved.</summary>
