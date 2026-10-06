@@ -170,7 +170,7 @@ public class SupplierService(
     /// the main cause of the list page loading slowly.</summary>
     public async Task<List<SupplierListItem>> GetSupplierListAsync(
         IReadOnlyCollection<int>? businessUnitIds, string? supplierName = null, int? assignedToUserId = null,
-        int? visibleToDepartmentId = null)
+        int? visibleToDepartmentId = null, bool? isActive = null)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var query = db.Suppliers.AsNoTracking().AsQueryable();
@@ -178,6 +178,12 @@ public class SupplierService(
         if (!string.IsNullOrWhiteSpace(supplierName))
         {
             query = query.Where(s => s.SupplierName.Contains(supplierName));
+        }
+        // Supplier Status filter: null = all; true = Active only (the dashboard default, so Inactive suppliers
+        // are hidden unless the user asks for them); false = Inactive only.
+        if (isActive is bool active)
+        {
+            query = query.Where(s => s.IsActive == active);
         }
 
         return await query
@@ -236,6 +242,26 @@ public class SupplierService(
             ? $"Unassigned supplier '{supplier.SupplierName}'"
             : $"Assigned supplier '{supplier.SupplierName}' to {(await db.Users.Where(u => u.Id == userId).Select(u => u.FullName ?? u.Username).FirstOrDefaultAsync()) ?? "user #" + userId}";
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, detail);
+    }
+
+    /// <summary>Sets the supplier's Active/Inactive status (the enable/disable toggle on Manage Supplier).
+    /// Inactive suppliers are hidden from the default list. Recorded in the audit log.</summary>
+    public async Task SetActiveAsync(int supplierId, bool isActive, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null || supplier.IsActive == isActive)
+        {
+            return;
+        }
+
+        supplier.IsActive = isActive;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        supplier.UpdatedBy = actorUsername;
+        await db.SaveChangesAsync();
+
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+            $"Set supplier '{supplier.SupplierName}' to {(isActive ? "Active" : "Inactive")}");
     }
 
     /// <summary>Assigns (or, with a null departmentId, un-assigns) the supplier to a department, so that
