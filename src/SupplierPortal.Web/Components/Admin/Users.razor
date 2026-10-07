@@ -110,7 +110,7 @@
                 <td>@user.FullName</td>
                 <td>@(user.Designation ?? "-")</td>
                 <td>@user.Email</td>
-                <td>@user.UserType</td>
+                <td>@RoleLabel(user.UserType)</td>
                 <td>
                     @if (user.BusinessUnits.Count == 0)
                     {
@@ -256,6 +256,14 @@
     private List<User> users = [];
     private List<User> pendingRegistrations = [];
     private string currentUser = "unknown";
+
+    private static string RoleLabel(UserType t) => t switch
+    {
+        UserType.NormalUser => "Normal User",
+        UserType.ApplicationAdministrator => "Application Administrator",
+        UserType.LeasingManager => "Leasing Manager",
+        _ => "Administrator"
+    };
 
     // Cleanup of invalid (scanner/injection) pending registrations.
     private bool confirmingCleanup;

@@ -128,7 +128,7 @@
                 }
             }
 
-            @if (isAdministrator)
+            @if (isFullAdministrator)
             {
                 <div class="nav-item px-3">
                     <button type="button" class="nav-link di-group-toggle" @onclick="ToggleSetup">
@@ -217,6 +217,7 @@
 @code {
     private bool isAuthenticated;
     private bool isAdministrator;
+    private bool isFullAdministrator;
     private bool isLeasingUser;
     private bool canSupplier;
     private bool canBroker;
@@ -240,6 +241,7 @@
         if (isAuthenticated)
         {
             isAdministrator = state.User.IsAdministrator();
+            isFullAdministrator = state.User.IsFullAdministrator();
             isLeasingUser = state.User.IsLeasingUser();
             canSupplier = state.User.CanAccessPortal(PortalAccess.Supplier);
             canBroker = state.User.CanAccessPortal(PortalAccess.Broker);
