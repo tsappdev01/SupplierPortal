@@ -9,12 +9,21 @@ public class SupplierFieldMappingTests
     // The registration wizard enforces "mandatory" by reflecting on SupplierFormModel using the
     // field-settings FieldKey. A settings key with no matching form property would silently never be
     // validated, so every seeded key must resolve to a real, readable SupplierFormModel property.
+    // Internal admin flags that appear in the field manager to control grid/behaviour (e.g. the
+    // Active/Inactive "Supplier Status" column) but are deliberately NOT supplier registration-form
+    // inputs, so they intentionally have no matching SupplierFormModel property.
+    private static readonly HashSet<string> NonFormFieldKeys = [nameof(Supplier.IsActive)];
+
     [Fact]
     public void Every_field_setting_key_maps_to_a_form_model_property()
     {
         var missing = new List<string>();
         foreach (var (fieldKey, _, _, _) in SupplierFieldSettingSeedData.Fields)
         {
+            if (NonFormFieldKeys.Contains(fieldKey))
+            {
+                continue; // internal flag, not a form field — never validated against SupplierFormModel
+            }
             if (typeof(SupplierFormModel).GetProperty(fieldKey) is null)
             {
                 missing.Add(fieldKey);
