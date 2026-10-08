@@ -40,7 +40,9 @@ trigger: none
 
 variables:
   buildConfiguration: 'Release'
-  uatAgentPool: 'REPLACE_WITH_UATWEB01_POOL_NAME'   # <-- the Azure DevOps agent pool UATWEB01 is in
+  # UATWEB01 has agents in two pools: 'Default' (agent UATWEB01Agent) and 'Development' (agent UATWEB01).
+  # Using Default; change to 'Development' if you'd rather run UAT deploys on that pool.
+  uatAgentPool: 'Default'
   # IIS *site names* on UATWEB01 (NOT the host headers). Path + app pool are resolved from these.
   internalSiteName: 'DI Supplier'                            # -> C:\Websites\SupplierPortal (usupplierportal.dubaiinvestments.com)
   selfServiceSiteName: 'DI PORTAL'                           # -> C:\Websites\partnerconnect  (upartnerconnect.dubaiinvestments.com)
