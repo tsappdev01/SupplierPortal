@@ -195,14 +195,11 @@
                                 }
                                 else if (cfg.FieldKind == "yesno")
                                 {
-                                    <div class="di-switch-wrap">
-                                        <button type="button" role="switch" aria-checked="@(cur == "true" ? "true" : "false")"
-                                                class="di-switch @(cur == "true" ? "on" : "") @(cur == "false" ? "off" : "")"
-                                                @onclick='() => SetVal(cfg.Section, cfg.FieldKey, cur == "true" ? "false" : "true")'>
-                                            <span class="di-switch-knob"></span>
-                                        </button>
-                                        <span class="di-switch-text">@(cur == "true" ? "Yes" : cur == "false" ? "No" : "—")</span>
-                                    </div>
+                                    <select value="@cur" @onchange="e => SetVal(cfg.Section, cfg.FieldKey, e.Value?.ToString())">
+                                        <option value="" selected="@(cur != "true" && cur != "false")">— Select —</option>
+                                        <option value="true" selected="@(cur == "true")">Yes</option>
+                                        <option value="false" selected="@(cur == "false")">No</option>
+                                    </select>
                                 }
                                 else if (isCombinedCountry)
                                 {
@@ -644,7 +641,9 @@
     {
         if (string.IsNullOrWhiteSpace(cfg.ControllingFieldKey)) return true;
         var cur = Vals(cfg.Section).GetValueOrDefault(cfg.ControllingFieldKey);
-        return string.Equals(cur, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+        var equals = string.Equals(cur, cfg.ControllingValue, StringComparison.OrdinalIgnoreCase);
+        // "ne" shows the field when the controlling value does NOT match (e.g. Nationality is not UAE); "eq" (default) when it matches.
+        return string.Equals(cfg.ControllingOperator, "ne", StringComparison.OrdinalIgnoreCase) ? !equals : equals;
     }
 
     /// <summary>Whether a document type currently applies (its conditional "Depends On" rule is satisfied). The

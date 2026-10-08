@@ -975,6 +975,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("ControllingOperator")
+                        .HasMaxLength(4)
+                        .HasColumnType("nvarchar(4)");
+
                     b.Property<string>("ControllingValue")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");

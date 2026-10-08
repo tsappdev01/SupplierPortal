@@ -77,6 +77,9 @@ public class CustomerFieldConfigService(IDbContextFactory<ApplicationDbContext> 
             row.ControllingFieldKey = string.IsNullOrWhiteSpace(edit.ControllingFieldKey) ? null : edit.ControllingFieldKey;
             row.ControllingValue = row.ControllingFieldKey is null ? null
                 : (string.IsNullOrWhiteSpace(edit.ControllingValue) ? "true" : edit.ControllingValue);
+            // Comparison operator for the depends-on rule: "ne" (not equals) or "eq" (equals, default).
+            row.ControllingOperator = row.ControllingFieldKey is null ? null
+                : (string.Equals(edit.ControllingOperator, "ne", StringComparison.OrdinalIgnoreCase) ? "ne" : "eq");
             // Moving a field to another tab keeps it in the same Section (enforced by the admin UI).
             if (!string.IsNullOrWhiteSpace(edit.GroupName)) row.GroupName = edit.GroupName;
             row.Sequence = edit.Sequence;

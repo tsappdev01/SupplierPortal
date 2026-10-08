@@ -26,7 +26,19 @@ public static class ClaimsPrincipalExtensions
         return int.TryParse(principal.FindFirstValue(AppClaims.CompanyBusinessUnitId), out var id) ? id : null;
     }
 
+    /// <summary>Admin-level access used for data visibility and operational gating: true for a full
+    /// Administrator AND for an Application Administrator (a miniature admin with everything except Settings).
+    /// Both see all records within the business units assigned to them, unscoped by department/assignee.</summary>
     public static bool IsAdministrator(this ClaimsPrincipal principal)
+    {
+        return principal.IsInRole(Models.UserType.Administrator.ToString())
+            || principal.IsInRole(Models.UserType.ApplicationAdministrator.ToString());
+    }
+
+    /// <summary>True only for a FULL Administrator — gates the Settings area (users, business units, field
+    /// settings, documents, notification groups, scheduled reports, break-glass, audit log), which an
+    /// Application Administrator must not access.</summary>
+    public static bool IsFullAdministrator(this ClaimsPrincipal principal)
     {
         return principal.IsInRole(Models.UserType.Administrator.ToString());
     }

@@ -84,7 +84,7 @@
             </a>
         }
 
-        @if (isAdministrator)
+        @if (isFullAdministrator)
         {
             <a class="di-launch-card di-launch-admin" href="/admin/users">
                 <span class="di-launch-ico">
@@ -99,7 +99,7 @@
         }
     </div>
 
-    @if (!hasAnyPortal && !isAdministrator)
+    @if (!hasAnyPortal && !isFullAdministrator)
     {
         <div class="alert alert-info">
             You don't have access to any portal yet. Please contact your administrator to be granted access.
@@ -237,6 +237,7 @@
     private User? user;
     private bool hasPhoto;
     private bool isAdministrator;
+    private bool isFullAdministrator;
     private bool canSupplier;
     private bool canLandlord;
     private bool canBroker;
@@ -250,6 +251,7 @@
         user = await UserService.GetByIdAsync(userId);
         hasPhoto = state.User.HasPhoto();
         isAdministrator = state.User.IsAdministrator();
+        isFullAdministrator = state.User.IsFullAdministrator();
         canSupplier = state.User.CanAccessPortal(PortalAccess.Supplier);
         canLandlord = state.User.CanAccessPortal(PortalAccess.Landlord);
         canBroker = state.User.CanAccessPortal(PortalAccess.Broker);

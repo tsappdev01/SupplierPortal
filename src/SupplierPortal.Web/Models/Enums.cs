@@ -4,7 +4,12 @@ public enum UserType
 {
     Administrator = 1,
     NormalUser = 2,
-    LeasingManager = 3
+    LeasingManager = 3,
+    /// <summary>A miniature Administrator: full operational access (all data within the business units assigned
+    /// to them, all users' records, import/export, register, notify, assign, reports on the dashboards) but NO
+    /// access to the Settings area (users, business units, field settings, documents, notification groups,
+    /// scheduled reports, break-glass, audit log).</summary>
+    ApplicationAdministrator = 4
 }
 
 /// <summary>Which business portals a user is allowed to open. Stored as a bit-flag column on the user and

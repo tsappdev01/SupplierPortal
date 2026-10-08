@@ -1144,7 +1144,8 @@ public class LandlordService(
 
     /// <summary>Server-side enforcement of the per-contact required document uploads at submit, mirroring the
     /// self-service forms' checklist: Emirates ID for EVERY contact; Trade Licence for a Company owner; MOA/POA
-    /// for any non-owner contact. Documents are matched to the incoming contacts by email (the same linkage the
+    /// for any non-owner contact AND for a Company's owner (who signs on behalf of the company). Documents are
+    /// matched to the incoming contacts by email (the same linkage the
     /// re-link step uses), since contact rows are replaced on each save. Returns an error message or null.</summary>
     private static async Task<string?> ValidateRequiredDocumentsAsync(
         LeasingDbContext db, int landlordId, LandlordType type, List<ContactInput> contacts)
@@ -1181,7 +1182,9 @@ public class LandlordService(
                 return $"{who}: an Emirates ID document must be uploaded.";
             if (type == LandlordType.Company && isOwner && !have.Contains(LandlordDocumentType.TradeLicense))
                 return $"{who}: a Trade Licence document must be uploaded.";
-            if (!isOwner && !have.Contains(LandlordDocumentType.MoaOrPoa))
+            // MOA/POA is required for any non-owner contact, and for a Company's owner (who signs on behalf of
+            // the company, so an MOA/POA proving their authority is required). Not required for an Individual owner.
+            if ((!isOwner || type == LandlordType.Company) && !have.Contains(LandlordDocumentType.MoaOrPoa))
                 return $"{who}: an MOA / POA document must be uploaded.";
         }
         return null;

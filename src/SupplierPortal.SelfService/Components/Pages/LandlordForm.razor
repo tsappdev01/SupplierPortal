@@ -304,7 +304,7 @@
                 ? new() { new("EmiratesId", "Emirates ID", true, true) }
                 : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
         return isOwner
-            ? new() { new("TradeLicense", "Trade Licence", true, false), new("EmiratesId", "Emirates ID", true, true) }
+            ? new() { new("TradeLicense", "Trade Licence", true, false), new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) }
             : new() { new("MoaOrPoa", "MOA / POA", true, false), new("EmiratesId", "Emirates ID", true, true) };
     }
 

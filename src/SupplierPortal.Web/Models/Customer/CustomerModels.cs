@@ -350,8 +350,15 @@ public class CustomerFieldConfig
     /// Null = always shown (the default).</summary>
     [MaxLength(100)] public string? ControllingFieldKey { get; set; }
 
-    /// <summary>The controlling field's value that reveals this field: "true" (Yes) or "false" (No).</summary>
+    /// <summary>The controlling field's value this field's visibility is compared against: e.g. "true"/"false"
+    /// for a Yes/No control, or a lookup value such as "Others". How it is compared is set by
+    /// <see cref="ControllingOperator"/>.</summary>
     [MaxLength(40)] public string? ControllingValue { get; set; }
+
+    /// <summary>How <see cref="ControllingValue"/> is compared to the controlling field's current value:
+    /// "eq" (default) shows this field when they are EQUAL; "ne" shows it when they are NOT equal (e.g. show
+    /// VISA fields only when Nationality is NOT "United Arab Emirates"). Null/empty is treated as "eq".</summary>
+    [MaxLength(4)] public string? ControllingOperator { get; set; }
 }
 
 /// <summary>Admin-configurable title, order, visibility and per-user edit restriction for one customer wizard

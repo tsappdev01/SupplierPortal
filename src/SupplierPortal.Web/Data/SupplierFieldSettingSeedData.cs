@@ -9,6 +9,10 @@ public static class SupplierFieldSettingSeedData
     public static readonly (string FieldKey, string DisplayLabel, int Step, bool IsMandatory)[] Fields =
     [
         // Step 1: Business / Organization Information
+        // Supplier Status (Active/Inactive) — an internal admin flag, not a supplier-facing form field. It is
+        // listed here so an administrator can show/hide the Active/Inactive column on the Manage Supplier grid
+        // from Settings > Supplier Fields (its "Visible" toggle / Remove drives the grid column).
+        ("IsActive", "Supplier Status", 1, false),
         ("SupplierName", "Supplier Name", 1, true),
         ("TaxOrganizationTypeId", "Tax Organization Type", 1, true),
         ("SupplierTypeId", "Supplier Type", 1, true),

@@ -226,7 +226,11 @@
                                         }
                                         else
                                         {
-                                            <input class="di-cfm-select mt-1" @bind="field.ControllingValue" placeholder="equals… (e.g. Others)" title="Show this field only when the controlling field equals this exact option" />
+                                            <select class="di-cfm-select mt-1" @bind="field.ControllingOperator" title="How to compare the controlling field's value">
+                                                <option value="eq">equals → show</option>
+                                                <option value="ne">does not equal → show</option>
+                                            </select>
+                                            <input class="di-cfm-select mt-1" @bind="field.ControllingValue" placeholder="value (e.g. United Arab Emirates)" title="The controlling field's value to compare against" />
                                         }
                                     }
                                 </td>
@@ -747,6 +751,8 @@
         // the exact option (e.g. "Others").
         f.ControllingValue = f.ControllingFieldKey is null ? null
             : (ControllingKind(f.ControllingFieldKey) == "yesno" ? "true" : "");
+        // Default the comparison to "equals"; the admin can switch an LOV rule to "does not equal".
+        f.ControllingOperator = f.ControllingFieldKey is null ? null : "eq";
     }
 
     // ---- Title-group tab management (one modal row per distinct title, unified across both sections) ----

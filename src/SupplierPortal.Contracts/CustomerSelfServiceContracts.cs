@@ -29,9 +29,12 @@ public class CustomerFieldConfigDto
     public string CustomerControl { get; set; } = "Editable";
     public bool IsVisible { get; set; } = true;
     public bool IsRequired { get; set; }
-    /// <summary>Conditional (depends-on) rule: this field shows only when the controlling field equals the value.</summary>
+    /// <summary>Conditional (depends-on) rule: this field shows only when the controlling field's value matches
+    /// <see cref="ControllingValue"/> under <see cref="ControllingOperator"/> ("eq" = equals, "ne" = not equals).</summary>
     public string? ControllingFieldKey { get; set; }
     public string? ControllingValue { get; set; }
+    /// <summary>"eq" (default, equals) or "ne" (not equals).</summary>
+    public string? ControllingOperator { get; set; }
 }
 
 /// <summary>A customer wizard tab (title/order/visibility). Tabs sharing a Title merge into one step.</summary>

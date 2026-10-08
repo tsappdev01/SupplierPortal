@@ -354,6 +354,17 @@
             }
         </select>
     </div>
+    @if (supplierStatusFieldOn)
+    {
+        <div class="col-auto" style="min-width: 160px;">
+            <label class="form-label">Supplier Status</label>
+            <select class="form-select" @bind="supplierStatusFilter" @bind:after="ReloadAsync">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="all">All</option>
+            </select>
+        </div>
+    }
 </div>
 
 <ul class="nav nav-tabs no-print mb-3">
@@ -442,7 +453,7 @@ else
                     <span>Show columns</span>
                     <button type="button" class="di-chip-btn" @onclick="ResetColumnsAsync">Reset</button>
                 </div>
-                @foreach (var col in ChoosableCols)
+                @foreach (var col in ChoosableCols.Where(c => c.Key != "suppstatus" || supplierStatusFieldOn))
                 {
                     <label class="di-cols-item">
                         <input type="checkbox" checked="@ColOn(col.Key)" @onchange="() => ToggleColumnAsync(col.Key)" />
@@ -469,6 +480,7 @@ else
             @if (ColOn("fullname")) { <th>Full Name</th> }
             @if (ColOn("email")) { <th>Contact Email</th> }
             @if (ColOn("status")) { <th>Status</th> }
+            @if (supplierStatusFieldOn && ColOn("suppstatus")) { <th class="no-print">Supplier Status</th> }
             @if (ColOn("taxorg")) { <th>Tax Organization Type</th> }
             @if (ColOn("suppliertype")) { <th>Supplier Type</th> }
             @if (ColOn("trn")) { <th>TRN / VAT Reg. Number</th> }
@@ -518,6 +530,19 @@ else
                         {
                             <span class="badge @WorkflowBadgeClass(supplier.StatusName)">@supplier.StatusName</span>
                         }
+                    </td>
+                }
+                @if (supplierStatusFieldOn && ColOn("suppstatus"))
+                {
+                    <td class="no-print">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="di-switch" title="@(supplier.IsActive ? "Active — click to deactivate" : "Inactive — click to activate")">
+                                <input type="checkbox" checked="@supplier.IsActive"
+                                       @onchange="e => ToggleActiveAsync(supplier, e.Value is true)" />
+                                <span class="di-switch-slider"></span>
+                            </label>
+                            <span>@(supplier.IsActive ? "Active" : "Inactive")</span>
+                        </div>
                     </td>
                 }
                 @if (ColOn("taxorg")) { <td>@supplier.TaxOrganizationTypeName</td> }
@@ -1141,6 +1166,7 @@ else if (TabFilteredSuppliers.Any())
     private string statusFilter = "";   // default: "All Statuses"
     private string priorityFilter = ""; // default: "All Priorities"
     private string assignedFilter = ""; // default: "All Assignees"; "unassigned" or a user id
+    private string supplierStatusFilter = "active"; // "active" (default, hides Inactive) | "inactive" | "all"
     private SupplierTab activeTab = SupplierTab.RecentlyUpdated;
     private string currentUser = "unknown";
     private int? notifyingSupplierId;
@@ -1278,8 +1304,17 @@ else if (TabFilteredSuppliers.Any())
         pageSize = await SupplierFieldSettingService.GetListPageSizeAsync();
         assignableUsers = await UserService.GetSupplierAssignableUsersAsync();
 
+        // The "Supplier Status" field (IsActive) is admin-controlled in Settings > Supplier Fields: show the
+        // Active/Inactive grid column + filter only while that field is present, visible and not removed.
+        var fields = await SupplierFieldSettingService.GetAllAsync();
+        supplierStatusFieldOn = fields.Any(f => f.FieldKey == nameof(SupplierPortal.Web.Models.Supplier.IsActive)
+            && f.IsVisibleToSupplier && !f.IsRemoved);
+
         await ReloadAsync();
     }
+
+    // Whether the admin has the "Supplier Status" field enabled (visible, not removed) in the field manager.
+    private bool supplierStatusFieldOn;
 
     // Active users with Supplier portal access (each with their Business Units) that a supplier can be
     // assigned to. Scoped per row to the supplier's own Business Unit.
@@ -1293,6 +1328,22 @@ else if (TabFilteredSuppliers.Any())
             .Where(u => u.BusinessUnits.Any(b => b.Id == supplier.BusinessUnitId)
                         || u.Id == supplier.AssignedToUserId)
             .OrderBy(u => u.FullName ?? u.Username);
+
+    /// <summary>Enable/disable a supplier (Active/Inactive) from the grid toggle. Persists + audits, then if the
+    /// row no longer matches the Supplier Status filter it is reloaded off the list.</summary>
+    private async Task ToggleActiveAsync(SupplierListItem supplier, bool newActive)
+    {
+        if (supplier.IsActive == newActive)
+        {
+            return;
+        }
+        await SupplierService.SetActiveAsync(supplier.Id, newActive, currentUser);
+        supplier.IsActive = newActive;
+        if ((supplierStatusFilter == "active" && !newActive) || (supplierStatusFilter == "inactive" && newActive))
+        {
+            await ReloadAsync();
+        }
+    }
 
     private async Task AssignAsync(SupplierListItem supplier, string? value)
     {
@@ -1340,7 +1391,8 @@ else if (TabFilteredSuppliers.Any())
         await Loading.RunAsync(async () =>
         {
             suppliers = await SupplierService.GetSupplierListAsync(
-                AccessBusinessUnitIds(filterBusinessUnitId), supplierNameFilter, AssigneeScope, DepartmentScope);
+                AccessBusinessUnitIds(filterBusinessUnitId), supplierNameFilter, AssigneeScope, DepartmentScope,
+                isActive: supplierStatusFilter switch { "active" => true, "inactive" => false, _ => (bool?)null });
         });
         initialLoad = false;
         currentPage = 1;
@@ -1870,6 +1922,7 @@ else if (TabFilteredSuppliers.Any())
         ("fullname", "Full Name"),
         ("email", "Contact Email"),
         ("status", "Status"),
+        ("suppstatus", "Supplier Status"),
         ("taxorg", "Tax Organization Type"),
         ("suppliertype", "Supplier Type"),
         ("trn", "TRN / VAT Reg. Number"),
@@ -1880,7 +1933,7 @@ else if (TabFilteredSuppliers.Any())
         ("actions", "Actions"),
     ];
     private static readonly string[] DefaultCols =
-        ["number", "priority", "name", "fullname", "email", "status", "assigned", "department", "actions"];
+        ["number", "priority", "name", "fullname", "email", "status", "suppstatus", "assigned", "department", "actions"];
     private HashSet<string> visibleCols = new(DefaultCols);
     private bool showColumnMenu;
     private bool colsLoaded;
@@ -1923,6 +1976,7 @@ else if (TabFilteredSuppliers.Any())
             new() { Label = "Full Name", Value = s => s.FullName, Default = true },
             new() { Label = "Contact Email", Value = s => s.ContactEmail ?? "", Default = true },
             new() { Label = "Status", Value = s => s.StatusName ?? "", Default = true },
+            new() { Label = "Supplier Status", Value = s => s.IsActive ? "Active" : "Inactive", Default = true },
             new() { Label = "Assigned To", Value = s => s.AssignedToUserName ?? "", Default = true },
             new() { Label = "Department", Value = s => s.DepartmentName ?? "", Default = true },
             new() { Label = "Tax Organization Type", Value = s => s.TaxOrganizationTypeName ?? "" },
@@ -1931,6 +1985,9 @@ else if (TabFilteredSuppliers.Any())
             new() { Label = "Trade License Number", Value = s => s.TradeLicenseNumber ?? "" },
             new() { Label = "Last Updated", Value = s => (s.UpdatedAt ?? s.CreatedAt).ToString("dd MMM yyyy") },
         ];
+        // The on-screen Print/Export offers "Supplier Status" only while the admin has that field enabled in
+        // Settings > Supplier Fields, matching the grid column. (The full Excel export keeps it regardless.)
+        if (!supplierStatusFieldOn) { printColumns.RemoveAll(c => c.Label == "Supplier Status"); }
         SelectDefaultPrintColumns();
     }
 

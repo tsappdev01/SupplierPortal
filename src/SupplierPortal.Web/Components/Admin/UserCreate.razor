@@ -83,9 +83,14 @@
         <label class="form-label">Role</label>
         <InputSelect class="form-select" style="max-width: 260px;" @bind-Value="Input.UserType">
             <option value="@UserType.NormalUser">Normal User</option>
+            <option value="@UserType.ApplicationAdministrator">Application Administrator</option>
             <option value="@UserType.Administrator">Administrator</option>
         </InputSelect>
-        <div class="form-text">Administrators also see the Settings area (users, business units, audit log).</div>
+        <div class="form-text">
+            <strong>Administrator</strong> has full access including the Settings area. <strong>Application
+            Administrator</strong> has the same operational access (all data within their assigned business
+            units, import/export, register, notify) but <strong>cannot open Settings</strong>.
+        </div>
     </div>
     <div class="mb-3">
         <label class="form-label">Portal Access</label>
