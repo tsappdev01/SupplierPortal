@@ -16,7 +16,7 @@ public sealed record PortalSenderEmails(string? Supplier, string? Customer, stri
 }
 
 public class BusinessUnitService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, AuditService auditService, IMemoryCache cache,
+    IAppDbContextFactory dbFactory, AuditService auditService, IMemoryCache cache,
     SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     private const string AllCacheKey = "ref:businessunits";
@@ -316,7 +316,7 @@ public class BusinessUnitService(
     }
 
     /// <summary>Appends a numeric suffix to baseCode until it doesn't collide with an existing BusinessUnit.Code.</summary>
-    public static async Task<string> ResolveUniqueCodeAsync(ApplicationDbContext db, string baseCode)
+    public static async Task<string> ResolveUniqueCodeAsync(IAppDbContext db, string baseCode)
     {
         var code = baseCode;
         var suffix = 1;

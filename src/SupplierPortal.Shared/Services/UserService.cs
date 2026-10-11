@@ -6,7 +6,7 @@ using SupplierPortal.Web.Models;
 namespace SupplierPortal.Web.Services;
 
 public class UserService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher, AuditService auditService,
+    IAppDbContextFactory dbFactory, IPasswordHasher<User> hasher, AuditService auditService,
     SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     /// <summary>Stores a newly-supplied profile photo in blob storage (when enabled) or inline in the
