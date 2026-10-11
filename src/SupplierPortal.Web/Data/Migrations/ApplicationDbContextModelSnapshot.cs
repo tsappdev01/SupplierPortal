@@ -2554,7 +2554,7 @@ namespace SupplierPortal.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "BusinessUnit")
-                        .WithMany("Suppliers")
+                        .WithMany()
                         .HasForeignKey("BusinessUnitId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -2970,7 +2970,6 @@ namespace SupplierPortal.Web.Data.Migrations
 
             modelBuilder.Entity("SupplierPortal.Web.Models.BusinessUnit", b =>
                 {
-                    b.Navigation("Suppliers");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.Customer", b =>

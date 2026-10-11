@@ -144,7 +144,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.Entity<Supplier>()
             .HasOne(s => s.BusinessUnit)
-            .WithMany(b => b.Suppliers)
+            .WithMany()
             .HasForeignKey(s => s.BusinessUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
