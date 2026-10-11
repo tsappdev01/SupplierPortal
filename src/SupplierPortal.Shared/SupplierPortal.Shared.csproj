@@ -6,13 +6,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-
   <ItemGroup>
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 
+  <!-- Shared core hosts framework-level code (auth, EF data access, email, Blazor components) reused by
+       the main portal and the separate Landlord apps, so it references the full ASP.NET Core framework
+       rather than individual Blazor packages. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.31" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

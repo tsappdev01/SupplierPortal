@@ -30,6 +30,7 @@
     <!-- Dependency-free DTOs shared with the DMZ self-service front-end. The self-service OAuth API
          (/connect/token + /api/selfservice/*) is now hosted inside this project (see SelfServiceApi/). -->
     <ProjectReference Include="..\SupplierPortal.Contracts\SupplierPortal.Contracts.csproj" />
+    <ProjectReference Include="..\SupplierPortal.Shared\SupplierPortal.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
