@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Data;
@@ -14,6 +15,9 @@ public interface IAppDbContext : IAsyncDisposable, IDisposable
     DbSet<Department> Departments { get; }
     DbSet<LookupValue> LookupValues { get; }
     DbSet<AuditLog> AuditLogs { get; }
+
+    /// <summary>EF Core database facade — used for raw SQL (e.g. the SQL Server Database Mail send).</summary>
+    DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

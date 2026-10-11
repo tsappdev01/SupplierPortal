@@ -8,7 +8,7 @@ namespace SupplierPortal.Web.Services;
 /// are sent via SQL Server Database Mail, which has no place to host a linked image). Falls back to the
 /// record's Business Unit, then to no logo (the caller then shows the default text brand).</summary>
 public class EmailBrandingService(
-    IDbContextFactory<ApplicationDbContext> dbFactory,
+    IAppDbContextFactory dbFactory,
     SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
 {
     /// <summary>The acting user's company logo as a data URI, or null if the user has no company / logo.</summary>
@@ -198,7 +198,7 @@ public class EmailBrandingService(
            ?? await GetBusinessUnitNameAsync(fallbackBusinessUnitId)
            ?? DefaultBrandName;
 
-    private async Task<string?> LogoDataUriAsync(ApplicationDbContext db, int businessUnitId)
+    private async Task<string?> LogoDataUriAsync(IAppDbContext db, int businessUnitId)
     {
         var bu = await db.BusinessUnits.AsNoTracking().FirstOrDefaultAsync(b => b.Id == businessUnitId);
         return bu is null ? null : await DataUriAsync(bu);

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using SupplierPortal.Web.Data;
 
 namespace SupplierPortal.Web.Services;
@@ -11,7 +13,7 @@ namespace SupplierPortal.Web.Services;
 /// working unchanged. All supplier/customer notification and OTP emails route through here so the delivery
 /// mechanism is chosen in one place.</summary>
 public class EmailDispatcher(
-    IConfiguration config, IDbContextFactory<ApplicationDbContext> dbFactory, ILogger<EmailDispatcher> logger,
+    IConfiguration config, IAppDbContextFactory dbFactory, ILogger<EmailDispatcher> logger,
     GraphMailSender graphMail)
 {
     private const string DefaultProfile = "BP";
