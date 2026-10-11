@@ -10,7 +10,7 @@ using SupplierPortal.Web.Models;
 namespace SupplierPortal.Web.Services;
 
 public class AuthService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IPasswordHasher<User> hasher,
+    IAppDbContextFactory dbFactory, IPasswordHasher<User> hasher,
     ActiveDirectoryService activeDirectory, IMemoryCache cache, IConfiguration configuration)
 {
     /// <summary>Public self-registration is OFF unless explicitly enabled (Auth:AllowSelfRegistration=true).
