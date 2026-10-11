@@ -24,6 +24,7 @@
     <PackageReference Include="Microsoft.Graph" Version="6.6.0" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="System.DirectoryServices.Protocols" Version="8.0.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.22.2" />
   </ItemGroup>
 
 </Project>
