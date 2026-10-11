@@ -1,18 +1,29 @@
 using Microsoft.EntityFrameworkCore;
+using SupplierPortal.Web.Data;
+using SupplierPortal.Web.Models;
 using SupplierPortal.Web.Models.Leasing;
 
 namespace SupplierPortal.Web.Data.Leasing;
 
 /// <summary>
-/// Bounded-context DbContext for the Landlord / Leasing module. It reads the read-only land view
-/// <c>dbo.Property</c> (<see cref="Premises"/>) and owns the <c>leasing.*</c> tables. Kept separate from
-/// <see cref="ApplicationDbContext"/> — its own migrations history (<c>__EFLeasingMigrationsHistory</c>,
-/// configured at registration) means it never shares a model snapshot with the supplier schema.
+/// The Landlord application's database context. As the standalone Landlord app runs against its OWN separate
+/// database, this context owns BOTH the shared framework tables (identity, business units, departments,
+/// lookups, audit — shaped by <see cref="SharedModelConfig"/>) AND the <c>leasing.*</c> tables, and reads the
+/// read-only land view <c>dbo.Property</c> (<see cref="Premises"/>). Implementing <see cref="IAppDbContext"/>
+/// lets every shared service in SupplierPortal.Shared run against it unchanged.
 /// </summary>
-public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbContext(options)
+public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbContext(options), IAppDbContext
 {
     public const string Schema = "leasing";
 
+    // ---- Shared framework tables (shaped by SharedModelConfig) ----
+    public DbSet<User> Users => Set<User>();
+    public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
+    public DbSet<Department> Departments => Set<Department>();
+    public DbSet<LookupValue> LookupValues => Set<LookupValue>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    // ---- Landlord (leasing.*) tables ----
     public DbSet<Premises> Premises => Set<Premises>();
     public DbSet<Landlord> Landlords => Set<Landlord>();
     public DbSet<LandlordPremises> LandlordPremises => Set<LandlordPremises>();
@@ -29,6 +40,11 @@ public class LeasingDbContext(DbContextOptions<LeasingDbContext> options) : DbCo
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        base.OnModelCreating(b);
+
+        // Shared framework tables live in this same database (the Landlord app is self-contained).
+        SharedModelConfig.Apply(b);
+
         // Read-only land view — never migrated.
         b.Entity<Premises>(e =>
         {
