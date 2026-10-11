@@ -229,7 +229,17 @@ $@"<!DOCTYPE html><html><body style=""margin:0;background:#06213D;font-family:Se
         await db.SaveChangesAsync();
     }
 
-    public static string MaskEmail(string? email) => SupplierAccessTokenService.MaskEmail(email);
+    public static string MaskEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            return "your email on file";
+        }
+        var parts = email.Split('@', 2);
+        var name = parts[0];
+        var shown = name.Length <= 2 ? name[..1] : name[..2];
+        return $"{shown}{new string('*', Math.Max(2, name.Length - shown.Length))}@{parts[1]}";
+    }
 
     private static string GenerateRawToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
     private static string Hash(string raw) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant();

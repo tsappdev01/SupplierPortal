@@ -4,6 +4,9 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Keep moved types/components in their original SupplierPortal.Web.* namespaces so the main app and
+         the Landlord apps reference them unchanged. -->
+    <RootNamespace>SupplierPortal.Web</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

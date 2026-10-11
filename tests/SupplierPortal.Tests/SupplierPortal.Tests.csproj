@@ -12,5 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\SupplierPortal.Web\SupplierPortal.Web.csproj" />
+    <ProjectReference Include="..\..\src\SupplierPortal.Leasing.Web\SupplierPortal.Leasing.Web.csproj" />
   </ItemGroup>
 </Project>

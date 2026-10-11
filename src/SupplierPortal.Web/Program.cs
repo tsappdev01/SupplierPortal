@@ -81,35 +81,9 @@ if (string.IsNullOrWhiteSpace(dbConnection))
 builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(dbConnection, sql => sql.EnableRetryOnFailure()));
 
-// Landlord / Leasing module — separate bounded context over the same DB (reads the dbo.Property view,
-// owns the leasing.* tables) with its own migrations history so it never clashes with ApplicationDbContext.
-// EnableRetryOnFailure adds resiliency against Azure SQL transient faults (throttling/failover).
-builder.Services.AddDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>(options =>
-    options.UseSqlServer(dbConnection,
-        sql => sql
-            .MigrationsHistoryTable("__EFLeasingMigrationsHistory", SupplierPortal.Web.Data.Leasing.LeasingDbContext.Schema)
-            .EnableRetryOnFailure()));
-builder.Services.Configure<SupplierPortal.Web.Services.Leasing.LeasingOptions>(
-    builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.LeasingOptions.SectionName));
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandRegisterService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordEmailService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordDocumentService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordSummaryPdfService>();
-builder.Services.AddScoped<SupplierPortal.Web.Services.Leasing.LandlordFieldConfigService>();
+// NOTE: The Landlord / Leasing module has moved to the standalone apps SupplierPortal.Leasing.Web and
+// SupplierPortal.Leasing.SelfService (separate database). It is no longer wired into this host.
 builder.Services.AddScoped<SupplierDeclarationPdfService>();
-builder.Services.Configure<SupplierPortal.Web.Services.Leasing.UaePassOptions>(
-    builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.UaePassOptions.SectionName));
-builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.IUaePassService,
-    SupplierPortal.Web.Services.Leasing.UaePassService>(c => c.Timeout = TimeSpan.FromSeconds(20));
-builder.Services.Configure<SupplierPortal.Web.Services.Leasing.CircularoOptions>(
-    builder.Configuration.GetSection(SupplierPortal.Web.Services.Leasing.CircularoOptions.SectionName));
-builder.Services.AddHttpClient<SupplierPortal.Web.Services.Leasing.ICircularoService,
-    SupplierPortal.Web.Services.Leasing.CircularoService>(c => c.Timeout = TimeSpan.FromSeconds(60));
-// Background poller: fetch completed signatures from Circularo so the signed document lands automatically
-// even when the completion webhook can't reach this server.
-builder.Services.AddHostedService<SupplierPortal.Web.Services.Leasing.CircularoSignaturePoller>();
 
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));
@@ -452,14 +426,7 @@ if (!deployment.IsDmz)
     await DbSeeder.SeedAsync(db, app.Configuration);
     app.Logger.LogInformation("Startup: migrate + seed completed in {Ms} ms.", swSeed.ElapsedMilliseconds);
 
-    // Apply the Leasing bounded-context migrations (leasing.* tables) with their own history table, so a
-    // deployment that already has the supplier schema also gets the Landlord module tables created.
-    var swLeasing = System.Diagnostics.Stopwatch.StartNew();
-    var leasingFactory = scope.ServiceProvider
-        .GetRequiredService<IDbContextFactory<SupplierPortal.Web.Data.Leasing.LeasingDbContext>>();
-    await using var leasingDb = await leasingFactory.CreateDbContextAsync();
-    await leasingDb.Database.MigrateAsync();
-    app.Logger.LogInformation("Startup: leasing migrate completed in {Ms} ms.", swLeasing.ElapsedMilliseconds);
+    // (The Landlord / Leasing module now lives in its own apps against a separate database.)
 
     // Make the effective SQL Server unambiguous in the logs. If appsettings.Local.json is present it
     // overrides appsettings.json — this line shows which server/database the app actually talks to.
@@ -524,7 +491,6 @@ if (selfServiceApiEnabled)
 {
     SupplierPortal.Web.SelfServiceApi.SelfServiceEndpoints.MapSelfServiceApi(app);
     SupplierPortal.Web.SelfServiceApi.CustomerSelfServiceEndpoints.MapCustomerSelfServiceApi(app);
-    SupplierPortal.Web.SelfServiceApi.LandlordSelfServiceEndpoints.MapLandlordSelfServiceApi(app);
 }
 
 app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService) =>
@@ -1097,90 +1063,6 @@ app.MapGet("/customers/{id:int}/documents.pdf", async (int id, HttpContext ctx,
         ? Results.NotFound("This customer has no image attachments.")
         : Results.File(exportService.ImagesToPdf(images), "application/pdf", $"customer-{id}-documents.pdf");
 }).RequireAuthorization("Portal.Customer");
-
-// Landlord document preview/download for leasing reviewers (users granted the Landlord portal).
-// Without ?download=1 the file is served inline (preview); with it, as an attachment.
-app.MapGet("/landlord-documents/{id:int}", async (int id, string? download, SupplierPortal.Web.Services.Leasing.LandlordDocumentService documentService) =>
-{
-    var file = await documentService.GetFileAsync(id);
-    if (file is null) return Results.NotFound();
-    return ServeDocument(file.Value.Bytes, file.Value.ContentType, file.Value.FileName, WantsAttachment(download));
-}).RequireAuthorization("Portal.Landlord");
-
-// Circularo signature callback: Circularo POSTs here when a document's signing status changes. Validated by
-// a shared secret (X-Webhook-Secret header or ?secret=). Best-effort parsing of the document id + status.
-app.MapPost("/api/leasing/circularo/webhook", async (
-    HttpContext ctx,
-    Microsoft.Extensions.Options.IOptions<SupplierPortal.Web.Services.Leasing.CircularoOptions> opts,
-    SupplierPortal.Web.Services.Leasing.LandlordService landlordService,
-    SupplierPortal.Web.Services.Leasing.ICircularoService circularo) =>
-{
-    using var reader = new StreamReader(ctx.Request.Body);
-    var body = await reader.ReadToEndAsync();
-
-    // Validate the webhook. Circularo signs the raw body with HMAC-SHA256 and sends the lowercase hex digest
-    // in the X-Circularo-Signature header. A legacy shared-secret header/query is accepted as a fallback.
-    var secret = opts.Value.WebhookSecret;
-    if (!string.IsNullOrWhiteSpace(secret))
-    {
-        var signature = ctx.Request.Headers["X-Circularo-Signature"].ToString();
-        bool valid;
-        if (!string.IsNullOrWhiteSpace(signature))
-        {
-            using var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes(secret));
-            var computed = Convert.ToHexString(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(body))).ToLowerInvariant();
-            valid = System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.UTF8.GetBytes(signature), System.Text.Encoding.UTF8.GetBytes(computed));
-        }
-        else
-        {
-            valid = ctx.Request.Headers["X-Webhook-Secret"].ToString() == secret
-                 || ctx.Request.Query["secret"].ToString() == secret;
-        }
-        if (!valid) return Results.Unauthorized();
-    }
-    string? docId = null, status = null, signedB64 = null;
-    try
-    {
-        using var doc = System.Text.Json.JsonDocument.Parse(string.IsNullOrWhiteSpace(body) ? "{}" : body);
-        string? Find(params string[] names)
-        {
-            string? Walk(System.Text.Json.JsonElement el)
-            {
-                if (el.ValueKind == System.Text.Json.JsonValueKind.Object)
-                {
-                    foreach (var p in el.EnumerateObject())
-                        if (names.Contains(p.Name, StringComparer.OrdinalIgnoreCase) && p.Value.ValueKind is System.Text.Json.JsonValueKind.String or System.Text.Json.JsonValueKind.Number)
-                            return p.Value.ToString();
-                    foreach (var p in el.EnumerateObject()) { var n = Walk(p.Value); if (n is not null) return n; }
-                }
-                else if (el.ValueKind == System.Text.Json.JsonValueKind.Array)
-                    foreach (var it in el.EnumerateArray()) { var n = Walk(it); if (n is not null) return n; }
-                return null;
-            }
-            return Walk(doc.RootElement);
-        }
-        docId = Find("documentId", "docId", "_id", "id");
-        status = Find("status", "state", "event", "action");
-        signedB64 = Find("signedDocument", "fileBase64", "contentBase64");
-    }
-    catch { /* fall through to query-string fallback */ }
-
-    docId ??= ctx.Request.Query["documentId"].ToString();
-    if (string.IsNullOrWhiteSpace(status)) status = ctx.Request.Query["status"].ToString();
-    if (string.IsNullOrWhiteSpace(docId)) return Results.BadRequest("Missing document id.");
-
-    byte[]? signed = null;
-    if (!string.IsNullOrWhiteSpace(signedB64))
-    {
-        try { signed = Convert.FromBase64String(signedB64); } catch { /* ignore */ }
-    }
-    signed ??= await circularo.DownloadSignedAsync(docId);
-
-    var ok = await landlordService.HandleSignatureCallbackAsync(docId, status, signed, null);
-    return ok ? Results.Ok(new { handled = true }) : Results.NotFound();
-}).AllowAnonymous();
-
 // Download all of a supplier's attachments (originals, any type) as a single zip archive.
 app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, HttpContext ctx, UserService userService,
     SupplierDocumentService documentService, SupplierService supplierService) =>

@@ -12,6 +12,17 @@ namespace SupplierPortal.Web.Services.Leasing;
 public class LandlordFieldConfigService(
     IDbContextFactory<LeasingDbContext> dbFactory, SupplierPortal.Web.Services.AuditService auditService)
 {
+    /// <summary>Parses a comma-separated list of user ids (the per-tab "editable by" restriction).</summary>
+    public static HashSet<int> ParseEditorUserIds(string? csv)
+    {
+        if (string.IsNullOrWhiteSpace(csv)) { return []; }
+        return csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => int.TryParse(s, out var id) ? id : (int?)null)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .ToHashSet();
+    }
+
     // Contact section renders first (the wizard's Primary Contact step), then Landlord (company-level).
     private static int SectionRank(string section) => section == "Contact" ? 0 : 1;
 
@@ -122,7 +133,7 @@ public class LandlordFieldConfigService(
             row.Title = string.IsNullOrWhiteSpace(tab.Title) ? tab.GroupName : tab.Title.Trim();
             row.Sequence = tab.Sequence;
             row.IsVisible = tab.IsVisible;
-            var ids = SupplierPortal.Web.Services.SupplierFieldSettingService.ParseEditorUserIds(tab.EditableByUserIdsCsv);
+            var ids = LandlordFieldConfigService.ParseEditorUserIds(tab.EditableByUserIdsCsv);
             row.EditableByUserIdsCsv = ids.Count == 0 ? null : string.Join(",", ids.OrderBy(i => i));
         }
 

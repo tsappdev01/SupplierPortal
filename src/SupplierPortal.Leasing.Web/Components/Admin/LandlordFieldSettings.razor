@@ -669,7 +669,7 @@
             .ToList();
         foreach (var t in tabs)
         {
-            tabEditors[EditorKey(t)] = SupplierFieldSettingService.ParseEditorUserIds(t.EditableByUserIdsCsv);
+            tabEditors[EditorKey(t)] = LandlordFieldConfigService.ParseEditorUserIds(t.EditableByUserIdsCsv);
         }
         NormalizeSequences();
     }

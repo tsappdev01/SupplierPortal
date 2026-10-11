@@ -12,6 +12,9 @@ namespace SupplierPortal.Web.SelfServiceApi;
 /// UAE Pass and Circularo signing remain served by the in-app host; the DMZ path covers the OTP core flow.</summary>
 public static class LandlordSelfServiceEndpoints
 {
+    // The OAuth client-credentials policy that the DMZ portal must satisfy to call this API.
+    // Registered with this name in the Landlord app's host (Program.cs).
+    public const string LandlordPortalPolicy = "PortalClient";
     private const long MaxDocumentBytes = 10 * 1024 * 1024;
     private const string LinkHeader = "X-Landlord-Link";
     private const string SessionHeader = "X-Landlord-Session";
@@ -31,7 +34,7 @@ public static class LandlordSelfServiceEndpoints
     public static void MapLandlordSelfServiceApi(this WebApplication app)
     {
         var group = app.MapGroup("/api/selfservice/landlord")
-            .RequireAuthorization(SelfServiceEndpoints.PortalPolicy);
+            .RequireAuthorization(LandlordPortalPolicy);
 
         // ---- OTP / session ----
 
@@ -52,7 +55,7 @@ public static class LandlordSelfServiceEndpoints
             {
                 Success = ok,
                 Error = error,
-                MaskedEmail = SupplierAccessTokenService.MaskEmail(token.Landlord.Email),
+                MaskedEmail = SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService.MaskEmail(token.Landlord.Email),
                 ExpiresInMinutes = 10,
                 LogoUrl = await branding.GetBusinessUnitLogoSrcAsync(token.Landlord.BusinessUnitId)
             });
