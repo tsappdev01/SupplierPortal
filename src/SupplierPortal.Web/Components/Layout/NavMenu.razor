@@ -68,29 +68,7 @@
                 }
             }
 
-            @* ---------- Landlord Portal ---------- *@
-            @if (isLeasingUser)
-            {
-                <div class="nav-item px-3">
-                    <button type="button" class="nav-link di-group-toggle" @onclick="() => landlordExpanded = !landlordExpanded">
-                        <span>Landlord Portal</span>
-                        @Chevron(landlordExpanded)
-                    </button>
-                </div>
-                @if (landlordExpanded)
-                {
-                    <div class="nav-item px-3 di-sub-item">
-                        <NavLink class="nav-link" href="admin/land-register">
-                            Property Listing
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 di-sub-item">
-                        <NavLink class="nav-link" href="admin/landlords">
-                            Landlord Registrations
-                        </NavLink>
-                    </div>
-                }
-            }
+            @* Landlord Portal moved to the standalone app (SupplierPortal.Leasing.Web). *@
 
             @* ---------- Broker Portal (coming soon) ---------- *@
             @if (canBroker)
@@ -156,11 +134,6 @@
                     <div class="nav-item px-3 di-sub-item">
                         <NavLink class="nav-link" href="admin/customer-fields">
                             Customer Fields
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3 di-sub-item">
-                        <NavLink class="nav-link" href="admin/landlord-fields">
-                            Landlord Fields
                         </NavLink>
                     </div>
                     <div class="nav-item px-3 di-sub-item">
