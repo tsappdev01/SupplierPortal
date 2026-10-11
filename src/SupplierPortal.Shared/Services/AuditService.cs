@@ -4,7 +4,7 @@ using SupplierPortal.Web.Models;
 
 namespace SupplierPortal.Web.Services;
 
-public class AuditService(IDbContextFactory<ApplicationDbContext> dbFactory)
+public class AuditService(IAppDbContextFactory dbFactory)
 {
     public async Task LogAsync(string actorUsername, AuditAction action, string entityType, int? entityId = null, string? details = null)
     {

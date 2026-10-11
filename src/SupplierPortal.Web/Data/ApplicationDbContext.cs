@@ -4,7 +4,7 @@ using SupplierPortal.Web.Models.Customer;
 
 namespace SupplierPortal.Web.Data;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options), IAppDbContext
 {
     public DbSet<BusinessUnit> BusinessUnits => Set<BusinessUnit>();
     public DbSet<Department> Departments => Set<Department>();

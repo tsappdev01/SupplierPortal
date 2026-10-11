@@ -115,6 +115,9 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.Configure<ActiveDirectoryOptions>(builder.Configuration.GetSection("ActiveDirectory"));
 builder.Services.AddSingleton<ActiveDirectoryService>();
 builder.Services.AddScoped<AuthService>();
+// Context-agnostic factory so SupplierPortal.Shared services (e.g. AuditService) resolve a unit-of-work
+// without binding to this app's concrete ApplicationDbContext.
+builder.Services.AddScoped<IAppDbContextFactory, AppDbContextFactory<ApplicationDbContext>>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<NotificationGroupService>();
 builder.Services.AddScoped<ScheduledReportService>();
