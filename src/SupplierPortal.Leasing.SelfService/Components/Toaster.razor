@@ -1,0 +1,71 @@
+@implements IDisposable
+@inject ToastService Toasts
+
+<div class="ss-toast-wrap" aria-live="polite" aria-atomic="true">
+    @foreach (var t in Toasts.Messages)
+    {
+        <div class="ss-toast ss-toast-@(t.Level.ToString().ToLowerInvariant())" role="alert" @key="t.Id">
+            <span class="ss-toast-icon" aria-hidden="true">
+                @switch (t.Level)
+                {
+                    case ToastLevel.Success:
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="7" /><path d="M4.8 8.2 7 10.4l4-4.6" /></svg>
+                        break;
+                    case ToastLevel.Error:
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="7" /><path d="M8 4.6v4.2" /><path d="M8 11.2h.01" /></svg>
+                        break;
+                    default:
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="7" /><path d="M8 7.2v4" /><path d="M8 4.9h.01" /></svg>
+                        break;
+                }
+            </span>
+            <span class="ss-toast-text">@t.Text</span>
+            <button type="button" class="ss-toast-close" aria-label="Dismiss" @onclick="() => Toasts.Remove(t.Id)">&times;</button>
+        </div>
+    }
+</div>
+
+<style>
+    .ss-toast-wrap {
+        position: fixed; top: 1rem; right: 1rem; z-index: 1080;
+        display: flex; flex-direction: column; gap: 0.6rem; max-width: min(460px, 94vw);
+    }
+    .ss-toast {
+        display: flex; align-items: flex-start; gap: 0.7rem;
+        padding: 0.85rem 1rem; border-radius: 10px; color: #fff; font-size: 0.92rem; line-height: 1.45;
+        box-shadow: 0 12px 32px rgba(11, 37, 69, 0.26); animation: ss-toast-in 0.18s ease-out;
+    }
+    .ss-toast-success { background: #1e7d52; }
+    .ss-toast-error   { background: #b03b3b; }
+    .ss-toast-info    { background: #274a7d; }
+    .ss-toast-icon { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 1px; }
+    .ss-toast-icon svg { width: 18px; height: 18px; display: block; }
+    /* pre-line keeps multi-error messages readable: each error sits on its own line as a bullet. */
+    .ss-toast-text { flex: 1 1 auto; min-width: 0; white-space: pre-line; word-break: break-word; }
+    .ss-toast-close {
+        flex: 0 0 auto; background: none; border: none; color: #fff; opacity: 0.85; font-size: 1.25rem;
+        line-height: 1; cursor: pointer; padding: 0; margin-left: 0.15rem;
+    }
+    .ss-toast-close:hover { opacity: 1; }
+    @@keyframes ss-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+</style>
+
+@code {
+    protected override void OnInitialized() => Toasts.OnChange += OnToastsChanged;
+
+    private async void OnToastsChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+
+        // Auto-dismiss the most recent toast after a few seconds (errors linger a little longer).
+        var latest = Toasts.Messages.LastOrDefault();
+        if (latest is not null)
+        {
+            var delay = latest.Level == ToastLevel.Error ? 8000 : 4500;
+            await Task.Delay(delay);
+            Toasts.Remove(latest.Id);
+        }
+    }
+
+    public void Dispose() => Toasts.OnChange -= OnToastsChanged;
+}

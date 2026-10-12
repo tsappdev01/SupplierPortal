@@ -1,0 +1,96 @@
+@namespace SupplierPortal.SelfService.Components.Shared
+@using SupplierPortal.Contracts
+
+@* Reusable telephone/mobile control: a native country dial-code selector combined with the number
+   input in one bordered group (e.g. [AE +971] [ 50 ] [ 123 4567 ]). A native <select> is used for the
+   country so it is always reliable — it can never be clipped by an ancestor's overflow and cannot
+   crash the interactive circuit. Two-way binds the country-code lookup id and the number; optionally
+   shows a small area-code segment. Mirrors SupplierPortal.Web's PhoneField (DTO-typed for the DMZ). *@
+<div class="di-phone @(Disabled ? "di-phone-disabled" : null)">
+    <select class="di-phone-code-select" value="@(CountryCodeId?.ToString() ?? "")"
+            @onchange="OnCountryChanged" disabled="@Disabled" title="Country dialing code">
+        <option value="">Code</option>
+        @foreach (var c in Countries)
+        {
+            <option value="@c.Id" selected="@(c.Id == CountryCodeId)">@Flag(c.Code) +@c.PhoneCode  @c.DisplayName</option>
+        }
+    </select>
+
+    @if (ShowAreaCode)
+    {
+        <input type="tel" class="di-phone-area" value="@AreaCode" @oninput="OnAreaInput"
+               placeholder="Area" maxlength="5" inputmode="numeric" disabled="@Disabled" />
+    }
+
+    <span class="di-phone-numberbox">
+        <svg class="di-phone-icon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M3.654 1.328a.678.678 0 0 0-1.015-.063L1.605 2.3c-.483.484-.661 1.169-.45 1.77a17.568 17.568 0 0 0 4.168 6.608 17.569 17.569 0 0 0 6.608 4.168c.601.211 1.286.033 1.77-.45l1.034-1.034a.678.678 0 0 0-.063-1.015l-2.307-1.794a.678.678 0 0 0-.58-.122l-2.19.547a1.745 1.745 0 0 1-1.657-.459L5.482 8.062a1.745 1.745 0 0 1-.46-1.657l.548-2.19a.678.678 0 0 0-.122-.58L3.654 1.328z" />
+        </svg>
+        <input type="tel" class="di-phone-number" value="@Number" @oninput="OnNumberInput"
+               placeholder="@Placeholder" disabled="@Disabled" />
+    </span>
+</div>
+
+@code {
+    /// <summary>Country lookups that carry a dial code (PhoneCode set).</summary>
+    [Parameter] public List<LookupItemDto> Countries { get; set; } = new();
+
+    [Parameter] public int? CountryCodeId { get; set; }
+    [Parameter] public EventCallback<int?> CountryCodeIdChanged { get; set; }
+
+    [Parameter] public string? Number { get; set; }
+    [Parameter] public EventCallback<string?> NumberChanged { get; set; }
+
+    [Parameter] public string? AreaCode { get; set; }
+    [Parameter] public EventCallback<string?> AreaCodeChanged { get; set; }
+
+    /// <summary>Show a small area-code segment before the number (used for landline phone).</summary>
+    [Parameter] public bool ShowAreaCode { get; set; }
+
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>Dial code to pre-select when no country is chosen yet (defaults to UAE, +971).</summary>
+    [Parameter] public string? DefaultDialCode { get; set; } = "971";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Default the selector to a country (UAE by default) so the dial code shows up instead of an
+        // empty placeholder, and the chosen code is persisted with the record.
+        if (CountryCodeId is null && Countries.Count > 0 && !string.IsNullOrWhiteSpace(DefaultDialCode))
+        {
+            var def = Countries.FirstOrDefault(c => c.PhoneCode == DefaultDialCode);
+            if (def is not null)
+            {
+                await CountryCodeIdChanged.InvokeAsync(def.Id);
+            }
+        }
+    }
+
+    private Task OnCountryChanged(ChangeEventArgs e)
+    {
+        int? id = int.TryParse(e.Value?.ToString(), out var v) ? v : null;
+        return CountryCodeIdChanged.InvokeAsync(id);
+    }
+
+    private Task OnNumberInput(ChangeEventArgs e) => NumberChanged.InvokeAsync(e.Value?.ToString());
+
+    private Task OnAreaInput(ChangeEventArgs e) => AreaCodeChanged.InvokeAsync(e.Value?.ToString());
+
+    /// <summary>Turns a 2-letter ISO country code into its flag emoji (regional indicator symbols).
+    /// On platforms that don't render flag emoji (e.g. Windows) this shows the 2-letter code instead,
+    /// which is still a useful label.</summary>
+    private static string Flag(string? iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso) || iso.Length != 2)
+        {
+            return "";
+        }
+        iso = iso.ToUpperInvariant();
+        if (iso[0] < 'A' || iso[0] > 'Z' || iso[1] < 'A' || iso[1] > 'Z')
+        {
+            return "";
+        }
+        return char.ConvertFromUtf32(0x1F1E6 + (iso[0] - 'A')) + char.ConvertFromUtf32(0x1F1E6 + (iso[1] - 'A'));
+    }
+}
