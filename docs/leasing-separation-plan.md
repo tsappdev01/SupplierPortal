@@ -56,3 +56,34 @@ SupplierPortal.Tests                  — tests (Leasing tests retargeted to Sha
 - Property data from the separate DB: **cross-database synonym/view** vs **periodic read-sync** (affects Phase 3/7).
 - Shared reference data (Business Units, Lookups): seed independently in the Leasing DB, or one-time copy + thereafter maintained separately.
 - Whether the two Landlord apps share one database or the DMZ stays database-free calling `Leasing.Web` (recommended: DMZ stays database-free, as today).
+
+---
+
+## Status (2026-10-12): code-complete on `claude/leasing-phase4-wip`
+
+All phases built and green (46 tests). Both Landlord apps compile; the internal
+host reaches DB-migrate and the DMZ app serves HTTP 200 (smoke-tested).
+
+Deliverables: `SupplierPortal.Shared` (framework + `IAppDbContext` seam),
+`SupplierPortal.Leasing.Web` (internal, own DB), `SupplierPortal.Leasing.SelfService`
+(DMZ), the `AddSharedFrameworkTables` migration, `LeasingDbSeeder`, appsettings
+templates, `deploy/Leasing-DB-Setup.sql`, `deploy/Leasing-Data-Migration.sql`, and
+the extended `azure-pipelines-uat.yml` (two new IIS sites).
+
+### Deploy runbook (UATWEB01 + SQL Server — outside the sandbox)
+1. Create the **Landlord database** (e.g. `BP_Landlord`) on the SQL instance.
+2. Create the **two IIS sites** on UATWEB01 (App Pool = No Managed Code), set
+   `landlordSiteName` / `landlordDmzSiteName` in `azure-pipelines-uat.yml` to match.
+3. Put the filled **`appsettings.Local.json`** on each site (from the templates):
+   the Landlord DB connection string, and a matching `ApiSecurity:Clients[0].ClientSecret`
+   (Leasing.Web) ⇔ `Api:ClientSecret` (DMZ); set `Api:BaseUrl` to the internal site.
+4. Run the pipeline (or publish manually) so EF creates the schema on first start.
+5. Run **`deploy/Leasing-DB-Setup.sql`** against the Landlord DB (`@MainDb = BP`)
+   — the `Property` + `MaintainTenantUAEPassEmails` synonyms.
+6. Run **`deploy/Leasing-Data-Migration.sql`** against the Landlord DB
+   (`@MainDb = BP`) to copy existing landlord + reference/identity data.
+   (Requires SQL Server 2017+ for STRING_AGG.)
+7. Functional-test: sign in to the internal portal, open a registration; open the
+   DMZ link + OTP flow. Change the seeded admin password.
+8. Merge `claude/leasing-phase4-wip` into the deploy branch (coordinated release:
+   the main app drops Landlord as the two new apps go live).
