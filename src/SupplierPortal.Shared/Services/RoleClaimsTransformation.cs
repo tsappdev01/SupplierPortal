@@ -15,7 +15,7 @@ namespace SupplierPortal.Web.Services;
 /// inactive users get no app-user claim, so the deny-by-default policy blocks them. Break-glass
 /// sessions are granted Administrator only while their time window is still open.</summary>
 public class RoleClaimsTransformation(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IOptions<AuthOptions> authOptions)
+    IAppDbContextFactory dbFactory, IOptions<AuthOptions> authOptions)
     : IClaimsTransformation
 {
     public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)

@@ -16,7 +16,7 @@ namespace SupplierPortal.Web.Services;
 /// never stored (only its SHA-256 hash, compared in constant time); the grant is time-boxed and every
 /// activation is written to the audit log.</summary>
 public class BreakGlassService(
-    IDbContextFactory<ApplicationDbContext> dbFactory, IOptions<BreakGlassOptions> options,
+    IAppDbContextFactory dbFactory, IOptions<BreakGlassOptions> options,
     BreakGlassSecretStore secretStore)
 {
     private readonly BreakGlassOptions _options = options.Value;
