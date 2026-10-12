@@ -1,12 +1,17 @@
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using SupplierPortal.Contracts;
 using SupplierPortal.Leasing.Web.Components;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Data.Leasing;
 using SupplierPortal.Web.Models;
+using SupplierPortal.Web.SelfServiceApi;
 using SupplierPortal.Web.Services;
 using SupplierPortal.Web.Services.Leasing;
 using SupplierPortal.Web.Services.Storage;
@@ -48,6 +53,12 @@ builder.Services.Configure<LeasingOptions>(builder.Configuration.GetSection(Leas
 builder.Services.Configure<UaePassOptions>(builder.Configuration.GetSection(UaePassOptions.SectionName));
 builder.Services.Configure<CircularoOptions>(builder.Configuration.GetSection(CircularoOptions.SectionName));
 
+// Self-service API security (DMZ Partner Connect -> this app). Enabled when a JWT signing key is configured.
+var apiSecurity = builder.Configuration.GetSection(ApiSecurityOptions.SectionName).Get<ApiSecurityOptions>() ?? new ApiSecurityOptions();
+builder.Services.Configure<ApiSecurityOptions>(builder.Configuration.GetSection(ApiSecurityOptions.SectionName));
+var selfServiceApiEnabled = !string.IsNullOrWhiteSpace(apiSecurity.SigningKey);
+builder.Services.AddScoped<TokenService>();
+
 // ---------------------------------------------------------------------------
 // Framework services (shared) + infra
 // ---------------------------------------------------------------------------
@@ -88,12 +99,12 @@ builder.Services.AddHostedService<CircularoSignaturePoller>();
 // ---------------------------------------------------------------------------
 // Authentication (local cookie — UAT) + authorization
 // ---------------------------------------------------------------------------
-builder.Services.AddAuthentication(options =>
+var authBuilder = builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    })
-    .AddCookie(options =>
+    });
+authBuilder.AddCookie(options =>
     {
         options.Cookie.Name = "__Host-LeasingPortalAuth";
         options.Cookie.HttpOnly = true;
@@ -106,15 +117,46 @@ builder.Services.AddAuthentication(options =>
         options.SlidingExpiration = true;
     });
 
+if (selfServiceApiEnabled)
+{
+    // Additive JWT scheme for the self-service API (not the default scheme — the cookie stays default).
+    authBuilder.AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = apiSecurity.Issuer,
+            ValidateAudience = true,
+            ValidAudience = apiSecurity.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(apiSecurity.SigningKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+}
+
 var appUserPolicy = new AuthorizationPolicyBuilder()
     .RequireAuthenticatedUser()
     .RequireClaim(AppClaims.AppUser, "true")
     .Build();
-builder.Services.AddAuthorizationBuilder()
+var authz = builder.Services.AddAuthorizationBuilder()
     .SetDefaultPolicy(appUserPolicy)
     .AddPolicy("Portal.Landlord", p => p
         .RequireClaim(AppClaims.AppUser, "true")
         .RequireClaim(AppClaims.Portal, nameof(PortalAccess.Landlord)));
+
+if (selfServiceApiEnabled)
+{
+    // Client-credentials policy for the DMZ Partner Connect app (bound explicitly to the JWT scheme).
+    authz.AddPolicy(LandlordSelfServiceEndpoints.LandlordPortalPolicy, policy =>
+    {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("scope", ApiScopes.Portal);
+    });
+}
 
 var app = builder.Build();
 
@@ -155,6 +197,33 @@ app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService
     }
     return Results.Redirect("/account/login");
 });
+
+// ---------------------------------------------------------------------------
+// Self-service API for the DMZ Partner Connect (Landlord) app.
+// ---------------------------------------------------------------------------
+if (selfServiceApiEnabled)
+{
+    // OAuth2 client-credentials token endpoint (DMZ portal -> this API trust).
+    app.MapPost("/connect/token", async (HttpContext ctx, TokenService tokens) =>
+    {
+        var form = await ctx.Request.ReadFormAsync();
+        if (!string.Equals(form["grant_type"].ToString(), "client_credentials", StringComparison.Ordinal))
+        {
+            return Results.BadRequest(new { error = "unsupported_grant_type" });
+        }
+        var clientId = form["client_id"].ToString();
+        var clientSecret = form["client_secret"].ToString();
+        if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret)
+            || !tokens.ValidateClient(clientId, clientSecret))
+        {
+            return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+        }
+        var (token, expiresIn) = tokens.IssuePortalToken(clientId);
+        return Results.Ok(new TokenResponse { access_token = token, token_type = "Bearer", expires_in = expiresIn });
+    });
+
+    LandlordSelfServiceEndpoints.MapLandlordSelfServiceApi(app);
+}
 
 // Discover routable components from this assembly AND the shared library (Login/account pages live there).
 app.MapRazorComponents<App>()
