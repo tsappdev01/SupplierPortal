@@ -41,7 +41,6 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddSingleton<PortalTokenProvider>();
 builder.Services.AddScoped<SupplierApiClient>();
 builder.Services.AddScoped<CustomerApiClient>();
-builder.Services.AddScoped<LandlordApiClient>();
 builder.Services.AddScoped<SelfServiceSession>();
 builder.Services.AddScoped<SelfServiceBranding>();
 builder.Services.AddScoped<ToastService>();

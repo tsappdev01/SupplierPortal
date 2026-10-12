@@ -1,0 +1,57 @@
+{
+  "// THIS FILE": "Copy to appsettings.Local.json (gitignored) on the server and fill the real values. It OVERRIDES appsettings.json. Never commit the filled copy.",
+
+  "ConnectionStrings": {
+    "// LeasingConnection": "The SEPARATE Landlord database (its own SQL database).",
+    "LeasingConnection": "Server=UATWEB01;Database=BP_Landlord;User Id=bpuser;Password=REAL_PASSWORD;TrustServerCertificate=True;MultipleActiveResultSets=True;"
+  },
+
+  "// Ocr": "Optional Emirates ID OCR (Azure Document Intelligence). Leave Provider blank to disable.",
+  "Ocr": {
+    "Provider": "Azure",
+    "Endpoint": "https://YOUR-RESOURCE.cognitiveservices.azure.com",
+    "ApiKey": "REAL_OCR_KEY"
+  },
+
+  "// BlobStorage": "Optional Azure Blob storage for uploaded documents.",
+  "BlobStorage": {
+    "Enabled": true,
+    "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=...;AccountKey=REAL_KEY;EndpointSuffix=core.windows.net",
+    "ContainerName": "landlordportal"
+  },
+
+  "// Email": "Microsoft Graph app-only sender (preferred) OR rely on SQL Database Mail via Leasing:MailProfile.",
+  "Email": {
+    "Graph": {
+      "TenantId": "YOUR_TENANT_ID",
+      "ClientId": "YOUR_CLIENT_ID",
+      "ClientSecret": "REAL_GRAPH_SECRET",
+      "SenderUpn": "tenantrelation@dubaiinvestments.com"
+    }
+  },
+
+  "// ApiSecurity": "Fill to enable the DMZ Partner Connect app. SigningKey: a long random secret. Clients[0].ClientSecret MUST equal the DMZ app's Api:ClientSecret.",
+  "ApiSecurity": {
+    "SigningKey": "REPLACE_WITH_A_LONG_RANDOM_SIGNING_KEY",
+    "Clients": [
+      {
+        "ClientId": "landlord-portal",
+        "ClientSecret": "REPLACE_WITH_A_SHARED_SECRET"
+      }
+    ]
+  },
+
+  "// Leasing": "Enable + fill UAE PASS and Circularo (e-signature) if used in this environment.",
+  "Leasing": {
+    "UaePass": {
+      "Enabled": false,
+      "ClientId": "REAL_UAEPASS_CLIENT_ID",
+      "ClientSecret": "REAL_UAEPASS_CLIENT_SECRET"
+    },
+    "Circularo": {
+      "Enabled": false,
+      "ApiKey": "REAL_CIRCULARO_API_KEY",
+      "WebhookSecret": "REAL_WEBHOOK_SECRET"
+    }
+  }
+}

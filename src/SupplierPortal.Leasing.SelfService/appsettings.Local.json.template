@@ -1,0 +1,10 @@
+{
+  "// THIS FILE": "Copy to appsettings.Local.json (gitignored) on the DMZ server and fill the real values. It OVERRIDES appsettings.json. Never commit the filled copy.",
+
+  "// Api": "Points at the internal Landlord app. ClientSecret MUST equal the Landlord app's ApiSecurity:Clients[0].ClientSecret.",
+  "Api": {
+    "BaseUrl": "https://ulandlordportal.dubaiinvestments.com",
+    "ClientId": "landlord-portal",
+    "ClientSecret": "REPLACE_WITH_THE_SAME_SHARED_SECRET"
+  }
+}

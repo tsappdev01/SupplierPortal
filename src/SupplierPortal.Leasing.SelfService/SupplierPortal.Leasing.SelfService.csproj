@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The DMZ app is database-free: it reaches the trusted zone only through the internal Self-Service API,
+       so it references only the shared DTO contracts (no Shared/EF). -->
+  <ItemGroup>
+    <ProjectReference Include="..\SupplierPortal.Contracts\SupplierPortal.Contracts.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SupplierPortal.SelfService</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

@@ -48,6 +48,11 @@ variables:
   selfServiceSiteName: 'DI PORTAL'                           # -> C:\Websites\partnerconnect  (upartnerconnect.dubaiinvestments.com)
   internalUrl: 'https://usupplierportal.dubaiinvestments.com/'
   selfServiceUrl: 'https://upartnerconnect.dubaiinvestments.com/'   # confirm host: your note said 'uportalconnect', IIS binding shows 'upartnerconnect'
+  # --- Standalone Landlord apps (create these two IIS sites on UATWEB01 first) ---
+  landlordSiteName: 'DI Landlord'                            # IIS site name for the Landlord internal app
+  landlordDmzSiteName: 'DI Landlord Connect'                 # IIS site name for the Landlord DMZ app
+  landlordUrl: 'https://ulandlordportal.dubaiinvestments.com/'
+  landlordDmzUrl: 'https://ulandlordconnect.dubaiinvestments.com/'
 
 stages:
 - stage: BuildAndDeployUAT
@@ -118,4 +123,48 @@ stages:
           -SiteName "$(selfServiceSiteName)"
           -SourcePath "$(Build.ArtifactStagingDirectory)\selfservice"
           -WarmupUrl "$(selfServiceUrl)"
+        pwsh: false
+
+    # --- Publish Landlord internal portal (standalone app, separate Landlord database) ---
+    - task: DotNetCoreCLI@2
+      displayName: Publish SupplierPortal.Leasing.Web
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: 'src/SupplierPortal.Leasing.Web/SupplierPortal.Leasing.Web.csproj'
+        arguments: '--configuration $(buildConfiguration) -r win-x64 --self-contained false --no-restore --output $(Build.ArtifactStagingDirectory)/leasingweb'
+        zipAfterPublish: false
+        modifyOutputPath: false
+
+    # --- Publish Landlord DMZ (self-service) ---
+    - task: DotNetCoreCLI@2
+      displayName: Publish SupplierPortal.Leasing.SelfService
+      inputs:
+        command: publish
+        publishWebProjects: false
+        projects: 'src/SupplierPortal.Leasing.SelfService/SupplierPortal.Leasing.SelfService.csproj'
+        arguments: '--configuration $(buildConfiguration) -r win-x64 --self-contained false --no-restore --output $(Build.ArtifactStagingDirectory)/leasingdmz'
+        zipAfterPublish: false
+        modifyOutputPath: false
+
+    # --- Deploy Landlord internal portal in place ---
+    - task: PowerShell@2
+      displayName: Deploy Landlord portal
+      inputs:
+        filePath: 'deploy/Deploy-Site-Local.ps1'
+        arguments: >-
+          -SiteName "$(landlordSiteName)"
+          -SourcePath "$(Build.ArtifactStagingDirectory)\leasingweb"
+          -WarmupUrl "$(landlordUrl)"
+        pwsh: false
+
+    # --- Deploy Landlord DMZ in place ---
+    - task: PowerShell@2
+      displayName: Deploy Landlord Connect (DMZ)
+      inputs:
+        filePath: 'deploy/Deploy-Site-Local.ps1'
+        arguments: >-
+          -SiteName "$(landlordDmzSiteName)"
+          -SourcePath "$(Build.ArtifactStagingDirectory)\leasingdmz"
+          -WarmupUrl "$(landlordDmzUrl)"
         pwsh: false

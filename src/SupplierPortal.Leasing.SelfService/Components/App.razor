@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="SupplierPortal.Leasing.SelfService.styles.css" />
+    <title>Self-Service — Dubai Investments</title>
+    <HeadOutlet />
+</head>
+<body>
+    @* prerender:false app-wide so page OnInitializedAsync (which requests the OTP) runs ONCE on the
+       interactive render, not twice — prerendering fired two OTP requests per load. *@
+    <Routes @rendermode="@(new Microsoft.AspNetCore.Components.Web.InteractiveServerRenderMode(prerender: false))" />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="js/ss.js"></script>
+</body>
+</html>
