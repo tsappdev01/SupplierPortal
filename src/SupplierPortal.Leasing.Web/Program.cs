@@ -168,7 +168,8 @@ var app = builder.Build();
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<LeasingDbContext>>();
     await using var db = await factory.CreateDbContextAsync();
     await db.Database.MigrateAsync();
-    app.Logger.LogInformation("Landlord DB migrated ({Server}/{Database}).",
+    await SupplierPortal.Leasing.Web.Data.LeasingDbSeeder.SeedAsync(db, app.Configuration);
+    app.Logger.LogInformation("Landlord DB migrated + seeded ({Server}/{Database}).",
         db.Database.GetDbConnection().DataSource, db.Database.GetDbConnection().Database);
 }
 
