@@ -331,6 +331,71 @@ public class UserService(
         return (true, null);
     }
 
+    /// <summary>Updates the signed-in user's own editable profile fields (full name, designation and
+    /// optional new photo). Does not touch role, portal access, business units or status.</summary>
+    public async Task<(bool Success, string? Error)> UpdateProfileAsync(
+        int id, string fullName, string? designation, byte[]? photo, string? photoContentType, string actorUsername)
+    {
+        fullName = fullName.Trim();
+        designation = designation?.Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return (false, "Full name is required.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null)
+        {
+            return (false, "User not found.");
+        }
+
+        user.FullName = fullName;
+        user.Designation = designation;
+        await ApplyPhotoAsync(user, photo, photoContentType);
+
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "User", user.Id, $"Updated own profile '{user.Username}'");
+
+        return (true, null);
+    }
+
+    /// <summary>Changes the signed-in user's own password after verifying their current password. Not
+    /// available to Active Directory accounts, whose password lives in AD.</summary>
+    public async Task<(bool Success, string? Error)> ChangePasswordAsync(
+        int id, string currentPassword, string newPassword, string actorUsername)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            return (false, "A new password is required.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null)
+        {
+            return (false, "User not found.");
+        }
+
+        if (user.AuthSource == AuthSource.ActiveDirectory)
+        {
+            return (false, "This account signs in with Active Directory; its password is managed there.");
+        }
+
+        if (string.IsNullOrEmpty(user.PasswordHash)
+            || hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+        {
+            return (false, "Your current password is incorrect.");
+        }
+
+        user.PasswordHash = hasher.HashPassword(user, newPassword);
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "User", user.Id, $"Changed own password '{user.Username}'");
+
+        return (true, null);
+    }
+
     public async Task SetActiveAsync(int id, bool isActive, string actorUsername)
     {
         await using var db = await dbFactory.CreateDbContextAsync();

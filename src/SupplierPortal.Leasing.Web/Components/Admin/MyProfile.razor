@@ -1,0 +1,291 @@
+@page "/account/profile"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Models
+@using SupplierPortal.Web.Services
+@inject UserService UserService
+@inject LoadingService Loading
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>My Profile - Landlord Portal</PageTitle>
+
+<h1>My Profile</h1>
+
+@if (notFound)
+{
+    <div class="alert alert-danger">Your account could not be loaded.</div>
+}
+else if (Profile is null)
+{
+    <LoadingIndicator Message="Loading your profile…" />
+}
+else
+{
+    <div class="d-flex align-items-center gap-3 mb-4">
+        @if (photoPreview is not null)
+        {
+            <img src="@photoPreview" alt="" class="di-profile-pic" />
+        }
+        else if (hasExistingPhoto)
+        {
+            <img src="/users/@userId/photo" alt="" class="di-profile-pic" />
+        }
+        else
+        {
+            <span class="di-profile-pic di-profile-pic-initials">@GetInitials(Profile.FullName)</span>
+        }
+        <div>
+            <div class="h5 mb-0">@Profile.FullName</div>
+            <div class="text-muted">@(string.IsNullOrWhiteSpace(Profile.Designation) ? "—" : Profile.Designation)</div>
+            <div class="text-muted small">@email</div>
+        </div>
+    </div>
+
+    <div class="row g-4" style="max-width: 920px;">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header fw-semibold">Profile details</div>
+                <div class="card-body">
+                    <EditForm Model="Profile" OnValidSubmit="SaveProfileAsync" FormName="my-profile">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Full Name</label>
+                            <InputText class="form-control" @bind-Value="Profile.FullName" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Designation</label>
+                            <InputText class="form-control" @bind-Value="Profile.Designation" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input class="form-control" value="@email" disabled />
+                            <div class="form-text">Contact an administrator to change your email.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Profile Photo</label>
+                            <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
+                        </div>
+
+                        @if (profileError is not null)
+                        {
+                            <div class="alert alert-danger">@profileError</div>
+                        }
+                        @if (profileSaved)
+                        {
+                            <div class="alert alert-success py-2">Profile updated.</div>
+                        }
+
+                        <button type="submit" class="btn btn-primary">Save Profile</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header fw-semibold">Change password</div>
+                <div class="card-body">
+                    @if (isAdAccount)
+                    {
+                        <div class="alert alert-info mb-0">
+                            You sign in with your Active Directory account. Your password is managed there and
+                            cannot be changed here.
+                        </div>
+                    }
+                    else
+                    {
+                        <EditForm Model="Password" OnValidSubmit="ChangePasswordAsync" FormName="change-password">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            <div class="mb-3">
+                                <label class="form-label">Current Password</label>
+                                <InputText type="password" class="form-control" @bind-Value="Password.CurrentPassword" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">New Password</label>
+                                <InputText type="password" class="form-control" @bind-Value="Password.NewPassword" />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Confirm New Password</label>
+                                <InputText type="password" class="form-control" @bind-Value="Password.ConfirmPassword" />
+                            </div>
+
+                            @if (passwordError is not null)
+                            {
+                                <div class="alert alert-danger">@passwordError</div>
+                            }
+                            @if (passwordChanged)
+                            {
+                                <div class="alert alert-success py-2">Password changed.</div>
+                            }
+
+                            <button type="submit" class="btn btn-primary">Change Password</button>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .di-profile-pic {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .di-profile-pic-initials {
+        background: #1a2233;
+        color: #b5892f;
+        font-size: 1.4rem;
+        font-weight: 700;
+    }
+</style>
+
+@code {
+    private const long MaxPhotoSize = 2 * 1024 * 1024;
+
+    private int userId;
+    private string currentUser = "unknown";
+    private string email = "";
+    private bool notFound;
+    private bool hasExistingPhoto;
+    private bool isAdAccount;
+
+    private string? photoPreview;
+    private byte[]? photoBytes;
+    private string? photoContentType;
+
+    private string? profileError;
+    private bool profileSaved;
+    private string? passwordError;
+    private bool passwordChanged;
+
+    private ProfileModel? Profile { get; set; }
+    private PasswordModel Password { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+        userId = state.User.GetUserId();
+
+        var user = await UserService.GetByIdAsync(userId);
+        if (user is null)
+        {
+            notFound = true;
+            return;
+        }
+
+        email = user.Email;
+        hasExistingPhoto = user.ProfilePhoto is not null || user.ProfilePhotoBlobKey is not null;
+        isAdAccount = user.AuthSource == AuthSource.ActiveDirectory;
+        Profile = new ProfileModel
+        {
+            FullName = user.FullName ?? "",
+            Designation = user.Designation
+        };
+    }
+
+    private async Task OnPhotoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxPhotoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        photoBytes = memoryStream.ToArray();
+        photoContentType = file.ContentType;
+        photoPreview = $"data:{photoContentType};base64,{Convert.ToBase64String(photoBytes)}";
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (Profile is null)
+        {
+            return;
+        }
+
+        profileError = null;
+        profileSaved = false;
+
+        var (success, error) = await Loading.RunAsync(() => UserService.UpdateProfileAsync(
+            userId, Profile.FullName, Profile.Designation, photoBytes, photoContentType, currentUser));
+
+        if (!success)
+        {
+            profileError = error;
+            return;
+        }
+
+        if (photoBytes is not null)
+        {
+            hasExistingPhoto = true;
+        }
+        profileSaved = true;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordError = null;
+        passwordChanged = false;
+
+        if (Password.NewPassword != Password.ConfirmPassword)
+        {
+            passwordError = "The new password and its confirmation do not match.";
+            return;
+        }
+
+        var (success, error) = await Loading.RunAsync(() => UserService.ChangePasswordAsync(
+            userId, Password.CurrentPassword, Password.NewPassword, currentUser));
+
+        if (!success)
+        {
+            passwordError = error;
+            return;
+        }
+
+        Password = new PasswordModel();
+        passwordChanged = true;
+    }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+            : name.Length >= 2 ? name[..2].ToUpperInvariant() : name.ToUpperInvariant();
+    }
+
+    private sealed class ProfileModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FullName { get; set; } = "";
+
+        public string? Designation { get; set; }
+    }
+
+    private sealed class PasswordModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string CurrentPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(1)]
+        public string NewPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}
