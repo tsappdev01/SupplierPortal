@@ -16,9 +16,35 @@ namespace SupplierPortal.Web.Services.Leasing;
 public class LandlordService(
     IDbContextFactory<LeasingDbContext> dbFactory, LandlordEmailService email,
     LandlordDocumentService documents, LandlordSummaryPdfService summaryPdf,
-    ICircularoService circularo, SupplierPortal.Web.Services.UserService users, ILogger<LandlordService> logger)
+    ICircularoService circularo, SupplierPortal.Web.Services.UserService users, ILogger<LandlordService> logger,
+    IConfiguration configuration)
 {
     private static readonly TimeSpan LinkValidity = TimeSpan.FromDays(30);
+
+    /// <summary>Builds the landlord self-service invitation URL. The host is taken from the landlord's
+    /// Business Unit "Domain" (its public DMZ self-service host) when set, then the global
+    /// <c>SelfService:PortalUrl</c>, and finally the internal request base — mirroring how the Supplier
+    /// Portal resolves its self-service link. The path is always <c>/landlord/{token}</c>.</summary>
+    private async Task<string> BuildSelfServiceLinkAsync(LeasingDbContext db, int businessUnitId, string? baseUrl, string rawToken)
+    {
+        var buDomain = await db.BusinessUnits
+            .Where(b => b.Id == businessUnitId)
+            .Select(b => b.Domain)
+            .FirstOrDefaultAsync();
+        var linkBase = SelfServiceLinkBase(buDomain, configuration["SelfService:PortalUrl"], baseUrl);
+        return $"{linkBase.TrimEnd('/')}/landlord/{rawToken}";
+    }
+
+    /// <summary>Picks the first non-blank host and ensures it has a scheme (defaults to https).</summary>
+    internal static string SelfServiceLinkBase(params string?[] candidates)
+    {
+        var chosen = candidates.FirstOrDefault(u => !string.IsNullOrWhiteSpace(u))?.Trim() ?? "";
+        if (chosen.Length == 0) return "";
+        return chosen.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || chosen.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? chosen
+            : $"https://{chosen}";
+    }
 
     // Registration-trace / audit event types (FRD §29).
     public const string EventCreated = "RegistrationCreated";
@@ -334,7 +360,10 @@ public class LandlordService(
         await AddEventAsync(db, landlordId, EventInvited, $"Invite link issued to {landlord.Email}", actor, ActorBusinessCentre, old, landlord.Status);
 
         if (baseUrl is not null)
-            await email.SendInviteAsync(landlord.Email, landlord.CompanyName ?? landlord.PropertyCode, $"{baseUrl}landlord/{raw}", actor, landlord.BusinessUnitId);
+        {
+            var link = await BuildSelfServiceLinkAsync(db, landlord.BusinessUnitId, baseUrl, raw);
+            await email.SendInviteAsync(landlord.Email, landlord.CompanyName ?? landlord.PropertyCode, link, actor, landlord.BusinessUnitId);
+        }
         return (true, null, raw);
     }
 
@@ -552,7 +581,10 @@ public class LandlordService(
 
         var raw = await ReissueTokenIfNeededAsync(db, landlordId, actor);
         if (baseUrl is not null && raw is not null)
-            await email.SendCorrectionAsync(l.Email, l.PropertyCode, comment.Trim(), $"{baseUrl}landlord/{raw}", actor, l.BusinessUnitId);
+        {
+            var link = await BuildSelfServiceLinkAsync(db, l.BusinessUnitId, baseUrl, raw);
+            await email.SendCorrectionAsync(l.Email, l.PropertyCode, comment.Trim(), link, actor, l.BusinessUnitId);
+        }
         return (true, null);
     }
 
@@ -654,10 +686,13 @@ public class LandlordService(
             actor, ActorBusinessCentre, old, l.Status);
 
         if (baseUrl is not null)
+        {
+            var link = await BuildSelfServiceLinkAsync(db, l.BusinessUnitId, baseUrl, raw);
             await email.SendCorrectionAsync(l.Email, l.PropertyCode,
                 "Your registration has been reopened so you can update the signatories or landlord information. " +
                 "Please review, make the changes and resubmit.",
-                $"{baseUrl}landlord/{raw}", actor, l.BusinessUnitId);
+                link, actor, l.BusinessUnitId);
+        }
 
         return (true, null, raw);
     }
