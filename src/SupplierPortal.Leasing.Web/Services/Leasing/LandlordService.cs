@@ -810,6 +810,21 @@ public class LandlordService(
         await db.SaveChangesAsync();
         logger.LogInformation("Landlord {Id}: wrote {Count} MaintainTenantUAEPassEmails for tenant {Tenant} ({AndOr}).",
             l.Id, ordered.Count, tenantId, andOr);
+
+        // Also stamp the signing rule on the tenant record itself: dbo.MaintainTenant.SignatureType = "AND"
+        // (all signatories must sign) / "OR" (any one), keyed by the source tenant id. Best-effort: the
+        // emails above are the primary write, so a failure here must not fail the completion.
+        try
+        {
+            var affected = await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE dbo.MaintainTenant SET SignatureType = {andOr} WHERE ID = {tenantId}");
+            logger.LogInformation("Landlord {Id}: MaintainTenant {Tenant} SignatureType set to {AndOr} ({Rows} row).",
+                l.Id, tenantId, andOr, affected);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Landlord {Id}: MaintainTenant.SignatureType update skipped for tenant {Tenant}.", l.Id, tenantId);
+        }
     }
 
     // ---------------------------------------------------------------- helpers
