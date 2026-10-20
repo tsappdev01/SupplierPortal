@@ -1,7 +1,12 @@
 ﻿@page "/"
+@inject NavigationManager Nav
 
-<PageTitle>Home</PageTitle>
+@* The Landlord portal has no separate landing page: send users straight to the
+   Landlords list. Unauthenticated users are redirected to /account/login by the
+   cookie auth middleware (the list requires the Portal.Landlord policy). *@
 
-<h1>Hello, world!</h1>
+<PageTitle>Landlord Portal</PageTitle>
 
-Welcome to your new app.
+@code {
+    protected override void OnInitialized() => Nav.NavigateTo("/admin/landlords", replace: true);
+}
