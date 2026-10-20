@@ -18,6 +18,9 @@ using SupplierPortal.Web.Services.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Environment-specific overrides (secrets, connection strings) kept out of source control.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // ---------------------------------------------------------------------------
 // Blazor Server (interactive)
 // ---------------------------------------------------------------------------
