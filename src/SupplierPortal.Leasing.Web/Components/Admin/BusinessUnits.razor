@@ -8,63 +8,107 @@
 
 <PageTitle>Business Units - Supplier Portal</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Business Units</h1>
-    <a class="btn btn-primary" href="/admin/business-units/new">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
-            <path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" />
-        </svg>
-        Add Business Unit
-    </a>
-</div>
+<div class="di-cfm">
+    <div class="di-cfm-card">
+        <div class="di-cfm-head">
+            <div class="di-cfm-head-icon">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h5v-2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5V15h5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm1 2h2v2H3V3zm5 0h2v2H8V3zM3 7h2v2H3V7zm5 0h2v2H8V7z"/></svg>
+            </div>
+            <div class="di-cfm-head-text">
+                <h1 class="di-cfm-title">Business Units</h1>
+                <p class="di-cfm-sub">Manage the business units that landlords are registered under, their domains and logos.</p>
+            </div>
+            <div class="di-cfm-head-actions">
+                <a class="di-cfm-new" href="/admin/business-units/new">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z"/></svg>
+                    Add Business Unit
+                </a>
+            </div>
+        </div>
 
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th></th>
-            <th>Code</th>
-            <th>Business Unit Name</th>
-            <th>Domain</th>
-            <th>Created</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var businessUnit in businessUnits)
-        {
-            <tr>
-                <td style="width: 44px;">
-                    @if (businessUnit.Logo is not null)
+        <div class="di-cfm-toolbar">
+            <div class="di-cfm-search">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                <input type="text" placeholder="Search by code, name or domain…" @bind="searchText" @bind:event="oninput" />
+            </div>
+        </div>
+
+        <div class="di-cfm-tablewrap">
+            @{ var filtered = Filtered; }
+            <table class="di-cfm-table">
+                <thead>
+                    <tr>
+                        <th style="width: 56px;"></th>
+                        <th style="width: 120px;">Code</th>
+                        <th>Business Unit Name</th>
+                        <th>Domain</th>
+                        <th style="width: 170px;">Created</th>
+                        <th style="width: 90px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filtered.Count == 0)
                     {
-                        <img src="/business-units/@businessUnit.Id/thumbnail" alt="" class="di-bu-logo" />
+                        <tr><td colspan="6" class="di-cfm-empty">No business units match your search.</td></tr>
                     }
-                </td>
-                <td>@businessUnit.Code</td>
-                <td>@businessUnit.Name</td>
-                <td>@(string.IsNullOrWhiteSpace(businessUnit.Domain) ? "—" : businessUnit.Domain)</td>
-                <td>@businessUnit.CreatedAt.ToLocalTime().ToString("g")</td>
-                <td>
-                    <a class="btn btn-sm btn-outline-secondary" href="/admin/business-units/edit/@businessUnit.Id" title="Edit">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5ZM3.51 10.658l-1.8 4.5 1.8-4.5.001 0Z" />
-                        </svg>
-                    </a>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+                    @foreach (var businessUnit in filtered)
+                    {
+                        <tr>
+                            <td>
+                                @if (businessUnit.Logo is not null)
+                                {
+                                    <img src="/business-units/@businessUnit.Id/thumbnail" alt="" class="di-cfm-avatar" />
+                                }
+                                else
+                                {
+                                    <span class="di-cfm-avatar di-cfm-avatar-navy">@Initials(businessUnit.Code)</span>
+                                }
+                            </td>
+                            <td><span class="di-cfm-fd-name">@businessUnit.Code</span></td>
+                            <td>@businessUnit.Name</td>
+                            <td>@(string.IsNullOrWhiteSpace(businessUnit.Domain) ? "—" : businessUnit.Domain)</td>
+                            <td>@businessUnit.CreatedAt.ToLocalTime().ToString("g")</td>
+                            <td>
+                                <div class="di-cfm-acts">
+                                    <a class="di-cfm-iconbtn i-primary" href="/admin/business-units/edit/@businessUnit.Id" title="Edit">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Z"/></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
 
-<style>
-    .di-bu-logo {
-        width: 32px;
-        height: 32px;
-        object-fit: contain;
-    }
-</style>
+        <div class="di-cfm-footer">
+            <span class="di-cfm-count">@filtered.Count of @businessUnits.Count business unit(s)</span>
+        </div>
+    </div>
+</div>
 
 @code {
     private List<BusinessUnit> businessUnits = [];
+    private string searchText = "";
+
+    private List<BusinessUnit> Filtered
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchText)) return businessUnits;
+            var s = searchText.Trim();
+            return businessUnits.Where(b =>
+                (b.Code?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (b.Name?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (b.Domain?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+        }
+    }
+
+    private static string Initials(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "–";
+        return code.Trim().Length >= 2 ? code.Trim()[..2].ToUpperInvariant() : code.Trim().ToUpperInvariant();
+    }
 
     protected override async Task OnInitializedAsync()
     {
