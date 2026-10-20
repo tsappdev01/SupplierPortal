@@ -4,7 +4,9 @@ obj/
 *.user
 
 ## Deployment package output (created by deploy/Publish-And-Package.ps1)
-dist/
+## Anchored to the repo root so it does NOT match client-lib folders like
+## wwwroot/lib/bootstrap/dist (those assets must be committed and served).
+/dist/
 
 ## Local secrets - never commit real connection strings
 appsettings.Local.json
