@@ -158,7 +158,7 @@
                                 }
                                 else
                                 {
-                                    <label class="di-switch" title="@(user.IsActive ? "Active" : "Inactive")">
+                                    <label class="di-switch di-switch-rg" title="@(user.IsActive ? "Active" : "Inactive")">
                                         <input type="checkbox" checked="@user.IsActive" @onchange="e => ToggleActiveAsync(user, (bool)e.Value!)" />
                                         <span class="di-switch-slider"></span>
                                     </label>

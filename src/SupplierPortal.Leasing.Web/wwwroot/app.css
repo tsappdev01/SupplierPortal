@@ -550,6 +550,9 @@ table thead th {
 .di-cfm-status-grey { background: #eef1f6; color: #5a6578; }
 .di-cfm .di-switch-slider { background-color: #cbd5e1; }
 .di-cfm .di-switch input:checked + .di-switch-slider { background-color: var(--blue); }
+/* Opt back into the red(off)/green(on) semantics for status toggles (e.g. user active/inactive). */
+.di-cfm .di-switch.di-switch-rg .di-switch-slider { background-color: #c34; }
+.di-cfm .di-switch.di-switch-rg input:checked + .di-switch-slider { background-color: #28a745; }
 /* Icon action buttons */
 .di-cfm-acts { display: inline-flex; gap: 6px; justify-content: flex-end; }
 .di-cfm-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #64708a; cursor: pointer; padding: 0; text-decoration: none; }
