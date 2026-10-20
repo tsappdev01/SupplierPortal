@@ -22,6 +22,9 @@
         leasing.Landlords, leasing.LandlordPremises, leasing.LandlordContacts,
         leasing.LandlordSignatories, leasing.LandlordDocuments.
   * dbo.LandlordData, dbo.Property and dbo.BusinessUnits exist in this database.
+  * dbo.MaintainTransactionKeys and dbo.MaintainTenant exist in this database (source tenant chain,
+    joined on PlotNo): they supply the signatories and the signing rule. dbo.MaintainTenantUAEPassEmails
+    (already referenced for signatories) must also exist.
 
   IDEMPOTENCY & TRANSACTIONS
   --------------------------
@@ -43,10 +46,17 @@
      adjust the reference here to match -- a wrong name will raise "Invalid column name".
   2. DOCUMENT CONTENT TYPE. All migrated documents are assumed to be PDFs and are stored with
      ContentType = 'application/pdf'. Change this if a source document is a different format.
-  3. DEFAULT SIGNING RULE. dbo.LandlordData has no signing-rule column, so SigningRule is set
-     to 0 (All) for every migrated landlord. The real live rule lives in
-     dbo.MaintainTenant.SignatureType / dbo.MaintainTenantUAEPassEmails.AND_OR; see the
-     commented block in the Landlord insert for how to override to 1 (Any) when AND_OR = 'OR'.
+  3. SIGNATORIES AND SIGNING RULE COME FROM THE SOURCE TENANT CHAIN, not from LandlordData's
+     primary/secondary contacts. Each LandlordData row is matched to at most one source tenant via
+     PlotNo through the chain
+        dbo.MaintainTransactionKeys (PropertyCode = PlotNo, TranCode NOT LIKE '%-%')
+          -> dbo.MaintainTenant (TenantCode)
+          -> dbo.MaintainTenantUAEPassEmails (MaintainTenantId).
+     SigningRule is taken from dbo.MaintainTenant.SignatureType: 'OR' => 1 (Any), otherwise 0 (All).
+     The signatories are the active dbo.MaintainTenantUAEPassEmails rows (OwnershipLevel = signing
+     order, Email the address; the source has no name, so the name is derived from the email
+     local-part). When NO tenant resolves for a row, the script falls back to the old behaviour and
+     builds signatories from the LandlordData primary/secondary contacts (and SigningRule stays 0 = All).
   5. DATE FORMATS. CreatedOn and DateOfExpiration may be stored as TEXT. They are parsed with
      TRY_CONVERT (DateOfExpiration as dd/mm/yyyy = style 103, e.g. '29/05/2027'); an unparseable
      value becomes NULL (CreatedAt then falls back to now, EmiratesIdExpiry stays NULL) rather than
@@ -110,8 +120,11 @@ DECLARE @SecondayEmiratesIdNo  nvarchar(100);   -- source spelling "Seconday"
 DECLARE @PrimaryName           nvarchar(200);
 DECLARE @SecondayName          nvarchar(200);    -- source spelling "Seconday"
 DECLARE @DateOfExpiration      datetime2(7);
+DECLARE @TenantId              bigint;           -- source tenant id (dbo.MaintainTenant.ID), resolved via PlotNo
+DECLARE @SignatureType         nvarchar(10);     -- source signing rule 'OR'/'AND' (dbo.MaintainTenant.SignatureType)
 
 DECLARE @CreatedOn             datetime2(7);
+DECLARE @SigningRule           int;              -- 1=Any (OR), 0=All; derived per row from @SignatureType
 DECLARE @PropertyId            int;
 DECLARE @PropCompanyName       nvarchar(200);
 DECLARE @PropBuildingName      nvarchar(250);
@@ -151,8 +164,20 @@ BEGIN TRY
                 d.PrimaryName,
                 d.SecondayName,           -- source spelling
                 COALESCE(TRY_CONVERT(datetime2(7), d.DateOfExpiration, 103),
-                         TRY_CONVERT(datetime2(7), d.DateOfExpiration))
+                         TRY_CONVERT(datetime2(7), d.DateOfExpiration)),
+                -- Signatories and the signing rule come from the source tenant chain, keyed on PlotNo:
+                --   MaintainTransactionKeys -> MaintainTenant (-> MaintainTenantUAEPassEmails later).
+                -- Resolve AT MOST ONE tenant per row deterministically (lowest MaintainTenant.ID).
+                ten.TenantId,
+                ten.SignatureType
         FROM    dbo.LandlordData d
+        OUTER APPLY (
+                    SELECT TOP (1) mt.ID AS TenantId, mt.SignatureType AS SignatureType
+                    FROM dbo.MaintainTransactionKeys k
+                    JOIN dbo.MaintainTenant mt ON mt.TenantCode = k.TenantCode
+                    WHERE k.PropertyCode = d.PlotNo AND k.TranCode NOT LIKE '%-%'
+                    ORDER BY mt.ID
+                ) ten
         WHERE   NOT EXISTS (
                     SELECT 1 FROM leasing.Landlords l WHERE l.LegacySourceId = d.Id
                 );
@@ -162,7 +187,7 @@ BEGIN TRY
         @SourceId, @AgreementType, @PlotNo, @ContactName, @MobileNumber, @Email,
         @SecondaryContactName, @SecondaryMobileNumber, @SecondaryEmail, @RawCreatedOn,
         @PrimaryEmiratesIdNo, @SecondayEmiratesIdNo, @PrimaryName, @SecondayName,
-        @DateOfExpiration;
+        @DateOfExpiration, @TenantId, @SignatureType;
 
     WHILE @@FETCH_STATUS = 0
     BEGIN
@@ -207,7 +232,7 @@ BEGIN TRY
                 @SourceId, @AgreementType, @PlotNo, @ContactName, @MobileNumber, @Email,
                 @SecondaryContactName, @SecondaryMobileNumber, @SecondaryEmail, @RawCreatedOn,
                 @PrimaryEmiratesIdNo, @SecondayEmiratesIdNo, @PrimaryName, @SecondayName,
-                @DateOfExpiration;
+                @DateOfExpiration, @TenantId, @SignatureType;
             CONTINUE;
         END
 
@@ -218,6 +243,9 @@ BEGIN TRY
                         CASE WHEN CHARINDEX('-', @PlotNo) > 0
                              THEN LEFT(@PlotNo, CHARINDEX('-', @PlotNo) - 1)
                              ELSE @PlotNo END, 10);
+
+        -- Signing rule from the source tenant's SignatureType: 'OR' => 1 (Any), anything else => 0 (All).
+        SET @SigningRule = CASE WHEN UPPER(LTRIM(RTRIM(@SignatureType))) = 'OR' THEN 1 ELSE 0 END;
 
         ---------------------------------------------------------------------------------------
         -- 1) Parent: leasing.Landlords
@@ -236,7 +264,7 @@ BEGIN TRY
              LEFT(@PropBuildingName, 250),                         -- Building
              LEFT(COALESCE(@Email, N''), 200),                     -- Email (NOT NULL)
              LEFT(@PropLandLordCode, 50),                          -- LandLordCode
-             0,                                                    -- SigningRule = All (default; see note below)
+             @SigningRule,                                         -- SigningRule from MaintainTenant.SignatureType (1=Any when 'OR', else 0=All)
              8,                                                    -- Status = RegistrationComplete
              0,                                                    -- LinkActive = 0 (link deactivated for completed reg.)
              N'LandlordData migration',                            -- CreatedBy
@@ -248,19 +276,8 @@ BEGIN TRY
 
         SET @LandlordId = CAST(SCOPE_IDENTITY() AS int);
 
-        /* -- OPTIONAL: override SigningRule to 1 (Any) from the source system's AND_OR / SignatureType.
-           --           dbo.LandlordData has no signing-rule column, so it defaults to 0 (All) above.
-           --           The live rule is keyed by the source landlord id (dbo.Property.LandlordId =
-           --           dbo.MaintainTenant.ID). Uncomment and verify the join keys for your instance:
-        UPDATE l
-           SET l.SigningRule = 1
-        FROM leasing.Landlords l
-        JOIN dbo.Property p            ON p.Id = l.PropertyId
-        LEFT JOIN dbo.MaintainTenant mt ON mt.ID = p.LandlordId
-        LEFT JOIN dbo.MaintainTenantUAEPassEmails e ON e.MaintainTenantId = mt.ID
-        WHERE l.Id = @LandlordId
-          AND (UPPER(LTRIM(RTRIM(e.AND_OR))) = 'OR' OR UPPER(LTRIM(RTRIM(mt.SignatureType))) = 'OR');
-        */
+        -- SigningRule is now set directly in the INSERT above from dbo.MaintainTenant.SignatureType
+        -- (resolved per row via the PlotNo tenant chain), so the old optional override block is removed.
 
         -- Human-readable reference, e.g. DIP-LR-2026-104882.
         UPDATE leasing.Landlords
@@ -325,32 +342,67 @@ BEGIN TRY
         END
 
         ---------------------------------------------------------------------------------------
-        -- 4) leasing.LandlordSignatories -- PRIMARY (Order 1), SECONDARY (Order 2) when present.
+        -- 4) leasing.LandlordSignatories -- from the SOURCE TENANT CHAIN when a tenant resolves,
+        --    else fall back to the LandlordData primary/secondary contacts.
         --    [Order] is a reserved word -> always bracketed.
+        --
+        --    When @TenantId IS NOT NULL the authorised signatories come from
+        --    dbo.MaintainTenantUAEPassEmails (one active row per signatory, OwnershipLevel = order).
+        --    The source has no signatory name, so [Name] is derived from the email local-part
+        --    (the text before '@'); when the email is null/empty it becomes 'Signatory <level>'.
         ---------------------------------------------------------------------------------------
-        INSERT INTO leasing.LandlordSignatories
-            (LandlordId, [Name], Email, Mobile, [Order], IsPrimaryContact)
-        VALUES
-            (@LandlordId,
-             LEFT(COALESCE(@PrimaryName, @ContactName, N''), 150),
-             LEFT(COALESCE(@Email, N''), 200),
-             LEFT(@MobileNumber, 40),
-             1,
-             1);
-        SET @cntSignatories = @cntSignatories + 1;
-
-        IF @HasSecondary = 1
+        IF @TenantId IS NOT NULL
         BEGIN
+            INSERT INTO leasing.LandlordSignatories
+                (LandlordId, [Name], Email, Mobile, [Order], IsPrimaryContact)
+            SELECT @LandlordId,
+                   LEFT(
+                       CASE
+                           WHEN NULLIF(LTRIM(RTRIM(u.Email)), N'') IS NULL
+                               THEN N'Signatory ' + CONVERT(varchar, u.OwnershipLevel)
+                           WHEN CHARINDEX('@', LTRIM(RTRIM(u.Email))) > 0
+                               THEN LEFT(LTRIM(RTRIM(u.Email)),
+                                         CHARINDEX('@', LTRIM(RTRIM(u.Email))) - 1)
+                           ELSE LTRIM(RTRIM(u.Email))
+                       END, 150),                                  -- [Name] derived from email local-part
+                   LEFT(COALESCE(u.Email, N''), 200),              -- Email
+                   NULL,                                           -- Mobile (none in source)
+                   u.OwnershipLevel,                               -- [Order] = signing order
+                   CASE WHEN u.OwnershipLevel = 1 THEN 1 ELSE 0 END -- IsPrimaryContact
+            FROM dbo.MaintainTenantUAEPassEmails u
+            WHERE u.MaintainTenantId = @TenantId
+              AND u.IsActive = 1
+              AND u.IsDeleted = 0
+            ORDER BY u.OwnershipLevel;
+            SET @cntSignatories = @cntSignatories + @@ROWCOUNT;
+        END
+        ELSE
+        BEGIN
+            -- Fallback: no tenant resolved -> keep the old LandlordData-based signatories.
             INSERT INTO leasing.LandlordSignatories
                 (LandlordId, [Name], Email, Mobile, [Order], IsPrimaryContact)
             VALUES
                 (@LandlordId,
-                 LEFT(COALESCE(@SecondayName, @SecondaryContactName, N''), 150),
-                 LEFT(COALESCE(@SecondaryEmail, N''), 200),
-                 LEFT(@SecondaryMobileNumber, 40),
-                 2,
-                 0);
+                 LEFT(COALESCE(@PrimaryName, @ContactName, N''), 150),
+                 LEFT(COALESCE(@Email, N''), 200),
+                 LEFT(@MobileNumber, 40),
+                 1,
+                 1);
             SET @cntSignatories = @cntSignatories + 1;
+
+            IF @HasSecondary = 1
+            BEGIN
+                INSERT INTO leasing.LandlordSignatories
+                    (LandlordId, [Name], Email, Mobile, [Order], IsPrimaryContact)
+                VALUES
+                    (@LandlordId,
+                     LEFT(COALESCE(@SecondayName, @SecondaryContactName, N''), 150),
+                     LEFT(COALESCE(@SecondaryEmail, N''), 200),
+                     LEFT(@SecondaryMobileNumber, 40),
+                     2,
+                     0);
+                SET @cntSignatories = @cntSignatories + 1;
+            END
         END
 
         ---------------------------------------------------------------------------------------
@@ -428,7 +480,7 @@ BEGIN TRY
             @SourceId, @AgreementType, @PlotNo, @ContactName, @MobileNumber, @Email,
             @SecondaryContactName, @SecondaryMobileNumber, @SecondaryEmail, @RawCreatedOn,
             @PrimaryEmiratesIdNo, @SecondayEmiratesIdNo, @PrimaryName, @SecondayName,
-            @DateOfExpiration;
+            @DateOfExpiration, @TenantId, @SignatureType;
     END
 
     CLOSE cur;
