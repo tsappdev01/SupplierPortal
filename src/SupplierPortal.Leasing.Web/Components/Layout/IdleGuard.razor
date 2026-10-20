@@ -1,0 +1,17 @@
+@inject IJSRuntime JS
+
+@* No UI — starts the client-side idle auto-logout timer for authenticated app users. *@
+
+@code {
+    /// <summary>Idle timeout in minutes before the session is locked (auto-logged-out). Default 15.</summary>
+    [Parameter] public int TimeoutMinutes { get; set; } = 15;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { await JS.InvokeVoidAsync("idleGuard.start", TimeoutMinutes * 60 * 1000); }
+            catch { /* best-effort: JS may not be ready during prerender */ }
+        }
+    }
+}
