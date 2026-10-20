@@ -2,9 +2,11 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using SupplierPortal.Contracts;
 using SupplierPortal.Leasing.Web.Components;
@@ -100,25 +102,57 @@ builder.Services.AddHttpClient<ICircularoService, CircularoService>(c => c.Timeo
 builder.Services.AddHostedService<CircularoSignaturePoller>();
 
 // ---------------------------------------------------------------------------
-// Authentication (local cookie — UAT) + authorization
+// Authentication (cookie + optional Entra ID SSO) + authorization
 // ---------------------------------------------------------------------------
+// SSO is active only when it is BOTH selected (Auth:Mode = Sso) AND configured (Entra TenantId/ClientId).
+// If Sso is selected without Entra credentials, fall back to local sign-in so no one is locked out.
+var useEntra = authOptions.UseSso;
+
 var authBuilder = builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        // SSO-first: an unauthenticated request is challenged straight to the identity provider.
+        options.DefaultChallengeScheme = useEntra
+            ? OpenIdConnectDefaults.AuthenticationScheme
+            : CookieAuthenticationDefaults.AuthenticationScheme;
     });
 authBuilder.AddCookie(options =>
     {
         options.Cookie.Name = "__Host-LeasingPortalAuth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SameSite = SameSiteMode.Lax;  // Lax so the SSO redirect back still carries the cookie
         options.Cookie.Path = "/";
         options.LoginPath = "/account/login";
         options.AccessDeniedPath = "/account/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     });
+
+if (useEntra)
+{
+    // Federated single sign-on (OpenID Connect, authorization-code + PKCE). The IdP proves identity;
+    // RoleClaimsTransformation then maps that identity to an app user (role + business units) on each
+    // request. No tokens are kept on the front channel.
+    authBuilder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    {
+        options.Authority = authOptions.Entra.Authority;
+        options.ClientId = authOptions.Entra.ClientId;
+        options.ClientSecret = authOptions.Entra.ClientSecret;
+        options.CallbackPath = authOptions.Entra.CallbackPath;
+        options.SignedOutCallbackPath = authOptions.Entra.SignedOutCallbackPath;
+        options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.ResponseType = OpenIdConnectResponseType.Code;
+        options.UsePkce = true;
+        options.SaveTokens = false;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.Scope.Clear();
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.TokenValidationParameters.NameClaimType = "name";
+    });
+}
 
 if (selfServiceApiEnabled)
 {
@@ -190,8 +224,16 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Sign-out endpoint (the Login page handles sign-in).
-app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService) =>
+// With SSO selected but not configured, fall back to local sign-in — warn so it is obvious in the logs.
+if (authOptions.Mode == AuthMode.Sso && !authOptions.Entra.Enabled)
+{
+    app.Logger.LogWarning(
+        "Auth:Mode is 'Sso' but Entra ID is not configured (TenantId/ClientId missing). " +
+        "Falling back to local username/password sign-in.");
+}
+
+// Sign-out endpoint (the Login page / SSO handles sign-in).
+app.MapPost("/account/logout", async Task<IResult> (HttpContext ctx, AuditService auditService) =>
 {
     var username = ctx.User.Identity?.Name;
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -199,8 +241,26 @@ app.MapPost("/account/logout", async (HttpContext ctx, AuditService auditService
     {
         await auditService.LogAsync(username, AuditAction.Logout, "User", null, "Signed out (Landlord portal)");
     }
-    return Results.Redirect("/account/login");
+
+    // With SSO on, also end the session at the identity provider.
+    if (useEntra)
+    {
+        return Results.SignOut(
+            new AuthenticationProperties { RedirectUri = "/account/login" },
+            [CookieAuthenticationDefaults.AuthenticationScheme, OpenIdConnectDefaults.AuthenticationScheme]);
+    }
+    return Results.LocalRedirect("/account/login");
 });
+
+// Challenge the identity provider (SSO). Only mapped when SSO is configured; the Login page links here.
+if (useEntra)
+{
+    app.MapGet("/account/sso-login", (string? returnUrl) =>
+        Results.Challenge(
+            new AuthenticationProperties { RedirectUri = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl },
+            [OpenIdConnectDefaults.AuthenticationScheme]))
+        .AllowAnonymous();
+}
 
 // ---------------------------------------------------------------------------
 // Self-service API for the DMZ Partner Connect (Landlord) app.

@@ -41,6 +41,17 @@
     ]
   },
 
+  "// Auth": "Enable Microsoft Entra ID single sign-on: set Mode to 'Sso' and fill Entra TenantId/ClientId/ClientSecret. In the Entra app registration add the redirect URI https://<this-site>/signin-oidc (and front-channel logout https://<this-site>/signout-callback-oidc). BootstrapAdminEmails provisions the first admin(s) on their first SSO sign-in. Leave Mode 'Local' for username/password.",
+  "Auth": {
+    "Mode": "Sso",
+    "BootstrapAdminEmails": [ "first.admin@dubaiinvestments.com" ],
+    "Entra": {
+      "TenantId": "YOUR_TENANT_ID",
+      "ClientId": "YOUR_CLIENT_ID",
+      "ClientSecret": "REAL_CLIENT_SECRET"
+    }
+  },
+
   "// Leasing": "Enable + fill UAE PASS and Circularo (e-signature) if used in this environment.",
   "Leasing": {
     "UaePass": {
