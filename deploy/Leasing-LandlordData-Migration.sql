@@ -47,6 +47,11 @@
      to 0 (All) for every migrated landlord. The real live rule lives in
      dbo.MaintainTenant.SignatureType / dbo.MaintainTenantUAEPassEmails.AND_OR; see the
      commented block in the Landlord insert for how to override to 1 (Any) when AND_OR = 'OR'.
+  5. DATE FORMATS. CreatedOn and DateOfExpiration may be stored as TEXT. They are parsed with
+     TRY_CONVERT (DateOfExpiration as dd/mm/yyyy = style 103, e.g. '29/05/2027'); an unparseable
+     value becomes NULL (CreatedAt then falls back to now, EmiratesIdExpiry stays NULL) rather than
+     failing the run. Adjust the style if your dates use a different format.
+
   4. TYPE (Individual vs Company). AgreementType is mapped to Type with:
         Type = 1 (Company)    when AgreementType LIKE 'Corp%' OR LIKE 'Comp%'
         Type = 0 (Individual) otherwise.
@@ -99,12 +104,12 @@ DECLARE @Email                 nvarchar(200);
 DECLARE @SecondaryContactName  nvarchar(200);
 DECLARE @SecondaryMobileNumber nvarchar(200);
 DECLARE @SecondaryEmail        nvarchar(200);
-DECLARE @RawCreatedOn          datetime;
+DECLARE @RawCreatedOn          datetime2(7);
 DECLARE @PrimaryEmiratesIdNo   nvarchar(100);
 DECLARE @SecondayEmiratesIdNo  nvarchar(100);   -- source spelling "Seconday"
 DECLARE @PrimaryName           nvarchar(200);
 DECLARE @SecondayName          nvarchar(200);    -- source spelling "Seconday"
-DECLARE @DateOfExpiration      datetime;
+DECLARE @DateOfExpiration      datetime2(7);
 
 DECLARE @CreatedOn             datetime2(7);
 DECLARE @PropertyId            int;
@@ -136,12 +141,17 @@ BEGIN TRY
                 d.SecondaryContactName,
                 d.SecondaryMobileNumber,
                 d.SecondaryEmail,
-                d.CreatedOn,
+                -- Dates may be stored as text. Parse defensively so a bad/locale value becomes NULL
+                -- instead of aborting the whole run. CreatedOn is tried as ISO/native then dd/mm/yyyy;
+                -- DateOfExpiration is dd/mm/yyyy (style 103, e.g. '29/05/2027') then a native fallback.
+                COALESCE(TRY_CONVERT(datetime2(7), d.CreatedOn),
+                         TRY_CONVERT(datetime2(7), d.CreatedOn, 103)),
                 d.PrimaryEmiratesIdNo,
                 d.SecondayEmiratesIdNo,   -- source spelling
                 d.PrimaryName,
                 d.SecondayName,           -- source spelling
-                d.DateOfExpiration
+                COALESCE(TRY_CONVERT(datetime2(7), d.DateOfExpiration, 103),
+                         TRY_CONVERT(datetime2(7), d.DateOfExpiration))
         FROM    dbo.LandlordData d
         WHERE   NOT EXISTS (
                     SELECT 1 FROM leasing.Landlords l WHERE l.LegacySourceId = d.Id
