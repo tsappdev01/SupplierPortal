@@ -50,6 +50,12 @@
                 </NavLink>
             </div>
 
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="account/profile">
+                    My Profile
+                </NavLink>
+            </div>
+
             @* ---------- Landlord Portal ---------- *@
             <div class="nav-item px-3">
                 <button type="button" class="nav-link di-group-toggle" @onclick="() => landlordExpanded = !landlordExpanded">
@@ -82,6 +88,16 @@
                 </div>
                 @if (setupExpanded)
                 {
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/users">
+                            Manage Users
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3 di-sub-item">
+                        <NavLink class="nav-link" href="admin/business-units">
+                            Business Units
+                        </NavLink>
+                    </div>
                     <div class="nav-item px-3 di-sub-item">
                         <NavLink class="nav-link" href="admin/landlord-fields">
                             Landlord Fields
@@ -142,7 +158,7 @@
         // Keep the Landlord group open by default; open Settings when on a settings route.
         var uri = NavigationManager.Uri;
         bool In(string s) => uri.Contains(s, StringComparison.OrdinalIgnoreCase);
-        setupExpanded = In("/admin/landlord-fields");
+        setupExpanded = In("/admin/landlord-fields") || In("/admin/users") || In("/admin/business-units");
     }
 
     private RenderFragment Chevron(bool open) => @<svg class="di-chevron @(open ? "di-chevron-open" : "")" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">

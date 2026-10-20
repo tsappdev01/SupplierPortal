@@ -252,6 +252,25 @@ app.MapPost("/account/logout", async Task<IResult> (HttpContext ctx, AuditServic
     return Results.LocalRedirect("/account/login");
 });
 
+// User / business-unit image endpoints used by the admin screens and profile card.
+app.MapGet("/users/{id:int}/photo", async (int id, UserService userService) =>
+{
+    var photo = await userService.GetPhotoAsync(id);
+    return photo is null ? Results.NotFound() : Results.File(photo.Value.Bytes, photo.Value.ContentType);
+}).RequireAuthorization();
+
+app.MapGet("/business-units/{id:int}/logo", async (int id, BusinessUnitService businessUnitService) =>
+{
+    var logo = await businessUnitService.GetLogoAsync(id);
+    return logo is null ? Results.NotFound() : Results.File(logo.Value.Bytes, logo.Value.ContentType);
+}).RequireAuthorization();
+
+app.MapGet("/business-units/{id:int}/thumbnail", async (int id, BusinessUnitService businessUnitService) =>
+{
+    var thumb = await businessUnitService.GetThumbnailAsync(id);
+    return thumb is null ? Results.NotFound() : Results.File(thumb.Value.Bytes, thumb.Value.ContentType);
+}).RequireAuthorization();
+
 // Challenge the identity provider (SSO). Only mapped when SSO is configured; the Login page links here.
 if (useEntra)
 {

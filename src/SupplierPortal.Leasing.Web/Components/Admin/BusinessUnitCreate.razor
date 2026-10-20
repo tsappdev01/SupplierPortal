@@ -1,0 +1,185 @@
+@page "/admin/business-units/new"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using SupplierPortal.Web.Services
+@inject BusinessUnitService BusinessUnitService
+@inject LoadingService Loading
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Add Business Unit - Supplier Portal</PageTitle>
+
+<h1>Add Business Unit</h1>
+
+<EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="add-business-unit" style="max-width: 480px;">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
+
+    <div class="mb-3">
+        <label class="form-label">Business Unit Name</label>
+        <InputText class="form-control" @bind-Value="Input.Name" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Business Unit Code</label>
+        <InputText class="form-control" @bind-Value="Input.Code" placeholder="Auto-generated if blank" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Domain Name <span class="text-muted small">(public self-service host for this unit's emailed links)</span></label>
+        <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. supplier.dipark.com" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email Address <span class="text-muted small">(default sender / reply-to for this unit's communications)</span></label>
+        <InputText type="email" class="form-control" @bind-Value="Input.Email" placeholder="e.g. supplier.support@dipark.com" />
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+
+    <fieldset class="mb-3" style="border:1px solid #dee2e6; border-radius:8px; padding:12px 14px;">
+        <legend class="form-label" style="font-size:0.95rem; font-weight:600; float:none; width:auto; margin-bottom:4px;">
+            Portal sender email addresses
+        </legend>
+        <div class="form-text mb-2">A dedicated sender for each portal's system emails. When left blank, the
+            Email Address above is used.</div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Supplier Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.SupplierSenderEmail" placeholder="e.g. purchase@dipark.com" />
+            <ValidationMessage For="() => Input.SupplierSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Customer Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.CustomerSenderEmail" placeholder="e.g. businessrelation@dipark.com" />
+            <ValidationMessage For="() => Input.CustomerSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-2">
+            <label class="form-label mb-1">Landlord Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.LandlordSenderEmail" placeholder="e.g. tenantrelation@dipark.com" />
+            <ValidationMessage For="() => Input.LandlordSenderEmail" class="text-danger" />
+        </div>
+        <div class="mb-0">
+            <label class="form-label mb-1">Broker Portal</label>
+            <InputText type="email" class="form-control" @bind-Value="Input.BrokerSenderEmail" placeholder="e.g. broker@dipark.com" />
+            <ValidationMessage For="() => Input.BrokerSenderEmail" class="text-danger" />
+        </div>
+    </fieldset>
+    <div class="mb-3">
+        <label class="form-label">Logo URL <span class="text-muted small">(used in emails &amp; external links)</span></label>
+        <InputText class="form-control" @bind-Value="Input.LogoUrl" placeholder="e.g. https://cdn.dipark.com/logo.png" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Logo <span class="text-muted small">(full-size)</span></label>
+        <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
+        @if (logoPreview is not null)
+        {
+            <img src="@logoPreview" alt="Logo preview" class="mt-2" style="max-width: 160px; max-height: 100px; object-fit: contain;" />
+        }
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Thumbnail <span class="text-muted small">(square, ~640×640; optional — derived from the logo if omitted)</span></label>
+        <InputFile OnChange="OnThumbnailSelectedAsync" accept="image/*" class="form-control" />
+        @if (thumbPreview is not null)
+        {
+            <img src="@thumbPreview" alt="Thumbnail preview" class="mt-2" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #dee2e6; border-radius: 6px;" />
+        }
+    </div>
+
+    @if (errorMessage is not null)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <button type="submit" class="btn btn-primary">Save Business Unit</button>
+    <a class="btn btn-secondary" href="/admin/business-units">Cancel</a>
+</EditForm>
+
+@code {
+    private const long MaxLogoSize = 2 * 1024 * 1024;
+
+    private string currentUser = "unknown";
+    private string? errorMessage;
+    private string? logoPreview;
+    private byte[]? logoBytes;
+    private string? logoContentType;
+    private string? thumbPreview;
+    private byte[]? thumbBytes;
+    private string? thumbContentType;
+
+    [SupplyParameterFromForm]
+    private BusinessUnitModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUser = state.User.Identity?.Name ?? "unknown";
+    }
+
+    private async Task OnLogoSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxLogoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        logoBytes = memoryStream.ToArray();
+        logoContentType = file.ContentType;
+        logoPreview = $"data:{logoContentType};base64,{Convert.ToBase64String(logoBytes)}";
+    }
+
+    private async Task OnThumbnailSelectedAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        using var stream = file.OpenReadStream(MaxLogoSize);
+        using var memoryStream = new MemoryStream();
+        await stream.CopyToAsync(memoryStream);
+        thumbBytes = memoryStream.ToArray();
+        thumbContentType = file.ContentType;
+        thumbPreview = $"data:{thumbContentType};base64,{Convert.ToBase64String(thumbBytes)}";
+    }
+
+    private async Task SaveAsync()
+    {
+        var (success, error) = await Loading.RunAsync(
+            () => BusinessUnitService.AddAsync(Input.Name, Input.Code, Input.Domain, Input.Email, Input.LogoUrl, logoBytes, logoContentType, thumbBytes, thumbContentType, currentUser,
+                new PortalSenderEmails(Input.SupplierSenderEmail, Input.CustomerSenderEmail, Input.LandlordSenderEmail, Input.BrokerSenderEmail)));
+        if (!success)
+        {
+            errorMessage = error;
+            return;
+        }
+
+        NavigationManager.NavigateTo("/admin/business-units");
+    }
+
+    private sealed class BusinessUnitModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = "";
+
+        public string? Code { get; set; }
+
+        public string? Domain { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? Email { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? SupplierSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? CustomerSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? LandlordSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? BrokerSenderEmail { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(500)]
+        public string? LogoUrl { get; set; }
+    }
+}
