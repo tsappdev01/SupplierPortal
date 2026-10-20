@@ -489,3 +489,105 @@ table thead th {
     border-color: var(--di-border);
 }
 [data-theme="dark"] .text-muted { color: var(--di-text-soft) !important; }
+
+/* ============================================================================
+   Shared "Card Manager" design system (di-cfm)
+   The Landlord Field Manager look, lifted here so the Property List, Landlord
+   Registrations, Business Units and Manage Users pages share one surface:
+   a white card with an icon header, a filter toolbar, a styled table and a
+   footer pager. Page-specific pieces (confirm dialogs, KPI cards, modals)
+   stay in each page's own <style> block.
+   ============================================================================ */
+.di-cfm { --navy: #16244a; --blue: #2f6fed; --border: #e4e8f0; --label: #55627a; }
+.di-cfm-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 3px rgba(16,24,40,.06); overflow: hidden; }
+.di-cfm-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.di-cfm-head-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: #eaf0fe; color: var(--blue); flex-shrink: 0; }
+.di-cfm-head-text { min-width: 0; flex: 1; }
+.di-cfm-title { margin: 0; font-size: 19px; font-weight: 800; color: var(--navy); }
+.di-cfm-sub { margin: 2px 0 0; font-size: 13px; color: var(--label); }
+.di-cfm-head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.di-cfm-new { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent; background: var(--blue); color: #fff; text-decoration: none; }
+.di-cfm-new:hover { background: #2560d8; color: #fff; }
+.di-cfm-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+.di-cfm-search { position: relative; flex: 1 1 260px; min-width: 200px; }
+.di-cfm-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9aa4b8; }
+.di-cfm-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #fff; color: #1a2233; }
+.di-cfm-filter { display: flex; flex-direction: column; gap: 4px; }
+.di-cfm-filter label { font-size: 11px; font-weight: 700; color: var(--label); text-transform: uppercase; letter-spacing: .03em; }
+.di-cfm-filter select, .di-cfm-filter input { padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #fff; color: #1a2233; min-width: 150px; }
+.di-cfm-toolbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
+.di-cfm-btn { padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+.di-cfm-btn-primary { background: var(--blue); color: #fff; }
+.di-cfm-btn-primary:hover { background: #2560d8; }
+.di-cfm-btn-primary:disabled { opacity: .6; cursor: default; }
+.di-cfm-btn-ghost { background: #fff; border-color: var(--border); color: var(--navy); }
+.di-cfm-btn-ghost:hover { background: #f5f7fc; }
+.di-cfm-saved { margin: 12px 22px 0; padding: 10px 14px; border-radius: 8px; background: #e8f6ee; color: #1c7a41; font-size: 13.5px; font-weight: 600; }
+.di-cfm-tablewrap { overflow-x: auto; padding: 6px 10px; }
+.di-cfm-table { width: 100%; border-collapse: collapse; }
+.di-cfm-table thead th { text-align: left; font-size: 11.5px; font-weight: 700; color: var(--label); text-transform: uppercase; letter-spacing: .03em; padding: 12px; background: #f7f9fc; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.di-cfm-table tbody td { padding: 12px; border-bottom: 1px solid #eef1f6; vertical-align: middle; font-size: 13.5px; color: #26324a; }
+.di-cfm-table tbody tr:hover { background: #fafbfe; }
+.di-cfm-table tbody tr.is-clickable { cursor: pointer; }
+.di-cfm-empty { text-align: center; color: #97a1b3; font-style: italic; padding: 30px 0; }
+.di-cfm-fd { display: flex; align-items: center; gap: 10px; }
+.di-cfm-avatar { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; font-size: 13px; font-weight: 700; flex-shrink: 0; object-fit: cover; }
+.di-cfm-avatar-navy { background: #1a2233; color: #c9a227; }
+.di-cfm-fd-text { min-width: 0; }
+.di-cfm-fd-name { font-weight: 700; color: var(--navy); font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.di-cfm-fd-desc { font-size: 12px; color: #8a93a6; margin-top: 1px; }
+.di-cfm-star { color: #e0383e; }
+.di-cfm-tag { font-size: 10px; font-weight: 700; color: #b06a00; background: #fff2dc; border-radius: 4px; padding: 1px 6px; letter-spacing: .02em; }
+.di-cfm-select { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; background: #fff; color: #1a2233; }
+.di-cfm-select:disabled { background: #f4f5f8; color: #9aa4b8; }
+.di-cfm-select-inline { min-width: 104px; width: auto; }
+/* Status pills */
+.di-cfm-status { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.di-cfm-status-active, .di-cfm-status-green { background: #e4f7ec; color: #128a4a; }
+.di-cfm-status-removed, .di-cfm-status-red { background: #fdecec; color: #c0392b; }
+.di-cfm-status-blue { background: #e7f0fe; color: #1f5fd0; }
+.di-cfm-status-amber { background: #fdf0db; color: #9a6410; }
+.di-cfm-status-grey { background: #eef1f6; color: #5a6578; }
+.di-cfm .di-switch-slider { background-color: #cbd5e1; }
+.di-cfm .di-switch input:checked + .di-switch-slider { background-color: var(--blue); }
+/* Icon action buttons */
+.di-cfm-acts { display: inline-flex; gap: 6px; justify-content: flex-end; }
+.di-cfm-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #64708a; cursor: pointer; padding: 0; text-decoration: none; }
+.di-cfm-iconbtn:hover { background: #eef2fb; color: var(--blue); }
+.di-cfm-iconbtn.i-primary:hover { color: var(--blue); border-color: #cfe0ff; background: #f2f7ff; }
+.di-cfm-iconbtn.i-dark:hover { color: #1a2233; }
+.di-cfm-iconbtn.i-info:hover { color: #0a8ea6; border-color: #bfe8f0; background: #eefafd; }
+.di-cfm-iconbtn.is-disabled, .di-cfm-iconbtn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+/* Business-unit logos / chips */
+.di-cfm-bulogos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.di-cfm-bulogo { width: 28px; height: 28px; object-fit: contain; border: 1px solid var(--border); border-radius: 4px; background: #fff; padding: 2px; }
+.di-cfm-buchip { font-size: 11px; font-weight: 600; background: #eef1f6; color: #1a2233; border: 1px solid #dce1ea; border-radius: 4px; padding: 2px 7px; }
+/* Footer + pager */
+.di-cfm-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.di-cfm-count { font-size: 13px; color: var(--label); }
+.di-cfm-pager { display: flex; gap: 6px; }
+.di-cfm-page { min-width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--navy); font-weight: 600; cursor: pointer; }
+.di-cfm-page.is-active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.di-cfm-page:disabled { opacity: .45; cursor: default; }
+/* KPI cards (Landlord Registrations) */
+.di-cfm-kpis { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+.di-cfm-kpi { flex: 1 1 128px; min-width: 118px; text-align: left; background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--kpi, #64748b); border-radius: 9px; padding: 10px 14px; cursor: pointer; }
+.di-cfm-kpi:hover { box-shadow: 0 2px 8px rgba(16,24,40,.08); }
+.di-cfm-kpi.sel { outline: 2px solid var(--kpi, #16244a); }
+.di-cfm-kpi-n { display: block; font-size: 1.5rem; font-weight: 800; line-height: 1.1; color: var(--navy); }
+.di-cfm-kpi-l { display: block; font-size: .78rem; color: var(--label); }
+/* Inline alert strip inside a card body */
+.di-cfm-note { margin: 14px 22px 0; padding: 12px 16px; border-radius: 8px; font-size: 13.5px; }
+.di-cfm-note-info { background: #eef4ff; border: 1px solid #c7dbff; color: #1a2233; }
+.di-cfm-note-success { background: #e8f6ee; border: 1px solid #bfe5cd; color: #1c7a41; }
+/* Dark theme */
+[data-theme="dark"] .di-cfm-card { background: #1a2236; border-color: #2b3550; }
+[data-theme="dark"] .di-cfm-title, [data-theme="dark"] .di-cfm-fd-name, [data-theme="dark"] .di-cfm-kpi-n { color: #e7ecf5; }
+[data-theme="dark"] .di-cfm-table thead th, [data-theme="dark"] .di-cfm-toolbar, [data-theme="dark"] .di-cfm-kpis { background: #202a42; }
+[data-theme="dark"] .di-cfm-table tbody td { border-color: #232d46; color: #cdd6ea; }
+[data-theme="dark"] .di-cfm-table tbody tr:hover { background: #202a42; }
+[data-theme="dark"] .di-cfm-search input, [data-theme="dark"] .di-cfm-filter select, [data-theme="dark"] .di-cfm-filter input,
+[data-theme="dark"] .di-cfm-select, [data-theme="dark"] .di-cfm-kpi { background: #131a2b; color: #e7ecf5; border-color: #2b3550; }
+[data-theme="dark"] .di-cfm-iconbtn { background: #131a2b; border-color: #2b3550; color: #aab6d0; }
+[data-theme="dark"] .di-cfm-page { background: #131a2b; border-color: #2b3550; color: #e7ecf5; }
+[data-theme="dark"] .di-cfm-buchip { background: #202a42; color: #cdd6ea; border-color: #2b3550; }

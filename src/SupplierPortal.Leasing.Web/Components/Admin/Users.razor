@@ -10,252 +10,188 @@
 
 <PageTitle>Manage Users - Supplier Portal</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="mb-0">Manage Users</h1>
-    <a class="btn btn-primary" href="/admin/users/new">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
-            <path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z" />
-        </svg>
-        New User
-    </a>
-</div>
-
-@if (pendingRegistrations.Count > 0)
-{
-    <div class="alert alert-info">
-        <div class="d-flex justify-content-between align-items-start gap-3">
-            <div>
-                <strong>Pending registrations awaiting linking:</strong>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                    @foreach (var p in pendingRegistrations)
-                    {
-                        <span class="badge bg-white text-dark border d-inline-flex align-items-center gap-2 py-1" style="font-weight:500;">
-                            @p.Email
-                            <button type="button" class="btn-close" style="font-size:.55rem;"
-                                    title="Reject this registration" aria-label="Reject"
-                                    @onclick="() => RejectPendingAsync(p)" disabled="@cleaning"></button>
-                        </span>
-                    }
-                </div>
+<div class="di-cfm">
+    <div class="di-cfm-card">
+        <div class="di-cfm-head">
+            <div class="di-cfm-head-icon">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
             </div>
-            @if (InvalidPendingCount > 0)
-            {
-                <div class="flex-shrink-0 text-nowrap">
-                    @if (!confirmingCleanup)
-                    {
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => confirmingCleanup = true">
-                            Remove @InvalidPendingCount invalid
-                        </button>
-                    }
-                    else
-                    {
-                        <span class="me-2 small">Delete @InvalidPendingCount junk registration(s)?</span>
-                        <button class="btn btn-sm btn-danger" @onclick="RemoveInvalidAsync" disabled="@cleaning">
-                            @(cleaning ? "Removing…" : "Yes, remove")
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => confirmingCleanup = false" disabled="@cleaning">Cancel</button>
-                    }
-                </div>
-            }
+            <div class="di-cfm-head-text">
+                <h1 class="di-cfm-title">Manage Users</h1>
+                <p class="di-cfm-sub">Create and manage portal users, assign roles and business units, and control access.</p>
+            </div>
+            <div class="di-cfm-head-actions">
+                <a class="di-cfm-new" href="/admin/users/new">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.5.5 0 0 1 .5.5V7.5H14.5a.5.5 0 0 1 0 1H8.5V14.5a.5.5 0 0 1-1 0V8.5H1.5a.5.5 0 0 1 0-1H7.5V1.5A.5.5 0 0 1 8 1Z"/></svg>
+                    New User
+                </a>
+            </div>
         </div>
-    </div>
-}
-@* Rendered outside the pending banner so the confirmation still shows after the last pending row is removed. *@
-@if (cleanupResult is not null)
-{
-    <div class="alert alert-success py-2">@cleanupResult</div>
-}
 
-<div class="d-flex align-items-center gap-2 mb-3">
-    <label class="form-label mb-0 fw-semibold">Status</label>
-    <select class="form-select form-select-sm" style="max-width: 200px;" @bind="statusFilter">
-        <option value="Active">Active</option>
-        <option value="Inactive">Inactive</option>
-        <option value="Pending">Pending</option>
-        <option value="All">All Statuses</option>
-    </select>
-    <span class="text-muted small">@FilteredUsers.Count() of @users.Count user(s)</span>
-</div>
-
-<div style="overflow-x: auto;">
-<table class="table table-striped align-middle">
-    <thead>
-        <tr>
-            <th></th>
-            <th>Username</th>
-            <th>Full Name</th>
-            <th>Designation</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Business Unit(s)</th>
-            <th>Status</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in FilteredUsers)
+        @if (pendingRegistrations.Count > 0)
         {
-            <tr>
-                <td style="width: 44px;">
-                    @if (user.ProfilePhoto is not null || user.ProfilePhotoBlobKey is not null)
-                    {
-                        <img src="/users/@user.Id/photo" alt="" class="di-avatar-sm" />
-                    }
-                    else
-                    {
-                        <span class="di-avatar-sm di-avatar-initials">@GetInitials(user)</span>
-                    }
-                </td>
-                <td>@user.Username</td>
-                <td>@user.FullName</td>
-                <td>@(user.Designation ?? "-")</td>
-                <td>@user.Email</td>
-                <td>@RoleLabel(user.UserType)</td>
-                <td>
-                    @if (user.BusinessUnits.Count == 0)
-                    {
-                        <span>-</span>
-                    }
-                    else
-                    {
-                        <div class="di-bu-logos">
-                            @foreach (var bu in user.BusinessUnits)
+            <div class="di-cfm-note di-cfm-note-info">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                        <strong>Pending registrations awaiting linking:</strong>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @foreach (var p in pendingRegistrations)
                             {
-                                @if (bu.Logo is not null)
-                                {
-                                    <img src="/business-units/@bu.Id/thumbnail" alt="@bu.Name" title="@bu.Name" class="di-bu-logo" />
-                                }
-                                else
-                                {
-                                    <span class="di-bu-chip" title="@bu.Name">@bu.Code</span>
-                                }
+                                <span class="badge bg-white text-dark border d-inline-flex align-items-center gap-2 py-1" style="font-weight:500;">
+                                    @p.Email
+                                    <button type="button" class="btn-close" style="font-size:.55rem;"
+                                            title="Reject this registration" aria-label="Reject"
+                                            @onclick="() => RejectPendingAsync(p)" disabled="@cleaning"></button>
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    @if (InvalidPendingCount > 0)
+                    {
+                        <div class="flex-shrink-0 text-nowrap">
+                            @if (!confirmingCleanup)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => confirmingCleanup = true">
+                                    Remove @InvalidPendingCount invalid
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="me-2 small">Delete @InvalidPendingCount junk registration(s)?</span>
+                                <button class="btn btn-sm btn-danger" @onclick="RemoveInvalidAsync" disabled="@cleaning">
+                                    @(cleaning ? "Removing…" : "Yes, remove")
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => confirmingCleanup = false" disabled="@cleaning">Cancel</button>
                             }
                         </div>
                     }
-                </td>
-                <td>
-                    @if (user.IsPendingRegistration)
-                    {
-                        <span class="badge bg-warning text-dark">Pending</span>
-                    }
-                    else
-                    {
-                        <label class="di-switch" title="@(user.IsActive ? "Active" : "Inactive")">
-                            <input type="checkbox" checked="@user.IsActive" @onchange="e => ToggleActiveAsync(user, (bool)e.Value!)" />
-                            <span class="di-switch-slider"></span>
-                        </label>
-                        @if (user.IsDefaultAdmin)
-                        {
-                            <span class="badge bg-secondary ms-2">Default Admin</span>
-                        }
-                    }
-                </td>
-                <td>
-                    <a class="btn btn-sm btn-outline-secondary" href="/admin/users/edit/@user.Id" title="Edit">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5ZM3.51 10.658l-1.8 4.5 1.8-4.5.001 0Z" />
-                        </svg>
-                    </a>
-                </td>
-            </tr>
+                </div>
+            </div>
         }
-    </tbody>
-</table>
+        @* Rendered outside the pending banner so the confirmation still shows after the last pending row is removed. *@
+        @if (cleanupResult is not null)
+        {
+            <div class="di-cfm-note di-cfm-note-success">@cleanupResult</div>
+        }
+
+        <div class="di-cfm-toolbar">
+            <div class="di-cfm-search">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                <input type="text" placeholder="Search name, username or email…" @bind="searchText" @bind:event="oninput" />
+            </div>
+            <div class="di-cfm-filter">
+                <label>Status</label>
+                <select @bind="statusFilter">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Pending">Pending</option>
+                    <option value="All">All Statuses</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="di-cfm-tablewrap">
+            @{ var filtered = FilteredUsers.ToList(); }
+            <table class="di-cfm-table">
+                <thead>
+                    <tr>
+                        <th style="width: 56px;"></th>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Designation</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Business Unit(s)</th>
+                        <th style="width: 120px;" class="text-center">Status</th>
+                        <th style="width: 80px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filtered.Count == 0)
+                    {
+                        <tr><td colspan="9" class="di-cfm-empty">No users match the current filters.</td></tr>
+                    }
+                    @foreach (var user in filtered)
+                    {
+                        <tr>
+                            <td>
+                                @if (user.ProfilePhoto is not null || user.ProfilePhotoBlobKey is not null)
+                                {
+                                    <img src="/users/@user.Id/photo" alt="" class="di-cfm-avatar" />
+                                }
+                                else
+                                {
+                                    <span class="di-cfm-avatar di-cfm-avatar-navy">@GetInitials(user)</span>
+                                }
+                            </td>
+                            <td><span class="di-cfm-fd-name">@user.Username</span></td>
+                            <td>@user.FullName</td>
+                            <td>@(user.Designation ?? "—")</td>
+                            <td>@user.Email</td>
+                            <td>@RoleLabel(user.UserType)</td>
+                            <td>
+                                @if (user.BusinessUnits.Count == 0)
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    <div class="di-cfm-bulogos">
+                                        @foreach (var bu in user.BusinessUnits)
+                                        {
+                                            @if (bu.Logo is not null)
+                                            {
+                                                <img src="/business-units/@bu.Id/thumbnail" alt="@bu.Name" title="@bu.Name" class="di-cfm-bulogo" />
+                                            }
+                                            else
+                                            {
+                                                <span class="di-cfm-buchip" title="@bu.Name">@bu.Code</span>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td class="text-center">
+                                @if (user.IsPendingRegistration)
+                                {
+                                    <span class="di-cfm-status di-cfm-status-amber">Pending</span>
+                                }
+                                else
+                                {
+                                    <label class="di-switch" title="@(user.IsActive ? "Active" : "Inactive")">
+                                        <input type="checkbox" checked="@user.IsActive" @onchange="e => ToggleActiveAsync(user, (bool)e.Value!)" />
+                                        <span class="di-switch-slider"></span>
+                                    </label>
+                                    @if (user.IsDefaultAdmin)
+                                    {
+                                        <div class="di-cfm-fd-desc">Default Admin</div>
+                                    }
+                                }
+                            </td>
+                            <td>
+                                <div class="di-cfm-acts">
+                                    <a class="di-cfm-iconbtn i-primary" href="/admin/users/edit/@user.Id" title="Edit">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10ZM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5Z"/></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="di-cfm-footer">
+            <span class="di-cfm-count">@filtered.Count of @users.Count user(s)</span>
+        </div>
+    </div>
 </div>
-
-<style>
-    .di-avatar-sm {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        object-fit: cover;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .di-avatar-initials {
-        background: #1a2233;
-        color: #b5892f;
-        font-size: 0.75rem;
-        font-weight: 700;
-    }
-
-    .di-bu-logos {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        align-items: center;
-    }
-
-    .di-bu-logo {
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
-        border: 1px solid #e2e5ea;
-        border-radius: 4px;
-        background: #fff;
-        padding: 2px;
-    }
-
-    .di-bu-chip {
-        font-size: 0.72rem;
-        font-weight: 600;
-        background: #eef1f6;
-        color: #1a2233;
-        border: 1px solid #dce1ea;
-        border-radius: 4px;
-        padding: 2px 7px;
-    }
-
-    .di-switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 22px;
-        vertical-align: middle;
-    }
-
-    .di-switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-
-    .di-switch-slider {
-        position: absolute;
-        cursor: pointer;
-        inset: 0;
-        background-color: #dc3545;
-        border-radius: 22px;
-        transition: background-color 0.15s ease;
-    }
-
-    .di-switch-slider::before {
-        content: "";
-        position: absolute;
-        height: 16px;
-        width: 16px;
-        left: 3px;
-        bottom: 3px;
-        background-color: #fff;
-        border-radius: 50%;
-        transition: transform 0.15s ease;
-    }
-
-    .di-switch input:checked + .di-switch-slider {
-        background-color: #28a745;
-    }
-
-    .di-switch input:checked + .di-switch-slider::before {
-        transform: translateX(18px);
-    }
-</style>
 
 @code {
     private List<User> users = [];
     private List<User> pendingRegistrations = [];
     private string currentUser = "unknown";
+    private string searchText = "";
 
     private static string RoleLabel(UserType t) => t switch
     {
@@ -274,13 +210,29 @@
     // Status filter — defaults to Active so the list opens on active users only.
     private string statusFilter = "Active";
 
-    private IEnumerable<User> FilteredUsers => statusFilter switch
+    private IEnumerable<User> FilteredUsers
     {
-        "Active" => users.Where(u => u.IsActive && !u.IsPendingRegistration),
-        "Inactive" => users.Where(u => !u.IsActive && !u.IsPendingRegistration),
-        "Pending" => users.Where(u => u.IsPendingRegistration),
-        _ => users,
-    };
+        get
+        {
+            IEnumerable<User> q = statusFilter switch
+            {
+                "Active" => users.Where(u => u.IsActive && !u.IsPendingRegistration),
+                "Inactive" => users.Where(u => !u.IsActive && !u.IsPendingRegistration),
+                "Pending" => users.Where(u => u.IsPendingRegistration),
+                _ => users,
+            };
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var s = searchText.Trim();
+                q = q.Where(u =>
+                    (u.Username?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (u.Designation?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+            return q;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

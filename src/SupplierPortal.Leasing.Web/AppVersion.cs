@@ -8,5 +8,5 @@ namespace SupplierPortal.Leasing.Web;
 /// </summary>
 public static class AppVersion
 {
-    public const string Token = "20261020b";
+    public const string Token = "20261020c";
 }

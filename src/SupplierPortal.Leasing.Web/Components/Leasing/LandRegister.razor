@@ -15,128 +15,140 @@
 
 <PageTitle>Property List - Supplier Portal</PageTitle>
 
-<h1 class="mb-1">Property List</h1>
-<p class="text-muted">Initiate and track landlord registrations. Company, contact and email are read from the Property View; the invitation is always sent to that email.</p>
+<div class="di-cfm">
+    <div class="di-cfm-card">
+        <div class="di-cfm-head">
+            <div class="di-cfm-head-icon">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.707 1.5z"/><path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293l6-6z"/></svg>
+            </div>
+            <div class="di-cfm-head-text">
+                <h1 class="di-cfm-title">Property List</h1>
+                <p class="di-cfm-sub">Initiate and track landlord registrations. Company, contact and email are read from the Property View; the invitation is always sent to that email.</p>
+            </div>
+        </div>
 
-<div class="row g-2 mb-3">
-    <div class="col-sm-3">
-        <label class="form-label small mb-0">Zone</label>
-        <select class="form-select form-select-sm" @bind="zone" @bind:after="LoadAsync">
-            <option value="__all">All zones</option>
-            @foreach (var z in LandRegisterService.Zones)
-            {
-                <option value="@z">@z</option>
-            }
-        </select>
-    </div>
-    <div class="col-sm-3">
-        <label class="form-label small mb-0">Category</label>
-        <select class="form-select form-select-sm" @bind="category" @bind:after="LoadAsync">
-            <option value="">All</option>
-            @foreach (var c in categories)
-            {
-                <option value="@c">@c</option>
-            }
-        </select>
-    </div>
-    <div class="col-sm-3">
-        <label class="form-label small mb-0">Status</label>
-        <select class="form-select form-select-sm" @bind="statusText" @bind:after="LoadAsync">
-            <option value="">All</option>
-            <option value="__none">Not started</option>
-            @foreach (var g in Landlords.kpiGroups)
-            {
-                <option value="@g.Label">@g.Label</option>
-            }
-        </select>
-    </div>
-    <div class="col-sm-3">
-        <label class="form-label small mb-0">Search</label>
-        <input class="form-control form-control-sm" placeholder="Code, company, contact, email…" value="@search" @oninput="OnSearchInput" />
+        <div class="di-cfm-toolbar">
+            <div class="di-cfm-search">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+                <input type="text" placeholder="Code, company, contact, email…" value="@search" @oninput="OnSearchInput" />
+            </div>
+            <div class="di-cfm-filter">
+                <label>Zone</label>
+                <select @bind="zone" @bind:after="LoadAsync">
+                    <option value="__all">All zones</option>
+                    @foreach (var z in LandRegisterService.Zones)
+                    {
+                        <option value="@z">@z</option>
+                    }
+                </select>
+            </div>
+            <div class="di-cfm-filter">
+                <label>Category</label>
+                <select @bind="category" @bind:after="LoadAsync">
+                    <option value="">All</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+            <div class="di-cfm-filter">
+                <label>Status</label>
+                <select @bind="statusText" @bind:after="LoadAsync">
+                    <option value="">All</option>
+                    <option value="__none">Not started</option>
+                    @foreach (var g in Landlords.kpiGroups)
+                    {
+                        <option value="@g.Label">@g.Label</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (loading)
+        {
+            <div class="p-4"><LoadingIndicator Message="Loading properties…" /></div>
+        }
+        else if (rows.Count == 0)
+        {
+            <div class="di-cfm-tablewrap"><div class="di-cfm-empty">No properties match the current filter.</div></div>
+        }
+        else
+        {
+            <div class="di-cfm-tablewrap">
+                <table class="di-cfm-table">
+                    <thead>
+                        <tr>
+                            <th>Property Code</th>
+                            <th>Company Name</th>
+                            <th>Contact Name</th>
+                            <th>Email Address</th>
+                            <th style="width: 150px;" class="text-center">Status</th>
+                            <th style="width: 170px;" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in PageRows)
+                        {
+                            <tr>
+                                <td class="text-nowrap"><span class="di-cfm-fd-name">@r.PropertyCode</span></td>
+                                <td>@(r.CompanyName ?? "—")</td>
+                                <td>@(r.ContactName ?? "—")</td>
+                                <td>@(r.EmailAddress ?? "—")</td>
+                                <td class="text-center">
+                                    @if (r.Status is LandlordStatus s)
+                                    {
+                                        <span class="di-cfm-status @StatusPill(s)">@Landlords.Label(s)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="di-cfm-status di-cfm-status-grey">Not started</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="di-cfm-acts">
+                                        @{ var rid = r.RegistrationId; }
+                                        @* Edit / view details *@
+                                        @if (rid is int eid)
+                                        {
+                                            <a class="di-cfm-iconbtn i-primary" href="/admin/landlords/@eid" title="View / edit all details">@IconEdit</a>
+                                        }
+                                        else
+                                        {
+                                            <button class="di-cfm-iconbtn i-primary" title="Initiate registration" @onclick="() => EditAsync(r)">@IconEdit</button>
+                                        }
+                                        @* Notify / email invite *@
+                                        <button class="di-cfm-iconbtn i-primary @(CanNotify(r) ? "" : "is-disabled")" title="Notify (send secure link)"
+                                                disabled="@(!CanNotify(r))" @onclick="() => NotifyAsync(r)">@IconMail</button>
+                                        @* Attachments *@
+                                        @if (rid is int aid)
+                                        {
+                                            <a class="di-cfm-iconbtn i-dark" href="/admin/landlords/@aid" title="View attachments">@IconClip</a>
+                                        }
+                                        else
+                                        {
+                                            <button class="di-cfm-iconbtn i-dark is-disabled" title="No attachments yet" disabled>@IconClip</button>
+                                        }
+                                        @* Review *@
+                                        @if (rid is int vid && CanReview(r))
+                                        {
+                                            <a class="di-cfm-iconbtn i-info" href="/admin/landlords/@vid" title="Review submission">@IconReview</a>
+                                        }
+                                        else
+                                        {
+                                            <button class="di-cfm-iconbtn i-info is-disabled" title="No submission to review" disabled>@IconReview</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="di-cfm-footer">@Pager</div>
+        }
     </div>
 </div>
-
-@if (loading)
-{
-    <LoadingIndicator Message="Loading properties…" />
-}
-else if (rows.Count == 0)
-{
-    <div class="alert alert-light border">No properties match the current filter.</div>
-}
-else
-{
-    @Pager
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="di-thead">
-                <tr>
-                    <th>PropertyCode</th>
-                    <th>CompanyName</th>
-                    <th>ContactName</th>
-                    <th>EmailAddress</th>
-                    <th>Status</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var r in PageRows)
-                {
-                    <tr>
-                        <td class="text-nowrap">@r.PropertyCode</td>
-                        <td>@(r.CompanyName ?? "—")</td>
-                        <td>@(r.ContactName ?? "—")</td>
-                        <td>@(r.EmailAddress ?? "—")</td>
-                        <td>
-                            @if (r.Status is LandlordStatus s)
-                            {
-                                <span class="badge @Landlords.StatusClass(s)">@Landlords.Label(s)</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted small">Not started</span>
-                            }
-                        </td>
-                        <td class="text-end text-nowrap di-iconacts">
-                            @{ var rid = r.RegistrationId; }
-                            @* Edit / view details *@
-                            @if (rid is int eid)
-                            {
-                                <a class="btn btn-sm btn-outline-secondary" href="/admin/landlords/@eid" title="View / edit all details">@IconEdit</a>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-secondary" title="Initiate registration" @onclick="() => EditAsync(r)">@IconEdit</button>
-                            }
-                            @* Notify / email invite *@
-                            <button class="btn btn-sm btn-outline-primary" title="Notify (send secure link)"
-                                    disabled="@(!CanNotify(r))" @onclick="() => NotifyAsync(r)">@IconMail</button>
-                            @* Attachments *@
-                            @if (rid is int aid)
-                            {
-                                <a class="btn btn-sm btn-outline-dark" href="/admin/landlords/@aid" title="View attachments">@IconClip</a>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-dark" title="No attachments yet" disabled>@IconClip</button>
-                            }
-                            @* Review *@
-                            @if (rid is int vid && CanReview(r))
-                            {
-                                <a class="btn btn-sm btn-outline-info" href="/admin/landlords/@vid" title="Review submission">@IconReview</a>
-                            }
-                            else
-                            {
-                                <button class="btn btn-sm btn-outline-info" title="No submission to review" disabled>@IconReview</button>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-    @Pager
-}
 
 @if (initiating is not null)
 {
@@ -207,12 +219,6 @@ else
 }
 
 <style>
-    .di-thead th { background: #1a5276; color: #fff; }
-    .di-actions a { color: #b8860b; font-weight: 600; text-decoration: none; margin: 0 .15rem; }
-    .di-actions a:hover { text-decoration: underline; }
-    .di-actions a.di-disabled { color: #b7bcc4; pointer-events: none; }
-    .di-actions a.di-attach { margin-left: .5rem; vertical-align: middle; }
-    .di-iconacts .btn { margin-left: 4px; }
     .di-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 3000; }
     .di-modal { width: 100%; max-width: 460px; background: var(--bs-body-bg); border-radius: .6rem; box-shadow: 0 12px 40px rgba(0,0,0,.3); padding: 1.25rem 1.5rem; }
 
@@ -255,22 +261,30 @@ else
     private List<string> categories = [];
     private CancellationTokenSource? debounceCts;
 
-    private RenderFragment Pager => @<div class="d-flex justify-content-between align-items-center my-2">
-        <span class="small text-muted">Showing @(rows.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, rows.Count) of @rows.Count</span>
+    private RenderFragment Pager =>@<text>
+        <span class="di-cfm-count">Showing @(rows.Count == 0 ? 0 : ((page - 1) * PageSize + 1))–@Math.Min(page * PageSize, rows.Count) of @rows.Count</span>
         @if (TotalPages > 1)
         {
-            <nav>
-                <ul class="pagination pagination-sm mb-0">
-                    <li class="page-item @(page == 1 ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page - 1)">Prev</button></li>
-                    @foreach (var pg in PageWindow)
-                    {
-                        <li class="page-item @(pg == page ? "active" : "")"><button class="page-link" @onclick="() => GoTo(pg)">@pg</button></li>
-                    }
-                    <li class="page-item @(page == TotalPages ? "disabled" : "")"><button class="page-link" @onclick="() => GoTo(page + 1)">Next</button></li>
-                </ul>
-            </nav>
+            <div class="di-cfm-pager">
+                <button class="di-cfm-page" disabled="@(page == 1)" @onclick="() => GoTo(page - 1)">‹</button>
+                @foreach (var pg in PageWindow)
+                {
+                    <button class="di-cfm-page @(pg == page ? "is-active" : "")" @onclick="() => GoTo(pg)">@pg</button>
+                }
+                <button class="di-cfm-page" disabled="@(page == TotalPages)" @onclick="() => GoTo(page + 1)">›</button>
+            </div>
         }
-    </div>;
+    </text>;
+
+    // Maps a landlord status to its di-cfm status-pill colour (mirrors Landlords.StatusClass grouping).
+    private static string StatusPill(LandlordStatus s) => s switch
+    {
+        LandlordStatus.RegistrationComplete => "di-cfm-status-green",
+        LandlordStatus.Submitted or LandlordStatus.UnderReview => "di-cfm-status-amber",
+        LandlordStatus.Rejected => "di-cfm-status-red",
+        LandlordStatus.Draft => "di-cfm-status-grey",
+        _ => "di-cfm-status-blue"
+    };
 
     private const int PageSize = 25;
     private int page = 1;
