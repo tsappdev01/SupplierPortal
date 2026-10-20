@@ -229,6 +229,11 @@ if (selfServiceApiEnabled)
     LandlordSelfServiceEndpoints.MapLandlordSelfServiceApi(app);
 }
 
+// The Landlord portal has no landing page of its own: redirect the root to the Landlords
+// list. Done as an endpoint (not a Blazor page) so it issues a plain 302 instead of a
+// server-side NavigationException. Cookie auth bounces anonymous users to /account/login.
+app.MapGet("/", () => Results.Redirect("/admin/landlords"));
+
 // Discover routable components from this assembly AND the shared library (Login/account pages live there).
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
