@@ -12,86 +12,114 @@
 
 <PageTitle>Add Business Unit - Supplier Portal</PageTitle>
 
-<h1>Add Business Unit</h1>
-
-<EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="add-business-unit" style="max-width: 480px;">
-    <DataAnnotationsValidator />
-    <ValidationSummary class="text-danger" />
-
-    <div class="mb-3">
-        <label class="form-label">Business Unit Name</label>
-        <InputText class="form-control" @bind-Value="Input.Name" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Business Unit Code</label>
-        <InputText class="form-control" @bind-Value="Input.Code" placeholder="Auto-generated if blank" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Domain Name <span class="text-muted small">(public self-service host for this unit's emailed links)</span></label>
-        <InputText class="form-control" @bind-Value="Input.Domain" placeholder="e.g. supplier.dipark.com" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Email Address <span class="text-muted small">(default sender / reply-to for this unit's communications)</span></label>
-        <InputText type="email" class="form-control" @bind-Value="Input.Email" placeholder="e.g. supplier.support@dipark.com" />
-        <ValidationMessage For="() => Input.Email" class="text-danger" />
-    </div>
-
-    <fieldset class="mb-3" style="border:1px solid #dee2e6; border-radius:8px; padding:12px 14px;">
-        <legend class="form-label" style="font-size:0.95rem; font-weight:600; float:none; width:auto; margin-bottom:4px;">
-            Portal sender email addresses
-        </legend>
-        <div class="form-text mb-2">A dedicated sender for each portal's system emails. When left blank, the
-            Email Address above is used.</div>
-        <div class="mb-2">
-            <label class="form-label mb-1">Supplier Portal</label>
-            <InputText type="email" class="form-control" @bind-Value="Input.SupplierSenderEmail" placeholder="e.g. purchase@dipark.com" />
-            <ValidationMessage For="() => Input.SupplierSenderEmail" class="text-danger" />
+<div class="di-cfm" style="max-width: 640px;">
+    <div class="di-cfm-card">
+        <div class="di-cfm-head">
+            <div class="di-cfm-head-icon">
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 1A1.5 1.5 0 0 0 5 2.5V3H1.5A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-8A1.5 1.5 0 0 0 14.5 3H11v-.5A1.5 1.5 0 0 0 9.5 1h-3zm0 1h3a.5.5 0 0 1 .5.5V3H6v-.5a.5.5 0 0 1 .5-.5zm1.886 6.914L15 7.151V12.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5V7.15l6.614 1.764a1.5 1.5 0 0 0 .772 0zM1.5 4h13a.5.5 0 0 1 .5.5v1.616L8.129 7.948a.5.5 0 0 1-.258 0L1 6.116V4.5a.5.5 0 0 1 .5-.5z"/></svg>
+            </div>
+            <div class="di-cfm-head-text">
+                <h1 class="di-cfm-title">Add Business Unit</h1>
+                <p class="di-cfm-sub">Create a business unit and set its branding and sender email addresses.</p>
+            </div>
         </div>
-        <div class="mb-2">
-            <label class="form-label mb-1">Customer Portal</label>
-            <InputText type="email" class="form-control" @bind-Value="Input.CustomerSenderEmail" placeholder="e.g. businessrelation@dipark.com" />
-            <ValidationMessage For="() => Input.CustomerSenderEmail" class="text-danger" />
-        </div>
-        <div class="mb-2">
-            <label class="form-label mb-1">Landlord Portal</label>
-            <InputText type="email" class="form-control" @bind-Value="Input.LandlordSenderEmail" placeholder="e.g. tenantrelation@dipark.com" />
-            <ValidationMessage For="() => Input.LandlordSenderEmail" class="text-danger" />
-        </div>
-        <div class="mb-0">
-            <label class="form-label mb-1">Broker Portal</label>
-            <InputText type="email" class="form-control" @bind-Value="Input.BrokerSenderEmail" placeholder="e.g. broker@dipark.com" />
-            <ValidationMessage For="() => Input.BrokerSenderEmail" class="text-danger" />
-        </div>
-    </fieldset>
-    <div class="mb-3">
-        <label class="form-label">Logo URL <span class="text-muted small">(used in emails &amp; external links)</span></label>
-        <InputText class="form-control" @bind-Value="Input.LogoUrl" placeholder="e.g. https://cdn.dipark.com/logo.png" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Logo <span class="text-muted small">(full-size)</span></label>
-        <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" class="form-control" />
-        @if (logoPreview is not null)
-        {
-            <img src="@logoPreview" alt="Logo preview" class="mt-2" style="max-width: 160px; max-height: 100px; object-fit: contain;" />
-        }
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Thumbnail <span class="text-muted small">(square, ~640×640; optional — derived from the logo if omitted)</span></label>
-        <InputFile OnChange="OnThumbnailSelectedAsync" accept="image/*" class="form-control" />
-        @if (thumbPreview is not null)
-        {
-            <img src="@thumbPreview" alt="Thumbnail preview" class="mt-2" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid #dee2e6; border-radius: 6px;" />
-        }
-    </div>
 
-    @if (errorMessage is not null)
-    {
-        <div class="alert alert-danger">@errorMessage</div>
-    }
+        <div class="di-cfm-body">
+            <EditForm Model="Input" OnValidSubmit="SaveAsync" FormName="add-business-unit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
 
-    <button type="submit" class="btn btn-primary">Save Business Unit</button>
-    <a class="btn btn-secondary" href="/admin/business-units">Cancel</a>
-</EditForm>
+                <div class="di-cfm-fld">
+                    <label>Business Unit Name</label>
+                    <InputText @bind-Value="Input.Name" />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Business Unit Code</label>
+                    <InputText @bind-Value="Input.Code" placeholder="Auto-generated if blank" />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Domain Name <span class="di-cfm-fld-hint">(public self-service host for this unit's emailed links)</span></label>
+                    <InputText @bind-Value="Input.Domain" placeholder="e.g. supplier.dipark.com" />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Email Address <span class="di-cfm-fld-hint">(default sender / reply-to for this unit's communications)</span></label>
+                    <InputText type="email" @bind-Value="Input.Email" placeholder="e.g. supplier.support@dipark.com" />
+                    <ValidationMessage For="() => Input.Email" class="text-danger" />
+                </div>
+
+                <fieldset class="di-cfm-fieldset">
+                    <legend>Portal sender email addresses</legend>
+                    <div class="form-text mb-2">A dedicated sender for each portal's system emails. When left blank, the
+                        Email Address above is used.</div>
+                    <div class="di-cfm-fld">
+                        <label>Supplier Portal</label>
+                        <InputText type="email" @bind-Value="Input.SupplierSenderEmail" placeholder="e.g. purchase@dipark.com" />
+                        <ValidationMessage For="() => Input.SupplierSenderEmail" class="text-danger" />
+                    </div>
+                    <div class="di-cfm-fld">
+                        <label>Customer Portal</label>
+                        <InputText type="email" @bind-Value="Input.CustomerSenderEmail" placeholder="e.g. businessrelation@dipark.com" />
+                        <ValidationMessage For="() => Input.CustomerSenderEmail" class="text-danger" />
+                    </div>
+                    <div class="di-cfm-fld">
+                        <label>Landlord Portal</label>
+                        <InputText type="email" @bind-Value="Input.LandlordSenderEmail" placeholder="e.g. tenantrelation@dipark.com" />
+                        <ValidationMessage For="() => Input.LandlordSenderEmail" class="text-danger" />
+                    </div>
+                    <div class="di-cfm-fld" style="margin-bottom:0;">
+                        <label>Broker Portal</label>
+                        <InputText type="email" @bind-Value="Input.BrokerSenderEmail" placeholder="e.g. broker@dipark.com" />
+                        <ValidationMessage For="() => Input.BrokerSenderEmail" class="text-danger" />
+                    </div>
+                </fieldset>
+                <div class="di-cfm-fld">
+                    <label>Logo URL <span class="di-cfm-fld-hint">(used in emails &amp; external links)</span></label>
+                    <InputText @bind-Value="Input.LogoUrl" placeholder="e.g. https://cdn.dipark.com/logo.png" />
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Logo <span class="di-cfm-fld-hint">(full-size)</span></label>
+                    <InputFile OnChange="OnLogoSelectedAsync" accept="image/*" />
+                    @if (logoPreview is not null)
+                    {
+                        <img src="@logoPreview" alt="Logo preview" class="mt-2" style="max-width: 160px; max-height: 100px; object-fit: contain;" />
+                    }
+                </div>
+                <div class="di-cfm-fld">
+                    <label>Thumbnail <span class="di-cfm-fld-hint">(square, ~640×640; optional — derived from the logo if omitted)</span></label>
+                    <InputFile OnChange="OnThumbnailSelectedAsync" accept="image/*" />
+                    @if (thumbPreview is not null)
+                    {
+                        <img src="@thumbPreview" alt="Thumbnail preview" class="mt-2" style="width: 80px; height: 80px; object-fit: contain; border: 1px solid var(--border); border-radius: 6px;" />
+                    }
+                </div>
+
+                @if (errorMessage is not null)
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <div class="di-cfm-formfoot">
+                    <button type="submit" class="di-cfm-btn di-cfm-btn-primary">Save Business Unit</button>
+                    <a class="di-cfm-btn di-cfm-btn-ghost" href="/admin/business-units">Cancel</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .di-cfm-body { padding: 20px 22px; }
+    .di-cfm-fld { margin-bottom: 16px; }
+    .di-cfm-fld > label { display: block; font-size: 12.5px; font-weight: 700; color: var(--label); margin-bottom: 5px; }
+    .di-cfm-fld-hint { font-weight: 400; color: #9aa4b8; }
+    .di-cfm-fld input:not([type=checkbox]):not([type=radio]), .di-cfm-fld textarea, .di-cfm-fld select {
+        width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; color: #1a2233; background: #fff; }
+    .di-cfm-fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+    .di-cfm-fieldset > legend { font-size: 12.5px; font-weight: 700; color: var(--label); float: none; width: auto; margin-bottom: 4px; }
+    .di-cfm-formfoot { display: flex; gap: 8px; margin-top: 6px; }
+    a.di-cfm-btn { display: inline-flex; align-items: center; text-decoration: none; }
+    [data-theme="dark"] .di-cfm-fld input:not([type=checkbox]):not([type=radio]), [data-theme="dark"] .di-cfm-fld textarea, [data-theme="dark"] .di-cfm-fld select { background: #131a2b; color: #e7ecf5; border-color: #2b3550; }
+</style>
 
 @code {
     private const long MaxLogoSize = 2 * 1024 * 1024;
