@@ -12,8 +12,6 @@
 
 <PageTitle>My Profile - Landlord Portal</PageTitle>
 
-<h1>My Profile</h1>
-
 @if (notFound)
 {
     <div class="alert alert-danger">Your account could not be loaded.</div>
@@ -24,110 +22,134 @@ else if (Profile is null)
 }
 else
 {
-    <div class="d-flex align-items-center gap-3 mb-4">
-        @if (photoPreview is not null)
-        {
-            <img src="@photoPreview" alt="" class="di-profile-pic" />
-        }
-        else if (hasExistingPhoto)
-        {
-            <img src="/users/@userId/photo" alt="" class="di-profile-pic" />
-        }
-        else
-        {
-            <span class="di-profile-pic di-profile-pic-initials">@GetInitials(Profile.FullName)</span>
-        }
-        <div>
-            <div class="h5 mb-0">@Profile.FullName</div>
-            <div class="text-muted">@(string.IsNullOrWhiteSpace(Profile.Designation) ? "—" : Profile.Designation)</div>
-            <div class="text-muted small">@email</div>
-        </div>
-    </div>
-
-    <div class="row g-4" style="max-width: 920px;">
+    <div class="row g-4" style="max-width: 980px;">
         <div class="col-md-6">
-            <div class="card">
-                <div class="card-header fw-semibold">Profile details</div>
-                <div class="card-body">
-                    <EditForm Model="Profile" OnValidSubmit="SaveProfileAsync" FormName="my-profile">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary class="text-danger" />
+            <div class="di-cfm">
+                <div class="di-cfm-card">
+                    <div class="di-cfm-head">
+                        <div class="di-cfm-head-icon">
+                            <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/></svg>
+                        </div>
+                        <div class="di-cfm-head-text">
+                            <h1 class="di-cfm-title">My Profile</h1>
+                            <p class="di-cfm-sub">Your personal details and profile photo.</p>
+                        </div>
+                    </div>
+                    <div class="di-cfm-body">
+                        <div class="d-flex align-items-center gap-3 mb-4">
+                            @if (photoPreview is not null)
+                            {
+                                <img src="@photoPreview" alt="" class="di-profile-pic" />
+                            }
+                            else if (hasExistingPhoto)
+                            {
+                                <img src="/users/@userId/photo" alt="" class="di-profile-pic" />
+                            }
+                            else
+                            {
+                                <span class="di-profile-pic di-profile-pic-initials">@GetInitials(Profile.FullName)</span>
+                            }
+                            <div>
+                                <div class="h5 mb-0">@Profile.FullName</div>
+                                <div class="text-muted">@(string.IsNullOrWhiteSpace(Profile.Designation) ? "—" : Profile.Designation)</div>
+                                <div class="text-muted small">@email</div>
+                            </div>
+                        </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Full Name</label>
-                            <InputText class="form-control" @bind-Value="Profile.FullName" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Designation</label>
-                            <InputText class="form-control" @bind-Value="Profile.Designation" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Email</label>
-                            <input class="form-control" value="@email" disabled />
-                            <div class="form-text">Contact an administrator to change your email.</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Profile Photo</label>
-                            <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" class="form-control" />
-                        </div>
+                        <EditForm Model="Profile" OnValidSubmit="SaveProfileAsync" FormName="my-profile">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
 
-                        @if (profileError is not null)
-                        {
-                            <div class="alert alert-danger">@profileError</div>
-                        }
-                        @if (profileSaved)
-                        {
-                            <div class="alert alert-success py-2">Profile updated.</div>
-                        }
+                            <div class="di-cfm-fld">
+                                <label>Full Name</label>
+                                <InputText @bind-Value="Profile.FullName" />
+                            </div>
+                            <div class="di-cfm-fld">
+                                <label>Designation</label>
+                                <InputText @bind-Value="Profile.Designation" />
+                            </div>
+                            <div class="di-cfm-fld">
+                                <label>Email</label>
+                                <input value="@email" disabled />
+                                <div class="form-text">Contact an administrator to change your email.</div>
+                            </div>
+                            <div class="di-cfm-fld">
+                                <label>Profile Photo</label>
+                                <InputFile OnChange="OnPhotoSelectedAsync" accept="image/*" />
+                            </div>
 
-                        <button type="submit" class="btn btn-primary">Save Profile</button>
-                    </EditForm>
+                            @if (profileError is not null)
+                            {
+                                <div class="alert alert-danger">@profileError</div>
+                            }
+                            @if (profileSaved)
+                            {
+                                <div class="alert alert-success py-2">Profile updated.</div>
+                            }
+
+                            <div class="di-cfm-formfoot">
+                                <button type="submit" class="di-cfm-btn di-cfm-btn-primary">Save Profile</button>
+                            </div>
+                        </EditForm>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="col-md-6">
-            <div class="card">
-                <div class="card-header fw-semibold">Change password</div>
-                <div class="card-body">
-                    @if (isAdAccount)
-                    {
-                        <div class="alert alert-info mb-0">
-                            You sign in with your Active Directory account. Your password is managed there and
-                            cannot be changed here.
+            <div class="di-cfm">
+                <div class="di-cfm-card">
+                    <div class="di-cfm-head">
+                        <div class="di-cfm-head-icon">
+                            <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>
                         </div>
-                    }
-                    else
-                    {
-                        <EditForm Model="Password" OnValidSubmit="ChangePasswordAsync" FormName="change-password">
-                            <DataAnnotationsValidator />
-                            <ValidationSummary class="text-danger" />
-
-                            <div class="mb-3">
-                                <label class="form-label">Current Password</label>
-                                <InputText type="password" class="form-control" @bind-Value="Password.CurrentPassword" />
+                        <div class="di-cfm-head-text">
+                            <h2 class="di-cfm-title">Change Password</h2>
+                            <p class="di-cfm-sub">Update the password used to sign in.</p>
+                        </div>
+                    </div>
+                    <div class="di-cfm-body">
+                        @if (isAdAccount)
+                        {
+                            <div class="alert alert-info mb-0">
+                                You sign in with your Active Directory account. Your password is managed there and
+                                cannot be changed here.
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">New Password</label>
-                                <InputText type="password" class="form-control" @bind-Value="Password.NewPassword" />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Confirm New Password</label>
-                                <InputText type="password" class="form-control" @bind-Value="Password.ConfirmPassword" />
-                            </div>
+                        }
+                        else
+                        {
+                            <EditForm Model="Password" OnValidSubmit="ChangePasswordAsync" FormName="change-password">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary class="text-danger" />
 
-                            @if (passwordError is not null)
-                            {
-                                <div class="alert alert-danger">@passwordError</div>
-                            }
-                            @if (passwordChanged)
-                            {
-                                <div class="alert alert-success py-2">Password changed.</div>
-                            }
+                                <div class="di-cfm-fld">
+                                    <label>Current Password</label>
+                                    <InputText type="password" @bind-Value="Password.CurrentPassword" />
+                                </div>
+                                <div class="di-cfm-fld">
+                                    <label>New Password</label>
+                                    <InputText type="password" @bind-Value="Password.NewPassword" />
+                                </div>
+                                <div class="di-cfm-fld">
+                                    <label>Confirm New Password</label>
+                                    <InputText type="password" @bind-Value="Password.ConfirmPassword" />
+                                </div>
 
-                            <button type="submit" class="btn btn-primary">Change Password</button>
-                        </EditForm>
-                    }
+                                @if (passwordError is not null)
+                                {
+                                    <div class="alert alert-danger">@passwordError</div>
+                                }
+                                @if (passwordChanged)
+                                {
+                                    <div class="alert alert-success py-2">Password changed.</div>
+                                }
+
+                                <div class="di-cfm-formfoot">
+                                    <button type="submit" class="di-cfm-btn di-cfm-btn-primary">Change Password</button>
+                                </div>
+                            </EditForm>
+                        }
+                    </div>
                 </div>
             </div>
         </div>
@@ -135,6 +157,14 @@ else
 }
 
 <style>
+    .di-cfm-body { padding: 20px 22px; }
+    .di-cfm-fld { margin-bottom: 16px; }
+    .di-cfm-fld > label { display: block; font-size: 12.5px; font-weight: 700; color: var(--label); margin-bottom: 5px; }
+    .di-cfm-fld input:not([type=checkbox]):not([type=radio]), .di-cfm-fld textarea, .di-cfm-fld select {
+        width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; color: #1a2233; background: #fff; }
+    .di-cfm-fld input:disabled { background: #f4f5f8; color: #8a93a6; }
+    .di-cfm-formfoot { display: flex; gap: 8px; margin-top: 6px; }
+
     .di-profile-pic {
         width: 72px;
         height: 72px;
@@ -151,6 +181,8 @@ else
         font-size: 1.4rem;
         font-weight: 700;
     }
+
+    [data-theme="dark"] .di-cfm-fld input:not([type=checkbox]):not([type=radio]), [data-theme="dark"] .di-cfm-fld textarea, [data-theme="dark"] .di-cfm-fld select { background: #131a2b; color: #e7ecf5; border-color: #2b3550; }
 </style>
 
 @code {

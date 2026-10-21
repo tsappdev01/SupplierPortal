@@ -26,5 +26,8 @@ src/SupplierPortal.SelfService/keys/
 .vscode/
 *.suo
 
+## Claude Code local scaffolding (temporary agent worktrees, never commit)
+.claude/worktrees/
+
 ## OS
 .DS_Store
