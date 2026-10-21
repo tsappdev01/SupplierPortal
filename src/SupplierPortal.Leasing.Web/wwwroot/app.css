@@ -75,13 +75,13 @@ h1:focus {
     text-align: start;
 }
 /* ============================================================
-   Dubai Investments corporate theme (navy + gold)
+   Dubai Investments corporate theme (navy + taupe)
    ============================================================ */
 :root {
     --di-navy: #1a2233;
     --di-navy-2: #26324a;
-    --di-gold: #c8a24a;
-    --di-gold-dark: #a8842f;
+    --di-gold: #a89582;
+    --di-gold-dark: #83715c;
     --di-page-bg: #f4f6f9;
     --di-border: #e2e5ea;
     /* semantic tokens (flip in dark) */
@@ -90,7 +90,7 @@ h1:focus {
     --di-text: #26303f;
     --di-text-soft: #5a6678;
     --di-heading: #1a2233;      /* page titles / labels — must stay readable on the page ground */
-    --di-row-hover: #fbf6ea;    /* faint gold tint */
+    --di-row-hover: #f6f2ec;    /* faint gold tint */
     --di-link: #26324a;
 }
 
@@ -278,7 +278,7 @@ table thead th {
 
 .di-export-btn:hover,
 .di-export-btn:focus-visible {
-    border-color: var(--di-gold, #c8a24a);
+    border-color: var(--di-gold, #a89582);
     box-shadow: 0 2px 8px rgba(26, 34, 51, 0.12);
     transform: translateY(-1px);
     color: #1a2233;
@@ -413,7 +413,7 @@ table thead th {
 .di-stat-total { border-top-color: #1a2233; }
 .di-stat-new { border-top-color: #6c757d; } .di-stat-new .di-stat-value { color: #6c757d; }
 .di-stat-await { border-top-color: #2f80b5; } .di-stat-await .di-stat-value { color: #2f80b5; }
-.di-stat-review { border-top-color: #c8a24a; } .di-stat-review .di-stat-value { color: #a8842f; }
+.di-stat-review { border-top-color: #a89582; } .di-stat-review .di-stat-value { color: #83715c; }
 .di-stat-complete { border-top-color: #2e7d46; } .di-stat-complete .di-stat-value { color: #2e7d46; }
 [data-theme="dark"] .di-stat-total { border-top-color: #8fa0c4; }
 /* Brighten the accent values so they stay legible on the dark surface. */
@@ -532,7 +532,7 @@ table thead th {
 .di-cfm-empty { text-align: center; color: #97a1b3; font-style: italic; padding: 30px 0; }
 .di-cfm-fd { display: flex; align-items: center; gap: 10px; }
 .di-cfm-avatar { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; font-size: 13px; font-weight: 700; flex-shrink: 0; object-fit: cover; }
-.di-cfm-avatar-navy { background: #1a2233; color: #c9a227; }
+.di-cfm-avatar-navy { background: #1a2233; color: #c3b19c; }
 .di-cfm-fd-text { min-width: 0; }
 .di-cfm-fd-name { font-weight: 700; color: var(--navy); font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .di-cfm-fd-desc { font-size: 12px; color: #8a93a6; margin-top: 1px; }

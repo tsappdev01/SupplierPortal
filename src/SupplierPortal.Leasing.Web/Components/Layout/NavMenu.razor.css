@@ -55,7 +55,7 @@
 }
 
 .di-profile-initials {
-    background: #b5892f;
+    background: #a89582;
     color: #10192a;
     font-size: 0.8rem;
     font-weight: 800;
@@ -103,7 +103,7 @@
     }
 
 .nav-item ::deep a.active {
-    background-color: #b5892f;
+    background-color: #a89582;
     color: #10192a;
     font-weight: 700;
 }
@@ -114,7 +114,7 @@
 }
 
 .nav-item ::deep a.active:hover {
-    background-color: #b5892f;
+    background-color: #a89582;
     color: #10192a;
 }
 
@@ -201,7 +201,7 @@
 }
 
 .di-logout-btn:hover {
-    background: #b5892f;
+    background: #a89582;
     color: #10192a;
 }
 
