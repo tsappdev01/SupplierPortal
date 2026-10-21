@@ -23,7 +23,7 @@
     <PackageReference Include="System.DirectoryServices.Protocols" Version="8.0.1" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="ZXing.Net" Version="0.16.9" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
   </ItemGroup>
 
   <ItemGroup>
