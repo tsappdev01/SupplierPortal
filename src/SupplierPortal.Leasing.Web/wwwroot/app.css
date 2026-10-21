@@ -498,16 +498,16 @@ table thead th {
    footer pager. Page-specific pieces (confirm dialogs, KPI cards, modals)
    stay in each page's own <style> block.
    ============================================================================ */
-.di-cfm { --navy: #16244a; --blue: #2f6fed; --border: #e4e8f0; --label: #55627a; }
+.di-cfm { --navy: #16244a; --blue: #1c3a5c; --border: #e4e8f0; --label: #55627a; } /* --blue = primary interactive (logo navy) */
 .di-cfm-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 3px rgba(16,24,40,.06); overflow: hidden; }
 .di-cfm-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); }
-.di-cfm-head-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: #eaf0fe; color: var(--blue); flex-shrink: 0; }
+.di-cfm-head-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: #e9edf4; color: var(--blue); flex-shrink: 0; }
 .di-cfm-head-text { min-width: 0; flex: 1; }
 .di-cfm-title { margin: 0; font-size: 19px; font-weight: 800; color: var(--navy); }
 .di-cfm-sub { margin: 2px 0 0; font-size: 13px; color: var(--label); }
 .di-cfm-head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 .di-cfm-new { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent; background: var(--blue); color: #fff; text-decoration: none; }
-.di-cfm-new:hover { background: #2560d8; color: #fff; }
+.di-cfm-new:hover { background: #142a44; color: #fff; }
 .di-cfm-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--border); }
 .di-cfm-search { position: relative; flex: 1 1 260px; min-width: 200px; }
 .di-cfm-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9aa4b8; }
@@ -518,7 +518,7 @@ table thead th {
 .di-cfm-toolbar-actions { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
 .di-cfm-btn { padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
 .di-cfm-btn-primary { background: var(--blue); color: #fff; }
-.di-cfm-btn-primary:hover { background: #2560d8; }
+.di-cfm-btn-primary:hover { background: #142a44; }
 .di-cfm-btn-primary:disabled { opacity: .6; cursor: default; }
 .di-cfm-btn-ghost { background: #fff; border-color: var(--border); color: var(--navy); }
 .di-cfm-btn-ghost:hover { background: #f5f7fc; }
@@ -557,7 +557,7 @@ table thead th {
 .di-cfm-acts { display: inline-flex; gap: 6px; justify-content: flex-end; }
 .di-cfm-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: #64708a; cursor: pointer; padding: 0; text-decoration: none; }
 .di-cfm-iconbtn:hover { background: #eef2fb; color: var(--blue); }
-.di-cfm-iconbtn.i-primary:hover { color: var(--blue); border-color: #cfe0ff; background: #f2f7ff; }
+.di-cfm-iconbtn.i-primary:hover { color: var(--blue); border-color: #c9d2e0; background: #eef1f6; }
 .di-cfm-iconbtn.i-dark:hover { color: #1a2233; }
 .di-cfm-iconbtn.i-info:hover { color: #0a8ea6; border-color: #bfe8f0; background: #eefafd; }
 .di-cfm-iconbtn.is-disabled, .di-cfm-iconbtn:disabled { opacity: .4; cursor: default; pointer-events: none; }
@@ -594,3 +594,5 @@ table thead th {
 [data-theme="dark"] .di-cfm-iconbtn { background: #131a2b; border-color: #2b3550; color: #aab6d0; }
 [data-theme="dark"] .di-cfm-page { background: #131a2b; border-color: #2b3550; color: #e7ecf5; }
 [data-theme="dark"] .di-cfm-buchip { background: #202a42; color: #cdd6ea; border-color: #2b3550; }
+[data-theme="dark"] .di-cfm { --blue: #3a5a85; } /* lighter navy so primary buttons/toggles stay visible on dark cards */
+[data-theme="dark"] .di-cfm-head-icon { background: #22304a; }
