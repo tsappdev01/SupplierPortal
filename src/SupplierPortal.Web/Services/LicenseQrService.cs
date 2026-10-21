@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using UglyToad.PdfPig;
 using ZXing;
 using ZXing.Common;
@@ -72,11 +71,20 @@ public class LicenseQrService
     {
         try
         {
-            using var image = Image.Load<Rgba32>(imageBytes);
-            var pixels = new byte[image.Width * image.Height * 4];
-            image.CopyPixelDataTo(pixels);
+            using var decoded = SKBitmap.Decode(imageBytes);
+            if (decoded is null)
+            {
+                return null;
+            }
+            // Normalise to straight RGBA so the pixel order matches ZXing's RGBA32 source.
+            using var rgba = new SKBitmap(new SKImageInfo(decoded.Width, decoded.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+            if (!decoded.CopyTo(rgba, SKColorType.Rgba8888))
+            {
+                return null;
+            }
+            var pixels = rgba.GetPixelSpan().ToArray();
             var source = new RGBLuminanceSource(
-                pixels, image.Width, image.Height, RGBLuminanceSource.BitmapFormat.RGBA32);
+                pixels, rgba.Width, rgba.Height, RGBLuminanceSource.BitmapFormat.RGBA32);
             var result = Reader.Decode(source);
             var text = result?.Text?.Trim();
             if (string.IsNullOrWhiteSpace(text))

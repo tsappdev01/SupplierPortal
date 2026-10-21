@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 using SupplierPortal.Web.Data;
 using SupplierPortal.Web.Models;
 
@@ -239,16 +237,35 @@ public class BusinessUnitService(
 
         try
         {
-            using var image = Image.Load(logo);
-            image.Mutate(x => x.Resize(new ResizeOptions
+            using var src = SKBitmap.Decode(logo);
+            if (src is null || src.Width == 0 || src.Height == 0)
             {
-                Size = new Size(ThumbnailSize, ThumbnailSize),
-                Mode = ResizeMode.Pad,                 // fit within the square, no distortion
-                PadColor = Color.Transparent
-            }));
-            using var ms = new MemoryStream();
-            image.Save(ms, new PngEncoder());
-            return (ms.ToArray(), "image/png");
+                // Not a decodable image (or an unsupported format) — keep what was uploaded.
+                return (logo, contentType);
+            }
+
+            // Fit within the square preserving aspect ratio (no distortion), then centre-pad
+            // onto a transparent ThumbnailSize×ThumbnailSize canvas, stored as PNG.
+            var scale = Math.Min((float)ThumbnailSize / src.Width, (float)ThumbnailSize / src.Height);
+            var w = Math.Max(1, (int)Math.Round(src.Width * scale));
+            var h = Math.Max(1, (int)Math.Round(src.Height * scale));
+
+            using var resized = src.Resize(new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul), SKFilterQuality.High);
+            if (resized is null)
+            {
+                return (logo, contentType);
+            }
+
+            var info = new SKImageInfo(ThumbnailSize, ThumbnailSize, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+            using var surface = SKSurface.Create(info);
+            var canvas = surface.Canvas;
+            canvas.Clear(SKColors.Transparent);
+            canvas.DrawBitmap(resized, (ThumbnailSize - w) / 2f, (ThumbnailSize - h) / 2f);
+            canvas.Flush();
+
+            using var snapshot = surface.Snapshot();
+            using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);
+            return (data.ToArray(), "image/png");
         }
         catch
         {
