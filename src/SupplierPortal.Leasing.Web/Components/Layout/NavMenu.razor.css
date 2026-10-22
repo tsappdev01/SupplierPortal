@@ -29,9 +29,13 @@
 
 .di-brand-logo {
     height: 2.5rem;
-    max-width: 190px;
+    max-width: 200px;
     width: auto;
     object-fit: contain;
+    /* The logo is navy text + taupe mark on transparent; sit it on a white chip so it reads on the navy sidebar. */
+    background: #fff;
+    padding: 5px 9px;
+    border-radius: 8px;
 }
 
 .di-profile-card {
