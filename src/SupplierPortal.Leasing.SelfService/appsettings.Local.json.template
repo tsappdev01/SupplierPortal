@@ -3,7 +3,7 @@
 
   "// Api": "Points at the internal Landlord app. ClientSecret MUST equal the Landlord app's ApiSecurity:Clients[0].ClientSecret.",
   "Api": {
-    "BaseUrl": "https://ulandlordportal.dubaiinvestments.com",
+    "BaseUrl": "https://tenant.dipark.com",
     "ClientId": "landlord-portal",
     "ClientSecret": "REPLACE_WITH_THE_SAME_SHARED_SECRET"
   }
