@@ -31,7 +31,10 @@
 #       runs here, so the .NET 8 SDK is needed (the UseDotNet step installs it if
 #       the agent has outbound access; otherwise pre-install it).
 #    4. Put the real secrets in each site's appsettings.Local.json ONCE on the
-#       server — the deploy never overwrites it.
+#       server — the deploy never overwrites it. A pre-deploy guard
+#       (deploy/Assert-SiteConfig.ps1) fails the step with a clear message if that
+#       file or a required key is missing, instead of a 500 at runtime. Set the
+#       'configGuard' variable to 'off' to skip it.
 # ============================================================================
 
 # Manual by default (click "Run pipeline"). To auto-deploy on every merge to
@@ -48,6 +51,7 @@ name: $(Date:yyyy.MM.dd).$(Rev:r)
 variables:
   buildConfiguration: 'Release'
   uatAgentPool: 'Default'                 # <-- set to your UATWEB01 agent pool
+  configGuard: 'on'                       # 'off' to skip the pre-deploy appsettings.Local.json checks
 
   # ---- INTERNAL sites ----
   # IIS *site names* on UATWEB01 (NOT host headers). Path + app pool are resolved from these.
@@ -99,6 +103,14 @@ steps:
 
   # ---- Supplier + Customer site — always deployed ----
   - task: PowerShell@2
+    displayName: 'Guard config → $(supplierSiteName)'
+    condition: and(succeeded(), ne(variables['configGuard'], 'off'))
+    inputs:
+      filePath: 'deploy/Assert-SiteConfig.ps1'
+      arguments: '-SiteName "$(supplierSiteName)" -RequireKeys "ConnectionStrings:DefaultConnection"'
+      pwsh: false
+
+  - task: PowerShell@2
     displayName: 'Deploy Supplier + Customer → $(supplierSiteName)'
     inputs:
       filePath: 'deploy/Deploy-Site-Local.ps1'
@@ -116,6 +128,14 @@ steps:
       arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/leasingweb" --nologo'
       zipAfterPublish: false
       modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Guard config → $(landlordSiteName)'
+    condition: and(succeeded(), ne(variables['landlordSiteName'], ''), ne(variables['configGuard'], 'off'))
+    inputs:
+      filePath: 'deploy/Assert-SiteConfig.ps1'
+      arguments: '-SiteName "$(landlordSiteName)" -RequireKeys "ConnectionStrings:LeasingConnection"'
+      pwsh: false
 
   - task: PowerShell@2
     displayName: 'Deploy Landlord Portal → $(landlordSiteName)'
@@ -140,6 +160,14 @@ steps:
       modifyOutputPath: false
 
   - task: PowerShell@2
+    displayName: 'Guard config → $(selfServiceSiteName)'
+    condition: and(succeeded(), ne(variables['selfServiceSiteName'], ''), ne(variables['configGuard'], 'off'))
+    inputs:
+      filePath: 'deploy/Assert-SiteConfig.ps1'
+      arguments: '-SiteName "$(selfServiceSiteName)" -RequireKeys "Api:ClientSecret"'
+      pwsh: false
+
+  - task: PowerShell@2
     displayName: 'Deploy Partner Connect → $(selfServiceSiteName)'
     condition: and(succeeded(), ne(variables['selfServiceSiteName'], ''))
     inputs:
@@ -158,6 +186,14 @@ steps:
       arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/leasingdmz" --nologo'
       zipAfterPublish: false
       modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Guard config → $(landlordDmzSiteName)'
+    condition: and(succeeded(), ne(variables['landlordDmzSiteName'], ''), ne(variables['configGuard'], 'off'))
+    inputs:
+      filePath: 'deploy/Assert-SiteConfig.ps1'
+      arguments: '-SiteName "$(landlordDmzSiteName)" -RequireKeys "Api:ClientSecret"'
+      pwsh: false
 
   - task: PowerShell@2
     displayName: 'Deploy Landlord Connect → $(landlordDmzSiteName)'
