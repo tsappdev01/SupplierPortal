@@ -58,10 +58,10 @@ variables:
   # Supplier + Customer both run the SAME SupplierPortal.Web build on two separate IIS sites.
   supplierSiteName: 'DI Supplier'         # Supplier internal site
   supplierUrl: 'https://usupplierportal.dubaiinvestments.com/'
-  customerSiteName: ''                    # Customer internal site — set its IIS site name to enable
-  customerUrl: ''
-  landlordSiteName: ''                    # Landlord internal site (SupplierPortal.Leasing.Web) — set to enable
-  landlordUrl: ''
+  customerSiteName: 'DI Customer'         # Customer internal site (same SupplierPortal.Web build)
+  customerUrl: ''                         # optional warm-up URL (blank = skip warm-up)
+  landlordSiteName: 'Landlord Portal'     # Landlord internal site (SupplierPortal.Leasing.Web) -> C:\Websites\Landlord\INT
+  landlordUrl: 'https://lms.dipark.com/'
 
   # ---- DMZ / self-service sites (set up later) ----
   selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService)
