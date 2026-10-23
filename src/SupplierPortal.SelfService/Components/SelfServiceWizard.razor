@@ -269,6 +269,121 @@
                                 @DocCard("Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
                             </div>
                         }
+
+                        @if (step == 6)
+                        {
+                            <div class="di-kys">
+                                <details class="di-acc" open>
+                                    <summary>Identity / licence</summary>
+                                    <div class="di-section-body">
+                                        <div class="di-field di-full">
+                                            <label>Licensed business activities (as per trade licence)</label>
+                                            <InputTextArea @bind-Value="model.KysLicensedActivities" rows="2" />
+                                        </div>
+                                        <div class="di-field">
+                                            <label>Emirates ID / Passport No.</label>
+                                            <InputText @bind-Value="model.KysIdNumber" />
+                                        </div>
+                                        <div class="di-field">
+                                            <label>ID expiry date</label>
+                                            <InputDate @bind-Value="model.KysIdExpiryDate" />
+                                        </div>
+                                        <div class="di-field di-full">
+                                            <label>Name &amp; position of the authorised representative</label>
+                                            <InputText @bind-Value="model.KysRepPosition" placeholder="Position / designation (the name is captured on the Contact tab)" />
+                                        </div>
+                                        @KysYesNo("Are you available to meet our representative in person or virtually before the first supply?", model.KysAvailableToMeet, v => model.KysAvailableToMeet = v)
+                                    </div>
+                                </details>
+
+                                <details class="di-acc">
+                                    <summary>Address</summary>
+                                    <div class="di-section-body">
+                                        @KysYesNo("Has the business address changed more than twice in the last 12 months?", model.KysAddressChangedTwice, v => model.KysAddressChangedTwice = v)
+                                        @KysYesNo("Have the employees / representatives dealing with us changed more than twice in the last 12 months?", model.KysRepsChangedTwice, v => model.KysRepsChangedTwice = v)
+                                        <div class="di-field di-full">
+                                            <label>Expected volume &amp; value of supplies to us (per month / year)</label>
+                                            <InputText @bind-Value="model.KysExpectedVolumeValue" />
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <details class="di-acc">
+                                    <summary>Banking</summary>
+                                    <div class="di-section-body">
+                                        @KysYesNo("Is the bank authorised / licensed in the UAE?", model.KysBankAuthorisedUae, v => model.KysBankAuthorisedUae = v)
+                                        @KysYesNo("Will payment ever be requested to a party other than the named account holder?", model.KysPaymentToOtherParty, v => model.KysPaymentToOtherParty = v)
+                                        @KysYesNo("Do you confirm that all payments will be received by electronic means and not in cash?", model.KysPaymentsElectronicOnly, v => model.KysPaymentsElectronicOnly = v)
+                                    </div>
+                                </details>
+
+                                <details class="di-acc">
+                                    <summary>Goods / supply &amp; pricing</summary>
+                                    <div class="di-section-body">
+                                        <div class="di-field di-full">
+                                            <label>Description of goods / services to be supplied to us</label>
+                                            <InputTextArea @bind-Value="model.KysGoodsDescription" rows="2" />
+                                        </div>
+                                        <div class="di-field di-full">
+                                            <label>Which licensed activity (Section 1) covers this supply?</label>
+                                            <InputText @bind-Value="model.KysCoveringActivity" />
+                                        </div>
+                                        <div class="di-field di-full">
+                                            <label>Basis of pricing (price list / quotation / contract) and profit margin, where available</label>
+                                            <InputTextArea @bind-Value="model.KysPricingBasis" rows="2" />
+                                        </div>
+                                        <div class="di-field di-full">
+                                            <label>Origin of the goods (country and manufacturer / source)</label>
+                                            <InputText @bind-Value="model.KysGoodsOrigin" />
+                                        </div>
+                                        @KysYesNo("Do you own the goods at the time of supply?", model.KysOwnGoodsAtSupply, v => model.KysOwnGoodsAtSupply = v)
+                                        @KysYesNo("Are the goods genuine / authentic?", model.KysGoodsGenuine, v => model.KysGoodsGenuine = v)
+                                        @if (model.KysGoodsGenuine == true)
+                                        {
+                                            <div class="di-field di-full">
+                                                <label>State the proof available (brand authorisation, purchase invoice, certificate of origin)</label>
+                                                <InputTextArea @bind-Value="model.KysGoodsGenuineProof" rows="2" />
+                                            </div>
+                                        }
+                                        <div class="di-field di-full">
+                                            <label>Commercial reason for the supply and for the price offered</label>
+                                            <InputTextArea @bind-Value="model.KysCommercialReason" rows="2" />
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <details class="di-acc">
+                                    <summary>Tax-compliance declarations</summary>
+                                    <div class="di-section-body">
+                                        @KysYesNo("Has the business or any owner / manager been subject to an FTA penalty, or investigated or convicted for Tax Evasion, in the UAE or elsewhere?", model.KysFtaPenalty, v => model.KysFtaPenalty = v)
+                                        @if (model.KysFtaPenalty == true)
+                                        {
+                                            <div class="di-field di-full">
+                                                <label>If yes, please explain</label>
+                                                <InputTextArea @bind-Value="model.KysFtaPenaltyDetails" rows="2" />
+                                            </div>
+                                        }
+                                        @KysYesNo("Are you aware of any adverse media, reviews or regulatory action concerning the business relating to tax matters?", model.KysAdverseMedia, v => model.KysAdverseMedia = v)
+                                        @if (model.KysAdverseMedia == true)
+                                        {
+                                            <div class="di-field di-full">
+                                                <label>If yes, please explain</label>
+                                                <InputTextArea @bind-Value="model.KysAdverseMediaDetails" rows="2" />
+                                            </div>
+                                        }
+                                    </div>
+                                </details>
+
+                                <details class="di-acc">
+                                    <summary>Documents</summary>
+                                    <div class="di-section-body di-documents-grid">
+                                        @DocCard("Copy of valid Emirates ID / passport", SelfServiceDocumentType.EmiratesIdOrPassport, "di-thumb-blue", false, false, "")
+                                        @DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SelfServiceDocumentType.ProofOfAddress, "di-thumb-green", false, false, "")
+                                        @DocCard("Current price list / quotation", SelfServiceDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, "")
+                                    </div>
+                                </details>
+                            </div>
+                        }
                     </div>
                     }
                 </div>
@@ -720,8 +835,19 @@
         3 => "Primary and additional people we should reach out to.",
         4 => "Assign the supplier to business units and select site usages.",
         5 => "Bank account and payment details used to settle invoices.",
+        6 => "Know Your Supplier due-diligence. Expand each group and answer the questions.",
         _ => ""
     };
+
+    /// <summary>A full-width Yes/No toggle for the KYS tab (tri-state: unanswered shows neither button active).</summary>
+    private RenderFragment KysYesNo(string label, bool? value, Action<bool?> set) =>
+        @<div class="di-field di-full">
+            <label>@label</label>
+            <div class="di-yesno">
+                <button type="button" class="di-yn @(value == true ? "on" : "")" @onclick="() => set(true)">Yes</button>
+                <button type="button" class="di-yn di-yn-no @(value == false ? "on" : "")" @onclick="() => set(false)">No</button>
+            </div>
+        </div>;
 
     // Per-step section icon (same glyphs as the internal supplier form's di-section-icon).
     private RenderFragment SectionIcon(int step) => step switch

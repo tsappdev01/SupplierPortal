@@ -7,7 +7,11 @@ public enum SelfServiceDocumentType
     TradeLicense = 0,
     VatCertification = 1,
     Other = 2,
-    BankConfirmationLetter = 3
+    BankConfirmationLetter = 3,
+    // KYS document types (aligned with the internal SupplierDocumentType; 4 = SignedDeclaration is internal-only)
+    EmiratesIdOrPassport = 5,
+    ProofOfAddress = 6,
+    PriceListOrQuotation = 7
 }
 
 public class LookupItemDto

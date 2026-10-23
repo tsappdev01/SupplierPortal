@@ -169,8 +169,56 @@ public class SupplierFormModel
     /// <summary>VAT group entities (required when VAT Registration Type is "VAT Group").</summary>
     public List<VatGroupEntityModel> VatGroupEntities { get; set; } = new();
 
+    // -- KYS (Know Your Supplier) due-diligence tab --
+    public string? KysLicensedActivities { get; set; }
+    public string? KysIdNumber { get; set; }
+    public DateTime? KysIdExpiryDate { get; set; }
+    public string? KysRepPosition { get; set; }
+    public bool? KysAvailableToMeet { get; set; }
+    public bool? KysAddressChangedTwice { get; set; }
+    public bool? KysRepsChangedTwice { get; set; }
+    public string? KysExpectedVolumeValue { get; set; }
+    public bool? KysBankAuthorisedUae { get; set; }
+    public bool? KysPaymentToOtherParty { get; set; }
+    public bool? KysPaymentsElectronicOnly { get; set; }
+    public string? KysGoodsDescription { get; set; }
+    public string? KysCoveringActivity { get; set; }
+    public string? KysPricingBasis { get; set; }
+    public string? KysGoodsOrigin { get; set; }
+    public bool? KysOwnGoodsAtSupply { get; set; }
+    public bool? KysGoodsGenuine { get; set; }
+    public string? KysGoodsGenuineProof { get; set; }
+    public string? KysCommercialReason { get; set; }
+    public bool? KysFtaPenalty { get; set; }
+    public string? KysFtaPenaltyDetails { get; set; }
+    public bool? KysAdverseMedia { get; set; }
+    public string? KysAdverseMediaDetails { get; set; }
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
+        KysLicensedActivities = s.KysLicensedActivities,
+        KysIdNumber = s.KysIdNumber,
+        KysIdExpiryDate = s.KysIdExpiryDate,
+        KysRepPosition = s.KysRepPosition,
+        KysAvailableToMeet = s.KysAvailableToMeet,
+        KysAddressChangedTwice = s.KysAddressChangedTwice,
+        KysRepsChangedTwice = s.KysRepsChangedTwice,
+        KysExpectedVolumeValue = s.KysExpectedVolumeValue,
+        KysBankAuthorisedUae = s.KysBankAuthorisedUae,
+        KysPaymentToOtherParty = s.KysPaymentToOtherParty,
+        KysPaymentsElectronicOnly = s.KysPaymentsElectronicOnly,
+        KysGoodsDescription = s.KysGoodsDescription,
+        KysCoveringActivity = s.KysCoveringActivity,
+        KysPricingBasis = s.KysPricingBasis,
+        KysGoodsOrigin = s.KysGoodsOrigin,
+        KysOwnGoodsAtSupply = s.KysOwnGoodsAtSupply,
+        KysGoodsGenuine = s.KysGoodsGenuine,
+        KysGoodsGenuineProof = s.KysGoodsGenuineProof,
+        KysCommercialReason = s.KysCommercialReason,
+        KysFtaPenalty = s.KysFtaPenalty,
+        KysFtaPenaltyDetails = s.KysFtaPenaltyDetails,
+        KysAdverseMedia = s.KysAdverseMedia,
+        KysAdverseMediaDetails = s.KysAdverseMediaDetails,
         SupplierNumber = s.SupplierNumber,
         Priority = s.Priority,
         IsActive = s.IsActive,
@@ -389,6 +437,32 @@ public class SupplierFormModel
         s.ProcurementBuId = ProcurementBuId;
         s.ClientBuId = ClientBuId;
         s.BillToBuId = BillToBuId;
+
+        // KYS due-diligence
+        s.KysLicensedActivities = KysLicensedActivities;
+        s.KysIdNumber = KysIdNumber;
+        s.KysIdExpiryDate = KysIdExpiryDate;
+        s.KysRepPosition = KysRepPosition;
+        s.KysAvailableToMeet = KysAvailableToMeet;
+        s.KysAddressChangedTwice = KysAddressChangedTwice;
+        s.KysRepsChangedTwice = KysRepsChangedTwice;
+        s.KysExpectedVolumeValue = KysExpectedVolumeValue;
+        s.KysBankAuthorisedUae = KysBankAuthorisedUae;
+        s.KysPaymentToOtherParty = KysPaymentToOtherParty;
+        s.KysPaymentsElectronicOnly = KysPaymentsElectronicOnly;
+        s.KysGoodsDescription = KysGoodsDescription;
+        s.KysCoveringActivity = KysCoveringActivity;
+        s.KysPricingBasis = KysPricingBasis;
+        s.KysGoodsOrigin = KysGoodsOrigin;
+        s.KysOwnGoodsAtSupply = KysOwnGoodsAtSupply;
+        s.KysGoodsGenuine = KysGoodsGenuine;
+        // Keep the proof text only when the goods are declared genuine.
+        s.KysGoodsGenuineProof = KysGoodsGenuine == true ? KysGoodsGenuineProof : null;
+        s.KysCommercialReason = KysCommercialReason;
+        s.KysFtaPenalty = KysFtaPenalty;
+        s.KysFtaPenaltyDetails = KysFtaPenalty == true ? KysFtaPenaltyDetails : null;
+        s.KysAdverseMedia = KysAdverseMedia;
+        s.KysAdverseMediaDetails = KysAdverseMedia == true ? KysAdverseMediaDetails : null;
 
         ApplyContactsTo(s);
         ApplyBankAccountsTo(s);

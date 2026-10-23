@@ -326,6 +326,43 @@ public class Supplier
     [MaxLength(50)]
     public string? IntermediaryBicSwiftCode { get; set; }
 
+    // -- KYS (Know Your Supplier) due-diligence --
+    //    All optional; captured on the dedicated KYS tab. Yes/No answers are nullable (unanswered = null).
+
+    // Identity / licence
+    [MaxLength(500)] public string? KysLicensedActivities { get; set; }
+    [MaxLength(100)] public string? KysIdNumber { get; set; }
+    public DateTime? KysIdExpiryDate { get; set; }
+    /// <summary>Position / designation of the authorised representative (the rep's name lives in the Contact fields).</summary>
+    [MaxLength(150)] public string? KysRepPosition { get; set; }
+    public bool? KysAvailableToMeet { get; set; }
+
+    // Address
+    public bool? KysAddressChangedTwice { get; set; }
+    public bool? KysRepsChangedTwice { get; set; }
+    [MaxLength(500)] public string? KysExpectedVolumeValue { get; set; }
+
+    // Banking (yes/no)
+    public bool? KysBankAuthorisedUae { get; set; }
+    public bool? KysPaymentToOtherParty { get; set; }
+    public bool? KysPaymentsElectronicOnly { get; set; }
+
+    // Goods / supply & pricing
+    [MaxLength(1000)] public string? KysGoodsDescription { get; set; }
+    [MaxLength(500)] public string? KysCoveringActivity { get; set; }
+    [MaxLength(1000)] public string? KysPricingBasis { get; set; }
+    [MaxLength(500)] public string? KysGoodsOrigin { get; set; }
+    public bool? KysOwnGoodsAtSupply { get; set; }
+    public bool? KysGoodsGenuine { get; set; }
+    [MaxLength(1000)] public string? KysGoodsGenuineProof { get; set; }
+    [MaxLength(1000)] public string? KysCommercialReason { get; set; }
+
+    // Tax-compliance declarations (yes/no + "if yes, explain")
+    public bool? KysFtaPenalty { get; set; }
+    [MaxLength(2000)] public string? KysFtaPenaltyDetails { get; set; }
+    public bool? KysAdverseMedia { get; set; }
+    [MaxLength(2000)] public string? KysAdverseMediaDetails { get; set; }
+
     // -- Status / ownership --
 
     /// <summary>Workflow status (LookupValue in the SupplierStatus category): New →

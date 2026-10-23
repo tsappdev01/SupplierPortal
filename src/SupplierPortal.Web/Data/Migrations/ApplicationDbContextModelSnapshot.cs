@@ -22,6 +22,21 @@ namespace SupplierPortal.Web.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("NotificationGroupUser", b =>
+                {
+                    b.Property<int>("NotificationGroupId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NotificationGroupId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("NotificationGroupUsers", (string)null);
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.AuditLog", b =>
                 {
                     b.Property<int>("Id")
@@ -506,6 +521,76 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("Customers");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerAccessToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAdminTest")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("OtpAttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OtpCodeHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("OtpExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OtpGeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OtpSendCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("OtpVerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Recipient")
+                        .HasMaxLength(1)
+                        .HasColumnType("nvarchar(1)");
+
+                    b.Property<DateTime?>("SessionExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SessionTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("CustomerAccessTokens");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerContact", b =>
                 {
                     b.Property<int>("Id")
@@ -885,79 +970,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("CustomerDocumentTypes");
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerAccessToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsAdminTest")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("OtpAttemptCount")
-                        .HasColumnType("int");
-
-                    b.Property<string>("OtpCodeHash")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<DateTime?>("OtpExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("OtpGeneratedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("OtpSendCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("OtpVerifiedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Recipient")
-                        .HasMaxLength(1)
-                        .HasColumnType("nvarchar(1)");
-
-                    b.Property<DateTime?>("SessionExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SessionTokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.ToTable("CustomerAccessTokens");
-                });
-
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerFieldConfig", b =>
                 {
                     b.Property<int>("Id")
@@ -1012,12 +1024,6 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<int?>("MaxLength")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("MinLength")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsRemoved")
                         .HasColumnType("bit");
 
@@ -1029,6 +1035,12 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<bool>("IsVisible")
                         .HasColumnType("bit");
+
+                    b.Property<int?>("MaxLength")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MinLength")
+                        .HasColumnType("int");
 
                     b.Property<string>("Section")
                         .IsRequired()
@@ -1086,6 +1098,77 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("CustomerTabSettings");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BusinessLegalName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("BusinessLocationType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EInvoicingWave")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TinNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TrnNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("CustomerVatGroupEntities");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.Department", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Departments");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.LookupValue", b =>
                 {
                     b.Property<int>("Id")
@@ -1120,6 +1203,180 @@ namespace SupplierPortal.Web.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("LookupValues");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.NotificationGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("NotificationGroups");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ReportDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColumnsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("FiltersJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SchemaName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ReportDefinitions");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BusinessUnitId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("Format")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastRunDetail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("LastRunStatus")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("LastRunUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("NextRunUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("NotificationGroupId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ReportDefinitionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("WeekDaysMask")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationGroupId");
+
+                    b.HasIndex("ReportDefinitionId");
+
+                    b.ToTable("ScheduledReports");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("RunAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ScheduledReportId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduledReportId", "RunAtUtc");
+
+                    b.ToTable("ScheduledReportRuns");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Supplier", b =>
@@ -1256,6 +1513,9 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("CurrencyId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("DisclaimerAcknowledged")
                         .HasColumnType("bit");
 
@@ -1273,9 +1533,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("DisclaimerText")
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
-
-                    b.Property<int?>("DepartmentId")
-                        .HasColumnType("int");
 
                     b.Property<string>("DunsNumber")
                         .HasMaxLength(50)
@@ -1353,6 +1610,87 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<bool?>("KysAddressChangedTwice")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("KysAdverseMedia")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KysAdverseMediaDetails")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool?>("KysAvailableToMeet")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("KysBankAuthorisedUae")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KysCommercialReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("KysCoveringActivity")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("KysExpectedVolumeValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool?>("KysFtaPenalty")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KysFtaPenaltyDetails")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("KysGoodsDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool?>("KysGoodsGenuine")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KysGoodsGenuineProof")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("KysGoodsOrigin")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("KysIdExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("KysIdNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("KysLicensedActivities")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool?>("KysOwnGoodsAtSupply")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("KysPaymentToOtherParty")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("KysPaymentsElectronicOnly")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("KysPricingBasis")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("KysRepPosition")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<bool?>("KysRepsChangedTwice")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LastName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1407,6 +1745,10 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<int?>("PrefixId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Priority")
+                        .HasMaxLength(2)
+                        .HasColumnType("nvarchar(2)");
+
                     b.Property<int?>("ProcurementBuId")
                         .HasColumnType("int");
 
@@ -1425,10 +1767,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("State")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Priority")
-                        .HasMaxLength(2)
-                        .HasColumnType("nvarchar(2)");
 
                     b.Property<int?>("StatusId")
                         .HasColumnType("int");
@@ -1544,6 +1882,8 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasIndex("BusinessPartnerTypeId");
 
+                    b.HasIndex("BusinessPhoneCountryCodeId");
+
                     b.HasIndex("BusinessRelationshipId");
 
                     b.HasIndex("BusinessUnitId");
@@ -1577,8 +1917,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("PrefixId");
 
                     b.HasIndex("ProcurementBuId");
-
-                    b.HasIndex("BusinessPhoneCountryCodeId");
 
                     b.HasIndex("StatusId");
 
@@ -1803,94 +2141,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierContacts");
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("BusinessLegalName")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<int?>("BusinessLocationTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("EInvoicingWaveId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SupplierId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TinNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("TrnNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SupplierId");
-
-                    b.ToTable("SupplierVatGroupEntities");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("BusinessLegalName")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("BusinessLocationType")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EInvoicingWave")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.Property<string>("TinNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("TrnNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("CustomerVatGroupEntities");
-                });
-
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.Property<int>("Id")
@@ -2047,39 +2297,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("SupplierFieldSettings");
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierTabSetting", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("EditableByUserIdsCsv")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsVisible")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("Step")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Step")
-                        .IsUnique();
-
-                    b.ToTable("SupplierTabSettings");
-                });
-
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierPartner", b =>
                 {
                     b.Property<int>("Id")
@@ -2120,6 +2337,82 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasIndex("SupplierId");
 
                     b.ToTable("SupplierPartners");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierTabSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EditableByUserIdsCsv")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsVisible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("Step")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Step")
+                        .IsUnique();
+
+                    b.ToTable("SupplierTabSettings");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BusinessLegalName")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int?>("BusinessLocationTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("EInvoicingWaveId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TinNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TrnNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("SupplierVatGroupEntities");
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.User", b =>
@@ -2210,32 +2503,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.Department", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Departments");
-                });
-
             modelBuilder.Entity("UserBusinessUnit", b =>
                 {
                     b.Property<int>("UserId")
@@ -2251,193 +2518,19 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.ToTable("UserBusinessUnits", (string)null);
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.NotificationGroup", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("NotificationGroups");
-                });
-
             modelBuilder.Entity("NotificationGroupUser", b =>
                 {
-                    b.Property<int>("NotificationGroupId")
-                        .HasColumnType("int");
+                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("NotificationGroupId", "UserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("NotificationGroupUsers", (string)null);
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("BusinessUnitId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<int>("Format")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Frequency")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("LastRunDetail")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime?>("LastRunUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastRunStatus")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("NextRunUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("NotificationGroupId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ReportDefinitionId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("WeekDaysMask")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NotificationGroupId");
-
-                    b.HasIndex("ReportDefinitionId");
-
-                    b.ToTable("ScheduledReports");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.ReportDefinition", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ColumnsJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("FiltersJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Format")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("SchemaName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("TableName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("ReportDefinitions");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Detail")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime>("RunAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ScheduledReportId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ScheduledReportId", "RunAtUtc");
-
-                    b.ToTable("ScheduledReportRuns");
+                    b.HasOne("SupplierPortal.Web.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.BankBranch", b =>
@@ -2455,8 +2548,7 @@ namespace SupplierPortal.Web.Data.Migrations
                 {
                     b.HasOne("SupplierPortal.Web.Models.User", "AssignedToUser")
                         .WithMany()
-                        .HasForeignKey("AssignedToUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("AssignedToUserId");
 
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "BusinessUnit")
                         .WithMany()
@@ -2501,6 +2593,46 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Customer");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Customer.Customer", "Customer")
+                        .WithMany("VatGroupEntities")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", "NotificationGroup")
+                        .WithMany()
+                        .HasForeignKey("NotificationGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SupplierPortal.Web.Models.ReportDefinition", "ReportDefinition")
+                        .WithMany()
+                        .HasForeignKey("ReportDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("NotificationGroup");
+
+                    b.Navigation("ReportDefinition");
+                });
+
+            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.ScheduledReport", "ScheduledReport")
+                        .WithMany()
+                        .HasForeignKey("ScheduledReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ScheduledReport");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.Supplier", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "AccountCountryCode")
@@ -2515,13 +2647,7 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasOne("SupplierPortal.Web.Models.User", "AssignedToUser")
                         .WithMany()
-                        .HasForeignKey("AssignedToUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SupplierPortal.Web.Models.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("AssignedToUserId");
 
                     b.HasOne("SupplierPortal.Web.Models.BankBranch", "BankBranch")
                         .WithMany()
@@ -2546,6 +2672,11 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessPartnerType")
                         .WithMany()
                         .HasForeignKey("BusinessPartnerTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessPhoneCountryCode")
+                        .WithMany()
+                        .HasForeignKey("BusinessPhoneCountryCodeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessRelationship")
@@ -2589,6 +2720,10 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("SupplierPortal.Web.Models.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId");
+
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "EInvoicingWave")
                         .WithMany()
                         .HasForeignKey("EInvoicingWaveId")
@@ -2627,11 +2762,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "ProcurementBu")
                         .WithMany()
                         .HasForeignKey("ProcurementBuId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SupplierPortal.Web.Models.LookupValue", "BusinessPhoneCountryCode")
-                        .WithMany()
-                        .HasForeignKey("BusinessPhoneCountryCodeId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SupplierPortal.Web.Models.LookupValue", "Status")
@@ -2690,6 +2820,8 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Navigation("BusinessPartnerType");
 
+                    b.Navigation("BusinessPhoneCountryCode");
+
                     b.Navigation("BusinessRelationship");
 
                     b.Navigation("BusinessUnit");
@@ -2704,9 +2836,9 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Navigation("CountryName");
 
-                    b.Navigation("Department");
-
                     b.Navigation("Currency");
+
+                    b.Navigation("Department");
 
                     b.Navigation("EInvoicingWave");
 
@@ -2723,8 +2855,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Prefix");
 
                     b.Navigation("ProcurementBu");
-
-                    b.Navigation("BusinessPhoneCountryCode");
 
                     b.Navigation("Status");
 
@@ -2825,28 +2955,6 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
-            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
-                {
-                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
-                        .WithMany("VatGroupEntities")
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Supplier");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.Customer.CustomerVatGroupEntity", b =>
-                {
-                    b.HasOne("SupplierPortal.Web.Models.Customer.Customer", "Customer")
-                        .WithMany("VatGroupEntities")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("SupplierPortal.Web.Models.SupplierDocument", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
@@ -2887,6 +2995,17 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("SupplierPortal.Web.Models.SupplierVatGroupEntity", b =>
+                {
+                    b.HasOne("SupplierPortal.Web.Models.Supplier", "Supplier")
+                        .WithMany("VatGroupEntities")
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("SupplierPortal.Web.Models.User", b =>
                 {
                     b.HasOne("SupplierPortal.Web.Models.BusinessUnit", "CompanyBusinessUnit")
@@ -2896,8 +3015,7 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasOne("SupplierPortal.Web.Models.Department", "Department")
                         .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("DepartmentId");
 
                     b.Navigation("CompanyBusinessUnit");
 
@@ -2919,57 +3037,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("NotificationGroupUser", b =>
-                {
-                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", null)
-                        .WithMany()
-                        .HasForeignKey("NotificationGroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SupplierPortal.Web.Models.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReport", b =>
-                {
-                    b.HasOne("SupplierPortal.Web.Models.NotificationGroup", "NotificationGroup")
-                        .WithMany()
-                        .HasForeignKey("NotificationGroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SupplierPortal.Web.Models.ReportDefinition", "ReportDefinition")
-                        .WithMany()
-                        .HasForeignKey("ReportDefinitionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("NotificationGroup");
-
-                    b.Navigation("ReportDefinition");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.ScheduledReportRun", b =>
-                {
-                    b.HasOne("SupplierPortal.Web.Models.ScheduledReport", "ScheduledReport")
-                        .WithMany()
-                        .HasForeignKey("ScheduledReportId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ScheduledReport");
-                });
-
             modelBuilder.Entity("SupplierPortal.Web.Models.Bank", b =>
                 {
                     b.Navigation("Branches");
-                });
-
-            modelBuilder.Entity("SupplierPortal.Web.Models.BusinessUnit", b =>
-                {
                 });
 
             modelBuilder.Entity("SupplierPortal.Web.Models.Customer.Customer", b =>

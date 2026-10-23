@@ -202,7 +202,8 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
         [2] = "Address Information",
         [3] = "Contact Information",
         [4] = "Site / Business Unit",
-        [5] = "Payment / Banking"
+        [5] = "Payment / Banking",
+        [6] = "KYS"
     };
 
     /// <summary>The five wizard tabs with their (admin-editable) titles and visibility. Seeds the
