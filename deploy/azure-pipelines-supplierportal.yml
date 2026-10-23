@@ -1,0 +1,133 @@
+# ============================================================================
+#  Azure DevOps pipeline — Supplier Portal (INTERNAL)
+#  Builds SupplierPortal.Web and deploys it to the IIS site on UATWEB01.
+#
+#  Target (from IIS Manager on UATWEB01):
+#    Site           : DI Supplier
+#    Host           : usupplierportal.dubaiinvestments.com  (https / 443)
+#    Physical path  : C:\Websites\SupplierPortal
+#    App pool       : DI Supplier
+#
+#  The build runs on the self-hosted agent that lives ON UATWEB01, so the
+#  "deploy" is just a local file copy (no WinRM/FTP needed). Server-only files
+#  (secrets, data-protection keys, uploaded documents) are preserved across
+#  deploys — see the robocopy exclusions below.
+#
+#  ONE-TIME SETUP in Azure DevOps:
+#    1. Pipelines > New pipeline > point it at this file
+#       (deploy/azure-pipelines-supplierportal.yml).
+#    2. Set the `agentPool` variable below to the self-hosted pool that holds
+#       the UATWEB01 UAT agent (see the "Azure Pipelines Agent (…UAT.UATWEB01)"
+#       service). Project Settings > Agent pools shows the exact pool name.
+#    3. The agent's service account must be able to manage IIS and write to
+#       C:\Websites\SupplierPortal (local admin on the box is sufficient).
+#    4. Put the real secrets in C:\Websites\SupplierPortal\appsettings.Local.json
+#       ONCE on the server — the deploy never overwrites it.
+# ============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src/SupplierPortal.Web/**
+      - src/SupplierPortal.Shared/**
+      - src/SupplierPortal.Contracts/**
+      - deploy/azure-pipelines-supplierportal.yml
+
+# Manual runs are allowed too (Run pipeline button).
+pr: none
+
+variables:
+  agentPool: 'UAT'                              # <-- set to your self-hosted pool name (UATWEB01 agent)
+  buildConfiguration: 'Release'
+  project: 'src/SupplierPortal.Web/SupplierPortal.Web.csproj'
+  publishDir: '$(Build.ArtifactStagingDirectory)\publish'
+  deployPath: 'C:\Websites\SupplierPortal'
+  appPool: 'DI Supplier'
+
+name: $(Date:yyyy.MM.dd).$(Rev:r)              # build number shown in the app's topbar lines up by date
+
+pool:
+  name: '$(agentPool)'
+
+steps:
+  # Full checkout so the build-time `git rev-parse --short HEAD` (the topbar
+  # commit stamp) resolves the real commit.
+  - checkout: self
+    clean: true
+    fetchDepth: 0
+
+  - task: UseDotNet@2
+    displayName: 'Use .NET 8 SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '8.0.x'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'dotnet publish SupplierPortal.Web'
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: '$(project)'
+      arguments: '-c $(buildConfiguration) -o "$(publishDir)" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Stop app pool (release file locks)'
+    inputs:
+      targetType: 'inline'
+      script: |
+        Import-Module WebAdministration
+        if ((Get-WebAppPoolState -Name "$(appPool)").Value -ne 'Stopped') {
+            Stop-WebAppPool -Name "$(appPool)"
+        }
+        # Wait for the worker process to exit so the DLLs are unlocked.
+        $tries = 0
+        while ((Get-WebAppPoolState -Name "$(appPool)").Value -ne 'Stopped' -and $tries -lt 15) {
+            Start-Sleep -Seconds 1; $tries++
+        }
+        Write-Host "App pool '$(appPool)' is $((Get-WebAppPoolState -Name '$(appPool)').Value)."
+
+  - task: PowerShell@2
+    displayName: 'Deploy files (preserve secrets, keys, uploaded docs)'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $src = "$(publishDir)"
+        $dst = "$(deployPath)"
+        if (-not (Test-Path $dst)) { New-Item -ItemType Directory -Path $dst | Out-Null }
+        # /MIR mirrors the publish output into the site folder, but these are
+        # server-only and must survive every deploy:
+        #   appsettings.Local.json  -> real connection string / secrets
+        #   keys\                   -> Data Protection keys (don't log users out)
+        #   doc\                    -> uploaded supplier documents
+        $log = robocopy "$src" "$dst" /MIR /XF appsettings.Local.json /XD "$dst\keys" "$dst\doc" /R:3 /W:5 /NP /NFL /NDL
+        Write-Host $log
+        # robocopy exit codes 0-7 are success; 8+ is a real failure.
+        if ($LASTEXITCODE -ge 8) { Write-Error "robocopy failed ($LASTEXITCODE)"; exit 1 }
+        exit 0
+
+  - task: PowerShell@2
+    displayName: 'Start app pool'
+    inputs:
+      targetType: 'inline'
+      script: |
+        Import-Module WebAdministration
+        Start-WebAppPool -Name "$(appPool)"
+        Start-Sleep -Seconds 2
+        Write-Host "App pool '$(appPool)' is $((Get-WebAppPoolState -Name '$(appPool)').Value)."
+
+  - task: PowerShell@2
+    displayName: 'Warm-up / health check'
+    inputs:
+      targetType: 'inline'
+      script: |
+        try {
+            $r = Invoke-WebRequest -Uri "https://usupplierportal.dubaiinvestments.com/" -UseBasicParsing -TimeoutSec 60
+            Write-Host "Home responded: HTTP $($r.StatusCode)"
+        } catch {
+            Write-Warning "Warm-up request failed (the app pool may still be starting): $($_.Exception.Message)"
+        }
