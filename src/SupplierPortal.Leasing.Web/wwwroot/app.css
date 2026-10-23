@@ -596,3 +596,13 @@ table thead th {
 [data-theme="dark"] .di-cfm-buchip { background: #202a42; color: #cdd6ea; border-color: #2b3550; }
 [data-theme="dark"] .di-cfm { --blue: #3a5a85; } /* lighter navy so primary buttons/toggles stay visible on dark cards */
 [data-theme="dark"] .di-cfm-head-icon { background: #22304a; }
+
+/* Deployed-build version stamp shown on the left of the topbar (which version is live). */
+.di-ver { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; font-size: 12px; color: #6b7686; background: #f1f4f9; border: 1px solid #e4e8f0; border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
+.di-ver-dot { width: 6px; height: 6px; border-radius: 50%; background: #128a4a; flex: none; }
+.di-ver-build { color: #1a2233; font-weight: 700; }
+.di-ver-sep { color: #aab2c0; }
+.di-ver-sha { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+@media (max-width: 820px) { .di-ver-date, .di-ver-sha, .di-ver-sep { display: none; } }
+[data-theme="dark"] .di-ver { background: #1b2740; border-color: #2b3550; color: #aab6d0; }
+[data-theme="dark"] .di-ver-build { color: #e7ecf5; }
