@@ -1,125 +1,183 @@
-# Azure DevOps CI/CD pipeline for the Supplier Portal.
-# Builds the two .NET 8 web apps and deploys them to their Azure App Services (Linux):
-#   - SupplierPortal.Web         -> app service 'supplierportal'  (internal portal)
-#   - SupplierPortal.SelfService -> app service 'partnerconnect'  (Partner Connect / self-service)
+# ============================================================================
+#  UAT CI/CD pipeline — on-prem IIS on UATWEB01 (self-hosted Azure DevOps agent)
 #
-# ONE-TIME SETUP in Azure DevOps (details in the chat notes):
-#   1. Project Settings > Service connections > New service connection >
-#      "Azure Resource Manager" > Service principal (automatic) > pick the subscription
-#      and resource group 'DotNetSites' > name it EXACTLY the value of 'azureSubscription' below.
-#   2. Pipelines > New pipeline > choose where this repo lives (GitHub / Azure Repos) >
-#      "Existing Azure Pipelines YAML file" > select '/azure-pipelines.yml' > Run.
+#  Builds the .NET 8 web app(s) and deploys them IN PLACE into their EXISTING IIS
+#  sites. The agent runs ON UATWEB01, so "deploy" is a local file copy performed
+#  by deploy/Deploy-Site-Local.ps1, which resolves each site's physical path and
+#  app pool FROM IIS by site name, takes the app offline, mirrors the new files,
+#  and preserves server-only state (appsettings.Local.json, doc\, keys\, logs\).
 #
-# After that, every push to the trigger branch builds and deploys automatically.
+#  Supplier, Customer and Landlord are THREE separate IIS sites:
+#    SupplierPortal.Web   is ONE app (Supplier + Customer modules). It is deployed
+#    to TWO IIS sites — a Supplier site and a Customer site — each with its own
+#    bindings and its own server-only appsettings.Local.json. Same binaries, two sites.
+#    SupplierPortal.Leasing.Web is a SEPARATE app on its own Landlord site.
+#
+#  Sites (from IIS Manager on UATWEB01):
+#    SupplierPortal.Web          -> Supplier site  'DI Supplier'  (usupplierportal.dubaiinvestments.com)
+#    SupplierPortal.Web          -> Customer site                 (set customerSiteName to enable)
+#    SupplierPortal.SelfService  -> Partner Connect site          (set selfServiceSiteName to enable)
+#    SupplierPortal.Leasing.Web  -> Landlord site                 (set landlordSiteName to enable)
+#    SupplierPortal.Leasing.SelfService -> Landlord DMZ           (set landlordDmzSiteName to enable)
+#
+#  A deploy step runs ONLY when its *SiteName variable is non-empty, so the
+#  Supplier site deploys by default and the others switch on when you fill in
+#  their IIS site names (nothing fails just because a site doesn't exist yet).
+#
+#  ONE-TIME SETUP in Azure DevOps:
+#    1. This pipeline must use THIS file (/azure-pipelines.yml). In the pipeline:
+#       Edit > three-dot menu > Triggers/Settings > YAML path = /azure-pipelines.yml.
+#    2. Set 'uatAgentPool' (below) to the Agent pool that holds the UATWEB01 agent
+#       (Project Settings > Agent pools). You can also override it as a pipeline
+#       variable in the UI without editing this file.
+#    3. On UATWEB01: IIS + "IIS Management Scripts and Tools", the .NET 8 ASP.NET
+#       Core Hosting Bundle, and the target IIS site(s) created. The build also
+#       runs here, so the .NET 8 SDK is needed (the UseDotNet step installs it if
+#       the agent has outbound access; otherwise pre-install it).
+#    4. Put the real secrets in each site's appsettings.Local.json ONCE on the
+#       server — the deploy never overwrites it.
+# ============================================================================
 
-trigger:
-  branches:
-    include:
-      - main            # <-- set this to your real release branch (main / master)
-  paths:
-    include:
-      - src/**
-      - azure-pipelines.yml
+# Manual by default (click "Run pipeline"). To auto-deploy on every merge to
+# main, replace 'trigger: none' with the commented block below.
+trigger: none
+# trigger:
+#   branches: { include: [ main ] }
+#   paths:    { include: [ 'src/**', 'deploy/**', 'azure-pipelines.yml' ] }
+
+pr: none
+
+name: $(Date:yyyy.MM.dd).$(Rev:r)
 
 variables:
   buildConfiguration: 'Release'
-  azureSubscription: 'Azure-DotNetSites'    # <-- MUST match the service-connection name you create
-  webAppName: 'supplierportal'
-  selfServiceAppName: 'partnerconnect'
-  vmImage: 'ubuntu-latest'
+  uatAgentPool: 'Default'                 # <-- set to your UATWEB01 agent pool
 
-stages:
-# ---------------------------------------------------------------------------
-- stage: Build
-  displayName: Build & package
-  jobs:
-  - job: build
-    pool:
-      vmImage: $(vmImage)
-    steps:
-    - task: UseDotNet@2
-      displayName: Install .NET 8 SDK
-      inputs:
-        packageType: sdk
-        version: '8.0.x'
+  # ---- INTERNAL sites (deployed first) ----
+  # IIS *site names* on UATWEB01 (NOT host headers). Path + app pool are resolved from these.
+  # Supplier + Customer both run the SAME SupplierPortal.Web build on two separate IIS sites.
+  supplierSiteName: 'DI Supplier'         # Supplier internal site
+  supplierUrl: 'https://usupplierportal.dubaiinvestments.com/'
+  customerSiteName: ''                    # Customer internal site — set its IIS site name to enable
+  customerUrl: ''
+  landlordSiteName: ''                    # Landlord internal site (SupplierPortal.Leasing.Web) — set to enable
+  landlordUrl: ''
 
-    - task: DotNetCoreCLI@2
-      displayName: Restore
-      inputs:
-        command: restore
-        projects: 'BPPortal.sln'
+  # ---- DMZ / self-service sites (set up later) ----
+  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService)
+  selfServiceUrl: ''
+  landlordDmzSiteName: ''                 # Landlord Connect (SupplierPortal.Leasing.SelfService)
+  landlordDmzUrl: ''
 
-    # Internal portal (Manage Supplier, Scheduled Reports, admin settings, tab restrictions).
-    - task: DotNetCoreCLI@2
-      displayName: Publish SupplierPortal.Web
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: 'src/SupplierPortal.Web/SupplierPortal.Web.csproj'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/web'
-        zipAfterPublish: true
+pool:
+  name: '$(uatAgentPool)'
 
-    # Partner Connect (supplier self-service / OTP form).
-    - task: DotNetCoreCLI@2
-      displayName: Publish SupplierPortal.SelfService
-      inputs:
-        command: publish
-        publishWebProjects: false
-        projects: 'src/SupplierPortal.SelfService/SupplierPortal.SelfService.csproj'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/selfservice'
-        zipAfterPublish: true
+steps:
+  # Full history so the topbar git-commit stamp (git rev-parse --short HEAD) resolves.
+  - checkout: self
+    clean: true
+    fetchDepth: 0
 
-    - publish: $(Build.ArtifactStagingDirectory)
-      artifact: drop
+  - task: UseDotNet@2
+    displayName: 'Ensure .NET 8 SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '8.0.x'
 
-# ---------------------------------------------------------------------------
-- stage: Deploy_Web
-  displayName: Deploy internal portal (supplierportal)
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-  - deployment: deployWeb
-    pool:
-      vmImage: $(vmImage)
-    environment: 'supplierportal-prod'      # add a manual approval on this environment if you want a gate
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: drop
-          - task: AzureWebApp@1
-            displayName: Deploy to $(webAppName)
-            inputs:
-              azureSubscription: $(azureSubscription)
-              appType: webAppLinux
-              appName: $(webAppName)
-              package: '$(Pipeline.Workspace)/drop/web/*.zip'
-              startUpCommand: 'dotnet SupplierPortal.Web.dll'
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore solution'
+    inputs:
+      command: 'restore'
+      projects: 'BPPortal.sln'
 
-# ---------------------------------------------------------------------------
-# Deploy Partner Connect too. Delete this whole stage if you only ever want to
-# deploy the internal portal from this pipeline.
-- stage: Deploy_SelfService
-  displayName: Deploy Partner Connect (partnerconnect)
-  dependsOn: Build
-  condition: succeeded()
-  jobs:
-  - deployment: deploySelfService
-    pool:
-      vmImage: $(vmImage)
-    environment: 'partnerconnect-prod'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - download: current
-            artifact: drop
-          - task: AzureWebApp@1
-            displayName: Deploy to $(selfServiceAppName)
-            inputs:
-              azureSubscription: $(azureSubscription)
-              appType: webAppLinux
-              appName: $(selfServiceAppName)
-              package: '$(Pipeline.Workspace)/drop/selfservice/*.zip'
-              startUpCommand: 'dotnet SupplierPortal.SelfService.dll'
+  # ================= INTERNAL SITES =================
+
+  # Build SupplierPortal.Web once; it feeds BOTH the Supplier and Customer sites.
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish SupplierPortal.Web (Supplier + Customer)'
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/SupplierPortal.Web/SupplierPortal.Web.csproj'
+      arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/web" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  # ---- Supplier site — always deployed ----
+  - task: PowerShell@2
+    displayName: 'Deploy Supplier → $(supplierSiteName)'
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "$(supplierSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\web" -WarmupUrl "$(supplierUrl)"'
+      pwsh: false   # Windows PowerShell — the WebAdministration module ships with IIS
+
+  # ---- Customer site — SAME build, second IIS site (only if customerSiteName set) ----
+  - task: PowerShell@2
+    displayName: 'Deploy Customer → $(customerSiteName)'
+    condition: and(succeeded(), ne(variables['customerSiteName'], ''))
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "$(customerSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\web" -WarmupUrl "$(customerUrl)"'
+      pwsh: false
+
+  # ---- Landlord internal — only if landlordSiteName set ----
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish SupplierPortal.Leasing.Web'
+    condition: and(succeeded(), ne(variables['landlordSiteName'], ''))
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/SupplierPortal.Leasing.Web/SupplierPortal.Leasing.Web.csproj'
+      arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/leasingweb" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Deploy Landlord Portal → $(landlordSiteName)'
+    condition: and(succeeded(), ne(variables['landlordSiteName'], ''))
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "$(landlordSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\leasingweb" -WarmupUrl "$(landlordUrl)"'
+      pwsh: false
+
+  # ================= DMZ / SELF-SERVICE SITES (set up later) =================
+
+  # ---- Partner Connect (supplier self-service) — only if selfServiceSiteName set ----
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish SupplierPortal.SelfService'
+    condition: and(succeeded(), ne(variables['selfServiceSiteName'], ''))
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/SupplierPortal.SelfService/SupplierPortal.SelfService.csproj'
+      arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/selfservice" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Deploy Partner Connect → $(selfServiceSiteName)'
+    condition: and(succeeded(), ne(variables['selfServiceSiteName'], ''))
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "$(selfServiceSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\selfservice" -WarmupUrl "$(selfServiceUrl)"'
+      pwsh: false
+
+  # ---- Landlord DMZ (self-service) — only if landlordDmzSiteName set ----
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish SupplierPortal.Leasing.SelfService'
+    condition: and(succeeded(), ne(variables['landlordDmzSiteName'], ''))
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/SupplierPortal.Leasing.SelfService/SupplierPortal.Leasing.SelfService.csproj'
+      arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/leasingdmz" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Deploy Landlord Connect → $(landlordDmzSiteName)'
+    condition: and(succeeded(), ne(variables['landlordDmzSiteName'], ''))
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "$(landlordDmzSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\leasingdmz" -WarmupUrl "$(landlordDmzUrl)"'
+      pwsh: false
