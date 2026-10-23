@@ -565,6 +565,9 @@ public class SupplierService(
         if (accessTokenId is null)
         {
             supplier.SupplierNumber = updated.SupplierNumber;
+            // Supplier active/inactive status is an internal-only control (Business/Organization tab); a
+            // supplier self-service (token) save must never change it.
+            supplier.IsActive = updated.IsActive;
         }
         supplier.Priority = updated.Priority;
         supplier.SupplierName = updated.SupplierName;

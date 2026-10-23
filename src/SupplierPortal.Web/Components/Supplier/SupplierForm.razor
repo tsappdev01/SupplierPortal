@@ -504,6 +504,20 @@ else
                             <option value="P4">P4</option>
                         </InputSelect>
                     </div>
+                    @* Supplier status (internal only). An inactive supplier is hidden from the default supplier list. *@
+                    <div class="di-field">
+                        <label>Supplier Status</label>
+                        <div class="di-switch-wrap">
+                            <button type="button" role="switch"
+                                    aria-checked="@(formModel.IsActive ? "true" : "false")"
+                                    title="@(formModel.IsActive ? "Active — click to set Inactive" : "Inactive — click to set Active")"
+                                    class="di-switch @(formModel.IsActive ? "on" : "off")"
+                                    @onclick="() => formModel.IsActive = !formModel.IsActive">
+                                <span class="di-switch-knob"></span>
+                            </button>
+                            <span class="di-switch-text">@(formModel.IsActive ? "Active" : "Inactive")</span>
+                        </div>
+                    </div>
                 }
                 @foreach (var key in MovableKeysForStep(1))
                 {

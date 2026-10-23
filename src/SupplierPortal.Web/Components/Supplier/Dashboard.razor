@@ -537,7 +537,10 @@ else
                     <td class="no-print">
                         <div class="d-flex align-items-center gap-2">
                             <label class="di-switch" title="@(supplier.IsActive ? "Active — click to deactivate" : "Inactive — click to activate")">
-                                <input type="checkbox" checked="@supplier.IsActive"
+                                @* @key forces a fresh input whenever IsActive changes, so the checkbox can't
+                                   desync from the model (Blazor won't re-push an unchanged `checked` to a box
+                                   the user just clicked) — which showed a toggle Off next to the text "Active". *@
+                                <input type="checkbox" @key="supplier.IsActive" checked="@supplier.IsActive"
                                        @onchange="e => ToggleActiveAsync(supplier, e.Value is true)" />
                                 <span class="di-switch-slider"></span>
                             </label>
