@@ -454,24 +454,58 @@ else
         </div>
     }
 
-    <div class="di-stepper">
-        @{ var visiblePages = VisiblePages; }
-        @for (var i = 1; i <= visiblePages.Count; i++)
-        {
-            var step = i;
-            <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") @(step <= maxStepReached ? "reached" : "")"
-                    disabled="@(step > maxStepReached)" @onclick="() => GoToStep(step)">
-                <span class="di-stepper-num">@step</span>
-                <span class="di-stepper-label">@PageTitle(visiblePages[step - 1])</span>
-            </button>
-            if (i < visiblePages.Count)
+    @{ var visiblePages = VisiblePages; }
+    @if (SupplierFacing)
+    {
+        <div class="di-stepper">
+            @for (var i = 1; i <= visiblePages.Count; i++)
             {
-                <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                    <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
-                </svg>
+                var step = i;
+                <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") @(step <= maxStepReached ? "reached" : "")"
+                        disabled="@(step > maxStepReached)" @onclick="() => GoToStep(step)">
+                    <span class="di-stepper-num">@step</span>
+                    <span class="di-stepper-label">@PageTitle(visiblePages[step - 1])</span>
+                </button>
+                if (i < visiblePages.Count)
+                {
+                    <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
+                    </svg>
+                }
             }
-        }
-    </div>
+        </div>
+    }
+    else
+    {
+        @* Internal view: tabs grouped under their category (eInvoicing / KYS). *@
+        <div class="di-stepcats">
+            @foreach (var cat in StepCategories)
+            {
+                var catSteps = Enumerable.Range(1, visiblePages.Count).Where(i => PageCategory(visiblePages[i - 1]) == cat).ToList();
+                if (catSteps.Count == 0) { continue; }
+                <div class="di-stepcat">
+                    <div class="di-stepcat-label">@cat</div>
+                    <div class="di-stepper">
+                        @for (var j = 0; j < catSteps.Count; j++)
+                        {
+                            var step = catSteps[j];
+                            <button type="button" class="di-stepper-item @(currentStep == step ? "active" : "") @(step <= maxStepReached ? "reached" : "")"
+                                    disabled="@(step > maxStepReached)" @onclick="() => GoToStep(step)">
+                                <span class="di-stepper-num">@step</span>
+                                <span class="di-stepper-label">@PageTitle(visiblePages[step - 1])</span>
+                            </button>
+                            if (j < catSteps.Count - 1)
+                            {
+                                <svg class="di-stepper-chevron" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" />
+                                </svg>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
 
     <EditForm Model="formModel" FormName="supplier-form">
 
@@ -1102,6 +1136,134 @@ else
             </div>
         }
 
+        <!-- Step 6: KYS (Know Your Supplier) due-diligence -->
+        <div class="di-section" style="display:@(CurrentSections.Contains(6) ? "block" : "none")">
+            <div class="di-section-header">
+                <span class="di-section-icon">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a5 5 0 0 0-5 5v2h10V5a5 5 0 0 0-5-5Zm3 7V5a3 3 0 1 0-6 0v2h6Z"/><path d="M3 7a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H3Zm6 4.5V13H7v-1.5a1.5 1.5 0 1 1 2 0Z"/></svg>
+                </span>
+                <span class="di-section-heading">
+                    <span class="di-section-title">@SectionTitle(6)</span>
+                    <span class="di-section-desc">Know Your Supplier due-diligence. Expand each group and answer the questions; declarations marked &ldquo;if&nbsp;yes, explain&rdquo; reveal a box when answered Yes.</span>
+                </span>
+            </div>
+            <fieldset class="di-tab-lock" disabled="@(!CanEditTab(6))">
+            <div class="di-kys">
+
+                <details class="di-acc" open>
+                    <summary>Identity / licence</summary>
+                    <div class="di-section-body">
+                        <div class="di-field di-full">
+                            <label>Licensed business activities (as per trade licence)</label>
+                            <InputTextArea @bind-Value="formModel.KysLicensedActivities" rows="2" />
+                        </div>
+                        <div class="di-field">
+                            <label>Emirates ID / Passport No.</label>
+                            <InputText @bind-Value="formModel.KysIdNumber" />
+                        </div>
+                        <div class="di-field">
+                            <label>ID expiry date</label>
+                            <InputDate @bind-Value="formModel.KysIdExpiryDate" />
+                        </div>
+                        <div class="di-field di-full">
+                            <label>Name &amp; position of the authorised representative</label>
+                            <InputText @bind-Value="formModel.KysRepPosition" placeholder="Position / designation (the name is captured on the Contact tab)" />
+                        </div>
+                        @YesNo("Are you available to meet our representative in person or virtually before the first supply?", formModel.KysAvailableToMeet, v => formModel.KysAvailableToMeet = v)
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Address</summary>
+                    <div class="di-section-body">
+                        @YesNo("Has the business address changed more than twice in the last 12 months?", formModel.KysAddressChangedTwice, v => formModel.KysAddressChangedTwice = v)
+                        @YesNo("Have the employees / representatives dealing with us changed more than twice in the last 12 months?", formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        <div class="di-field di-full">
+                            <label>Expected volume &amp; value of supplies to us (per month / year)</label>
+                            <InputText @bind-Value="formModel.KysExpectedVolumeValue" />
+                        </div>
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Banking</summary>
+                    <div class="di-section-body">
+                        @YesNo("Is the bank authorised / licensed in the UAE?", formModel.KysBankAuthorisedUae, v => formModel.KysBankAuthorisedUae = v)
+                        @YesNo("Will payment ever be requested to a party other than the named account holder?", formModel.KysPaymentToOtherParty, v => formModel.KysPaymentToOtherParty = v)
+                        @YesNo("Do you confirm that all payments will be received by electronic means and not in cash?", formModel.KysPaymentsElectronicOnly, v => formModel.KysPaymentsElectronicOnly = v)
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Goods / supply &amp; pricing</summary>
+                    <div class="di-section-body">
+                        <div class="di-field di-full">
+                            <label>Description of goods / services to be supplied to us</label>
+                            <InputTextArea @bind-Value="formModel.KysGoodsDescription" rows="2" />
+                        </div>
+                        <div class="di-field di-full">
+                            <label>Which licensed activity (Section 1) covers this supply?</label>
+                            <InputText @bind-Value="formModel.KysCoveringActivity" />
+                        </div>
+                        <div class="di-field di-full">
+                            <label>Basis of pricing (price list / quotation / contract) and profit margin, where available</label>
+                            <InputTextArea @bind-Value="formModel.KysPricingBasis" rows="2" />
+                        </div>
+                        <div class="di-field di-full">
+                            <label>Origin of the goods (country and manufacturer / source)</label>
+                            <InputText @bind-Value="formModel.KysGoodsOrigin" />
+                        </div>
+                        @YesNo("Do you own the goods at the time of supply?", formModel.KysOwnGoodsAtSupply, v => formModel.KysOwnGoodsAtSupply = v)
+                        @YesNo("Are the goods genuine / authentic?", formModel.KysGoodsGenuine, v => formModel.KysGoodsGenuine = v)
+                        @if (formModel.KysGoodsGenuine == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>State the proof available (brand authorisation, purchase invoice, certificate of origin)</label>
+                                <InputTextArea @bind-Value="formModel.KysGoodsGenuineProof" rows="2" />
+                            </div>
+                        }
+                        <div class="di-field di-full">
+                            <label>Commercial reason for the supply and for the price offered</label>
+                            <InputTextArea @bind-Value="formModel.KysCommercialReason" rows="2" />
+                        </div>
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Tax-compliance declarations</summary>
+                    <div class="di-section-body">
+                        @YesNo("Has the business or any owner / manager been subject to an FTA penalty, or investigated or convicted for Tax Evasion, in the UAE or elsewhere?", formModel.KysFtaPenalty, v => formModel.KysFtaPenalty = v)
+                        @if (formModel.KysFtaPenalty == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>If yes, please explain</label>
+                                <InputTextArea @bind-Value="formModel.KysFtaPenaltyDetails" rows="2" />
+                            </div>
+                        }
+                        @YesNo("Are you aware of any adverse media, reviews or regulatory action concerning the business relating to tax matters?", formModel.KysAdverseMedia, v => formModel.KysAdverseMedia = v)
+                        @if (formModel.KysAdverseMedia == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>If yes, please explain</label>
+                                <InputTextArea @bind-Value="formModel.KysAdverseMediaDetails" rows="2" />
+                            </div>
+                        }
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Documents</summary>
+                    <div class="di-section-body di-doc-grid">
+                        @(DocCard("Copy of valid Emirates ID / passport", SupplierDocumentType.EmiratesIdOrPassport, "di-thumb-blue", false, false, ""))
+                        @(DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SupplierDocumentType.ProofOfAddress, "di-thumb-green", false, false, ""))
+                        @(DocCard("Current price list / quotation", SupplierDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, ""))
+                    </div>
+                </details>
+
+            </div>
+            </fieldset>
+        </div>
+
         <div class="di-actions">
             @if (currentStep > 1)
             {
@@ -1240,6 +1402,36 @@ else
         border-bottom: 1px solid var(--di-border, #e2e5ea);
         color: var(--di-text, inherit);
     }
+    /* Category band over the stepper (internal view) */
+    .di-stepcats { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-start; }
+    .di-stepcat { display: flex; flex-direction: column; gap: 6px; }
+    .di-stepcat:not(:last-child) { padding-right: 22px; border-right: 1px dashed var(--di-border, #d7deea); }
+    .di-stepcat-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8a5b06; }
+    .di-stepcat:first-child .di-stepcat-label { color: #46618f; }
+    .di-stepcat .di-stepper { margin: 0; }
+    /* KYS accordion */
+    .di-kys { display: flex; flex-direction: column; gap: 12px; }
+    .di-acc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: var(--di-surface, #fff); }
+    .di-acc > summary {
+        list-style: none; cursor: pointer; user-select: none;
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 16px; font-weight: 600; font-size: 0.95rem;
+        color: var(--di-text, #0b2545); background: var(--di-surface-2, #f7f9fc);
+    }
+    .di-acc > summary::-webkit-details-marker { display: none; }
+    .di-acc > summary::before {
+        content: ""; flex: none; width: 8px; height: 8px;
+        border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg); transition: transform .15s ease; opacity: .6;
+    }
+    .di-acc[open] > summary::before { transform: rotate(45deg); }
+    .di-acc > .di-section-body { padding: 16px; }
+    /* Yes / No toggle */
+    .di-yesno { display: inline-flex; border: 1px solid var(--di-border, #cdd5e3); border-radius: 8px; overflow: hidden; }
+    .di-yn { border: 0; background: transparent; padding: 7px 20px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--di-text-muted, #5a6b8c); }
+    .di-yn + .di-yn { border-left: 1px solid var(--di-border, #cdd5e3); }
+    .di-yn.on { background: #1f3864; color: #fff; }
+    .di-yn.di-yn-no.on { background: #b4232a; color: #fff; }
 </style>
 }
 
@@ -1312,10 +1504,25 @@ else
         return currentUserId is int id && allowed.Contains(id);
     }
 
+    /// <summary>A full-width Yes/No toggle for the KYS tab (tri-state: unanswered shows neither button active).</summary>
+    private RenderFragment YesNo(string label, bool? value, Action<bool?> set) =>
+        @<div class="di-field di-full">
+            <label>@label</label>
+            <div class="di-yesno">
+                <button type="button" class="di-yn @(value == true ? "on" : "")" @onclick="() => set(true)">Yes</button>
+                <button type="button" class="di-yn di-yn-no @(value == false ? "on" : "")" @onclick="() => set(false)">No</button>
+            </div>
+        </div>;
+
     // Wizard pages group one or more field-sections. Address (2) and Contact (3) share one page and
     // are shown as an accordion; the other sections are each their own page. A page appears only if at
     // least one of its sections is visible; within a page only visible sections render.
-    private static readonly int[][] BasePages = [[1], [2, 3], [4], [5]];
+    private static readonly int[][] BasePages = [[1], [2, 3], [4], [5], [6]];
+
+    // Internal category grouping over the tabs: the existing tabs are "eInvoicing"; the KYS tab (section 6)
+    // is "KYS". Shown only on the internal form (the category is an internal classification).
+    private static readonly string[] StepCategories = ["eInvoicing", "KYS"];
+    private static string PageCategory(int[] sections) => sections.Contains(6) ? "KYS" : "eInvoicing";
 
     private bool SectionVisible(int step) =>
         tabSettings.FirstOrDefault(t => t.Step == step)?.IsVisible ?? true;

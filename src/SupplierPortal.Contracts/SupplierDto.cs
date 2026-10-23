@@ -111,4 +111,30 @@ public class SupplierDto
     public int? ProcurementBuId { get; set; }
     public int? ClientBuId { get; set; }
     public int? BillToBuId { get; set; }
+
+    // -- KYS (Know Your Supplier) due-diligence. Names/types match SupplierFormModel so the
+    //    reflection-based DtoMapper carries them automatically. --
+    public string? KysLicensedActivities { get; set; }
+    public string? KysIdNumber { get; set; }
+    public DateTime? KysIdExpiryDate { get; set; }
+    public string? KysRepPosition { get; set; }
+    public bool? KysAvailableToMeet { get; set; }
+    public bool? KysAddressChangedTwice { get; set; }
+    public bool? KysRepsChangedTwice { get; set; }
+    public string? KysExpectedVolumeValue { get; set; }
+    public bool? KysBankAuthorisedUae { get; set; }
+    public bool? KysPaymentToOtherParty { get; set; }
+    public bool? KysPaymentsElectronicOnly { get; set; }
+    public string? KysGoodsDescription { get; set; }
+    public string? KysCoveringActivity { get; set; }
+    public string? KysPricingBasis { get; set; }
+    public string? KysGoodsOrigin { get; set; }
+    public bool? KysOwnGoodsAtSupply { get; set; }
+    public bool? KysGoodsGenuine { get; set; }
+    public string? KysGoodsGenuineProof { get; set; }
+    public string? KysCommercialReason { get; set; }
+    public bool? KysFtaPenalty { get; set; }
+    public string? KysFtaPenaltyDetails { get; set; }
+    public bool? KysAdverseMedia { get; set; }
+    public string? KysAdverseMediaDetails { get; set; }
 }

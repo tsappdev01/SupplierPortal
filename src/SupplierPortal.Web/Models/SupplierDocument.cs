@@ -2,7 +2,18 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SupplierPortal.Web.Models;
 
-public enum SupplierDocumentType { TradeLicense, VatCertification, Other, BankConfirmationLetter, SignedDeclaration }
+public enum SupplierDocumentType
+{
+    TradeLicense = 0,
+    VatCertification = 1,
+    Other = 2,
+    BankConfirmationLetter = 3,
+    SignedDeclaration = 4,
+    // KYS document types
+    EmiratesIdOrPassport = 5,
+    ProofOfAddress = 6,
+    PriceListOrQuotation = 7
+}
 
 /// <summary>Metadata for a supplier-uploaded document. The physical file lives outside wwwroot
 /// (under the app's content root at doc/supplier/{SupplierId}/{StoredFileName}), so it is never
