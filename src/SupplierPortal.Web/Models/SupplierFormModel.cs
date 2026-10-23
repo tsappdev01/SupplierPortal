@@ -15,6 +15,10 @@ public class SupplierFormModel
     /// <summary>Internal triage priority: P1 / P2 / P3 / P4.</summary>
     public string? Priority { get; set; }
 
+    /// <summary>Supplier active/inactive status (internal only). Shown on the Business/Organization tab;
+    /// an inactive supplier is hidden from the default supplier list.</summary>
+    public bool IsActive { get; set; } = true;
+
     [Required(ErrorMessage = "Supplier Name is required.")]
     public string SupplierName { get; set; } = "";
 
@@ -169,6 +173,7 @@ public class SupplierFormModel
     {
         SupplierNumber = s.SupplierNumber,
         Priority = s.Priority,
+        IsActive = s.IsActive,
         SupplierName = s.SupplierName,
         PrefixId = s.PrefixId,
         TaxOrganizationTypeId = s.TaxOrganizationTypeId,
@@ -284,6 +289,7 @@ public class SupplierFormModel
     {
         s.SupplierName = SupplierName;
         s.Priority = Priority;
+        s.IsActive = IsActive;
         s.PrefixId = PrefixId;
         s.TaxOrganizationTypeId = TaxOrganizationTypeId;
         s.FirstName = FirstName;
