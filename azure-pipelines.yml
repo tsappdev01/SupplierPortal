@@ -7,22 +7,18 @@
 #  app pool FROM IIS by site name, takes the app offline, mirrors the new files,
 #  and preserves server-only state (appsettings.Local.json, doc\, keys\, logs\).
 #
-#  Supplier, Customer and Landlord are THREE separate IIS sites:
-#    SupplierPortal.Web   is ONE app (Supplier + Customer modules). It is deployed
-#    to TWO IIS sites — a Supplier site and a Customer site — each with its own
-#    bindings and its own server-only appsettings.Local.json. Same binaries, two sites.
-#    SupplierPortal.Leasing.Web is a SEPARATE app on its own Landlord site.
+#  SupplierPortal.Web is ONE app serving BOTH the Supplier and Customer modules on
+#  ONE IIS site. SupplierPortal.Leasing.Web is a SEPARATE app on its own Landlord site.
 #
 #  Sites (from IIS Manager on UATWEB01):
-#    SupplierPortal.Web          -> Supplier site  'DI Supplier'  (usupplierportal.dubaiinvestments.com)
-#    SupplierPortal.Web          -> Customer site                 (set customerSiteName to enable)
-#    SupplierPortal.SelfService  -> Partner Connect site          (set selfServiceSiteName to enable)
-#    SupplierPortal.Leasing.Web  -> Landlord site                 (set landlordSiteName to enable)
-#    SupplierPortal.Leasing.SelfService -> Landlord DMZ           (set landlordDmzSiteName to enable)
+#    SupplierPortal.Web          -> 'DI Supplier'        (Supplier + Customer, usupplierportal.dubaiinvestments.com)
+#    SupplierPortal.SelfService  -> Partner Connect site (set selfServiceSiteName to enable)
+#    SupplierPortal.Leasing.Web  -> 'Landlord Portal'    (C:\Websites\Landlord\INT, lms.dipark.com)
+#    SupplierPortal.Leasing.SelfService -> 'Landlord SelfService' (C:\Websites\Landlord\EXT, lmsext.dipark.com)
 #
-#  A deploy step runs ONLY when its *SiteName variable is non-empty, so the
-#  Supplier site deploys by default and the others switch on when you fill in
-#  their IIS site names (nothing fails just because a site doesn't exist yet).
+#  A deploy step runs ONLY when its *SiteName variable is non-empty, so a site is
+#  deployed only when you fill in its IIS site name (nothing fails for a site that
+#  doesn't exist yet).
 #
 #  ONE-TIME SETUP in Azure DevOps:
 #    1. This pipeline must use THIS file (/azure-pipelines.yml). In the pipeline:
@@ -53,21 +49,19 @@ variables:
   buildConfiguration: 'Release'
   uatAgentPool: 'Default'                 # <-- set to your UATWEB01 agent pool
 
-  # ---- INTERNAL sites (deployed first) ----
+  # ---- INTERNAL sites ----
   # IIS *site names* on UATWEB01 (NOT host headers). Path + app pool are resolved from these.
-  # Supplier + Customer both run the SAME SupplierPortal.Web build on two separate IIS sites.
-  supplierSiteName: 'DI Supplier'         # Supplier internal site
+  # Supplier + Customer are the SAME SupplierPortal.Web app on ONE IIS site.
+  supplierSiteName: 'DI Supplier'         # Supplier + Customer internal site (SupplierPortal.Web)
   supplierUrl: 'https://usupplierportal.dubaiinvestments.com/'
-  customerSiteName: 'DI Customer'         # Customer internal site (same SupplierPortal.Web build)
-  customerUrl: ''                         # optional warm-up URL (blank = skip warm-up)
   landlordSiteName: 'Landlord Portal'     # Landlord internal site (SupplierPortal.Leasing.Web) -> C:\Websites\Landlord\INT
   landlordUrl: 'https://lms.dipark.com/'
 
-  # ---- DMZ / self-service sites (set up later) ----
-  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService)
+  # ---- DMZ / self-service sites ----
+  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService) — set to enable
   selfServiceUrl: ''
-  landlordDmzSiteName: ''                 # Landlord Connect (SupplierPortal.Leasing.SelfService)
-  landlordDmzUrl: ''
+  landlordDmzSiteName: 'Landlord SelfService'   # Landlord DMZ (SupplierPortal.Leasing.SelfService) -> C:\Websites\Landlord\EXT
+  landlordDmzUrl: 'https://lmsext.dipark.com/'
 
 pool:
   name: '$(uatAgentPool)'
@@ -92,7 +86,7 @@ steps:
 
   # ================= INTERNAL SITES =================
 
-  # Build SupplierPortal.Web once; it feeds BOTH the Supplier and Customer sites.
+  # SupplierPortal.Web serves both the Supplier and Customer modules (one site).
   - task: DotNetCoreCLI@2
     displayName: 'Publish SupplierPortal.Web (Supplier + Customer)'
     inputs:
@@ -103,22 +97,13 @@ steps:
       zipAfterPublish: false
       modifyOutputPath: false
 
-  # ---- Supplier site — always deployed ----
+  # ---- Supplier + Customer site — always deployed ----
   - task: PowerShell@2
-    displayName: 'Deploy Supplier → $(supplierSiteName)'
+    displayName: 'Deploy Supplier + Customer → $(supplierSiteName)'
     inputs:
       filePath: 'deploy/Deploy-Site-Local.ps1'
       arguments: '-SiteName "$(supplierSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\web" -WarmupUrl "$(supplierUrl)"'
       pwsh: false   # Windows PowerShell — the WebAdministration module ships with IIS
-
-  # ---- Customer site — SAME build, second IIS site (only if customerSiteName set) ----
-  - task: PowerShell@2
-    displayName: 'Deploy Customer → $(customerSiteName)'
-    condition: and(succeeded(), ne(variables['customerSiteName'], ''))
-    inputs:
-      filePath: 'deploy/Deploy-Site-Local.ps1'
-      arguments: '-SiteName "$(customerSiteName)" -SourcePath "$(Build.ArtifactStagingDirectory)\web" -WarmupUrl "$(customerUrl)"'
-      pwsh: false
 
   # ---- Landlord internal — only if landlordSiteName set ----
   - task: DotNetCoreCLI@2
