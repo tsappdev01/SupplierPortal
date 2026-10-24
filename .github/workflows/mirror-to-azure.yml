@@ -49,12 +49,10 @@ jobs:
           git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
           cd repo.git
 
-          # GitHub exposes refs/pull/* which Azure DevOps rejects — drop them before pushing.
-          git for-each-ref --format='%(refname)' 'refs/pull/*' | while read -r r; do
-            [ -n "$r" ] && git update-ref -d "$r"
-          done
-
-          # Push everything to Azure. PAT goes in an auth header (empty username + PAT), not the URL.
+          # Push ONLY branches + tags — never GitHub's refs/pull/*, which Azure DevOps rejects.
+          # --prune keeps the destination's branch/tag set identical to GitHub; --force overwrites a
+          # stale earlier import. PAT goes in an auth header (empty username + PAT), not the URL.
           AUTH="Authorization: Basic $(printf ':%s' "$AZDO_PAT" | base64 -w0)"
-          git -c http.extraheader="$AUTH" push --mirror "$AZURE_URL"
+          git -c http.extraheader="$AUTH" push --force --prune "$AZURE_URL" \
+            "refs/heads/*:refs/heads/*" "refs/tags/*:refs/tags/*"
           echo "Mirror complete."
