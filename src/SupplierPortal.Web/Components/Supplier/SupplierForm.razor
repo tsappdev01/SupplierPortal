@@ -674,6 +674,29 @@ else
                     </div>
                 </div>
 
+                @* Re-run extraction on the Trade License already on file (internal view only) - for licences
+                   uploaded before auto-read existed, or to refresh with the latest reader. *@
+                @if (!SupplierFacing && HasTradeLicenseDocument())
+                {
+                    <div class="di-tl-reextract">
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
+                            @if (reExtracting)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span class="ms-1">Extracting…</span>
+                            }
+                            else
+                            {
+                                @(tlReadback?.HasData == true ? "Re-run extraction" : "Extract data from Trade License")
+                            }
+                        </button>
+                        @if (tlReadback?.HasData != true && !reExtracting)
+                        {
+                            <span class="text-muted small ms-2">No data has been extracted from this Trade License yet.</span>
+                        }
+                    </div>
+                }
+
                 @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
                 @if (!SupplierFacing && tlReadback?.HasData == true)
                 {
@@ -1472,7 +1495,8 @@ else
     .di-stepcat:first-child .di-stepcat-label { color: #46618f; }
     .di-stepcat .di-stepper { margin: 0; }
     /* "Read from Trade License" read-only panel */
-    .di-tl-readback { margin-top: 14px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; background: var(--di-surface, #fff); overflow: hidden; }
+    .di-tl-reextract { margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+    .di-tl-readback { margin-top: 10px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; background: var(--di-surface, #fff); overflow: hidden; }
     .di-tl-readback-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--di-surface-2, #f1f6ff); border-bottom: 1px solid var(--di-border, #e2e5ea); color: #1f3864; font-weight: 700; font-size: 0.9rem; }
     .di-tl-readback-meta { margin-left: auto; font-weight: 500; font-size: 12px; color: #6b7a90; }
     .di-tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; padding: 14px; }
@@ -1811,6 +1835,7 @@ else
     private List<SupplierDocument> documents = [];
     // Auto-read Trade License capture (internal view only), shown read-only under the Trade License upload.
     private SupplierPortal.Web.Services.TradeLicenseReadback? tlReadback;
+    private bool reExtracting;
     private bool uploadingDocument;
     private bool viewingDocument;
     private string? viewerUrl;
@@ -2364,6 +2389,31 @@ else
             ToastService.ShowError($"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.");
         }
         finally { uploadingDocument = false; }
+    }
+
+    // Re-run extraction on the Trade License already on file and refresh the read-only panel. Internal only.
+    private async Task ReExtractLicenseAsync()
+    {
+        if (reExtracting || Supplier.Id == 0) { return; }
+        reExtracting = true;
+        try
+        {
+            var (ok, error, visionEnabled) = await SupplierDocumentService.ReExtractLicenseAsync(Supplier.Id, CurrentUser);
+            if (ok)
+            {
+                tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+                ToastService.ShowSuccess("Trade License re-read. The captured fields are shown below.");
+            }
+            else
+            {
+                ToastService.ShowError(error ?? "Could not extract data from the Trade License.");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("Could not re-run extraction. Please try again.");
+        }
+        finally { reExtracting = false; }
     }
 
     private async Task ViewDocumentAsync(int documentId)
