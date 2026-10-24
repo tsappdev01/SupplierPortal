@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SupplierPortal.Web.Services;
@@ -78,7 +79,7 @@ public static class TradeLicenseParser
     // the label, so the after-label read misses it; this catches a number (optional CN-/IN- prefix) that
     // sits just before the label.
     private static readonly Regex LicenseNoBeforeLabel = new(
-        @"([A-Za-z]{0,3}-?[0-9]{3,})\s*\n?\s*(?:Economic\s*)?Licen[cs]e\s*No",
+        @"([A-Za-z]{0,3}-?[0-9]{3,})\s*\n?\s*(?:Economic\s*)?Licen[cs]e\s*(?:No|Number)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     // D&B D-U-N-S numbers are always 9 digits; read the 9-digit run nearest the label (Singleline so
@@ -95,12 +96,13 @@ public static class TradeLicenseParser
     // "License..." (a footer phrase) from being read as a "Tourism" licence when the real heading is
     // unreadable.
     private static readonly Regex LicenseKindLine = new(
-        @"(?<!and\s)(?<!&\s)\b(Commercial|Industrial|Professional|Trading|Tourism|Agricultural|Craftsmanship)\s+Licen[cs]e\b",
+        @"(?<!and\s)(?<!&\s)\b(Commercial|Industrial|Professional|Trading|Tourism|Logistic|Agricultural|Craftsmanship)\s+Licen[cs]e\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // Textual date ("27 January 2016") used by some free-zone licences instead of dd/MM/yyyy.
+    // Textual date used by some free-zone/TECOM licences instead of dd/MM/yyyy - full ("27 January 2016")
+    // or abbreviated ("17 Jun 2007") month names.
     private static readonly Regex TextDate = new(
-        @"\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b",
+        @"\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CapsName = new(
         @"\b[A-Z][A-Z0-9]*(?:\s+[A-Z0-9()&.,'\-]+){1,8}\b", RegexOptions.Compiled);
@@ -196,6 +198,8 @@ public static class TradeLicenseParser
         {
             return result;
         }
+
+        text = StripArabicDigits(text);
 
         var lic = FirstGroup(LicenseNoLabeled, text);
         if (lic is null || !lic.Any(char.IsDigit)) { lic = FirstGroup(LicenseNoBeforeLabel, text); }
@@ -341,7 +345,9 @@ public static class TradeLicenseParser
     private static bool TryParseLicenseDate(string s, out DateTime dt)
     {
         s = s.Replace('.', '/').Replace('-', '/').Trim();
-        string[] formats = ["dd/MM/yyyy", "d/M/yyyy", "d MMMM yyyy", "dd MMMM yyyy"];
+        s = Regex.Replace(s, @"\bSept\b", "Sep", RegexOptions.IgnoreCase); // invariant MMM uses "Sep"
+        string[] formats =
+            ["dd/MM/yyyy", "d/M/yyyy", "d MMMM yyyy", "dd MMMM yyyy", "d MMM yyyy", "dd MMM yyyy"];
         return DateTime.TryParseExact(s, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
     }
 
@@ -497,6 +503,21 @@ public static class TradeLicenseParser
     }
 
     // ---- Small text utilities ------------------------------------------------------------------
+
+    /// <summary>Drops Arabic-Indic / Eastern-Arabic numerals. UAE licences print each value twice -
+    /// Arabic numerals then Latin - and the Arabic glyphs are often glued to the Latin run in the text
+    /// layer ("٣٦١٩٠٥٣٣٢361905332", "٠٣/٣٠/٦٢٠٢30/03/2026"), which corrupts number and date reads. The
+    /// Latin digits (the official value) are always present and are left untouched.</summary>
+    private static string StripArabicDigits(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        foreach (var ch in s)
+        {
+            if ((ch >= '٠' && ch <= '٩') || (ch >= '۰' && ch <= '۹')) { continue; }
+            sb.Append(ch);
+        }
+        return sb.ToString();
+    }
 
     private static string? FirstContained(string haystack, string[] options)
     {
