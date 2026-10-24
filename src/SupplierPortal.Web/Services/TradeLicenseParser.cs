@@ -34,6 +34,25 @@ public sealed class ParsedLicense
     public string? DcciNumber { get; set; }
     public List<LicenseActivity> Activities { get; set; } = [];
     public List<LicenseMember> Members { get; set; } = [];
+
+    // Extra fields captured by the Claude-vision reader (and left null by the regex parser when not found),
+    // so one result type covers DED mainland and free-zone layouts alike.
+    public string? LegalName { get; set; }
+    public string? TradeName { get; set; }
+    /// <summary>Issuing authority / free zone: DED, JAFZA, DAFZA, Creative City, DMCC, ...</summary>
+    public string? IssuingAuthority { get; set; }
+    /// <summary>License kind: Commercial / Professional / Industrial, etc.</summary>
+    public string? LicenseKind { get; set; }
+    /// <summary>Paid capital exactly as printed (digits only, e.g. "300000"); mapped to decimal on save.</summary>
+    public string? PaidCapital { get; set; }
+    public string? CapitalCurrency { get; set; }
+    public string? PoBox { get; set; }
+    public string? ParcelId { get; set; }
+    public string? Premises { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? Mobile { get; set; }
+    public string? Address { get; set; }
 }
 
 /// <summary>Reusable, dependency-free extractor for Dubai DED trade/professional licences. Give it the

@@ -126,6 +126,7 @@ builder.Services.AddScoped<CustomerDeclarationPdfService>();
 builder.Services.AddScoped<ExcelImportService>();
 builder.Services.AddScoped<SupplierEmailService>();
 builder.Services.AddScoped<SupplierAccessTokenService>();
+builder.Services.AddScoped<ITradeLicenseReader, ClaudeTradeLicenseReader>();
 builder.Services.AddScoped<SupplierDocumentService>();
 
 // Deployment mode (Internal vs DMZ) and the self-service gateway seam. Internal mode resolves the

@@ -20,7 +20,7 @@ public record DocumentUploadResult(bool Success, string? Error, string? Extracte
 public class SupplierDocumentService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService,
-    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore)
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore, ITradeLicenseReader licenseReader)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -104,6 +104,8 @@ public class SupplierDocumentService(
         string? dunsNumber = null;
         string? licenseType = null;
         List<LicenseMember> partners = [];
+        ParsedLicense? license = null;   // full trade-license data (vision reader, or regex fallback)
+        string? readSource = null;
 
         if (documentType is SupplierDocumentType.VatCertification or SupplierDocumentType.TradeLicense)
         {
@@ -130,29 +132,50 @@ public class SupplierDocumentService(
                 }
             }
 
-            // Prefer the PDF's own text layer; fall back to cloud OCR (Azure Document Intelligence)
-            // for scanned/image licenses that carry no embedded text. Both are best-effort - if neither
-            // yields text, every extracted value stays null/empty and the upload still succeeds.
-            var text = TryReadPdfText(extractionPath);
-            if (string.IsNullOrWhiteSpace(text) && ocr.IsEnabled)
+            // Trade License: prefer the Claude-vision reader (handles DED + free-zone layouts and scans),
+            // reading the best copy (the official PDF from the QR when available, else the upload).
+            if (documentType == SupplierDocumentType.TradeLicense && licenseReader.IsEnabled)
             {
-                text = await ocr.ExtractTextAsync(extractionPath);
+                var bytes = await File.ReadAllBytesAsync(extractionPath);
+                var media = extractionPath == tempOfficialPdf ? "application/pdf" : contentType;
+                var vision = await licenseReader.ReadAsync(bytes, media);
+                if (vision is not null && LicenseHasData(vision))
+                {
+                    license = vision;
+                    readSource = "Claude vision";
+                }
             }
 
-            if (!string.IsNullOrWhiteSpace(text))
+            // Fallback (and the VAT path): prefer the PDF's own text layer, else cloud OCR (Azure Document
+            // Intelligence) for scanned licenses, then the regex parser. Best-effort - any value may stay null.
+            if (license is null)
             {
-                if (documentType == SupplierDocumentType.VatCertification)
+                var text = TryReadPdfText(extractionPath);
+                if (string.IsNullOrWhiteSpace(text) && ocr.IsEnabled)
                 {
-                    extractedNumber = MatchNumber(text, TrnLabeled, TrnBare);
+                    text = await ocr.ExtractTextAsync(extractionPath);
                 }
-                else
+
+                if (!string.IsNullOrWhiteSpace(text))
                 {
-                    var license = TradeLicenseParser.Parse(text);
-                    extractedNumber = license.LicenseNumber;
-                    dunsNumber = license.DunsNumber;
-                    licenseType = license.LegalType;
-                    partners = license.Members;
+                    if (documentType == SupplierDocumentType.VatCertification)
+                    {
+                        extractedNumber = MatchNumber(text, TrnLabeled, TrnBare);
+                    }
+                    else
+                    {
+                        license = TradeLicenseParser.Parse(text);
+                        readSource = "DED parser";
+                    }
                 }
+            }
+
+            if (documentType == SupplierDocumentType.TradeLicense && license is not null)
+            {
+                extractedNumber = license.LicenseNumber;
+                dunsNumber = license.DunsNumber;
+                licenseType = license.LegalType;
+                partners = license.Members;
             }
 
             if (tempOfficialPdf is not null)
@@ -251,24 +274,47 @@ public class SupplierDocumentService(
         // LicenseType column or the SupplierPartners table - can never undo the upload above or block the
         // extracted number from reaching the form. Written only when something parsed, so a re-upload
         // that fails to parse never wipes good data.
-        if (documentType == SupplierDocumentType.TradeLicense
-            && (!string.IsNullOrWhiteSpace(dunsNumber) || !string.IsNullOrWhiteSpace(licenseType) || partners.Count > 0))
+        if (documentType == SupplierDocumentType.TradeLicense && license is not null)
         {
             try
             {
                 var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
                 if (supplier is not null)
                 {
-                    if (!string.IsNullOrWhiteSpace(dunsNumber))
-                    {
-                        supplier.DunsNumber = dunsNumber;
-                    }
+                    // Keep the existing behaviour of folding D-U-N-S and legal type into the editable fields.
+                    if (!string.IsNullOrWhiteSpace(dunsNumber)) { supplier.DunsNumber = dunsNumber; }
+                    if (!string.IsNullOrWhiteSpace(licenseType)) { supplier.LicenseType = licenseType; }
 
-                    if (!string.IsNullOrWhiteSpace(licenseType))
-                    {
-                        supplier.LicenseType = licenseType;
-                    }
+                    // Dedicated, non-destructive auto-read capture (shown read-only under the document).
+                    supplier.TlLicenseNumber = license.LicenseNumber;
+                    supplier.TlMainLicenseNumber = license.MainLicenseNumber;
+                    supplier.TlLegalName = license.LegalName ?? license.BusinessName;
+                    supplier.TlTradeName = license.TradeName;
+                    supplier.TlLegalType = license.LegalType;
+                    supplier.TlLicenseCategory = license.LicenseCategory;
+                    supplier.TlIssuingAuthority = license.IssuingAuthority;
+                    supplier.TlLicenseType = license.LicenseKind;
+                    supplier.TlIssueDate = ParseLicenseDate(license.IssueDate);
+                    supplier.TlExpiryDate = ParseLicenseDate(license.ExpiryDate);
+                    supplier.TlRegisterNumber = license.RegisterNumber;
+                    supplier.TlDcciNumber = license.DcciNumber;
+                    supplier.TlDunsNumber = license.DunsNumber;
+                    supplier.TlPaidCapital = ParseCapital(license.PaidCapital);
+                    supplier.TlCapitalCurrency = license.CapitalCurrency;
+                    supplier.TlActivities = license.Activities.Count > 0
+                        ? string.Join(" | ", license.Activities.Select(a => a.Name).Where(n => !string.IsNullOrWhiteSpace(n)))
+                        : null;
+                    supplier.TlPoBox = license.PoBox;
+                    supplier.TlParcelId = license.ParcelId;
+                    supplier.TlPremises = license.Premises;
+                    supplier.TlEmail = license.Email;
+                    supplier.TlPhone = license.Phone;
+                    supplier.TlMobile = license.Mobile;
+                    supplier.TlAddress = license.Address;
+                    supplier.TlReadAt = DateTime.UtcNow;
+                    supplier.TlReadSource = readSource;
 
+                    // Replace the parties annex (owners/partners/managers) with the freshly read set.
                     if (partners.Count > 0)
                     {
                         var existingPartners = await db.SupplierPartners
@@ -507,6 +553,40 @@ public class SupplierDocumentService(
 
     /// <summary>Makes a string safe as a single blob path segment: no slashes/control characters,
     /// collapsed whitespace, trimmed, and length-capped. Falls back to "unknown" when empty.</summary>
+    /// <summary>True when a vision read produced at least one meaningful field (so we prefer it over the
+    /// regex fallback). A blank result (API returned nothing useful) is treated as a miss.</summary>
+    private static bool LicenseHasData(ParsedLicense l) =>
+        !string.IsNullOrWhiteSpace(l.LicenseNumber)
+        || !string.IsNullOrWhiteSpace(l.LegalType)
+        || !string.IsNullOrWhiteSpace(l.ExpiryDate)
+        || !string.IsNullOrWhiteSpace(l.IssuingAuthority)
+        || !string.IsNullOrWhiteSpace(l.RegisterNumber)
+        || l.Members.Count > 0
+        || l.Activities.Count > 0;
+
+    /// <summary>Parses a licence date string (DD/MM/YYYY and a few common variants) to a DateTime, or null.</summary>
+    private static DateTime? ParseLicenseDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) { return null; }
+        var formats = new[] { "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "dd.MM.yyyy" };
+        if (DateTime.TryParseExact(value.Trim(), formats, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var dt))
+        {
+            return dt;
+        }
+        return DateTime.TryParse(value.Trim(), System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var any) ? any : null;
+    }
+
+    /// <summary>Parses the paid-capital string (digits, possibly with commas/decimals) to a decimal, or null.</summary>
+    private static decimal? ParseCapital(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) { return null; }
+        var digits = new string(value.Where(c => char.IsDigit(c) || c == '.').ToArray());
+        return decimal.TryParse(digits, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
+    }
+
     private static string SanitizeSegment(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) { return "unknown"; }
