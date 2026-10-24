@@ -51,7 +51,7 @@ name: $(Date:yyyy.MM.dd).$(Rev:r)
 variables:
   buildConfiguration: 'Release'
   uatAgentPool: 'Default'                 # <-- set to your UATWEB01 agent pool
-  configGuard: 'on'                       # 'off' to skip the pre-deploy appsettings.Local.json checks
+  configGuard: 'off'                      # 'on' to re-enable pre-deploy appsettings.Local.json checks (config is copied to the server manually)
 
   # ---- INTERNAL sites ----
   # IIS *site names* on UATWEB01 (NOT host headers). Path + app pool are resolved from these.
