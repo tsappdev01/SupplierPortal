@@ -19,22 +19,26 @@
     min-height: 4rem;
     display: flex;
     align-items: center;
+    padding: 10px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .navbar-brand {
-    display: flex;
-    align-items: center;
+    display: block;
+    width: 100%;
 }
 
 .di-brand-logo {
-    height: 2.5rem;
-    max-width: 200px;
-    width: auto;
+    /* Consistent size for any logo, spanning the sidebar width and framed by a gold border. The default
+       Dubai Investments logo carries its own navy background, so the chip sits flush on the navy sidebar;
+       the matching navy backdrop keeps a transparent company-override logo readable too. */
+    display: block;
+    width: 100%;
+    height: 3.25rem;
     object-fit: contain;
-    /* The logo is navy text + taupe mark on transparent; sit it on a white chip so it reads on the navy sidebar. */
-    background: #fff;
-    padding: 5px 9px;
+    background: #073353; /* matches the Dubai Investments logo's own navy, so the framed box reads as one piece */
+    padding: 4px;
+    border: 1px solid rgba(197, 147, 63, 0.65);
     border-radius: 8px;
 }
 

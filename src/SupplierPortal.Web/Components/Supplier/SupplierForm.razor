@@ -674,12 +674,11 @@ else
                     </div>
                 </div>
 
-                @* Re-run extraction on the Trade License already on file (internal view only) - for licences
-                   uploaded before auto-read existed, or to refresh with the latest reader. *@
-                @if (!SupplierFacing && HasTradeLicenseDocument())
+                @* Prompt to extract when nothing has been read from the Trade License yet (internal view only). *@
+                @if (!SupplierFacing && HasTradeLicenseDocument() && tlReadback?.HasData != true)
                 {
                     <div class="di-tl-reextract">
-                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
+                        <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
                             @if (reExtracting)
                             {
                                 <span class="spinner-border spinner-border-sm" role="status"></span>
@@ -687,10 +686,11 @@ else
                             }
                             else
                             {
-                                @(tlReadback?.HasData == true ? "Re-run extraction" : "Extract data from Trade License")
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                <span>Extract data from Trade License</span>
                             }
                         </button>
-                        @if (tlReadback?.HasData != true && !reExtracting)
+                        @if (!reExtracting)
                         {
                             <span class="text-muted small ms-2">No data has been extracted from this Trade License yet.</span>
                         }
@@ -700,45 +700,70 @@ else
                 @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
                 @if (!SupplierFacing && tlReadback?.HasData == true)
                 {
-                    <div class="di-tl-readback">
-                        <div class="di-tl-readback-head">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
-                            <span class="di-tl-readback-title">Read from Trade License</span>
-                            @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource) || tlReadback.ReadAt is not null)
-                            {
-                                <span class="di-tl-readback-meta">
-                                    @tlReadback.ReadSource@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:yyyy-MM-dd HH:mm} UTC" : "")
+                    var tlIsAi = tlReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
+                    <div class="di-xtract">
+                        <div class="di-xtract-head">
+                            <div class="di-xtract-title">
+                                <span class="di-xtract-ic">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
                                 </span>
-                            }
+                                <div class="di-xtract-titletext">
+                                    <div class="di-xtract-h">Trade License</div>
+                                    <div class="di-xtract-sub">Read from the uploaded document@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
+                                </div>
+                            </div>
+                            <div class="di-xtract-actions">
+                                <span class="di-xtract-badge ok">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
+                                    @(tlIsAi ? "AI Extraction Completed" : "Extraction Completed")
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource))
+                                {
+                                    <span class="di-xtract-src">@tlReadback.ReadSource</span>
+                                }
+                                <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
+                                    @if (reExtracting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                                        <span class="ms-1">Extracting…</span>
+                                    }
+                                    else
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                        <span>Re-run Extraction</span>
+                                    }
+                                </button>
+                            </div>
                         </div>
-                        <div class="di-tl-grid">
-                            @TlRow("License No.", tlReadback.LicenseNumber)
-                            @TlRow("Main License No.", tlReadback.MainLicenseNumber)
-                            @TlRow("Legal Name", tlReadback.LegalName)
-                            @TlRow("Trade Name", tlReadback.TradeName)
-                            @TlRow("Legal Type", tlReadback.LegalType)
-                            @TlRow("License Category", tlReadback.LicenseCategory)
-                            @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
-                            @TlRow("License Type", tlReadback.LicenseType)
-                            @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
-                            @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
-                            @TlRow("Register No.", tlReadback.RegisterNumber)
-                            @TlRow("DCCI No.", tlReadback.DcciNumber)
-                            @TlRow("D-U-N-S", tlReadback.DunsNumber)
-                            @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
-                            @TlRow("P.O. Box", tlReadback.PoBox)
-                            @TlRow("Parcel ID", tlReadback.ParcelId)
-                            @TlRow("Premises", tlReadback.Premises)
-                            @TlRow("Email", tlReadback.Email)
-                            @TlRow("Phone", tlReadback.Phone)
-                            @TlRow("Mobile", tlReadback.Mobile)
-                            @TlRow("Address", tlReadback.Address)
-                            @TlRow("Activities", tlReadback.Activities)
-                        </div>
-                        @if (tlReadback.Parties.Count > 0)
-                        {
-                            <div class="di-tl-parties">
-                                <div class="di-tl-parties-title">Partners / Managers</div>
+                        <div class="di-xtract-body">
+                            <div class="di-xtract-sec">License Information</div>
+                            <div class="di-tl-grid">
+                                @TlRow("License No.", tlReadback.LicenseNumber)
+                                @TlRow("Main License No.", tlReadback.MainLicenseNumber)
+                                @TlRow("Legal Name", tlReadback.LegalName)
+                                @TlRow("Trade Name", tlReadback.TradeName)
+                                @TlRow("Legal Type", tlReadback.LegalType)
+                                @TlRow("License Category", tlReadback.LicenseCategory)
+                                @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
+                                @TlRow("License Type", tlReadback.LicenseType)
+                                @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
+                                @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
+                                @TlRow("Register No.", tlReadback.RegisterNumber)
+                                @TlRow("DCCI No.", tlReadback.DcciNumber)
+                                @TlRow("D-U-N-S", tlReadback.DunsNumber)
+                                @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
+                                @TlRow("P.O. Box", tlReadback.PoBox)
+                                @TlRow("Parcel ID", tlReadback.ParcelId)
+                                @TlRow("Premises", tlReadback.Premises)
+                                @TlRow("Email", tlReadback.Email)
+                                @TlRow("Phone", tlReadback.Phone)
+                                @TlRow("Mobile", tlReadback.Mobile)
+                                @TlRow("Address", tlReadback.Address)
+                                @TlRow("Activities", tlReadback.Activities)
+                            </div>
+                            @if (tlReadback.Parties.Count > 0)
+                            {
+                                <div class="di-xtract-sec">Partners / Managers</div>
                                 <table class="di-tl-parties-table">
                                     <thead><tr><th>Name</th><th>Nationality</th><th>Role</th><th>Share</th></tr></thead>
                                     <tbody>
@@ -746,15 +771,19 @@ else
                                         {
                                             <tr>
                                                 <td>@p.Name</td>
-                                                <td>@p.Nationality</td>
-                                                <td>@p.Role</td>
-                                                <td>@FormatShare(p.Share)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(p.Nationality) ? "—" : p.Nationality)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(p.Role) ? "—" : p.Role)</td>
+                                                <td>@(FormatShare(p.Share) ?? "—")</td>
                                             </tr>
                                         }
                                     </tbody>
                                 </table>
+                            }
+                            <div class="di-xtract-done">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                                <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
                             </div>
-                        }
+                        </div>
                     </div>
                 }
 
@@ -1345,10 +1374,10 @@ else
                     </div>
 
                     @* Re-run extraction on the Emirates ID / Passport already on file (internal view only). *@
-                    @if (!SupplierFacing && documents.Any(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport))
+                    @if (!SupplierFacing && documents.Any(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport) && idReadback?.HasData != true)
                     {
                         <div class="di-tl-reextract">
-                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
+                            <button type="button" class="di-xtract-rerun" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
                                 @if (reExtractingId)
                                 {
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
@@ -1356,10 +1385,11 @@ else
                                 }
                                 else
                                 {
-                                    @(idReadback?.HasData == true ? "Re-run Emirates ID / Passport extraction" : "Extract Emirates ID / Passport data")
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                    <span>Extract Emirates ID / Passport data</span>
                                 }
                             </button>
-                            @if (idReadback?.HasData != true && !reExtractingId)
+                            @if (!reExtractingId)
                             {
                                 <span class="text-muted small ms-2">No data has been extracted from this document yet.</span>
                             }
@@ -1369,22 +1399,53 @@ else
                     @* Read-only panel: what was auto-read from the Emirates ID / Passport (internal view only). *@
                     @if (!SupplierFacing && idReadback?.HasData == true)
                     {
-                        <div class="di-tl-readback">
-                            <div class="di-tl-readback-head">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
-                                <span class="di-tl-readback-title">Read from Emirates ID / Passport</span>
-                                @if (!string.IsNullOrWhiteSpace(idReadback.ReadSource) || idReadback.ReadAt is not null)
-                                {
-                                    <span class="di-tl-readback-meta">
-                                        @idReadback.ReadSource@(idReadback.ReadAt is not null ? $" · {idReadback.ReadAt:yyyy-MM-dd HH:mm} UTC" : "")
+                        var idIsAi = idReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
+                        <div class="di-xtract">
+                            <div class="di-xtract-head">
+                                <div class="di-xtract-title">
+                                    <span class="di-xtract-ic">
+                                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM3 8a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm8.5-1a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
                                     </span>
-                                }
+                                    <div class="di-xtract-titletext">
+                                        <div class="di-xtract-h">Emirates ID / Passport</div>
+                                        <div class="di-xtract-sub">Read from the uploaded document@(idReadback.ReadAt is not null ? $" · {idReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
+                                    </div>
+                                </div>
+                                <div class="di-xtract-actions">
+                                    <span class="di-xtract-badge ok">
+                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
+                                        @(idIsAi ? "AI Extraction Completed" : "Extraction Completed")
+                                    </span>
+                                    @if (!string.IsNullOrWhiteSpace(idReadback.ReadSource))
+                                    {
+                                        <span class="di-xtract-src">@idReadback.ReadSource</span>
+                                    }
+                                    <button type="button" class="di-xtract-rerun" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
+                                        @if (reExtractingId)
+                                        {
+                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                            <span class="ms-1">Extracting…</span>
+                                        }
+                                        else
+                                        {
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                            <span>Re-run Extraction</span>
+                                        }
+                                    </button>
+                                </div>
                             </div>
-                            <div class="di-tl-readback-grid">
-                                @TlRow("Emirates ID No.", idReadback.EmiratesIdNumber)
-                                @TlRow("Emirates ID Expiry", idReadback.EmiratesIdExpiryDate?.ToString("dd/MM/yyyy"))
-                                @TlRow("Passport No.", idReadback.PassportNumber)
-                                @TlRow("Passport Expiry", idReadback.PassportExpiryDate?.ToString("dd/MM/yyyy"))
+                            <div class="di-xtract-body">
+                                <div class="di-xtract-sec">Identity Information</div>
+                                <div class="di-tl-grid">
+                                    @TlRow("Emirates ID No.", idReadback.EmiratesIdNumber)
+                                    @TlRow("Emirates ID Expiry", idReadback.EmiratesIdExpiryDate?.ToString("dd/MM/yyyy"))
+                                    @TlRow("Passport No.", idReadback.PassportNumber)
+                                    @TlRow("Passport Expiry", idReadback.PassportExpiryDate?.ToString("dd/MM/yyyy"))
+                                </div>
+                                <div class="di-xtract-done">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                                    <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
+                                </div>
                             </div>
                         </div>
                     }
@@ -1540,19 +1601,39 @@ else
     .di-stepcat:first-child .di-stepcat-label { color: #46618f; }
     .di-stepcat .di-stepper { margin: 0; }
     /* "Read from Trade License" read-only panel */
-    .di-tl-reextract { margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-    .di-tl-readback { margin-top: 10px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; background: var(--di-surface, #fff); overflow: hidden; }
-    .di-tl-readback-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--di-surface-2, #f1f6ff); border-bottom: 1px solid var(--di-border, #e2e5ea); color: #1f3864; font-weight: 700; font-size: 0.9rem; }
-    .di-tl-readback-meta { margin-left: auto; font-weight: 500; font-size: 12px; color: #6b7a90; }
-    .di-tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; padding: 14px; }
-    .di-tl-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .di-tl-k { font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #8795a9; }
-    .di-tl-v { font-size: 13px; color: var(--di-text, #1f2a3d); word-break: break-word; }
-    .di-tl-parties { padding: 0 14px 14px; }
-    .di-tl-parties-title { font-size: 12px; font-weight: 700; color: #46618f; margin: 4px 0 6px; }
+    .di-tl-reextract { margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+    /* Enhanced extraction result card ("Read from ..." panels) */
+    .di-xtract { margin-top: 14px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 14px; background: var(--di-surface, #fff); overflow: hidden; box-shadow: 0 1px 3px rgba(16,32,64,.05), 0 6px 18px rgba(16,32,64,.05); }
+    .di-xtract-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 16px; background: linear-gradient(180deg, var(--di-surface-2, #f4f8ff), var(--di-surface, #fff)); border-bottom: 1px solid var(--di-border, #e2e5ea); }
+    .di-xtract-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .di-xtract-ic { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: #e7efff; color: #2b5bd7; flex: none; }
+    .di-xtract-titletext { min-width: 0; }
+    .di-xtract-h { font-size: 1rem; font-weight: 700; color: #1f3864; line-height: 1.2; }
+    .di-xtract-sub { font-size: 12px; color: #6b7a90; margin-top: 2px; }
+    .di-xtract-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .di-xtract-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .di-xtract-badge.ok { background: #e4f7ec; color: #1a7f4b; }
+    .di-xtract-src { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #6b7a90; background: var(--di-surface-2, #eef2f8); border: 1px solid var(--di-border, #e2e5ea); border-radius: 999px; padding: 4px 9px; }
+    .di-xtract-rerun { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 8px; border: 1px solid #2b5bd7; background: #2b5bd7; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, box-shadow .15s; }
+    .di-xtract-rerun:hover:not(:disabled) { background: #1f49b8; box-shadow: 0 2px 8px rgba(43,91,215,.3); }
+    .di-xtract-rerun:disabled { opacity: .65; cursor: default; }
+    .di-xtract-body { padding: 16px; }
+    .di-xtract-sec { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #46618f; margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .di-xtract-sec::after { content: ""; flex: 1; height: 1px; background: var(--di-border, #eef1f5); }
+    .di-xtract-sec:not(:first-child) { margin-top: 18px; }
+    .di-xtract-done { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 12px; border-radius: 10px; background: #effaf3; border: 1px solid #c9ecd7; color: #1a7f4b; font-size: 12.5px; }
+
+    .di-tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+    .di-tl-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 9px 11px; border: 1px solid var(--di-border, #e9edf3); border-radius: 9px; background: var(--di-surface-2, #fafbfe); }
+    .di-tl-k { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: #8795a9; }
+    .di-tl-vrow { display: flex; align-items: center; gap: 6px; }
+    .di-tl-v { font-size: 13.5px; font-weight: 500; color: var(--di-text, #1f2a3d); word-break: break-word; flex: 1; min-width: 0; }
+    .di-tl-chk { color: #1a7f4b; flex: none; }
     .di-tl-parties-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .di-tl-parties-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8795a9; border-bottom: 1px solid var(--di-border, #e2e5ea); padding: 4px 8px; }
-    .di-tl-parties-table td { padding: 4px 8px; border-bottom: 1px solid var(--di-border, #eef1f5); }
+    .di-tl-parties-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8795a9; border-bottom: 1px solid var(--di-border, #e2e5ea); padding: 6px 10px; }
+    .di-tl-parties-table td { padding: 7px 10px; border-bottom: 1px solid var(--di-border, #eef1f5); color: var(--di-text, #1f2a3d); }
+    .di-tl-parties-table tbody tr:last-child td { border-bottom: none; }
     /* KYS accordion */
     .di-kys { display: flex; flex-direction: column; gap: 12px; }
     .di-acc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: var(--di-surface, #fff); }
@@ -1649,6 +1730,9 @@ else
     }
 
     /// <summary>One label/value cell of the "Read from Trade License" panel; renders nothing when blank.</summary>
+    private const string CapturedCheckSvg =
+        "<svg class=\"di-tl-chk\" width=\"13\" height=\"13\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path d=\"M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z\"/></svg>";
+
     private RenderFragment TlRow(string label, string? value) => __builder =>
     {
         if (string.IsNullOrWhiteSpace(value)) { return; }
@@ -1658,9 +1742,13 @@ else
         __builder.AddAttribute(3, "class", "di-tl-k");
         __builder.AddContent(4, label);
         __builder.CloseElement();
-        __builder.OpenElement(5, "span");
-        __builder.AddAttribute(6, "class", "di-tl-v");
-        __builder.AddContent(7, value);
+        __builder.OpenElement(5, "div");
+        __builder.AddAttribute(6, "class", "di-tl-vrow");
+        __builder.OpenElement(7, "span");
+        __builder.AddAttribute(8, "class", "di-tl-v");
+        __builder.AddContent(9, value);
+        __builder.CloseElement();
+        __builder.AddMarkupContent(10, CapturedCheckSvg);
         __builder.CloseElement();
         __builder.CloseElement();
     };
