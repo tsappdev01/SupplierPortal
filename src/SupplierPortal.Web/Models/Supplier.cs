@@ -363,6 +363,39 @@ public class Supplier
     public bool? KysAdverseMedia { get; set; }
     [MaxLength(2000)] public string? KysAdverseMediaDetails { get; set; }
 
+    // -- Trade License (auto-read) --
+    //    Captured automatically from the uploaded Trade License (Claude vision, with the DED text parser as
+    //    a fallback). A dedicated, non-destructive set: these never overwrite the user's editable fields.
+    //    Shown read-only under the Trade License document. Partners/managers go to the SupplierPartners table.
+    [MaxLength(100)] public string? TlLicenseNumber { get; set; }
+    [MaxLength(100)] public string? TlMainLicenseNumber { get; set; }
+    [MaxLength(300)] public string? TlLegalName { get; set; }
+    [MaxLength(300)] public string? TlTradeName { get; set; }
+    [MaxLength(150)] public string? TlLegalType { get; set; }
+    [MaxLength(150)] public string? TlLicenseCategory { get; set; }
+    /// <summary>Issuing authority / free zone (DED, JAFZA, DAFZA, Creative City, DMCC, ...).</summary>
+    [MaxLength(150)] public string? TlIssuingAuthority { get; set; }
+    /// <summary>Commercial / Professional / Industrial, etc.</summary>
+    [MaxLength(100)] public string? TlLicenseType { get; set; }
+    public DateTime? TlIssueDate { get; set; }
+    public DateTime? TlExpiryDate { get; set; }
+    [MaxLength(50)] public string? TlRegisterNumber { get; set; }
+    [MaxLength(50)] public string? TlDcciNumber { get; set; }
+    [MaxLength(50)] public string? TlDunsNumber { get; set; }
+    public decimal? TlPaidCapital { get; set; }
+    [MaxLength(50)] public string? TlCapitalCurrency { get; set; }
+    [MaxLength(4000)] public string? TlActivities { get; set; }
+    [MaxLength(50)] public string? TlPoBox { get; set; }
+    [MaxLength(50)] public string? TlParcelId { get; set; }
+    [MaxLength(300)] public string? TlPremises { get; set; }
+    [MaxLength(256)] public string? TlEmail { get; set; }
+    [MaxLength(50)] public string? TlPhone { get; set; }
+    [MaxLength(50)] public string? TlMobile { get; set; }
+    [MaxLength(500)] public string? TlAddress { get; set; }
+    /// <summary>When the license was last auto-read, and by which extractor (e.g. "Claude vision" / "DED parser").</summary>
+    public DateTime? TlReadAt { get; set; }
+    [MaxLength(60)] public string? TlReadSource { get; set; }
+
     // -- Status / ownership --
 
     /// <summary>Workflow status (LookupValue in the SupplierStatus category): New →
