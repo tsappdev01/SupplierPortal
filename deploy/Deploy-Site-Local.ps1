@@ -26,9 +26,10 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)] [string] $SiteName,     # IIS site name, e.g. usupplierportal.dubaiinvestments.com
+    [Parameter(Mandatory = $true)] [string] $SiteName,     # IIS site name, e.g. 'DI Supplier' (also used as a label when -HostHeader is given)
     [Parameter(Mandatory = $true)] [string] $SourcePath,   # folder containing the publish output (dll, web.config, wwwroot)
     [string] $WarmupUrl = "",                              # optional URL to hit after start (e.g. https://host/)
+    [string] $HostHeader = "",                             # optional: resolve the site by this binding host (e.g. lmsext.dipark.com) instead of by name
     [string[]] $PreserveFiles = @("appsettings.Local.json"),
     [string[]] $PreserveDirs  = @("doc", "keys", "logs")
 )
@@ -38,13 +39,23 @@ Import-Module WebAdministration
 
 Write-Host "== Deploy '$SiteName' ==" -ForegroundColor Cyan
 
-# --- resolve the live site from IIS ---
-$site = Get-Website | Where-Object { $_.Name -eq $SiteName }
-if (-not $site) { throw "IIS site '$SiteName' not found on this server. Check the site name (Get-Website) or create it first." }
+# --- resolve the live site from IIS: by host-header binding when -HostHeader is given, else by site name ---
+if (-not [string]::IsNullOrWhiteSpace($HostHeader)) {
+    $site = Get-Website | Where-Object {
+        @(Get-WebBinding -Name $_.Name -ErrorAction SilentlyContinue |
+            ForEach-Object { ($_.bindingInformation -split ':')[-1] }) -contains $HostHeader
+    } | Select-Object -First 1
+    if (-not $site) { throw "No IIS site with a binding for host '$HostHeader' found on this server. Check the binding (Get-WebBinding) or create the site first." }
+    Write-Host "Resolved site by host '$HostHeader': $($site.Name)"
+}
+else {
+    $site = Get-Website | Where-Object { $_.Name -eq $SiteName }
+    if (-not $site) { throw "IIS site '$SiteName' not found on this server. Check the site name (Get-Website) or create it first." }
+}
 
 $dest    = [Environment]::ExpandEnvironmentVariables($site.physicalPath)
 $appPool = $site.applicationPool
-if ([string]::IsNullOrWhiteSpace($dest)) { throw "Could not resolve the physical path for site '$SiteName'." }
+if ([string]::IsNullOrWhiteSpace($dest)) { throw "Could not resolve the physical path for site '$($site.Name)'." }
 Write-Host "Physical path : $dest"
 Write-Host "App pool      : $appPool"
 

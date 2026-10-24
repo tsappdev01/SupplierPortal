@@ -1,0 +1,68 @@
+# ============================================================================
+#  UAT pipeline - lmsext.dipark.com ONLY (Landlord self-service / external)
+#
+#  Separate from azure-pipelines.yml (which publishes the INTERNAL sites). This one
+#  builds SupplierPortal.Leasing.SelfService and deploys it IN PLACE to the external
+#  Landlord self-service site that is hosted on UATWEB01 and bound to lmsext.dipark.com
+#  (physical path C:\Websites\Landlord\EXT).
+#
+#  The site is resolved by its host-header BINDING (lmsext.dipark.com), not by its IIS
+#  site name, so the exact site name does not need to be known/matched.
+#
+#  In Azure DevOps: New pipeline > Azure Repos Git > this repo > Existing YAML file >
+#  /azure-pipelines-lmsext.yml. Runs on the UATWEB01 agent. Manual (click Run).
+#
+#  Server-only config is preserved across deploys: appsettings.Local.json, doc\, keys\, logs\.
+#  The app is database-less and reaches the internal API; put Api:BaseUrl + Api:ClientSecret
+#  in C:\Websites\Landlord\EXT\appsettings.Local.json once on the server.
+# ============================================================================
+
+trigger: none
+pr: none
+name: $(Date:yyyy.MM.dd).$(Rev:r)
+
+variables:
+  buildConfiguration: 'Release'
+  uatAgentPool: 'Default'
+  lmsextHost: 'lmsext.dipark.com'
+  lmsextUrl: 'https://lmsext.dipark.com/'
+
+pool:
+  name: '$(uatAgentPool)'
+  # Must run on UATWEB01 (where the lmsext site lives); the Default pool is shared across many servers.
+  demands:
+    - Agent.Name -equals UATWEB01Agent
+
+steps:
+  - checkout: self
+    clean: true
+    fetchDepth: 0
+
+  - task: UseDotNet@2
+    displayName: 'Ensure .NET 8 SDK'
+    inputs:
+      packageType: 'sdk'
+      version: '8.0.x'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Restore solution'
+    inputs:
+      command: 'restore'
+      projects: 'BPPortal.sln'
+
+  - task: DotNetCoreCLI@2
+    displayName: 'Publish SupplierPortal.Leasing.SelfService'
+    inputs:
+      command: 'publish'
+      publishWebProjects: false
+      projects: 'src/SupplierPortal.Leasing.SelfService/SupplierPortal.Leasing.SelfService.csproj'
+      arguments: '--configuration $(buildConfiguration) --no-restore --output "$(Build.ArtifactStagingDirectory)/lmsext" --nologo'
+      zipAfterPublish: false
+      modifyOutputPath: false
+
+  - task: PowerShell@2
+    displayName: 'Deploy lmsext.dipark.com'
+    inputs:
+      filePath: 'deploy/Deploy-Site-Local.ps1'
+      arguments: '-SiteName "lmsext.dipark.com" -HostHeader "$(lmsextHost)" -SourcePath "$(Build.ArtifactStagingDirectory)\lmsext" -WarmupUrl "$(lmsextUrl)"'
+      pwsh: false   # Windows PowerShell - the WebAdministration module ships with IIS
