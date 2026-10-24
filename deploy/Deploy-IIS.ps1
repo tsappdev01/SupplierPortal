@@ -121,3 +121,7 @@ Start-Website -Name $SiteName -ErrorAction SilentlyContinue
 Write-Host ""
 Write-Host "Done. Browse to http://$HostName (ensure DNS resolves to this server)." -ForegroundColor Cyan
 Write-Host "Reminder: create $PhysicalPath\appsettings.Local.json with the SQL connection string before first request." -ForegroundColor Yellow
+
+# Return success explicitly so a non-zero $LASTEXITCODE left by an external tool (e.g. icacls) is not
+# misreported as a failed step. Real failures above use `throw`.
+exit 0

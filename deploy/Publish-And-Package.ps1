@@ -84,3 +84,7 @@ $sizeMB = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 Write-Host ""
 Write-Host "Package created: $ZipPath  ($sizeMB MB)" -ForegroundColor Green
 Write-Host "Copy it to the server and follow README-DEPLOYMENT.md." -ForegroundColor Cyan
+
+# Return success explicitly so a non-zero $LASTEXITCODE left by an external tool (e.g. dotnet) is not
+# misreported as a failed step. Real failures above use `throw`.
+exit 0
