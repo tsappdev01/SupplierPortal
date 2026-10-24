@@ -62,10 +62,14 @@ variables:
   landlordUrl: 'https://lms.dipark.com/'
 
   # ---- DMZ / self-service sites ----
-  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService) — set to enable
+  # These are EXTERNAL-facing and live on the DMZ web server (e.g. TSEXTWEB01), NOT UATWEB01, so they
+  # cannot be deployed from this UATWEB01-pinned job. Left blank (skipped) until a dedicated DMZ stage
+  # pinned to the DMZ agent is added. (Site names for when that's set up: Partner Connect / Landlord
+  # SelfService -> lmsext.dipark.com, C:\Websites\Landlord\EXT.)
+  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService)
   selfServiceUrl: ''
-  landlordDmzSiteName: 'Landlord SelfService'   # Landlord DMZ (SupplierPortal.Leasing.SelfService) -> C:\Websites\Landlord\EXT
-  landlordDmzUrl: 'https://lmsext.dipark.com/'
+  landlordDmzSiteName: ''                 # Landlord DMZ (SupplierPortal.Leasing.SelfService)
+  landlordDmzUrl: ''
 
 pool:
   name: '$(uatAgentPool)'
