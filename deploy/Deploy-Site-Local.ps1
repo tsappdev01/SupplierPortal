@@ -11,9 +11,9 @@
       2. Stops the application pool (belt-and-braces so no file is held open).
       3. Mirrors the publish output into the site folder with robocopy /MIR, but PRESERVES
          server-only state that must survive a deployment:
-            - appsettings.Local.json   (real connection string / secrets — git-ignored)
+            - appsettings.Local.json   (real connection string / secrets - git-ignored)
             - doc\                      (uploaded documents)
-            - keys\                     (Data Protection keys — losing these logs everyone out)
+            - keys\                     (Data Protection keys - losing these logs everyone out)
             - logs\                     (stdout logs)
       4. Starts the application pool and removes app_offline.htm.
       5. Optionally warms the site up with a request.
@@ -50,7 +50,7 @@ Write-Host "App pool      : $appPool"
 
 if (-not (Test-Path $SourcePath)) { throw "Publish source '$SourcePath' does not exist." }
 if (-not (Test-Path "$SourcePath\web.config")) {
-    Write-Warning "No web.config found in '$SourcePath' — is this an ASP.NET Core publish output folder?"
+    Write-Warning "No web.config found in '$SourcePath' - is this an ASP.NET Core publish output folder?"
 }
 
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -59,9 +59,9 @@ foreach ($d in $PreserveDirs) { New-Item -ItemType Directory -Force -Path (Join-
 $offline = Join-Path $dest "app_offline.htm"
 
 try {
-    # 1. app_offline — IIS stops routing to the app and releases the managed assemblies.
+    # 1. app_offline - IIS stops routing to the app and releases the managed assemblies.
     Set-Content -Path $offline -Encoding UTF8 -Value @"
-<!doctype html><html><head><meta charset="utf-8"><title>Updating…</title></head>
+<!doctype html><html><head><meta charset="utf-8"><title>Updating...</title></head>
 <body style="font-family:Segoe UI,Arial,sans-serif;padding:3rem;color:#1F3864">
 <h1>We'll be right back</h1><p>This site is being updated. Please try again in a moment.</p></body></html>
 "@

@@ -8,13 +8,13 @@
 
     Steps:
       1. dotnet publish -c Release (framework-dependent, win-x64).
-      2. Trim runtimes/ to win-x64 (+ shared 'win') only — the payload targets Windows x64 IIS.
+      2. Trim runtimes/ to win-x64 (+ shared 'win') only - the payload targets Windows x64 IIS.
       3. Drop dev-only / debug files (appsettings.Development.json, *.pdb).
       4. Copy the deploy helpers into the package.
       5. Zip to dist\SupplierPortal-deploy.zip.
 
     Requires the .NET 8 SDK on the build machine (dotnet on PATH). This does NOT need to run
-    on the web server — build here, copy the ZIP to the server, follow README-DEPLOYMENT.md.
+    on the web server - build here, copy the ZIP to the server, follow README-DEPLOYMENT.md.
 
 .EXAMPLE
     .\Publish-And-Package.ps1

@@ -14,7 +14,7 @@
     On any failure it writes an Azure DevOps ##[error] naming the exact file and key to fix,
     and exits 1 so the deploy step does not run (no silent runtime 500). On success it exits 0.
 
-    This never reads or prints secret VALUES — only whether each key is present and non-empty.
+    This never reads or prints secret VALUES - only whether each key is present and non-empty.
 
 .NOTES
     Requires the WebAdministration module (IIS Management Scripts and Tools).
@@ -95,7 +95,7 @@ foreach ($key in $RequireKeys) {
 }
 
 if ($problems.Count -gt 0) {
-    Write-Host "##[error]Config guard FAILED for site '$SiteName' — deploy skipped so the app does not crash at startup:"
+    Write-Host "##[error]Config guard FAILED for site '$SiteName' - deploy skipped so the app does not crash at startup:"
     foreach ($p in $problems) { Write-Host "##[error]  - $p" }
     exit 1
 }
