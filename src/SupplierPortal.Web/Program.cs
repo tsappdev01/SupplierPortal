@@ -1104,6 +1104,64 @@ app.MapGet("/suppliers/{id:int}/documents.zip", async (int id, HttpContext ctx, 
     return Results.File(ms.ToArray(), "application/zip", zipName);
 }).RequireAuthorization();
 
+// Bulk download: all attachments for several suppliers (?ids=1,2,3) as one ZIP, each supplier's files in
+// its own "Supplier Number_Supplier Name" subfolder. Suppliers the user can't access, or with no files,
+// are skipped silently; 404 only when nothing at all could be added.
+app.MapGet("/suppliers/documents.zip", async (string? ids, HttpContext ctx, UserService userService,
+    SupplierDocumentService documentService, SupplierService supplierService) =>
+{
+    var idList = (ids ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(s => int.TryParse(s, out var v) ? v : (int?)null)
+        .Where(v => v is not null).Select(v => v!.Value)
+        .Distinct().ToList();
+    if (idList.Count == 0) return Results.BadRequest("No suppliers selected.");
+
+    var any = false;
+    using var ms = new MemoryStream();
+    using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+    {
+        var usedFolders = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in idList)
+        {
+            if (!await CanAccessSupplierAsync(ctx, userService, supplierService, id)) continue;
+            var files = await documentService.GetAllFilesAsync(id);
+            if (files.Count == 0) continue;
+
+            var (supplierNumber, supplierName) = await supplierService.GetNumberAndNameAsync(id);
+            var rawName = string.Join("_", new[] { supplierNumber, supplierName }.Where(p => !string.IsNullOrWhiteSpace(p)));
+            var folder = SafeFileName(rawName, $"supplier-{id}");
+            var uniqueFolder = folder;
+            var fn = 0;
+            while (usedFolders.ContainsKey(uniqueFolder)) { fn++; uniqueFolder = $"{folder} ({fn})"; }
+            usedFolders[uniqueFolder] = 0;
+
+            var used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (bytes, fileName) in files)
+            {
+                var baseName = string.IsNullOrWhiteSpace(fileName) ? "document" : Path.GetFileName(fileName);
+                var name = baseName;
+                var n = 0;
+                while (used.ContainsKey(name))
+                {
+                    n++;
+                    name = $"{Path.GetFileNameWithoutExtension(baseName)} ({n}){Path.GetExtension(baseName)}";
+                }
+                used[name] = 0;
+
+                var entry = archive.CreateEntry($"{uniqueFolder}/{name}", System.IO.Compression.CompressionLevel.Optimal);
+                await using var entryStream = entry.Open();
+                await entryStream.WriteAsync(bytes);
+                any = true;
+            }
+        }
+    }
+    if (!any) return Results.NotFound("No attachments found for the selected suppliers.");
+
+    var zipName = $"supplier-documents_{DateTime.UtcNow.AddHours(4):yyyyMMdd_HHmm}.zip";
+    return Results.File(ms.ToArray(), "application/zip", zipName);
+}).RequireAuthorization();
+
 // Combine a supplier's attached images into a single PDF / Excel workbook.
 app.MapGet("/suppliers/{id:int}/documents.pdf", async (int id, HttpContext ctx, UserService userService,
     SupplierService supplierService, SupplierDocumentService documentService, ExportService exportService) =>
