@@ -14,6 +14,17 @@ namespace SupplierPortal.Web.Services;
 /// <c>ExtractedNumber</c> and, for a Trade License, the D-U-N-S number in <c>DunsNumber</c>.</summary>
 public record DocumentUploadResult(bool Success, string? Error, string? ExtractedNumber, string? DunsNumber);
 
+/// <summary>A no-save Trade License extraction preview: the Claude-vision result and the regex-fallback
+/// result side by side, plus which source production would use and how the fallback text was obtained.</summary>
+public record LicensePreview(
+    bool VisionEnabled,
+    bool OcrEnabled,
+    ParsedLicense? Vision,
+    ParsedLicense? Fallback,
+    string FallbackTextSource,
+    int FallbackTextChars,
+    string ChosenSource);
+
 /// <summary>Stores supplier-uploaded documents (Trade License, VAT Certification, Other) as
 /// physical files under the app's content root - not wwwroot, so they are never directly
 /// web-servable - with only their metadata in the database.</summary>
@@ -37,6 +48,45 @@ public class SupplierDocumentService(
 
     private string DocumentsDirectory(int supplierId) =>
         Path.Combine(env.ContentRootPath, "doc", "supplier", supplierId.ToString());
+
+    /// <summary>Runs the Trade License extraction on an uploaded file WITHOUT saving anything, returning
+    /// both the Claude-vision result and the regex-fallback result so an administrator can preview and
+    /// compare what each reader extracts. Mirrors the production selection logic (vision preferred when it
+    /// returns data, else the PDF text layer / OCR + regex parser), but touches no supplier record.</summary>
+    public async Task<LicensePreview> PreviewLicenseAsync(byte[] bytes, string? contentType, string fileName)
+    {
+        ParsedLicense? vision = null;
+        if (licenseReader.IsEnabled)
+        {
+            try { vision = await licenseReader.ReadAsync(bytes, contentType); }
+            catch { /* preview is best-effort; a reader failure just leaves the vision column empty */ }
+        }
+
+        ParsedLicense? fallback = null;
+        var textSource = "none";
+        var textChars = 0;
+        var ext = Path.GetExtension(fileName);
+        var tmp = Path.Combine(Path.GetTempPath(), $"licpreview_{Guid.NewGuid():N}{ext}");
+        try
+        {
+            await File.WriteAllBytesAsync(tmp, bytes);
+            var text = TryReadPdfText(tmp);
+            if (!string.IsNullOrWhiteSpace(text)) { textSource = "PDF text layer"; }
+            else if (ocr.IsEnabled)
+            {
+                text = await ocr.ExtractTextAsync(tmp);
+                if (!string.IsNullOrWhiteSpace(text)) { textSource = "OCR"; }
+            }
+            textChars = text?.Length ?? 0;
+            if (!string.IsNullOrWhiteSpace(text)) { fallback = TradeLicenseParser.Parse(text); }
+        }
+        catch { /* best-effort */ }
+        finally { try { File.Delete(tmp); } catch { /* temp cleanup */ } }
+
+        var chosen = vision is not null && LicenseHasData(vision) ? "Claude vision"
+            : fallback is not null ? "DED parser (text/OCR)" : "none";
+        return new LicensePreview(licenseReader.IsEnabled, ocr.IsEnabled, vision, fallback, textSource, textChars, chosen);
+    }
 
     /// <summary>The auto-read Trade License capture (Tl* fields + parties) for the read-only panel shown
     /// under the Trade License document on the internal form.</summary>
