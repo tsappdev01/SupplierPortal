@@ -673,6 +673,68 @@ else
                         </div>
                     </div>
                 </div>
+
+                @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
+                @if (!SupplierFacing && tlReadback?.HasData == true)
+                {
+                    <div class="di-tl-readback">
+                        <div class="di-tl-readback-head">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                            <span class="di-tl-readback-title">Read from Trade License</span>
+                            @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource) || tlReadback.ReadAt is not null)
+                            {
+                                <span class="di-tl-readback-meta">
+                                    @tlReadback.ReadSource@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:yyyy-MM-dd HH:mm} UTC" : "")
+                                </span>
+                            }
+                        </div>
+                        <div class="di-tl-grid">
+                            @TlRow("License No.", tlReadback.LicenseNumber)
+                            @TlRow("Main License No.", tlReadback.MainLicenseNumber)
+                            @TlRow("Legal Name", tlReadback.LegalName)
+                            @TlRow("Trade Name", tlReadback.TradeName)
+                            @TlRow("Legal Type", tlReadback.LegalType)
+                            @TlRow("License Category", tlReadback.LicenseCategory)
+                            @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
+                            @TlRow("License Type", tlReadback.LicenseType)
+                            @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
+                            @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
+                            @TlRow("Register No.", tlReadback.RegisterNumber)
+                            @TlRow("DCCI No.", tlReadback.DcciNumber)
+                            @TlRow("D-U-N-S", tlReadback.DunsNumber)
+                            @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
+                            @TlRow("P.O. Box", tlReadback.PoBox)
+                            @TlRow("Parcel ID", tlReadback.ParcelId)
+                            @TlRow("Premises", tlReadback.Premises)
+                            @TlRow("Email", tlReadback.Email)
+                            @TlRow("Phone", tlReadback.Phone)
+                            @TlRow("Mobile", tlReadback.Mobile)
+                            @TlRow("Address", tlReadback.Address)
+                            @TlRow("Activities", tlReadback.Activities)
+                        </div>
+                        @if (tlReadback.Parties.Count > 0)
+                        {
+                            <div class="di-tl-parties">
+                                <div class="di-tl-parties-title">Partners / Managers</div>
+                                <table class="di-tl-parties-table">
+                                    <thead><tr><th>Name</th><th>Nationality</th><th>Role</th><th>Share</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var p in tlReadback.Parties)
+                                        {
+                                            <tr>
+                                                <td>@p.Name</td>
+                                                <td>@p.Nationality</td>
+                                                <td>@p.Role</td>
+                                                <td>@FormatShare(p.Share)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                }
+
                 @if (Supplier.Id == 0)
                 {
                     <p class="text-muted di-document-hint">Documents can be uploaded after the first save (click Next).</p>
@@ -1409,6 +1471,19 @@ else
     .di-stepcat-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #8a5b06; }
     .di-stepcat:first-child .di-stepcat-label { color: #46618f; }
     .di-stepcat .di-stepper { margin: 0; }
+    /* "Read from Trade License" read-only panel */
+    .di-tl-readback { margin-top: 14px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; background: var(--di-surface, #fff); overflow: hidden; }
+    .di-tl-readback-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--di-surface-2, #f1f6ff); border-bottom: 1px solid var(--di-border, #e2e5ea); color: #1f3864; font-weight: 700; font-size: 0.9rem; }
+    .di-tl-readback-meta { margin-left: auto; font-weight: 500; font-size: 12px; color: #6b7a90; }
+    .di-tl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; padding: 14px; }
+    .di-tl-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .di-tl-k { font-size: 11px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: #8795a9; }
+    .di-tl-v { font-size: 13px; color: var(--di-text, #1f2a3d); word-break: break-word; }
+    .di-tl-parties { padding: 0 14px 14px; }
+    .di-tl-parties-title { font-size: 12px; font-weight: 700; color: #46618f; margin: 4px 0 6px; }
+    .di-tl-parties-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .di-tl-parties-table th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8795a9; border-bottom: 1px solid var(--di-border, #e2e5ea); padding: 4px 8px; }
+    .di-tl-parties-table td { padding: 4px 8px; border-bottom: 1px solid var(--di-border, #eef1f5); }
     /* KYS accordion */
     .di-kys { display: flex; flex-direction: column; gap: 12px; }
     .di-acc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: var(--di-surface, #fff); }
@@ -1502,6 +1577,33 @@ else
         if (string.IsNullOrWhiteSpace(csv)) { return true; }
         var allowed = SupplierFieldSettingService.ParseEditorUserIds(csv);
         return currentUserId is int id && allowed.Contains(id);
+    }
+
+    /// <summary>One label/value cell of the "Read from Trade License" panel; renders nothing when blank.</summary>
+    private RenderFragment TlRow(string label, string? value) => __builder =>
+    {
+        if (string.IsNullOrWhiteSpace(value)) { return; }
+        __builder.OpenElement(0, "div");
+        __builder.AddAttribute(1, "class", "di-tl-cell");
+        __builder.OpenElement(2, "span");
+        __builder.AddAttribute(3, "class", "di-tl-k");
+        __builder.AddContent(4, label);
+        __builder.CloseElement();
+        __builder.OpenElement(5, "span");
+        __builder.AddAttribute(6, "class", "di-tl-v");
+        __builder.AddContent(7, value);
+        __builder.CloseElement();
+        __builder.CloseElement();
+    };
+
+    /// <summary>Formats a license share string ("40.0000000") as a tidy percentage ("40%").</summary>
+    private static string? FormatShare(string? share)
+    {
+        if (string.IsNullOrWhiteSpace(share)) { return null; }
+        var s = share.Trim();
+        return decimal.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var d)
+            ? d.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%"
+            : s;
     }
 
     /// <summary>A full-width Yes/No toggle for the KYS tab (tri-state: unanswered shows neither button active).</summary>
@@ -1707,6 +1809,8 @@ else
     private List<Bank> banks = [];
     private List<BusinessUnit> businessUnits = [];
     private List<SupplierDocument> documents = [];
+    // Auto-read Trade License capture (internal view only), shown read-only under the Trade License upload.
+    private SupplierPortal.Web.Services.TradeLicenseReadback? tlReadback;
     private bool uploadingDocument;
     private bool viewingDocument;
     private string? viewerUrl;
@@ -2099,6 +2203,11 @@ else
             await Task.WhenAll(tDocs, tChanged);
             documents = tDocs.Result;
             changedFieldKeys = tChanged.Result;
+            // Internal view: load the auto-read Trade License capture for the read-only panel.
+            if (!SupplierFacing)
+            {
+                tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+            }
         }
     }
 
@@ -2242,6 +2351,11 @@ else
 
         ToastService.ShowSuccess(message);
         documents = await LoadDocumentsAsync();
+        // Internal view: refresh the read-only "Read from Trade License" panel with what was just captured.
+        if (!SupplierFacing && documentType == SupplierDocumentType.TradeLicense)
+        {
+            tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+        }
         }
         catch (Exception)
         {
