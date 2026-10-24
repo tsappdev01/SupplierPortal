@@ -38,6 +38,51 @@ public class SupplierDocumentService(
     private string DocumentsDirectory(int supplierId) =>
         Path.Combine(env.ContentRootPath, "doc", "supplier", supplierId.ToString());
 
+    /// <summary>The auto-read Trade License capture (Tl* fields + parties) for the read-only panel shown
+    /// under the Trade License document on the internal form.</summary>
+    public async Task<TradeLicenseReadback> GetLicenseReadbackAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var parties = await db.SupplierPartners.AsNoTracking()
+            .Where(p => p.SupplierId == supplierId)
+            .OrderBy(p => p.Id)
+            .ToListAsync();
+        var s = await db.Suppliers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == supplierId);
+        if (s is null)
+        {
+            return new TradeLicenseReadback { Parties = parties };
+        }
+        return new TradeLicenseReadback
+        {
+            LicenseNumber = s.TlLicenseNumber,
+            MainLicenseNumber = s.TlMainLicenseNumber,
+            LegalName = s.TlLegalName,
+            TradeName = s.TlTradeName,
+            LegalType = s.TlLegalType,
+            LicenseCategory = s.TlLicenseCategory,
+            IssuingAuthority = s.TlIssuingAuthority,
+            LicenseType = s.TlLicenseType,
+            IssueDate = s.TlIssueDate,
+            ExpiryDate = s.TlExpiryDate,
+            RegisterNumber = s.TlRegisterNumber,
+            DcciNumber = s.TlDcciNumber,
+            DunsNumber = s.TlDunsNumber,
+            PaidCapital = s.TlPaidCapital,
+            CapitalCurrency = s.TlCapitalCurrency,
+            Activities = s.TlActivities,
+            PoBox = s.TlPoBox,
+            ParcelId = s.TlParcelId,
+            Premises = s.TlPremises,
+            Email = s.TlEmail,
+            Phone = s.TlPhone,
+            Mobile = s.TlMobile,
+            Address = s.TlAddress,
+            ReadAt = s.TlReadAt,
+            ReadSource = s.TlReadSource,
+            Parties = parties
+        };
+    }
+
     public async Task<List<SupplierDocument>> GetDocumentsAsync(int supplierId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -673,4 +718,38 @@ public class SupplierDocumentService(
             File.Delete(path);
         }
     }
+}
+
+/// <summary>The auto-read Trade License capture surfaced read-only under the Trade License document.</summary>
+public sealed class TradeLicenseReadback
+{
+    public string? LicenseNumber { get; set; }
+    public string? MainLicenseNumber { get; set; }
+    public string? LegalName { get; set; }
+    public string? TradeName { get; set; }
+    public string? LegalType { get; set; }
+    public string? LicenseCategory { get; set; }
+    public string? IssuingAuthority { get; set; }
+    public string? LicenseType { get; set; }
+    public DateTime? IssueDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public string? RegisterNumber { get; set; }
+    public string? DcciNumber { get; set; }
+    public string? DunsNumber { get; set; }
+    public decimal? PaidCapital { get; set; }
+    public string? CapitalCurrency { get; set; }
+    public string? Activities { get; set; }
+    public string? PoBox { get; set; }
+    public string? ParcelId { get; set; }
+    public string? Premises { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    public string? Mobile { get; set; }
+    public string? Address { get; set; }
+    public DateTime? ReadAt { get; set; }
+    public string? ReadSource { get; set; }
+    public List<SupplierPortal.Web.Models.SupplierPartner> Parties { get; set; } = [];
+
+    /// <summary>True when a license has actually been read (so the panel is worth showing).</summary>
+    public bool HasData => ReadAt is not null || !string.IsNullOrWhiteSpace(LicenseNumber) || Parties.Count > 0;
 }
