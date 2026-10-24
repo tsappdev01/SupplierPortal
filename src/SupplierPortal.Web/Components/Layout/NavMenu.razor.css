@@ -19,23 +19,27 @@
     min-height: 4rem;
     display: flex;
     align-items: center;
+    padding: 10px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .navbar-brand {
-    display: flex;
-    align-items: center;
+    display: block;
+    width: 100%;
 }
 
 .di-brand-logo {
-    height: 2.5rem;
-    max-width: 200px;
-    width: auto;
+    /* Consistent size for any logo (company override or the default): a fixed-height white chip the logo
+       is letterboxed into, spanning the sidebar width, with a clear border so it reads on the navy. */
+    display: block;
+    width: 100%;
+    height: 3rem;
     object-fit: contain;
-    /* The logo is navy text + taupe mark on transparent; sit it on a white chip so it reads on the navy sidebar. */
     background: #fff;
-    padding: 5px 9px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.9);
     border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 .di-profile-card {
