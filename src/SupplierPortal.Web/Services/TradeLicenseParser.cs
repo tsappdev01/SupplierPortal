@@ -104,8 +104,6 @@ public static class TradeLicenseParser
     private static readonly Regex TextDate = new(
         @"\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\s+(\d{4})\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex CapsName = new(
-        @"\b[A-Z][A-Z0-9]*(?:\s+[A-Z0-9()&.,'\-]+){1,8}\b", RegexOptions.Compiled);
     private static readonly Regex RegisterNoLabeled = new(
         @"Register\s*No\.?\s*[:\-.]{0,2}\s*(\d{4,10})", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DcciNoLabeled = new(
@@ -258,25 +256,50 @@ public static class TradeLicenseParser
         return null;
     }
 
-    /// <summary>Reads an ALL-CAPS Latin name (e.g. a business name) near one of the given labels.</summary>
+    // A company/legal name as a run of Latin letters/digits and the punctuation that appears in UAE
+    // company names (". , ( ) & ' - /"). Matched as a plain char-class run (NOT anchored on a word
+    // boundary) so a name glued to the adjacent Arabic in the text layer - e.g. "...الشركةRYAN TAX
+    // SERVICES L.L.C" - is still captured in full rather than losing its first word.
+    private static readonly Regex LatinNameRun = new(
+        @"[A-Za-z][A-Za-z0-9 .,()&'\-/]{2,90}[A-Za-z0-9.)]", RegexOptions.Compiled);
+
+    /// <summary>Reads a company/business name printed next to one of the given labels. The DED layout
+    /// prints the English name on the line immediately before (or after) the label, so this takes the
+    /// longest Latin run from the nearest line on either side.</summary>
     private static string? LabeledName(string text, params string[] labels)
     {
         foreach (var label in labels)
         {
             var i = text.IndexOf(label, StringComparison.OrdinalIgnoreCase);
             if (i < 0) { continue; }
-            var window = Slice(text, i - 80, i + label.Length + 80);
-            var m = CapsName.Match(window);
-            while (m.Success)
-            {
-                var name = Regex.Replace(m.Value, @"\s+", " ").Trim();
-                if (name.Length >= 3 && !name.Contains("LICENSE", StringComparison.OrdinalIgnoreCase)
-                    && !name.Contains("NAME", StringComparison.OrdinalIgnoreCase))
-                {
-                    return name;
-                }
-                m = m.NextMatch();
-            }
+            // The name sits right next to the label; look before it first (RTL text-layer order), then after.
+            var name = BestLatinName(Slice(text, i - 160, i), nearestLast: true)
+                ?? BestLatinName(Slice(text, i + label.Length, i + label.Length + 160), nearestLast: false);
+            if (name is not null) { return name; }
+        }
+        return null;
+    }
+
+    /// <summary>Longest plausible Latin name from the line nearest the label in a fragment.</summary>
+    private static string? BestLatinName(string fragment, bool nearestLast)
+    {
+        var lines = fragment.Split('\n');
+        var ordered = nearestLast ? lines.Reverse() : lines.AsEnumerable();
+        foreach (var raw in ordered)
+        {
+            var candidates = LatinNameRun.Matches(raw);
+            if (candidates.Count == 0) { continue; }
+            var best = candidates.Cast<Match>()
+                // Drop parentheses - the RTL text layer flips "(L.L.C)"/"(BRANCH)" into a stray ")L.L.C",
+                // which otherwise leaves a leading ")" on the name - then tidy whitespace/edges.
+                .Select(m => Regex.Replace(Regex.Replace(m.Value, @"[()]", " "), @"\s+", " ").Trim().Trim('.', ',', '-', '/').Trim())
+                .Where(v => v.Length >= 3
+                    && !v.Contains("Name", StringComparison.OrdinalIgnoreCase)
+                    && !v.Contains("License", StringComparison.OrdinalIgnoreCase)
+                    && !LabelPhrases.Contains(v))
+                .OrderByDescending(v => v.Length)
+                .FirstOrDefault();
+            if (best is not null) { return best; }
         }
         return null;
     }
