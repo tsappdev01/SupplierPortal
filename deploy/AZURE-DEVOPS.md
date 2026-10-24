@@ -37,11 +37,24 @@ trigger:
   paths:    { include: [ 'src/**', 'deploy/**', 'azure-pipelines.yml' ] }
 ```
 
-## 3. Day-to-day after the move
+## 3. Keeping Azure in sync (GitHub is where changes land)
 
-- Clone from **Azure Repos** and push there; it is the source of truth.
+Changes are committed on **GitHub**; **Azure Repos is the primary** copy the team clones and the pipeline
+builds from. Keep Azure current one of two ways:
+
+- **Automatic (recommended):** the GitHub Action `.github/workflows/mirror-to-azure.yml` mirrors `main`
+  (all branches, tags, history) to Azure on every push. Enable it once:
+  1. GitHub repo → Settings → Secrets and variables → Actions → New repository secret
+     `AZURE_DEVOPS_PAT` = an Azure PAT with scope **Code (Read & Write)**.
+  2. (Only if your Repos clone URL differs from the default) add a repository **variable**
+     `AZURE_REPO_URL` with that URL.
+  It is a mirror, so **do not commit directly to Azure** while this is on — Azure follows GitHub.
+- **Manual:** re-run `deploy/Migrate-To-AzureRepos.ps1 -AzureRepoUrl "<your url>"` whenever you want to sync.
+
+## 4. Day-to-day
+
 - The pipeline builds from Azure Repos and deploys to UATWEB01 — see `azure-pipelines.yml` for the sites
   and `Deploy-Site-Local.ps1` for the in-place deploy (preserves each site's `appsettings.Local.json`,
   `keys\`, `doc\`, `logs\`). A pre-deploy guard (`Assert-SiteConfig.ps1`) fails fast if a site is missing
   its connection string / secret.
-- GitHub can be left as a read-only backup, or archived once Azure is verified.
+- GitHub remains the place commits are made; Azure stays in sync via the Action above.

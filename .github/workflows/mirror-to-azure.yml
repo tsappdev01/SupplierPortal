@@ -1,0 +1,60 @@
+# Keeps Azure DevOps Repos in sync with GitHub (GitHub is where changes land; Azure is the primary
+# repo for the team + the UAT pipeline). On every push to main it mirror-pushes all branches, tags and
+# history to Azure Repos, so Azure never trails GitHub.
+#
+# OPT-IN — this job only runs when the Azure PAT secret is present, and skips cleanly otherwise:
+#   1. Create an Azure DevOps PAT, scope "Code (Read & Write)".
+#   2. GitHub repo > Settings > Secrets and variables > Actions > New repository secret:
+#        name  = AZURE_DEVOPS_PAT        value = <the PAT>
+#   3. (Optional) If your Azure project/repo names differ from the default below, add a repository
+#      variable AZURE_REPO_URL with your Repos > Clone URL.
+#
+# NOTE: this is a MIRROR — it makes Azure an exact copy of GitHub, so do NOT commit directly to Azure
+# while this is enabled (those commits would be overwritten). Commit on GitHub; Azure follows.
+
+name: Mirror to Azure Repos
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-to-azure
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror GitHub -> Azure Repos
+        env:
+          AZDO_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          AZURE_REPO_URL: ${{ vars.AZURE_REPO_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AZDO_PAT:-}" ]; then
+            echo "AZURE_DEVOPS_PAT secret not set — skipping mirror (add it in repo Settings to enable)."
+            exit 0
+          fi
+          AZURE_URL="${AZURE_REPO_URL:-https://dev.azure.com/TechSourcedxb/Supplier_Portal/_git/Supplier_Portal}"
+          echo "Mirroring to: $AZURE_URL"
+
+          # Mirror-clone this repo (all refs) using the workflow token.
+          git clone --mirror "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" repo.git
+          cd repo.git
+
+          # GitHub exposes refs/pull/* which Azure DevOps rejects — drop them before pushing.
+          git for-each-ref --format='%(refname)' 'refs/pull/*' | while read -r r; do
+            [ -n "$r" ] && git update-ref -d "$r"
+          done
+
+          # Push everything to Azure. PAT goes in an auth header (empty username + PAT), not the URL.
+          AUTH="Authorization: Basic $(printf ':%s' "$AZDO_PAT" | base64 -w0)"
+          git -c http.extraheader="$AUTH" push --mirror "$AZURE_URL"
+          echo "Mirror complete."
