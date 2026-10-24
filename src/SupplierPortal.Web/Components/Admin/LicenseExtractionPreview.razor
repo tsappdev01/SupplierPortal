@@ -1,0 +1,229 @@
+@page "/admin/license-preview"
+@attribute [Authorize(Roles = "Administrator")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using SupplierPortal.Web.Services
+@inject SupplierDocumentService DocumentService
+
+<PageTitle>Trade License Extraction Preview - Supplier Portal</PageTitle>
+
+<h1>Trade License Extraction Preview</h1>
+<p class="text-muted">
+    Drop a Trade License (PDF or image) to see exactly what the readers extract — the Claude-vision reader
+    and the regex fallback, side by side. Nothing is saved; no supplier record is touched.
+</p>
+
+<div class="row g-2 mb-3 align-items-center no-print">
+    <div class="col-auto">
+        <InputFile OnChange="OnFileSelectedAsync" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                   class="form-control" style="max-width: 420px;" disabled="@busy" />
+    </div>
+    @if (busy)
+    {
+        <div class="col-auto">
+            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+            <span class="ms-1 small text-muted">Reading @fileName …</span>
+        </div>
+    }
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+@if (lastPreview is not null)
+{
+    var p = lastPreview;
+    <div class="mb-3">
+        <span class="badge @(p.ChosenSource.StartsWith("Claude") ? "bg-success" : p.ChosenSource == "none" ? "bg-secondary" : "bg-info")">
+            Production would use: @p.ChosenSource
+        </span>
+        <span class="badge @(p.VisionEnabled ? "bg-success" : "bg-secondary") ms-1">
+            Vision reader: @(p.VisionEnabled ? "enabled" : "NOT configured")
+        </span>
+        <span class="badge @(p.OcrEnabled ? "bg-success" : "bg-secondary") ms-1">
+            OCR: @(p.OcrEnabled ? "enabled" : "off")
+        </span>
+        <span class="badge bg-light text-dark ms-1">
+            Fallback text: @p.FallbackTextSource (@p.FallbackTextChars chars)
+        </span>
+        <span class="text-muted small ms-2">@fileName</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(p.VisionRaw))
+    {
+        <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => showRaw = !showRaw">
+                @(showRaw ? "Hide" : "Show") raw vision JSON
+            </button>
+            @if (showRaw)
+            {
+                <pre class="border rounded bg-light p-2 mt-2 mb-0" style="max-height: 420px; overflow: auto; font-size: .8rem;"><code>@p.VisionRaw</code></pre>
+            }
+        </div>
+    }
+
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered align-top">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 20%">Field</th>
+                    <th style="width: 40%">Claude vision</th>
+                    <th style="width: 40%">DED parser (text / OCR)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @Row("License kind", p.Vision?.LicenseKind, p.Fallback?.LicenseKind)
+                @Row("Issuing authority", p.Vision?.IssuingAuthority, p.Fallback?.IssuingAuthority)
+                @Row("License number", p.Vision?.LicenseNumber, p.Fallback?.LicenseNumber)
+                @Row("Main license number", p.Vision?.MainLicenseNumber, p.Fallback?.MainLicenseNumber)
+                @Row("Legal name", p.Vision?.LegalName, p.Fallback?.LegalName)
+                @Row("Trade name", p.Vision?.TradeName, p.Fallback?.TradeName)
+                @Row("Business name", p.Vision?.BusinessName, p.Fallback?.BusinessName)
+                @Row("Legal type", p.Vision?.LegalType, p.Fallback?.LegalType)
+                @Row("License category", p.Vision?.LicenseCategory, p.Fallback?.LicenseCategory)
+                @Row("Issue date", p.Vision?.IssueDate, p.Fallback?.IssueDate)
+                @Row("Expiry date", p.Vision?.ExpiryDate, p.Fallback?.ExpiryDate)
+                @Row("Register number", p.Vision?.RegisterNumber, p.Fallback?.RegisterNumber)
+                @Row("DCCI number", p.Vision?.DcciNumber, p.Fallback?.DcciNumber)
+                @Row("D-U-N-S number", p.Vision?.DunsNumber, p.Fallback?.DunsNumber)
+                @Row("Paid capital", p.Vision?.PaidCapital, p.Fallback?.PaidCapital)
+                @Row("Capital currency", p.Vision?.CapitalCurrency, p.Fallback?.CapitalCurrency)
+                @Row("P.O. Box", p.Vision?.PoBox, p.Fallback?.PoBox)
+                @Row("Parcel ID", p.Vision?.ParcelId, p.Fallback?.ParcelId)
+                @Row("Premises", p.Vision?.Premises, p.Fallback?.Premises)
+                @Row("Email", p.Vision?.Email, p.Fallback?.Email)
+                @Row("Phone", p.Vision?.Phone, p.Fallback?.Phone)
+                @Row("Mobile", p.Vision?.Mobile, p.Fallback?.Mobile)
+                @Row("Address", p.Vision?.Address, p.Fallback?.Address)
+                <tr>
+                    <th>Activities</th>
+                    <td>@ActivitiesCell(p.Vision)</td>
+                    <td>@ActivitiesCell(p.Fallback)</td>
+                </tr>
+                <tr>
+                    <th>Parties (owners / managers)</th>
+                    <td>@PartiesCell(p.Vision)</td>
+                    <td>@PartiesCell(p.Fallback)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private const long MaxFileSize = 10 * 1024 * 1024;
+    private LicensePreview? lastPreview;
+    private string? fileName;
+    private string? error;
+    private bool busy;
+    private bool showRaw;
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        error = null;
+        lastPreview = null;
+        showRaw = false;
+        var file = e.File;
+        fileName = file.Name;
+        if (file.Size > MaxFileSize)
+        {
+            error = $"File is too large ({file.Size / 1024 / 1024} MB). Maximum is {MaxFileSize / 1024 / 1024} MB.";
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            using var ms = new MemoryStream();
+            await using (var stream = file.OpenReadStream(MaxFileSize))
+            {
+                await stream.CopyToAsync(ms);
+            }
+            lastPreview = await DocumentService.PreviewLicenseAsync(ms.ToArray(), file.ContentType, file.Name);
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not read the file: {ex.Message}";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static RenderFragment Row(string label, object? vision, object? fallback) => __builder =>
+    {
+        <tr>
+            <th>@label</th>
+            <td>@Display(vision)</td>
+            <td>@Display(fallback)</td>
+        </tr>
+    };
+
+    private static RenderFragment Display(object? value) => __builder =>
+    {
+        var text = value switch
+        {
+            null => null,
+            DateTime d => d.ToString("dd/MM/yyyy"),
+            decimal m => m.ToString("#,0.##"),
+            _ => value.ToString()
+        };
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            <span class="text-muted">—</span>
+        }
+        else
+        {
+            @text
+        }
+    };
+
+    private static RenderFragment ActivitiesCell(ParsedLicense? l) => __builder =>
+    {
+        if (l is null || l.Activities.Count == 0)
+        {
+            <span class="text-muted">—</span>
+        }
+        else
+        {
+            <ul class="mb-0 ps-3">
+                @foreach (var a in l.Activities)
+                {
+                    <li>@a.Name @(string.IsNullOrWhiteSpace(a.Status) ? "" : $"({a.Status})")</li>
+                }
+            </ul>
+        }
+    };
+
+    private static RenderFragment PartiesCell(ParsedLicense? l) => __builder =>
+    {
+        if (l is null || l.Members.Count == 0)
+        {
+            <span class="text-muted">—</span>
+        }
+        else
+        {
+            <ul class="mb-0 ps-3">
+                @foreach (var m in l.Members)
+                {
+                    <li>
+                        <strong>@m.Name</strong>
+                        @{
+                            var parts = new List<string>();
+                            if (!string.IsNullOrWhiteSpace(m.Role)) { parts.Add(m.Role!); }
+                            if (!string.IsNullOrWhiteSpace(m.Nationality)) { parts.Add(m.Nationality!); }
+                            if (!string.IsNullOrWhiteSpace(m.Share)) { parts.Add(m.Share! + "%"); }
+                        }
+                        @if (parts.Count > 0)
+                        {
+                            <span class="text-muted small"> — @string.Join(", ", parts)</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    };
+}

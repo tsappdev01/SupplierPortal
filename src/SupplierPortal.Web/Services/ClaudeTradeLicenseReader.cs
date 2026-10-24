@@ -13,6 +13,10 @@ public interface ITradeLicenseReader
 
     /// <summary>Best-effort: returns the extracted license, or null on any failure (caller falls back).</summary>
     Task<ParsedLicense?> ReadAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default);
+
+    /// <summary>Like <see cref="ReadAsync"/> but also returns the raw model response (the JSON the model
+    /// produced, or a short error description) for diagnostics and the admin preview. Never throws.</summary>
+    Task<(ParsedLicense? License, string? Raw)> ReadWithRawAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default);
 }
 
 /// <summary>Sends the uploaded license to the Anthropic Messages API and maps the returned JSON to a
@@ -32,11 +36,27 @@ public sealed class ClaudeTradeLicenseReader(
     public bool IsEnabled => !string.IsNullOrWhiteSpace(_apiKey);
 
     private const string Prompt = """
-You are extracting data from a UAE trade/commercial licence (it may be a Dubai DED licence, a free-zone
-licence such as JAFZA/DAFZA/Creative City/DMCC, bilingual Arabic-English, and may be a scan). Return ONLY
-a single JSON object (no markdown, no commentary) with EXACTLY these keys; use null when a value is not
-present on this licence. Dates as "DD/MM/YYYY". paidCapital as digits only (no commas). parties is the
-combined list of owners/partners/managers/members.
+You are extracting data from a UAE trade/commercial licence. It may be a Dubai DET/DED mainland licence
+(a "Commercial / Industrial / Professional License" from the Department of Economy and Tourism), or a
+free-zone licence (JAFZA, DAFZA, DMCC, Creative City, Dubai Production/Media/Internet City, DSO, RAKEZ,
+SAIF, ...). It is usually bilingual Arabic-English and may be a scan. Read the RENDERED page, not just the
+text layer. Prefer the ENGLISH value for every field. Return ONLY a single JSON object (no markdown, no
+commentary) with EXACTLY these keys; use null when a value is not present on this licence. Dates as
+"DD/MM/YYYY". paidCapital as digits only (no commas). parties is the combined list of
+owners/partners/managers/members/general-managers.
+
+Field guidance:
+- licenseKind: the licence heading - "Commercial", "Industrial", "Professional", "Tourism", etc.
+- issuingAuthority: the issuer/free zone (e.g. "Dubai DET", "JAFZA", "DMCC", "Dubai Production City").
+- legalType: the legal form (maps from "Legal Type" or a free-zone "Legal Status"), e.g.
+  "Limited Liability Company", "Free Zone LLC", "Sole Establishment".
+- tradeName: the trade / business / operating name; legalName: the registered company name.
+- issueDate: the ORIGINAL first-issue date (labelled "Issue Date" or "First Issue Date"); do NOT use the
+  "Current Issue Date" or the "Print Date". expiryDate: the licence expiry date. On the Dubai layout the
+  expiry date is the later date and the issue date is the earlier one.
+- mainLicenseNumber: "Main License No." (falls back to the licence number when not separately printed).
+- registerNumber: "Register No." / commercial register; dcciNumber: "DCCI No." / chamber membership.
+- parcelId: "Parcel ID" / "Plot"; premises: the premises/area/business-unit description.
 
 {
   "licenseNumber": string|null,
@@ -67,8 +87,11 @@ combined list of owners/partners/managers/members.
 """;
 
     public async Task<ParsedLicense?> ReadAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default)
+        => (await ReadWithRawAsync(fileBytes, contentType, ct)).License;
+
+    public async Task<(ParsedLicense? License, string? Raw)> ReadWithRawAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default)
     {
-        if (!IsEnabled || fileBytes is null || fileBytes.Length == 0) { return null; }
+        if (!IsEnabled || fileBytes is null || fileBytes.Length == 0) { return (null, null); }
 
         try
         {
@@ -101,20 +124,22 @@ combined list of owners/partners/managers/members.
             if (!resp.IsSuccessStatusCode)
             {
                 logger.LogWarning("Claude license read failed ({Code}): {Body}", (int)resp.StatusCode, Truncate(json, 500));
-                return null;
+                return (null, $"HTTP {(int)resp.StatusCode}: {Truncate(json, 1500)}");
             }
 
             var answer = ExtractAnswerText(json);
             var payload = ExtractJsonObject(answer);
-            if (string.IsNullOrWhiteSpace(payload)) { return null; }
+            if (string.IsNullOrWhiteSpace(payload)) { return (null, answer); }
 
             using var parsed = JsonDocument.Parse(payload);
-            return Map(parsed.RootElement);
+            // Pretty-print the extracted JSON so the admin preview renders it legibly.
+            var pretty = JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
+            return (Map(parsed.RootElement), pretty);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Claude trade-license read failed; falling back.");
-            return null;
+            return (null, $"error: {ex.Message}");
         }
     }
 
