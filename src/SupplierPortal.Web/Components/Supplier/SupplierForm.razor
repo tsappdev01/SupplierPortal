@@ -701,6 +701,9 @@ else
                 @if (!SupplierFacing && tlReadback?.HasData == true)
                 {
                     var tlIsAi = tlReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
+                    var tlDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.TradeLicense);
+                    var tlIsPdf = (tlDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
+                        || (tlDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
                     <div class="di-xtract">
                         <div class="di-xtract-head">
                             <div class="di-xtract-title">
@@ -721,6 +724,13 @@ else
                                 {
                                     <span class="di-xtract-src">@tlReadback.ReadSource</span>
                                 }
+                                @if (tlDoc is not null)
+                                {
+                                    <a class="di-xtract-dl" href="/suppliers/documents/@tlDoc.Id?download=1" target="_blank" rel="noopener">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                                        <span>Download</span>
+                                    </a>
+                                }
                                 <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
                                     @if (reExtracting)
                                     {
@@ -735,7 +745,22 @@ else
                                 </button>
                             </div>
                         </div>
-                        <div class="di-xtract-body">
+                        <div class="di-xtract-main">
+                            <div class="di-xtract-doc">
+                                @if (tlDoc is null)
+                                {
+                                    <div class="di-xtract-doc-empty">No preview available</div>
+                                }
+                                else if (tlIsPdf)
+                                {
+                                    <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
+                                }
+                                else
+                                {
+                                    <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
+                                }
+                            </div>
+                            <div class="di-xtract-fields">
                             <div class="di-xtract-sec">License Information</div>
                             <div class="di-tl-grid">
                                 @TlRow("License No.", tlReadback.LicenseNumber)
@@ -782,6 +807,7 @@ else
                             <div class="di-xtract-done">
                                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
                                 <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
+                            </div>
                             </div>
                         </div>
                     </div>
@@ -1400,6 +1426,9 @@ else
                     @if (!SupplierFacing && idReadback?.HasData == true)
                     {
                         var idIsAi = idReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
+                        var idDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport);
+                        var idIsPdf = (idDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
+                            || (idDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
                         <div class="di-xtract">
                             <div class="di-xtract-head">
                                 <div class="di-xtract-title">
@@ -1420,6 +1449,13 @@ else
                                     {
                                         <span class="di-xtract-src">@idReadback.ReadSource</span>
                                     }
+                                    @if (idDoc is not null)
+                                    {
+                                        <a class="di-xtract-dl" href="/suppliers/documents/@idDoc.Id?download=1" target="_blank" rel="noopener">
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                                            <span>Download</span>
+                                        </a>
+                                    }
                                     <button type="button" class="di-xtract-rerun" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
                                         @if (reExtractingId)
                                         {
@@ -1434,7 +1470,22 @@ else
                                     </button>
                                 </div>
                             </div>
-                            <div class="di-xtract-body">
+                            <div class="di-xtract-main">
+                                <div class="di-xtract-doc">
+                                    @if (idDoc is null)
+                                    {
+                                        <div class="di-xtract-doc-empty">No preview available</div>
+                                    }
+                                    else if (idIsPdf)
+                                    {
+                                        <iframe src="/suppliers/documents/@idDoc.Id#toolbar=0&view=FitH" title="Emirates ID / Passport preview"></iframe>
+                                    }
+                                    else
+                                    {
+                                        <img src="/suppliers/documents/@idDoc.Id" alt="Emirates ID / Passport preview" />
+                                    }
+                                </div>
+                                <div class="di-xtract-fields">
                                 <div class="di-xtract-sec">Identity Information</div>
                                 <div class="di-tl-grid">
                                     @TlRow("Emirates ID No.", idReadback.EmiratesIdNumber)
@@ -1445,6 +1496,7 @@ else
                                 <div class="di-xtract-done">
                                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
                                     <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -1601,10 +1653,10 @@ else
     .di-stepcat:first-child .di-stepcat-label { color: #46618f; }
     .di-stepcat .di-stepper { margin: 0; }
     /* "Read from Trade License" read-only panel */
-    .di-tl-reextract { margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .di-tl-reextract { grid-column: 1 / -1; margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
-    /* Enhanced extraction result card ("Read from ..." panels) */
-    .di-xtract { margin-top: 14px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 14px; background: var(--di-surface, #fff); overflow: hidden; box-shadow: 0 1px 3px rgba(16,32,64,.05), 0 6px 18px rgba(16,32,64,.05); }
+    /* Enhanced extraction result card ("Read from ..." panels) — spans the full section-grid width. */
+    .di-xtract { grid-column: 1 / -1; margin-top: 14px; border: 1px solid var(--di-border, #e2e5ea); border-radius: 14px; background: var(--di-surface, #fff); overflow: hidden; box-shadow: 0 1px 3px rgba(16,32,64,.05), 0 6px 18px rgba(16,32,64,.05); }
     .di-xtract-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 16px; background: linear-gradient(180deg, var(--di-surface-2, #f4f8ff), var(--di-surface, #fff)); border-bottom: 1px solid var(--di-border, #e2e5ea); }
     .di-xtract-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .di-xtract-ic { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: #e7efff; color: #2b5bd7; flex: none; }
@@ -1618,7 +1670,20 @@ else
     .di-xtract-rerun { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 8px; border: 1px solid #2b5bd7; background: #2b5bd7; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, box-shadow .15s; }
     .di-xtract-rerun:hover:not(:disabled) { background: #1f49b8; box-shadow: 0 2px 8px rgba(43,91,215,.3); }
     .di-xtract-rerun:disabled { opacity: .65; cursor: default; }
-    .di-xtract-body { padding: 16px; }
+    .di-xtract-dl { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 8px; border: 1px solid var(--di-border, #cdd5e3); background: var(--di-surface, #fff); color: #2b3a52; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .di-xtract-dl:hover { background: var(--di-surface-2, #f4f8ff); color: #1f3864; }
+
+    /* Two-pane body: document preview (left) + extracted fields (right). */
+    .di-xtract-main { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 18px; padding: 16px; }
+    .di-xtract-doc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: #eef1f6; height: 560px; position: sticky; top: 12px; }
+    .di-xtract-doc iframe, .di-xtract-doc img { width: 100%; height: 100%; border: 0; display: block; }
+    .di-xtract-doc img { object-fit: contain; }
+    .di-xtract-doc-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #8795a9; font-size: 13px; }
+    .di-xtract-fields { min-width: 0; }
+    @@media (max-width: 900px) {
+        .di-xtract-main { grid-template-columns: 1fr; }
+        .di-xtract-doc { height: 380px; position: static; }
+    }
     .di-xtract-sec { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #46618f; margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; }
     .di-xtract-sec::after { content: ""; flex: 1; height: 1px; background: var(--di-border, #eef1f5); }
     .di-xtract-sec:not(:first-child) { margin-top: 18px; }
