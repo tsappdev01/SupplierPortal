@@ -1343,6 +1343,51 @@ else
                         @(DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SupplierDocumentType.ProofOfAddress, "di-thumb-green", false, false, ""))
                         @(DocCard("Current price list / quotation", SupplierDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, ""))
                     </div>
+
+                    @* Re-run extraction on the Emirates ID / Passport already on file (internal view only). *@
+                    @if (!SupplierFacing && documents.Any(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport))
+                    {
+                        <div class="di-tl-reextract">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
+                                @if (reExtractingId)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span class="ms-1">Extracting…</span>
+                                }
+                                else
+                                {
+                                    @(idReadback?.HasData == true ? "Re-run Emirates ID / Passport extraction" : "Extract Emirates ID / Passport data")
+                                }
+                            </button>
+                            @if (idReadback?.HasData != true && !reExtractingId)
+                            {
+                                <span class="text-muted small ms-2">No data has been extracted from this document yet.</span>
+                            }
+                        </div>
+                    }
+
+                    @* Read-only panel: what was auto-read from the Emirates ID / Passport (internal view only). *@
+                    @if (!SupplierFacing && idReadback?.HasData == true)
+                    {
+                        <div class="di-tl-readback">
+                            <div class="di-tl-readback-head">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                                <span class="di-tl-readback-title">Read from Emirates ID / Passport</span>
+                                @if (!string.IsNullOrWhiteSpace(idReadback.ReadSource) || idReadback.ReadAt is not null)
+                                {
+                                    <span class="di-tl-readback-meta">
+                                        @idReadback.ReadSource@(idReadback.ReadAt is not null ? $" · {idReadback.ReadAt:yyyy-MM-dd HH:mm} UTC" : "")
+                                    </span>
+                                }
+                            </div>
+                            <div class="di-tl-readback-grid">
+                                @TlRow("Emirates ID No.", idReadback.EmiratesIdNumber)
+                                @TlRow("Emirates ID Expiry", idReadback.EmiratesIdExpiryDate?.ToString("dd/MM/yyyy"))
+                                @TlRow("Passport No.", idReadback.PassportNumber)
+                                @TlRow("Passport Expiry", idReadback.PassportExpiryDate?.ToString("dd/MM/yyyy"))
+                            </div>
+                        </div>
+                    }
                 </details>
 
             </div>
@@ -1835,7 +1880,9 @@ else
     private List<SupplierDocument> documents = [];
     // Auto-read Trade License capture (internal view only), shown read-only under the Trade License upload.
     private SupplierPortal.Web.Services.TradeLicenseReadback? tlReadback;
+    private SupplierPortal.Web.Services.IdentityReadback? idReadback;
     private bool reExtracting;
+    private bool reExtractingId;
     private bool uploadingDocument;
     private bool viewingDocument;
     private string? viewerUrl;
@@ -2228,10 +2275,11 @@ else
             await Task.WhenAll(tDocs, tChanged);
             documents = tDocs.Result;
             changedFieldKeys = tChanged.Result;
-            // Internal view: load the auto-read Trade License capture for the read-only panel.
+            // Internal view: load the auto-read Trade License + identity-document capture for the read-only panels.
             if (!SupplierFacing)
             {
                 tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+                idReadback = await SupplierDocumentService.GetIdReadbackAsync(Supplier.Id);
             }
         }
     }
@@ -2376,10 +2424,14 @@ else
 
         ToastService.ShowSuccess(message);
         documents = await LoadDocumentsAsync();
-        // Internal view: refresh the read-only "Read from Trade License" panel with what was just captured.
+        // Internal view: refresh the read-only panels with what was just captured.
         if (!SupplierFacing && documentType == SupplierDocumentType.TradeLicense)
         {
             tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+        }
+        if (!SupplierFacing && documentType == SupplierDocumentType.EmiratesIdOrPassport)
+        {
+            idReadback = await SupplierDocumentService.GetIdReadbackAsync(Supplier.Id);
         }
         }
         catch (Exception)
@@ -2414,6 +2466,31 @@ else
             ToastService.ShowError("Could not re-run extraction. Please try again.");
         }
         finally { reExtracting = false; }
+    }
+
+    // Re-run Emirates ID / Passport extraction on the document already on file. Internal only.
+    private async Task ReExtractIdentityAsync()
+    {
+        if (reExtractingId || Supplier.Id == 0) { return; }
+        reExtractingId = true;
+        try
+        {
+            var (ok, error, visionEnabled) = await SupplierDocumentService.ReExtractIdentityAsync(Supplier.Id, CurrentUser);
+            if (ok)
+            {
+                idReadback = await SupplierDocumentService.GetIdReadbackAsync(Supplier.Id);
+                ToastService.ShowSuccess("Emirates ID / Passport re-read. The captured fields are shown below.");
+            }
+            else
+            {
+                ToastService.ShowError(error ?? "Could not extract data from the Emirates ID / Passport.");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("Could not re-run extraction. Please try again.");
+        }
+        finally { reExtractingId = false; }
     }
 
     private async Task ViewDocumentAsync(int documentId)
