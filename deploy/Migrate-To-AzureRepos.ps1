@@ -44,18 +44,11 @@ Write-Host "Cloning (mirror) from GitHub..." -ForegroundColor Yellow
 git clone --mirror $GitHubUrl $mirror
 if ($LASTEXITCODE -ne 0) { throw "git clone --mirror failed." }
 
-# 2. Drop GitHub-only pull-request refs (refs/pull/*). A GitHub mirror clone includes them, but Azure
-#    DevOps rejects pushes to that reserved namespace, which would otherwise fail the whole mirror push.
-Write-Host "Removing GitHub refs/pull/* (Azure rejects them)..." -ForegroundColor Yellow
-git --git-dir $mirror for-each-ref --format='%(refname)' 'refs/pull/*' |
-    ForEach-Object { if ($_) { git --git-dir $mirror update-ref -d $_ } }
-
-# 3. Mirror-push to Azure Repos (all branches + tags; Azure becomes an exact copy).
-#    NOTE: --mirror also DELETES refs on Azure that don't exist on the source, so the destination
-#    ends up identical. That is what you want for a one-time move into an empty/stale repo.
-Write-Host "Pushing (mirror) to Azure DevOps... (paste your PAT if prompted for a password)" -ForegroundColor Yellow
-git --git-dir $mirror push --mirror $AzureRepoUrl
-if ($LASTEXITCODE -ne 0) { throw "git push --mirror to Azure failed (check the URL and your PAT scope: Code Read & Write)." }
+# 2. Push ONLY branches + tags to Azure Repos — never GitHub's refs/pull/*, which Azure DevOps rejects.
+#    --prune keeps Azure's branch/tag set identical to the source; --force overwrites a stale earlier import.
+Write-Host "Pushing branches + tags to Azure DevOps... (paste your PAT if prompted for a password)" -ForegroundColor Yellow
+git --git-dir $mirror push --force --prune $AzureRepoUrl "refs/heads/*:refs/heads/*" "refs/tags/*:refs/tags/*"
+if ($LASTEXITCODE -ne 0) { throw "git push to Azure failed (check the URL and your PAT scope: Code Read & Write)." }
 
 Write-Host "== Done. Azure Repos now mirrors GitHub (all branches, tags, history). ==" -ForegroundColor Green
 Write-Host "Next: point the pipeline at Azure Repos (Repos Git > this repo > /azure-pipelines.yml) and set your UATWEB01 agent pool." -ForegroundColor Green
