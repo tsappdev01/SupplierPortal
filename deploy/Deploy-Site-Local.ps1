@@ -104,3 +104,8 @@ if ($WarmupUrl) {
 }
 
 Write-Host "== Deploy '$SiteName' complete ==" -ForegroundColor Cyan
+
+# Return success explicitly. robocopy leaves a non-zero $LASTEXITCODE (e.g. 3 = files copied) even on a
+# successful mirror, which the PowerShell task would otherwise report as a failed step. Real failures above
+# use `throw`, so reaching here means the deploy succeeded.
+exit 0
