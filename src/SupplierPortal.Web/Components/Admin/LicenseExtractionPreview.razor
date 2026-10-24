@@ -51,6 +51,19 @@
         <span class="text-muted small ms-2">@fileName</span>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(p.VisionRaw))
+    {
+        <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => showRaw = !showRaw">
+                @(showRaw ? "Hide" : "Show") raw vision JSON
+            </button>
+            @if (showRaw)
+            {
+                <pre class="border rounded bg-light p-2 mt-2 mb-0" style="max-height: 420px; overflow: auto; font-size: .8rem;"><code>@p.VisionRaw</code></pre>
+            }
+        </div>
+    }
+
     <div class="table-responsive">
         <table class="table table-sm table-bordered align-top">
             <thead class="table-light">
@@ -105,11 +118,13 @@
     private string? fileName;
     private string? error;
     private bool busy;
+    private bool showRaw;
 
     private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
     {
         error = null;
         lastPreview = null;
+        showRaw = false;
         var file = e.File;
         fileName = file.Name;
         if (file.Size > MaxFileSize)

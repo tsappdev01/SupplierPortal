@@ -23,7 +23,8 @@ public record LicensePreview(
     ParsedLicense? Fallback,
     string FallbackTextSource,
     int FallbackTextChars,
-    string ChosenSource);
+    string ChosenSource,
+    string? VisionRaw);
 
 /// <summary>Stores supplier-uploaded documents (Trade License, VAT Certification, Other) as
 /// physical files under the app's content root - not wwwroot, so they are never directly
@@ -56,9 +57,10 @@ public class SupplierDocumentService(
     public async Task<LicensePreview> PreviewLicenseAsync(byte[] bytes, string? contentType, string fileName)
     {
         ParsedLicense? vision = null;
+        string? visionRaw = null;
         if (licenseReader.IsEnabled)
         {
-            try { vision = await licenseReader.ReadAsync(bytes, contentType); }
+            try { (vision, visionRaw) = await licenseReader.ReadWithRawAsync(bytes, contentType); }
             catch { /* preview is best-effort; a reader failure just leaves the vision column empty */ }
         }
 
@@ -85,7 +87,7 @@ public class SupplierDocumentService(
 
         var chosen = vision is not null && LicenseHasData(vision) ? "Claude vision"
             : fallback is not null ? "DED parser (text/OCR)" : "none";
-        return new LicensePreview(licenseReader.IsEnabled, ocr.IsEnabled, vision, fallback, textSource, textChars, chosen);
+        return new LicensePreview(licenseReader.IsEnabled, ocr.IsEnabled, vision, fallback, textSource, textChars, chosen, visionRaw);
     }
 
     /// <summary>The auto-read Trade License capture (Tl* fields + parties) for the read-only panel shown

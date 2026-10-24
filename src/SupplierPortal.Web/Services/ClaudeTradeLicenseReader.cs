@@ -13,6 +13,10 @@ public interface ITradeLicenseReader
 
     /// <summary>Best-effort: returns the extracted license, or null on any failure (caller falls back).</summary>
     Task<ParsedLicense?> ReadAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default);
+
+    /// <summary>Like <see cref="ReadAsync"/> but also returns the raw model response (the JSON the model
+    /// produced, or a short error description) for diagnostics and the admin preview. Never throws.</summary>
+    Task<(ParsedLicense? License, string? Raw)> ReadWithRawAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default);
 }
 
 /// <summary>Sends the uploaded license to the Anthropic Messages API and maps the returned JSON to a
@@ -83,8 +87,11 @@ Field guidance:
 """;
 
     public async Task<ParsedLicense?> ReadAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default)
+        => (await ReadWithRawAsync(fileBytes, contentType, ct)).License;
+
+    public async Task<(ParsedLicense? License, string? Raw)> ReadWithRawAsync(byte[] fileBytes, string? contentType, CancellationToken ct = default)
     {
-        if (!IsEnabled || fileBytes is null || fileBytes.Length == 0) { return null; }
+        if (!IsEnabled || fileBytes is null || fileBytes.Length == 0) { return (null, null); }
 
         try
         {
@@ -117,20 +124,22 @@ Field guidance:
             if (!resp.IsSuccessStatusCode)
             {
                 logger.LogWarning("Claude license read failed ({Code}): {Body}", (int)resp.StatusCode, Truncate(json, 500));
-                return null;
+                return (null, $"HTTP {(int)resp.StatusCode}: {Truncate(json, 1500)}");
             }
 
             var answer = ExtractAnswerText(json);
             var payload = ExtractJsonObject(answer);
-            if (string.IsNullOrWhiteSpace(payload)) { return null; }
+            if (string.IsNullOrWhiteSpace(payload)) { return (null, answer); }
 
             using var parsed = JsonDocument.Parse(payload);
-            return Map(parsed.RootElement);
+            // Pretty-print the extracted JSON so the admin preview renders it legibly.
+            var pretty = JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
+            return (Map(parsed.RootElement), pretty);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Claude trade-license read failed; falling back.");
-            return null;
+            return (null, $"error: {ex.Message}");
         }
     }
 
