@@ -51,7 +51,6 @@ name: $(Date:yyyy.MM.dd).$(Rev:r)
 variables:
   buildConfiguration: 'Release'
   uatAgentPool: 'Default'                 # <-- set to your UATWEB01 agent pool
-  uatAgentName: 'UATWEB01Agent'           # pin to the agent ON UATWEB01 (the pool is shared across many servers)
   configGuard: 'on'                       # 'off' to skip the pre-deploy appsettings.Local.json checks
 
   # ---- INTERNAL sites ----
@@ -71,9 +70,9 @@ variables:
 pool:
   name: '$(uatAgentPool)'
   # The Default pool is shared across many servers; an in-place IIS deploy must run ON UATWEB01,
-  # so pin the job to that specific agent. Change uatAgentName if the UATWEB01 agent is renamed.
+  # so pin the job to that specific agent by name. Edit this if the UATWEB01 agent is renamed.
   demands:
-    - Agent.Name -equals $(uatAgentName)
+    - Agent.Name -equals UATWEB01Agent
 
 steps:
   # Full history so the topbar git-commit stamp (git rev-parse --short HEAD) resolves.
