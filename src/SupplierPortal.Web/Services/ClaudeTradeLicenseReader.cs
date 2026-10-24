@@ -32,11 +32,27 @@ public sealed class ClaudeTradeLicenseReader(
     public bool IsEnabled => !string.IsNullOrWhiteSpace(_apiKey);
 
     private const string Prompt = """
-You are extracting data from a UAE trade/commercial licence (it may be a Dubai DED licence, a free-zone
-licence such as JAFZA/DAFZA/Creative City/DMCC, bilingual Arabic-English, and may be a scan). Return ONLY
-a single JSON object (no markdown, no commentary) with EXACTLY these keys; use null when a value is not
-present on this licence. Dates as "DD/MM/YYYY". paidCapital as digits only (no commas). parties is the
-combined list of owners/partners/managers/members.
+You are extracting data from a UAE trade/commercial licence. It may be a Dubai DET/DED mainland licence
+(a "Commercial / Industrial / Professional License" from the Department of Economy and Tourism), or a
+free-zone licence (JAFZA, DAFZA, DMCC, Creative City, Dubai Production/Media/Internet City, DSO, RAKEZ,
+SAIF, ...). It is usually bilingual Arabic-English and may be a scan. Read the RENDERED page, not just the
+text layer. Prefer the ENGLISH value for every field. Return ONLY a single JSON object (no markdown, no
+commentary) with EXACTLY these keys; use null when a value is not present on this licence. Dates as
+"DD/MM/YYYY". paidCapital as digits only (no commas). parties is the combined list of
+owners/partners/managers/members/general-managers.
+
+Field guidance:
+- licenseKind: the licence heading - "Commercial", "Industrial", "Professional", "Tourism", etc.
+- issuingAuthority: the issuer/free zone (e.g. "Dubai DET", "JAFZA", "DMCC", "Dubai Production City").
+- legalType: the legal form (maps from "Legal Type" or a free-zone "Legal Status"), e.g.
+  "Limited Liability Company", "Free Zone LLC", "Sole Establishment".
+- tradeName: the trade / business / operating name; legalName: the registered company name.
+- issueDate: the ORIGINAL first-issue date (labelled "Issue Date" or "First Issue Date"); do NOT use the
+  "Current Issue Date" or the "Print Date". expiryDate: the licence expiry date. On the Dubai layout the
+  expiry date is the later date and the issue date is the earlier one.
+- mainLicenseNumber: "Main License No." (falls back to the licence number when not separately printed).
+- registerNumber: "Register No." / commercial register; dcciNumber: "DCCI No." / chamber membership.
+- parcelId: "Parcel ID" / "Plot"; premises: the premises/area/business-unit description.
 
 {
   "licenseNumber": string|null,

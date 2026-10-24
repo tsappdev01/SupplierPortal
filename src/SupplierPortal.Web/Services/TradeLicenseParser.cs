@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SupplierPortal.Web.Services;
@@ -81,6 +82,16 @@ public static class TradeLicenseParser
     private static readonly Regex DunsBare = new(@"\b(\d{9})\b", RegexOptions.Compiled);
 
     private static readonly Regex Date = new(@"\b(\d{2}[/.]\d{2}[/.]\d{4})\b", RegexOptions.Compiled);
+
+    // License kind printed as the document heading ("Commercial License", "Industrial License", ...).
+    private static readonly Regex LicenseKindLine = new(
+        @"\b(Commercial|Industrial|Professional|Tourism|Agricultural|Craftsmanship)\s+Licen[cs]e\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Textual date ("27 January 2016") used by some free-zone licences instead of dd/MM/yyyy.
+    private static readonly Regex TextDate = new(
+        @"\b(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex CapsName = new(
         @"\b[A-Z][A-Z0-9]*(?:\s+[A-Z0-9()&.,'\-]+){1,8}\b", RegexOptions.Compiled);
     private static readonly Regex RegisterNoLabeled = new(
@@ -121,10 +132,31 @@ public static class TradeLicenseParser
     // in the PDF text layer (and after it in OCR output), which a label-window read gets wrong.
     private static readonly string[] KnownLegalTypes =
     [
-        "Private Joint Stock Company", "Public Joint Stock Company", "Limited Liability Company",
-        "Branch of a Foreign Company", "Branch of Foreign Company", "Free Zone Establishment",
-        "Free Zone Company", "One Person Company", "Sole Proprietorship LLC", "Sole Proprietorship",
-        "Sole Establishment", "Civil Company", "Partnership Company", "Partnership"
+        "Free Zone Limited Liability Company", "Private Joint Stock Company", "Public Joint Stock Company",
+        "Limited Liability Company", "Branch of a Foreign Company", "Branch of Foreign Company",
+        "Free Zone Establishment", "Free Zone Company", "One Person Company", "Sole Proprietorship LLC",
+        "Sole Proprietorship", "Sole Establishment", "Civil Company", "Partnership Company", "Partnership"
+    ];
+
+    // Issuing authority / free zone, by a distinctive token anywhere in the text. Most specific first,
+    // so "Dubai Production City" wins over a bare "Dubai" and a free zone wins over the mainland default.
+    private static readonly (string Needle, string Name)[] Authorities =
+    [
+        ("Dubai Production City", "Dubai Production City (TECOM)"),
+        ("Dubai Media City", "Dubai Media City (TECOM)"),
+        ("Dubai Internet City", "Dubai Internet City (TECOM)"),
+        ("Dubai Studio City", "Dubai Studio City (TECOM)"),
+        ("Dubai Silicon Oasis", "Dubai Silicon Oasis"),
+        ("Dubai Healthcare City", "Dubai Healthcare City"),
+        ("Dubai Airport Free", "DAFZA"), ("DAFZA", "DAFZA"),
+        ("Jebel Ali Free", "JAFZA"), ("JAFZA", "JAFZA"),
+        ("DMCC", "DMCC"), ("Multi Commodities", "DMCC"),
+        ("Creative City", "Fujairah Creative City"),
+        ("Dubai South", "Dubai South"),
+        ("RAKEZ", "RAKEZ"), ("Ras Al Khaimah Economic", "RAKEZ"),
+        ("SAIF", "Sharjah (SAIF Zone)"),
+        ("Economic Development", "Dubai DET (Department of Economy and Tourism)"),
+        ("Economy and Tourism", "Dubai DET (Department of Economy and Tourism)"),
     ];
 
     /// <summary>Parses a licence's text into a <see cref="ParsedLicense"/>. Never throws; unreadable or
@@ -144,11 +176,17 @@ public static class TradeLicenseParser
         if (!duns.Success) { duns = DunsBare.Match(text); }
         result.DunsNumber = duns.Success ? duns.Groups[1].Value : null;
 
-        result.LegalType = FirstContained(text, KnownLegalTypes) ?? LabeledText(text, "Legal Type", "الشكل القانون");
+        var kindMatch = LicenseKindLine.Match(text);
+        result.LicenseKind = kindMatch.Success
+            ? CultureInfo.InvariantCulture.TextInfo.ToTitleCase(kindMatch.Groups[1].Value.ToLowerInvariant())
+            : null;
+        result.IssuingAuthority = DetectAuthority(text);
+
+        result.LegalType = FirstContained(text, KnownLegalTypes)
+            ?? LabeledText(text, "Legal Type", "Legal Status", "الشكل القانون");
         result.LicenseCategory = LabeledText(text, "License Category", "فئة الرخصة");
-        result.BusinessName = LabeledName(text, "Business Name", "Company Name", "الاسم التجاري", "اسم الشركة");
-        result.IssueDate = LabeledDate(text, "Issue Date", "تاريخ الاصدار", "تاريخ الإصدار");
-        result.ExpiryDate = LabeledDate(text, "Expiry Date", "تاريخ الانتهاء", "تاريخ النتهاء");
+        result.BusinessName = LabeledName(text, "Business Name", "Company Name", "Operating Name", "الاسم التجاري", "اسم الشركة");
+        (result.IssueDate, result.ExpiryDate) = ExtractIssueExpiry(text);
         result.RegisterNumber = FirstGroup(RegisterNoLabeled, text);
         result.DcciNumber = FirstGroup(DcciNoLabeled, text);
 
@@ -219,6 +257,65 @@ public static class TradeLicenseParser
             window = Slice(text, i - 40, i);
             m = Date.Match(window);
             if (m.Success) { return m.Groups[1].Value; }
+        }
+        return null;
+    }
+
+    /// <summary>Reads issue + expiry dates. On the modern DET/DED layout the two dates print together
+    /// (expiry first, then issue) far from their "Issue Date"/"Expiry Date" labels, so a label-window
+    /// read misses them. A DET licence runs from its (oldest) issue date to its (newest) expiry date, so
+    /// of the dates in the body - excluding the "Print Date" footer, and tolerating an intermediate
+    /// "remarks" date - the earliest is the issue date and the latest the expiry date. The labelled read
+    /// is tried first (older layouts) and kept as the fallback. Handles dd/MM/yyyy and "27 January 2016".</summary>
+    private static (string? issue, string? expiry) ExtractIssueExpiry(string text)
+    {
+        var labelledIssue = LabeledDate(text, "Issue Date", "تاريخ الاصدار", "تاريخ الإصدار");
+        var labelledExpiry = LabeledDate(text, "Expiry Date", "تاريخ الانتهاء", "تاريخ النتهاء");
+        if (labelledIssue is not null && labelledExpiry is not null && labelledIssue != labelledExpiry)
+        {
+            return (labelledIssue, labelledExpiry);
+        }
+
+        // Confine the search to the top "License Details" block: issue/expiry always print there, above
+        // the members/activities tables and the Print Date / Remarks footer - so a member's serial-year,
+        // an establishment/remarks date or the print date can never be mistaken for issue/expiry.
+        var body = text;
+        var cut = EarliestIndexOf(body, "License Members", "الاطراف", "الأطراف", "License Activities",
+            "نشاط الرخصة", "Print Date", "تاريخ الطباعة", "Remarks", "الملاحظات");
+        if (cut > 0) { body = body[..cut]; }
+
+        var found = new List<(string raw, DateTime dt)>();
+        foreach (Match m in Date.Matches(body))
+        {
+            if (TryParseLicenseDate(m.Groups[1].Value, out var dt)) { found.Add((m.Groups[1].Value, dt)); }
+        }
+        foreach (Match m in TextDate.Matches(body))
+        {
+            if (TryParseLicenseDate(m.Value, out var dt)) { found.Add((m.Value.Trim(), dt)); }
+        }
+        if (found.Count >= 2)
+        {
+            var earliest = found.OrderBy(p => p.dt).First().raw;
+            var latest = found.OrderByDescending(p => p.dt).First().raw;
+            if (earliest != latest) { return (earliest, latest); }
+        }
+        return (labelledIssue, labelledExpiry);
+    }
+
+    private static bool TryParseLicenseDate(string s, out DateTime dt)
+    {
+        s = s.Replace('.', '/').Trim();
+        string[] formats = ["dd/MM/yyyy", "d/M/yyyy", "d MMMM yyyy", "dd MMMM yyyy"];
+        return DateTime.TryParseExact(s, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt);
+    }
+
+    /// <summary>Identifies the issuing authority / free zone from a distinctive token in the text,
+    /// defaulting to Dubai DET when the mainland economic-development wording is present.</summary>
+    private static string? DetectAuthority(string text)
+    {
+        foreach (var (needle, name) in Authorities)
+        {
+            if (text.Contains(needle, StringComparison.OrdinalIgnoreCase)) { return name; }
         }
         return null;
     }
