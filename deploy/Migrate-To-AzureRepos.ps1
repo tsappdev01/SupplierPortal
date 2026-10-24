@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Does a MIRROR clone of the GitHub repo and a MIRROR push to Azure Repos, so every branch, tag
-    and commit is copied exactly — nothing is lost. Run it on a machine that can authenticate to BOTH
+    and commit is copied exactly - nothing is lost. Run it on a machine that can authenticate to BOTH
     remotes (e.g. your workstation or UATWEB01). Azure DevOps auth is easiest with a PAT:
         Azure DevOps > User settings > Personal access tokens > New token > scope "Code (Read & Write)".
     When Git prompts for a password on the Azure push, paste the PAT.
@@ -44,7 +44,7 @@ Write-Host "Cloning (mirror) from GitHub..." -ForegroundColor Yellow
 git clone --mirror $GitHubUrl $mirror
 if ($LASTEXITCODE -ne 0) { throw "git clone --mirror failed." }
 
-# 2. Push ONLY branches + tags to Azure Repos — never GitHub's refs/pull/*, which Azure DevOps rejects.
+# 2. Push ONLY branches + tags to Azure Repos - never GitHub's refs/pull/*, which Azure DevOps rejects.
 #    --prune keeps Azure's branch/tag set identical to the source; --force overwrites a stale earlier import.
 Write-Host "Pushing branches + tags to Azure DevOps... (paste your PAT if prompted for a password)" -ForegroundColor Yellow
 git --git-dir $mirror push --force --prune $AzureRepoUrl "refs/heads/*:refs/heads/*" "refs/tags/*:refs/tags/*"
