@@ -52,3 +52,6 @@ if ($LASTEXITCODE -ne 0) { throw "git push to Azure failed (check the URL and yo
 
 Write-Host "== Done. Azure Repos now mirrors GitHub (all branches, tags, history). ==" -ForegroundColor Green
 Write-Host "Next: point the pipeline at Azure Repos (Repos Git > this repo > /azure-pipelines.yml) and set your UATWEB01 agent pool." -ForegroundColor Green
+
+# Return success explicitly so a non-zero $LASTEXITCODE left by git is not misreported. Real failures throw above.
+exit 0
