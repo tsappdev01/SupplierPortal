@@ -419,6 +419,11 @@
                 <text>Assign Department to Selected</text>
             }
         </button>
+        <span class="vr d-none d-sm-inline"></span>
+        <button class="btn btn-sm btn-outline-dark" disabled="@bulkSending" @onclick="BulkDownloadDocumentsAsync"
+                title="Download all attached documents for the selected suppliers as a single ZIP">
+            ⬇ Download Documents (.zip)
+        </button>
         <button class="btn btn-sm btn-outline-secondary" disabled="@bulkSending" @onclick="ClearSelection">Clear Selection</button>
     </div>
 }
@@ -1533,6 +1538,16 @@ else if (TabFilteredSuppliers.Any())
             zipDownloading = false;
             ToastService.ShowError("Could not start the download. Please try again.");
         }
+    }
+
+    /// <summary>Bulk download: all attachments for the selected suppliers as one ZIP (each supplier in its
+    /// own subfolder). The server builds the archive and streams it as a download.</summary>
+    private async Task BulkDownloadDocumentsAsync()
+    {
+        if (selectedIds.Count == 0) { return; }
+        var ids = string.Join(",", selectedIds);
+        ToastService.ShowInfo("Preparing your download…");
+        await JS.InvokeVoidAsync("open", $"/suppliers/documents.zip?ids={ids}", "_blank");
     }
 
     /// <summary>Streams a single document via JS so its Download button shows the same live progress.</summary>
