@@ -431,6 +431,15 @@ table thead th {
 .di-switch input:checked + .di-switch-slider::before { transform: translateX(20px); }
 .di-switch input:disabled + .di-switch-slider { opacity: .45; cursor: not-allowed; }
 
+/* Button-based switch (desync-proof): colour/position driven by the on/off class, not a checkbox state.
+   Green = on (Active), Red = off (Inactive). Used by the supplier-status toggle on the Manage Supplier list. */
+.di-switch-btn { position: relative; display: inline-block; width: 44px; height: 24px; vertical-align: middle; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.di-switch-btn .di-switch-slider { position: absolute; inset: 0; background-color: #c34; border-radius: 24px; transition: background-color .15s ease; }
+.di-switch-btn .di-switch-slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: transform .15s ease; }
+.di-switch-btn.on .di-switch-slider { background-color: #28a745; }
+.di-switch-btn.on .di-switch-slider::before { transform: translateX(20px); }
+.di-switch-btn:disabled { opacity: .45; cursor: not-allowed; }
+
 /* Per-tab read-only banner (customer form; shown when a tab is edit-restricted to other users) */
 .di-tab-readonly-note { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid #f2d99b; border-radius: 10px; background: #fff8e8; color: #8a5b06; font-size: 13px; font-weight: 500; }
 .di-tab-readonly-note svg { flex: none; color: #b07d1a; }
