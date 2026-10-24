@@ -32,7 +32,8 @@ public record LicensePreview(
 public class SupplierDocumentService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService,
-    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore, ITradeLicenseReader licenseReader)
+    SupplierPortal.Web.Services.Storage.IFileStorageService fileStore, ITradeLicenseReader licenseReader,
+    IIdentityDocumentReader identityReader)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -88,6 +89,211 @@ public class SupplierDocumentService(
         var chosen = vision is not null && LicenseHasData(vision) ? "Claude vision"
             : fallback is not null ? "DED parser (text/OCR)" : "none";
         return new LicensePreview(licenseReader.IsEnabled, ocr.IsEnabled, vision, fallback, textSource, textChars, chosen, visionRaw);
+    }
+
+    /// <summary>Re-runs extraction on the Trade License already on file for a supplier and saves the
+    /// captured fields + parties - for licences uploaded before auto-read existed, or to refresh with an
+    /// improved reader. Returns success, an error message when nothing could be read, and whether the
+    /// vision reader is configured (so the caller can explain a thin result).</summary>
+    public async Task<(bool Success, string? Error, bool VisionEnabled)> ReExtractLicenseAsync(int supplierId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var doc = await db.SupplierDocuments
+            .Where(d => d.SupplierId == supplierId && d.DocumentType == SupplierDocumentType.TradeLicense)
+            .OrderByDescending(d => d.Id)
+            .FirstOrDefaultAsync();
+        if (doc is null)
+        {
+            return (false, "No Trade License document is on file for this supplier.", licenseReader.IsEnabled);
+        }
+
+        byte[]? bytes = doc.Content;
+        if ((bytes is null || bytes.Length == 0) && !string.IsNullOrWhiteSpace(doc.BlobKey))
+        {
+            try { bytes = await fileStore.ReadAsync(doc.BlobKey); } catch { bytes = null; }
+        }
+        if (bytes is null || bytes.Length == 0)
+        {
+            return (false, "The stored Trade License file could not be read.", licenseReader.IsEnabled);
+        }
+
+        var (license, readSource) = await ExtractChosenLicenseAsync(bytes, doc.ContentType, doc.FileName);
+        if (license is null || !LicenseHasData(license))
+        {
+            var why = licenseReader.IsEnabled
+                ? "Extraction did not find readable data in the stored file."
+                : "Extraction found nothing - the Claude-vision reader is not configured, so only the text parser ran (scanned licences need vision).";
+            return (false, why, licenseReader.IsEnabled);
+        }
+
+        try { await ApplyLicenseToSupplierAsync(db, supplierId, license, readSource); }
+        catch (Exception ex) { return (false, $"Extraction succeeded but saving failed: {ex.Message}", licenseReader.IsEnabled); }
+
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, "Re-ran Trade License extraction");
+        return (true, null, licenseReader.IsEnabled);
+    }
+
+    /// <summary>Runs the production selection (Claude vision when it returns data, else the PDF text layer
+    /// or OCR + regex parser) over a file's bytes and returns the chosen licence and its read source.</summary>
+    private async Task<(ParsedLicense? License, string? ReadSource)> ExtractChosenLicenseAsync(byte[] bytes, string? contentType, string fileName)
+    {
+        if (licenseReader.IsEnabled)
+        {
+            try
+            {
+                var vision = await licenseReader.ReadAsync(bytes, contentType);
+                if (vision is not null && LicenseHasData(vision)) { return (vision, "Claude vision"); }
+            }
+            catch { /* fall through to the text parser */ }
+        }
+
+        var tmp = Path.Combine(Path.GetTempPath(), $"licx_{Guid.NewGuid():N}{Path.GetExtension(fileName)}");
+        try
+        {
+            await File.WriteAllBytesAsync(tmp, bytes);
+            var text = TryReadPdfText(tmp);
+            if (string.IsNullOrWhiteSpace(text) && ocr.IsEnabled) { text = await ocr.ExtractTextAsync(tmp); }
+            if (!string.IsNullOrWhiteSpace(text)) { return (TradeLicenseParser.Parse(text), "DED parser"); }
+        }
+        catch { /* best-effort */ }
+        finally { try { File.Delete(tmp); } catch { /* temp cleanup */ } }
+
+        return (null, null);
+    }
+
+    /// <summary>Writes a parsed licence's fields and parties onto the supplier record (the non-destructive
+    /// Tl* capture, plus folding D-U-N-S and legal type into the editable fields). Shared by the upload
+    /// path and the re-extract action. Caller wraps this in its own try/catch - enrichment is optional.</summary>
+    private static async Task ApplyLicenseToSupplierAsync(ApplicationDbContext db, int supplierId, ParsedLicense license, string? readSource)
+    {
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null) { return; }
+
+        // Keep the existing behaviour of folding D-U-N-S and legal type into the editable fields.
+        if (!string.IsNullOrWhiteSpace(license.DunsNumber)) { supplier.DunsNumber = license.DunsNumber; }
+        if (!string.IsNullOrWhiteSpace(license.LegalType)) { supplier.LicenseType = license.LegalType; }
+
+        // Dedicated, non-destructive auto-read capture (shown read-only under the document).
+        supplier.TlLicenseNumber = license.LicenseNumber;
+        supplier.TlMainLicenseNumber = license.MainLicenseNumber;
+        supplier.TlLegalName = license.LegalName ?? license.BusinessName;
+        supplier.TlTradeName = license.TradeName;
+        supplier.TlLegalType = license.LegalType;
+        supplier.TlLicenseCategory = license.LicenseCategory;
+        supplier.TlIssuingAuthority = license.IssuingAuthority;
+        supplier.TlLicenseType = license.LicenseKind;
+        supplier.TlIssueDate = ParseLicenseDate(license.IssueDate);
+        supplier.TlExpiryDate = ParseLicenseDate(license.ExpiryDate);
+        supplier.TlRegisterNumber = license.RegisterNumber;
+        supplier.TlDcciNumber = license.DcciNumber;
+        supplier.TlDunsNumber = license.DunsNumber;
+        supplier.TlPaidCapital = ParseCapital(license.PaidCapital);
+        supplier.TlCapitalCurrency = license.CapitalCurrency;
+        supplier.TlActivities = license.Activities.Count > 0
+            ? string.Join(" | ", license.Activities.Select(a => a.Name).Where(n => !string.IsNullOrWhiteSpace(n)))
+            : null;
+        supplier.TlPoBox = license.PoBox;
+        supplier.TlParcelId = license.ParcelId;
+        supplier.TlPremises = license.Premises;
+        supplier.TlEmail = license.Email;
+        supplier.TlPhone = license.Phone;
+        supplier.TlMobile = license.Mobile;
+        supplier.TlAddress = license.Address;
+        supplier.TlReadAt = DateTime.UtcNow;
+        supplier.TlReadSource = readSource;
+
+        // Replace the parties annex (owners/partners/managers) with the freshly read set.
+        if (license.Members.Count > 0)
+        {
+            var existingPartners = await db.SupplierPartners.Where(p => p.SupplierId == supplierId).ToListAsync();
+            db.SupplierPartners.RemoveRange(existingPartners);
+            foreach (var partner in license.Members)
+            {
+                db.SupplierPartners.Add(new SupplierPartner
+                {
+                    SupplierId = supplierId,
+                    Name = partner.Name,
+                    Nationality = partner.Nationality,
+                    SerialNo = partner.PersonNo,
+                    Share = partner.Share,
+                    Role = partner.Role
+                });
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Writes the read Emirates ID / Passport fields onto the supplier record (non-destructive
+    /// capture shown read-only under the ID document), and fills the editable KYS "Emirates ID / Passport
+    /// No." + expiry when those are still blank - preferring the Emirates ID, else the passport.</summary>
+    private static async Task ApplyIdentityToSupplierAsync(ApplicationDbContext db, int supplierId, ParsedIdentityDocument id, string? readSource)
+    {
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null) { return; }
+
+        supplier.EmiratesIdNumber = id.EmiratesIdNumber;
+        supplier.EmiratesIdExpiryDate = ParseLicenseDate(id.EmiratesIdExpiry);
+        supplier.PassportNumber = id.PassportNumber;
+        supplier.PassportExpiryDate = ParseLicenseDate(id.PassportExpiry);
+        supplier.IdDocReadAt = DateTime.UtcNow;
+        supplier.IdDocReadSource = readSource;
+
+        // Convenience: fill the editable KYS ID No / expiry when still empty (Emirates ID first, else passport).
+        var number = id.EmiratesIdNumber ?? id.PassportNumber;
+        var expiry = ParseLicenseDate(id.EmiratesIdExpiry) ?? ParseLicenseDate(id.PassportExpiry);
+        if (string.IsNullOrWhiteSpace(supplier.KysIdNumber) && !string.IsNullOrWhiteSpace(number)) { supplier.KysIdNumber = number; }
+        if (supplier.KysIdExpiryDate is null && expiry is not null) { supplier.KysIdExpiryDate = expiry; }
+
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Re-runs identity extraction on the Emirates ID / Passport already on file and saves it.</summary>
+    public async Task<(bool Success, string? Error, bool VisionEnabled)> ReExtractIdentityAsync(int supplierId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var doc = await db.SupplierDocuments
+            .Where(d => d.SupplierId == supplierId && d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport)
+            .OrderByDescending(d => d.Id)
+            .FirstOrDefaultAsync();
+        if (doc is null) { return (false, "No Emirates ID / Passport document is on file for this supplier.", identityReader.IsEnabled); }
+        if (!identityReader.IsEnabled)
+        {
+            return (false, "The Claude-vision reader is not configured, so identity documents cannot be read.", false);
+        }
+
+        byte[]? bytes = doc.Content;
+        if ((bytes is null || bytes.Length == 0) && !string.IsNullOrWhiteSpace(doc.BlobKey))
+        {
+            try { bytes = await fileStore.ReadAsync(doc.BlobKey); } catch { bytes = null; }
+        }
+        if (bytes is null || bytes.Length == 0) { return (false, "The stored identity file could not be read.", true); }
+
+        ParsedIdentityDocument? id = null;
+        try { id = await identityReader.ReadAsync(bytes, doc.ContentType); } catch { /* best-effort */ }
+        if (id is null || !id.HasData) { return (false, "Extraction did not find readable identity data in the stored file.", true); }
+
+        try { await ApplyIdentityToSupplierAsync(db, supplierId, id, "Claude vision"); }
+        catch (Exception ex) { return (false, $"Extraction succeeded but saving failed: {ex.Message}", true); }
+
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, "Re-ran Emirates ID / Passport extraction");
+        return (true, null, true);
+    }
+
+    /// <summary>The auto-read Emirates ID / Passport capture for the read-only panel under that document.</summary>
+    public async Task<IdentityReadback> GetIdReadbackAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var s = await db.Suppliers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == supplierId);
+        return s is null ? new IdentityReadback() : new IdentityReadback
+        {
+            EmiratesIdNumber = s.EmiratesIdNumber,
+            EmiratesIdExpiryDate = s.EmiratesIdExpiryDate,
+            PassportNumber = s.PassportNumber,
+            PassportExpiryDate = s.PassportExpiryDate,
+            ReadAt = s.IdDocReadAt,
+            ReadSource = s.IdDocReadSource
+        };
     }
 
     /// <summary>The auto-read Trade License capture (Tl* fields + parties) for the read-only panel shown
@@ -203,6 +409,7 @@ public class SupplierDocumentService(
         List<LicenseMember> partners = [];
         ParsedLicense? license = null;   // full trade-license data (vision reader, or regex fallback)
         string? readSource = null;
+        ParsedIdentityDocument? idDoc = null;   // Emirates ID / Passport capture (vision reader)
 
         if (documentType is SupplierDocumentType.VatCertification or SupplierDocumentType.TradeLicense)
         {
@@ -286,6 +493,17 @@ public class SupplierDocumentService(
                 // Extraction is optional enrichment; swallow so a parse/OCR/download failure never
                 // stops the file from being saved. Extracted values remain null and are simply not applied.
             }
+        }
+        else if (documentType == SupplierDocumentType.EmiratesIdOrPassport && identityReader.IsEnabled)
+        {
+            // Emirates ID / Passport: read the identity fields with the vision reader. Best-effort - a
+            // failure must never block the upload, so it is guarded and simply leaves idDoc null.
+            try
+            {
+                var bytes = await File.ReadAllBytesAsync(fullPath);
+                idDoc = await identityReader.ReadAsync(bytes, contentType);
+            }
+            catch { /* optional enrichment */ }
         }
 
         // The local file above was needed for QR/OCR extraction. Move the durable copy to its store:
@@ -373,71 +591,18 @@ public class SupplierDocumentService(
         // that fails to parse never wipes good data.
         if (documentType == SupplierDocumentType.TradeLicense && license is not null)
         {
-            try
-            {
-                var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
-                if (supplier is not null)
-                {
-                    // Keep the existing behaviour of folding D-U-N-S and legal type into the editable fields.
-                    if (!string.IsNullOrWhiteSpace(dunsNumber)) { supplier.DunsNumber = dunsNumber; }
-                    if (!string.IsNullOrWhiteSpace(licenseType)) { supplier.LicenseType = licenseType; }
-
-                    // Dedicated, non-destructive auto-read capture (shown read-only under the document).
-                    supplier.TlLicenseNumber = license.LicenseNumber;
-                    supplier.TlMainLicenseNumber = license.MainLicenseNumber;
-                    supplier.TlLegalName = license.LegalName ?? license.BusinessName;
-                    supplier.TlTradeName = license.TradeName;
-                    supplier.TlLegalType = license.LegalType;
-                    supplier.TlLicenseCategory = license.LicenseCategory;
-                    supplier.TlIssuingAuthority = license.IssuingAuthority;
-                    supplier.TlLicenseType = license.LicenseKind;
-                    supplier.TlIssueDate = ParseLicenseDate(license.IssueDate);
-                    supplier.TlExpiryDate = ParseLicenseDate(license.ExpiryDate);
-                    supplier.TlRegisterNumber = license.RegisterNumber;
-                    supplier.TlDcciNumber = license.DcciNumber;
-                    supplier.TlDunsNumber = license.DunsNumber;
-                    supplier.TlPaidCapital = ParseCapital(license.PaidCapital);
-                    supplier.TlCapitalCurrency = license.CapitalCurrency;
-                    supplier.TlActivities = license.Activities.Count > 0
-                        ? string.Join(" | ", license.Activities.Select(a => a.Name).Where(n => !string.IsNullOrWhiteSpace(n)))
-                        : null;
-                    supplier.TlPoBox = license.PoBox;
-                    supplier.TlParcelId = license.ParcelId;
-                    supplier.TlPremises = license.Premises;
-                    supplier.TlEmail = license.Email;
-                    supplier.TlPhone = license.Phone;
-                    supplier.TlMobile = license.Mobile;
-                    supplier.TlAddress = license.Address;
-                    supplier.TlReadAt = DateTime.UtcNow;
-                    supplier.TlReadSource = readSource;
-
-                    // Replace the parties annex (owners/partners/managers) with the freshly read set.
-                    if (partners.Count > 0)
-                    {
-                        var existingPartners = await db.SupplierPartners
-                            .Where(p => p.SupplierId == supplierId).ToListAsync();
-                        db.SupplierPartners.RemoveRange(existingPartners);
-                        foreach (var partner in partners)
-                        {
-                            db.SupplierPartners.Add(new SupplierPartner
-                            {
-                                SupplierId = supplierId,
-                                Name = partner.Name,
-                                Nationality = partner.Nationality,
-                                SerialNo = partner.PersonNo,
-                                Share = partner.Share,
-                                Role = partner.Role
-                            });
-                        }
-                    }
-
-                    await db.SaveChangesAsync();
-                }
-            }
+            try { await ApplyLicenseToSupplierAsync(db, supplierId, license, readSource); }
             catch
             {
                 // Enrichment is optional; the document is already saved and the number already returned.
             }
+        }
+
+        // Emirates ID / Passport: fold the read identity fields into the supplier record (best-effort).
+        if (documentType == SupplierDocumentType.EmiratesIdOrPassport && idDoc is not null && idDoc.HasData)
+        {
+            try { await ApplyIdentityToSupplierAsync(db, supplierId, idDoc, "Claude vision"); }
+            catch { /* optional enrichment */ }
         }
 
         await auditService.LogAsync(uploadedBy, AuditAction.Update, "Supplier", supplierId, $"Uploaded {documentType} document '{fileName}'");
@@ -804,4 +969,19 @@ public sealed class TradeLicenseReadback
 
     /// <summary>True when a license has actually been read (so the panel is worth showing).</summary>
     public bool HasData => ReadAt is not null || !string.IsNullOrWhiteSpace(LicenseNumber) || Parties.Count > 0;
+}
+
+/// <summary>The auto-read Emirates ID / Passport capture for the read-only panel under that document.</summary>
+public sealed class IdentityReadback
+{
+    public string? EmiratesIdNumber { get; set; }
+    public DateTime? EmiratesIdExpiryDate { get; set; }
+    public string? PassportNumber { get; set; }
+    public DateTime? PassportExpiryDate { get; set; }
+    public DateTime? ReadAt { get; set; }
+    public string? ReadSource { get; set; }
+
+    /// <summary>True when something was read (so the panel is worth showing).</summary>
+    public bool HasData => ReadAt is not null
+        || !string.IsNullOrWhiteSpace(EmiratesIdNumber) || !string.IsNullOrWhiteSpace(PassportNumber);
 }

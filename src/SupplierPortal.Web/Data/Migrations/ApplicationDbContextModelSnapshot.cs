@@ -1545,6 +1545,13 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<DateTime?>("EmiratesIdExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmiratesIdNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("FirstName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1552,6 +1559,13 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.Property<string>("Iban")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("IdDocReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IdDocReadSource")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
 
                     b.Property<bool>("IntermediaryAccountApplicable")
                         .HasColumnType("bit");
@@ -1716,6 +1730,13 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<int?>("NumberOfVatGroupEntities")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("PassportExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PassportNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("PaymentMethodCode")
                         .HasMaxLength(50)

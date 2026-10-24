@@ -396,6 +396,16 @@ public class Supplier
     public DateTime? TlReadAt { get; set; }
     [MaxLength(60)] public string? TlReadSource { get; set; }
 
+    // -- Identity document auto-read (Emirates ID / Passport) --
+    //    Non-destructive capture read from the uploaded "Emirates ID / Passport" KYS document, shown
+    //    read-only under that document. Separate Emirates ID and Passport fields so both are kept.
+    [MaxLength(100)] public string? EmiratesIdNumber { get; set; }
+    public DateTime? EmiratesIdExpiryDate { get; set; }
+    [MaxLength(100)] public string? PassportNumber { get; set; }
+    public DateTime? PassportExpiryDate { get; set; }
+    public DateTime? IdDocReadAt { get; set; }
+    [MaxLength(60)] public string? IdDocReadSource { get; set; }
+
     // -- Status / ownership --
 
     /// <summary>Workflow status (LookupValue in the SupplierStatus category): New →
