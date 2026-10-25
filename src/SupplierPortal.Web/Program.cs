@@ -459,9 +459,11 @@ app.Use(async (context, next) =>
     headers["X-Frame-Options"] = "SAMEORIGIN";
     headers["Referrer-Policy"] = "no-referrer";
     // A conservative CSP that hardens without a default-src (Blazor Server renders inline component
-    // <style> blocks and a pre-paint inline <script>, which a strict default-src would break): block
-    // plugin/object embeds, lock the document base URI, and restrict framing to this origin.
-    headers["Content-Security-Policy"] = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
+    // <style> blocks and a pre-paint inline <script>, which a strict default-src would break): allow only
+    // same-origin / blob plugin embeds (so the browser's built-in PDF viewer can render an inline Trade
+    // License / ID preview and the blob-URL document viewer), lock the base URI, and restrict framing to
+    // this origin.
+    headers["Content-Security-Policy"] = "frame-ancestors 'self'; object-src 'self' blob:; base-uri 'self'";
     // Deny powerful browser features the admin app never uses (scanner sees an explicit deny).
     headers["Permissions-Policy"] =
         "accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), " +

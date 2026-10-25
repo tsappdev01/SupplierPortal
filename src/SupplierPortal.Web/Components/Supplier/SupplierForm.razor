@@ -751,13 +751,22 @@ else
                                 {
                                     <div class="di-xtract-doc-empty">No preview available</div>
                                 }
-                                else if (tlIsPdf)
-                                {
-                                    <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
-                                }
                                 else
                                 {
-                                    <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
+                                    <div class="di-xtract-doc-view">
+                                        @if (tlIsPdf)
+                                        {
+                                            <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
+                                        }
+                                        else
+                                        {
+                                            <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
+                                        }
+                                    </div>
+                                    <a class="di-xtract-doc-open" href="/suppliers/documents/@tlDoc.Id" target="_blank" rel="noopener">
+                                        Open document in a new tab
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                                    </a>
                                 }
                             </div>
                             <div class="di-xtract-fields">
@@ -1476,13 +1485,22 @@ else
                                     {
                                         <div class="di-xtract-doc-empty">No preview available</div>
                                     }
-                                    else if (idIsPdf)
-                                    {
-                                        <iframe src="/suppliers/documents/@idDoc.Id#toolbar=0&view=FitH" title="Emirates ID / Passport preview"></iframe>
-                                    }
                                     else
                                     {
-                                        <img src="/suppliers/documents/@idDoc.Id" alt="Emirates ID / Passport preview" />
+                                        <div class="di-xtract-doc-view">
+                                            @if (idIsPdf)
+                                            {
+                                                <iframe src="/suppliers/documents/@idDoc.Id#toolbar=0&view=FitH" title="Emirates ID / Passport preview"></iframe>
+                                            }
+                                            else
+                                            {
+                                                <img src="/suppliers/documents/@idDoc.Id" alt="Emirates ID / Passport preview" />
+                                            }
+                                        </div>
+                                        <a class="di-xtract-doc-open" href="/suppliers/documents/@idDoc.Id" target="_blank" rel="noopener">
+                                            Open document in a new tab
+                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                                        </a>
                                     }
                                 </div>
                                 <div class="di-xtract-fields">
@@ -1675,9 +1693,12 @@ else
 
     /* Two-pane body: document preview (left) + extracted fields (right). */
     .di-xtract-main { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 18px; padding: 16px; }
-    .di-xtract-doc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: #eef1f6; height: 560px; position: sticky; top: 12px; }
-    .di-xtract-doc iframe, .di-xtract-doc img { width: 100%; height: 100%; border: 0; display: block; }
-    .di-xtract-doc img { object-fit: contain; }
+    .di-xtract-doc { display: flex; flex-direction: column; border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: #eef1f6; height: 560px; position: sticky; top: 12px; }
+    .di-xtract-doc-view { flex: 1; min-height: 0; }
+    .di-xtract-doc-view iframe, .di-xtract-doc-view img { width: 100%; height: 100%; border: 0; display: block; }
+    .di-xtract-doc-view img { object-fit: contain; }
+    .di-xtract-doc-open { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; font-size: 12.5px; font-weight: 600; color: #2b5bd7; text-decoration: none; background: var(--di-surface, #fff); border-top: 1px solid var(--di-border, #e2e5ea); }
+    .di-xtract-doc-open:hover { background: var(--di-surface-2, #f4f8ff); }
     .di-xtract-doc-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #8795a9; font-size: 13px; }
     .di-xtract-fields { min-width: 0; }
     @@media (max-width: 900px) {
