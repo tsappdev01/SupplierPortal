@@ -192,6 +192,14 @@ public class SupplierDocumentService(
         supplier.TlActivities = license.Activities.Count > 0
             ? string.Join(" | ", license.Activities.Select(a => a.Name).Where(n => !string.IsNullOrWhiteSpace(n)))
             : null;
+        // Mirror the activities into the editable KYS "Licensed business activities" field when it is still
+        // blank, so the auto-read value is pre-filled there too (newline-separated for the textarea).
+        if (string.IsNullOrWhiteSpace(supplier.KysLicensedActivities) && license.Activities.Count > 0)
+        {
+            var kysActivities = string.Join("\n", license.Activities.Select(a => a.Name).Where(n => !string.IsNullOrWhiteSpace(n)));
+            if (kysActivities.Length > 500) { kysActivities = kysActivities[..500]; }
+            if (!string.IsNullOrWhiteSpace(kysActivities)) { supplier.KysLicensedActivities = kysActivities; }
+        }
         supplier.TlPoBox = license.PoBox;
         supplier.TlParcelId = license.ParcelId;
         supplier.TlPremises = license.Premises;
