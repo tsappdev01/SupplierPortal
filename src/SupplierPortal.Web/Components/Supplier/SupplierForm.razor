@@ -639,6 +639,10 @@ else
 
                     <div class="di-doccard">
                         @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
+                        @if (uploadingType == SupplierDocumentType.Other)
+                        {
+                            <div class="di-doccard-uploading"><span class="di-doccard-spinner"></span><span>Uploading…</span></div>
+                        }
                         <div class="di-doccard-thumb di-thumb-amber">
                             <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
                             <span class="di-doccard-ext">FILES</span>
@@ -656,7 +660,7 @@ else
                                     <div class="di-doccard-chip">
                                         <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
                                         <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
-                                        <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                        <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">@(viewingDocId == doc.Id ? "Opening…" : "View")</button>
                                         <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
                                     </div>
                                 }
@@ -2058,7 +2062,9 @@ else
     private bool reExtracting;
     private bool reExtractingId;
     private bool uploadingDocument;
+    private SupplierDocumentType? uploadingType;   // which card is mid-upload (for its spinner overlay)
     private bool viewingDocument;
+    private int? viewingDocId;                      // which document's View was clicked (for its spinner)
     private string? viewerUrl;
     private string? viewerName;
     private HashSet<string> changedFieldKeys = [];
@@ -2248,6 +2254,10 @@ else
             var inputId = $"docfile-{type}";
             var disabled = Supplier.Id == 0 || uploadingDocument;
         }
+        @if (uploadingType == type)
+        {
+            <div class="di-doccard-uploading"><span class="di-doccard-spinner"></span><span>Uploading…</span></div>
+        }
         <div class="di-doccard-thumb @thumbClass">
             <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
             <span class="di-doccard-ext">@(doc is null ? "FILE" : FileExtLabel(doc.FileName))</span>
@@ -2281,8 +2291,16 @@ else
         {
             <div class="di-doccard-actions">
                 <button type="button" class="di-doccard-viewbtn" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
-                    View
+                    @if (viewingDocId == doc.Id)
+                    {
+                        <span class="di-doccard-spinner di-doccard-spinner-sm"></span>
+                        <span>Opening…</span>
+                    }
+                    else
+                    {
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" /><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" /></svg>
+                        <span>View</span>
+                    }
                 </button>
             </div>
         }
@@ -2548,6 +2566,7 @@ else
         }
 
         uploadingDocument = true;
+        uploadingType = documentType;
         try
         {
         bool success; string? error; string? extractedNumber; string? dunsNumber;
@@ -2614,7 +2633,7 @@ else
             // circuit error that looks like the upload silently did nothing.
             ToastService.ShowError($"Could not upload '{e.File.Name}'. The file may be too large or in an unsupported format. Please try again.");
         }
-        finally { uploadingDocument = false; }
+        finally { uploadingDocument = false; uploadingType = null; }
     }
 
     // Re-run extraction on the Trade License already on file and refresh the read-only panel. Internal only.
@@ -2676,6 +2695,7 @@ else
         }
 
         viewingDocument = true;
+        viewingDocId = documentId;
         try
         {
             await CloseViewer();
@@ -2707,7 +2727,7 @@ else
         {
             ToastService.ShowError("Could not open the document. Please try again.");
         }
-        finally { viewingDocument = false; }
+        finally { viewingDocument = false; viewingDocId = null; }
     }
 
     private async Task CloseViewer()

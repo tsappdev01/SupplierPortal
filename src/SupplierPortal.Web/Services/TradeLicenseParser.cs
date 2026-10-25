@@ -137,6 +137,14 @@ public static class TradeLicenseParser
 
     private static readonly string[] StatusWords = ["Active", "Inactive", "Expired", "Cancelled"];
 
+    // Contact / footer words that follow the activities table on the DET layout and must never be
+    // captured as an activity if a stray line slips past the scope cut.
+    private static readonly string[] ActivityStopWords =
+    [
+        "Address", "Email", "Phone", "Mobile", "Fax", "P.O", "PO Box", "Box", "Parcel", "Tel",
+        "Receipt", "Print Date", "immigration", "Zoho", "Etisalat", "voucher"
+    ];
+
     // Field labels that must never be returned as a value (legal type) or captured as a member name -
     // some layouts (Abu Dhabi, garbled text layers) interleave these ALL-CAPS English labels with values.
     private static readonly HashSet<string> LabelPhrases = new(StringComparer.OrdinalIgnoreCase)
@@ -408,7 +416,11 @@ public static class TradeLicenseParser
         var start = FirstIndexOf(text, "License Activities", "نشاط الرخصة", "Activity");
         if (start < 0) { return activities; }
         var scope = text[start..];
-        var end = EarliestIndexOf(scope, "الملاحظات", "Remarks", "Print Date", "الطراف", "License Members");
+        // Stop at the next section OR the contact block that follows activities on the DET layout, so
+        // "Address", "P.O. Box", "Phone No", "Email", etc. are not swept up as activities.
+        var end = EarliestIndexOf(scope, "الملاحظات", "Remarks", "Print Date", "الطراف", "License Members",
+            "Email", "Address", "P.O. Box", "Phone No", "Tel.", "Fax", "Mobile", "Parcel ID",
+            "البريد", "العنوان", "صندوق");
         if (end > 0) { scope = scope[..end]; }
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -419,6 +431,11 @@ public static class TradeLicenseParser
             var namePart = FirstLatinPhrase(line);
             if (namePart is null || namePart.Length < 4
                 || namePart.Equals("Activity", StringComparison.OrdinalIgnoreCase)
+                || namePart.Equals("Status", StringComparison.OrdinalIgnoreCase)
+                || namePart.Contains("License", StringComparison.OrdinalIgnoreCase)
+                || namePart.Contains("Activit", StringComparison.OrdinalIgnoreCase)
+                || LabelPhrases.Contains(namePart)
+                || ActivityStopWords.Any(w => namePart.Contains(w, StringComparison.OrdinalIgnoreCase))
                 || StatusWords.Contains(namePart, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
