@@ -11,7 +11,9 @@
       2. Stops the application pool (belt-and-braces so no file is held open).
       3. Mirrors the publish output into the site folder with robocopy /MIR, but PRESERVES
          server-only state that must survive a deployment:
-            - appsettings.Local.json   (real connection string / secrets - git-ignored)
+            - appsettings.json          (server-managed config - not reverted to the repo copy)
+            - appsettings.*.json        (appsettings.Local.json secrets + any per-environment file)
+            - web.config                (server-managed host config - not reverted to the repo copy)
             - doc\                      (uploaded documents)
             - keys\                     (Data Protection keys - losing these logs everyone out)
             - logs\                     (stdout logs)
@@ -30,7 +32,10 @@ param(
     [Parameter(Mandatory = $true)] [string] $SourcePath,   # folder containing the publish output (dll, web.config, wwwroot)
     [string] $WarmupUrl = "",                              # optional URL to hit after start (e.g. https://host/)
     [string] $HostHeader = "",                             # optional: resolve the site by this binding host (e.g. lmsext.dipark.com) instead of by name
-    [string[]] $PreserveFiles = @("appsettings.Local.json"),
+    # Skip server-managed config on every deploy so it is never reverted: the base appsettings.json,
+    # every appsettings.<Environment>.json, appsettings.Local.json (secrets), and web.config. These are
+    # maintained on the box; any repo changes to them are applied to the server manually.
+    [string[]] $PreserveFiles = @("appsettings.json", "appsettings.*.json", "web.config"),
     [string[]] $PreserveDirs  = @("doc", "keys", "logs")
 )
 
