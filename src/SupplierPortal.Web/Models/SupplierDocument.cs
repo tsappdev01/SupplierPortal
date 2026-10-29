@@ -12,7 +12,8 @@ public enum SupplierDocumentType
     // KYS document types
     EmiratesIdOrPassport = 5,
     ProofOfAddress = 6,
-    PriceListOrQuotation = 7
+    PriceListOrQuotation = 7,
+    ProofOfOrigin = 8
 }
 
 /// <summary>Metadata for a supplier-uploaded document. The physical file lives outside wwwroot

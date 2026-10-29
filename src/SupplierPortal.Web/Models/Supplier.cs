@@ -333,13 +333,17 @@ public class Supplier
     [MaxLength(500)] public string? KysLicensedActivities { get; set; }
     [MaxLength(100)] public string? KysIdNumber { get; set; }
     public DateTime? KysIdExpiryDate { get; set; }
-    /// <summary>Position / designation of the authorised representative (the rep's name lives in the Contact fields).</summary>
+    /// <summary>Name of the signatory / authorised representative (job title lives in <see cref="KysRepPosition"/>).</summary>
+    [MaxLength(200)] public string? KysSignatoryName { get; set; }
+    /// <summary>Job title / position of the authorised representative.</summary>
     [MaxLength(150)] public string? KysRepPosition { get; set; }
     public bool? KysAvailableToMeet { get; set; }
 
     // Address
     public bool? KysAddressChangedTwice { get; set; }
     public bool? KysRepsChangedTwice { get; set; }
+    /// <summary>Country (LookupValue in the Country category) captured on the KYS tab.</summary>
+    public int? KysCountryId { get; set; }
     [MaxLength(500)] public string? KysExpectedVolumeValue { get; set; }
 
     // Banking (yes/no)
