@@ -38,11 +38,24 @@ steps:
     clean: true
     fetchDepth: 0
 
-  - task: UseDotNet@2
-    displayName: 'Ensure .NET 8 SDK'
+  # Use the .NET 8 SDK already installed on the agent (UATWEB01 has no outbound internet, so the
+  # UseDotNet download task times out). Install the SDK on the agent once; this step verifies it.
+  - task: PowerShell@2
+    displayName: 'Ensure .NET 8 SDK (pre-installed, no download)'
     inputs:
-      packageType: 'sdk'
-      version: '8.0.x'
+      targetType: 'inline'
+      pwsh: false
+      script: |
+        $ErrorActionPreference = 'Stop'
+        $sdks = @()
+        try { $sdks = & dotnet --list-sdks 2>$null } catch { }
+        $has8 = $sdks | Where-Object { $_ -match '^8\.' }
+        if (-not $has8) {
+          Write-Error "No .NET 8 SDK found on this agent. Install the .NET 8 SDK on UATWEB01 (offline installer) and re-run; this pipeline does not download it (no outbound internet)."
+          exit 1
+        }
+        Write-Host "Using pre-installed .NET 8 SDK:`n$([string]::Join([Environment]::NewLine, $has8))"
+        exit 0
 
   - task: DotNetCoreCLI@2
     displayName: 'Restore solution'
