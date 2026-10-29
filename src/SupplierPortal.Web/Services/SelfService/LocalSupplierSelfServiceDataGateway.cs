@@ -125,8 +125,13 @@ public class LocalSupplierSelfServiceDataGateway(
         // otherwise a crafted upload could overwrite the genuine declaration (non-Other types are
         // single-slot / replace).
         var type = (SupplierDocumentType)documentType;
+        // Supplier-uploadable document types (registration docs + the KYS documents). SignedDeclaration is
+        // deliberately excluded - it is generated server-side from the drawn signature, so a crafted upload
+        // could otherwise overwrite the genuine declaration (non-Other types are single-slot / replace).
         if (type is not (SupplierDocumentType.TradeLicense or SupplierDocumentType.VatCertification
-            or SupplierDocumentType.BankConfirmationLetter or SupplierDocumentType.Other))
+            or SupplierDocumentType.BankConfirmationLetter or SupplierDocumentType.Other
+            or SupplierDocumentType.EmiratesIdOrPassport or SupplierDocumentType.ProofOfAddress
+            or SupplierDocumentType.PriceListOrQuotation or SupplierDocumentType.ProofOfOrigin))
         {
             return new SsUploadResult(false, "That document type cannot be uploaded.", null, null);
         }
