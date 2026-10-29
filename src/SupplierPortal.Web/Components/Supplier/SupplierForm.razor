@@ -1318,9 +1318,13 @@ else
                             <label>ID expiry date</label>
                             <InputDate @bind-Value="formModel.KysIdExpiryDate" />
                         </div>
-                        <div class="di-field di-full">
-                            <label>Name &amp; position of the authorised representative</label>
-                            <InputText @bind-Value="formModel.KysRepPosition" placeholder="Position / designation (the name is captured on the Contact tab)" />
+                        <div class="di-field">
+                            <label>Name of signatory</label>
+                            <InputText @bind-Value="formModel.KysSignatoryName" placeholder="Name of the authorised representative / signatory" />
+                        </div>
+                        <div class="di-field">
+                            <label>Job title</label>
+                            <InputText @bind-Value="formModel.KysRepPosition" placeholder="Position / designation" />
                         </div>
                         @YesNo("Are you available to meet our representative in person or virtually before the first supply?", formModel.KysAvailableToMeet, v => formModel.KysAvailableToMeet = v)
                     </div>
@@ -1331,6 +1335,16 @@ else
                     <div class="di-section-body">
                         @YesNo("Has the business address changed more than twice in the last 12 months?", formModel.KysAddressChangedTwice, v => formModel.KysAddressChangedTwice = v)
                         @YesNo("Have the employees / representatives dealing with us changed more than twice in the last 12 months?", formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        <div class="di-field">
+                            <label>Country</label>
+                            <InputSelect @bind-Value="formModel.KysCountryId">
+                                <option value="">— Select —</option>
+                                @foreach (var lov in countries)
+                                {
+                                    <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
+                                }
+                            </InputSelect>
+                        </div>
                         <div class="di-field di-full">
                             <label>Expected volume &amp; value of supplies to us (per month / year)</label>
                             <InputText @bind-Value="formModel.KysExpectedVolumeValue" />
@@ -1409,6 +1423,7 @@ else
                     <div class="di-section-body di-doc-grid">
                         @(DocCard("Copy of valid Emirates ID / passport", SupplierDocumentType.EmiratesIdOrPassport, "di-thumb-blue", false, false, ""))
                         @(DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SupplierDocumentType.ProofOfAddress, "di-thumb-green", false, false, ""))
+                        @(DocCard("Proof of origin, ownership & authenticity of goods (purchase invoice, certificate of origin, brand authorisation)", SupplierDocumentType.ProofOfOrigin, "di-thumb-green", false, false, ""))
                         @(DocCard("Current price list / quotation", SupplierDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, ""))
                     </div>
 

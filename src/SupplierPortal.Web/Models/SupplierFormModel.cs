@@ -173,10 +173,12 @@ public class SupplierFormModel
     public string? KysLicensedActivities { get; set; }
     public string? KysIdNumber { get; set; }
     public DateTime? KysIdExpiryDate { get; set; }
+    public string? KysSignatoryName { get; set; }
     public string? KysRepPosition { get; set; }
     public bool? KysAvailableToMeet { get; set; }
     public bool? KysAddressChangedTwice { get; set; }
     public bool? KysRepsChangedTwice { get; set; }
+    public int? KysCountryId { get; set; }
     public string? KysExpectedVolumeValue { get; set; }
     public bool? KysBankAuthorisedUae { get; set; }
     public bool? KysPaymentToOtherParty { get; set; }
@@ -198,6 +200,8 @@ public class SupplierFormModel
     {
         KysLicensedActivities = s.KysLicensedActivities,
         KysIdNumber = s.KysIdNumber,
+        KysSignatoryName = s.KysSignatoryName,
+        KysCountryId = s.KysCountryId,
         KysIdExpiryDate = s.KysIdExpiryDate,
         KysRepPosition = s.KysRepPosition,
         KysAvailableToMeet = s.KysAvailableToMeet,
@@ -442,7 +446,9 @@ public class SupplierFormModel
         s.KysLicensedActivities = KysLicensedActivities;
         s.KysIdNumber = KysIdNumber;
         s.KysIdExpiryDate = KysIdExpiryDate;
+        s.KysSignatoryName = KysSignatoryName;
         s.KysRepPosition = KysRepPosition;
+        s.KysCountryId = KysCountryId;
         s.KysAvailableToMeet = KysAvailableToMeet;
         s.KysAddressChangedTwice = KysAddressChangedTwice;
         s.KysRepsChangedTwice = KysRepsChangedTwice;

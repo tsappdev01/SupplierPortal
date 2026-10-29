@@ -1644,6 +1644,9 @@ namespace SupplierPortal.Web.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int?>("KysCountryId")
+                        .HasColumnType("int");
+
                     b.Property<string>("KysCoveringActivity")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1704,6 +1707,10 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.Property<bool?>("KysRepsChangedTwice")
                         .HasColumnType("bit");
+
+                    b.Property<string>("KysSignatoryName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("LastName")
                         .HasMaxLength(100)

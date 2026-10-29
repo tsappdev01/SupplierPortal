@@ -818,6 +818,10 @@ public class SupplierDocumentService(
         SupplierDocumentType.VatCertification => "VAT",
         SupplierDocumentType.BankConfirmationLetter => "Bank Confirmation Letter",
         SupplierDocumentType.SignedDeclaration => "Signed Declaration",
+        SupplierDocumentType.EmiratesIdOrPassport => "Emirates ID or Passport",
+        SupplierDocumentType.ProofOfAddress => "Proof of Address",
+        SupplierDocumentType.PriceListOrQuotation => "Price List or Quotation",
+        SupplierDocumentType.ProofOfOrigin => "Proof of Origin",
         _ => "Other"
     };
 
