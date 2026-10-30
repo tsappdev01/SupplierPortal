@@ -20,7 +20,10 @@
       4. Starts the application pool and removes app_offline.htm.
       5. Optionally warms the site up with a request.
 
-    The published web.config IS overwritten (it is regenerated on every publish and is not host-specific).
+    web.config is PRESERVED too (see $PreserveFiles): the server copy is kept so any host-specific
+    settings (env vars, stdout logging, request limits) survive a deploy. Consequence: a BRAND-NEW
+    site must have its web.config and appsettings.Local.json placed on the server once by hand, because
+    the deploy will neither create nor overwrite them.
 
 .NOTES
     Requires: IIS + "IIS Management Scripts and Tools" (WebAdministration module), and the
