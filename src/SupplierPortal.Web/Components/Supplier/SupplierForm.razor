@@ -137,9 +137,18 @@ else
         }
     </text>;
     fieldFragments["SupplierTin"] = @<div class="di-field @FieldClass("SupplierTin")">
-        <label>@Label("SupplierTin", "Supplier TIN")@(Req("SupplierTin"))@Help("SupplierTin")</label>
+        <label>@Label("SupplierTin", "e-Invoicing TIN")@(Req("SupplierTin"))@Help("SupplierTin")</label>
         <InputText @bind-Value="formModel.SupplierTin" maxlength="10"
-                   inputmode="numeric" pattern="[0-9]*" title="10 digits" />
+                   inputmode="numeric" pattern="[0-9]*" title="Maximum 10 characters" />
+    </div>;
+    fieldFragments["PeppolId"] = @<div class="di-field @FieldClass("PeppolId")">
+        <label>@Label("PeppolId", "Peppol ID")@(Req("PeppolId"))@Help("PeppolId")</label>
+        <InputText @bind-Value="formModel.PeppolId" maxlength="15" placeholder="0235:<e-Invoicing TIN>"
+                   title="Maximum 15 characters; format 0235: followed by the e-Invoicing TIN" />
+    </div>;
+    fieldFragments["ApprovedServiceProviderId"] = @<div class="di-field @FieldClass("ApprovedServiceProviderId")">
+        <label>@Label("ApprovedServiceProviderId", "Approved Service Provider ID")@(Req("ApprovedServiceProviderId"))@Help("ApprovedServiceProviderId")</label>
+        <InputText @bind-Value="formModel.ApprovedServiceProviderId" maxlength="6" title="Maximum 6 characters" />
     </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
         <label>@Label("BusinessPartnerTypeId", "Business Partner Type")@(Req("BusinessPartnerTypeId"))</label>
@@ -2203,6 +2212,13 @@ else
     /// • Issuing Body if Others — required only when the issuing body is "Others".
     /// • VAT Group entity count / names — required when the VAT Registration Type is a VAT Group.
     /// • VAT-dependent fields (TRN, VAT type, TIN) — never required when VAT Registered is not "Yes".</summary>
+    /// <summary>True when the selected e-Invoicing wave is Wave 1 (drives Peppol ID / ASP ID requirements).</summary>
+    private bool IsWave1 =>
+        formModel.EInvoicingWaveId is int w
+        && eInvoicingWaves.FirstOrDefault(l => l.Id == w) is { } lov
+        && ((lov.Code?.Trim() is "1" or "Wave1" or "Wave 1")
+            || (lov.DisplayName?.Replace(" ", "").Contains("Wave1", StringComparison.OrdinalIgnoreCase) ?? false));
+
     private bool IsFieldMandatory(string fieldKey)
     {
         // Supplier Site is a free-text field with no validation — never required, whatever the admin setting.
@@ -2213,6 +2229,11 @@ else
         if (fieldKey == "IssuingBodyIfOthers")
         {
             return IsIssuingBodyOthers;
+        }
+        // Peppol ID and Approved Service Provider ID are conditionally mandatory for Wave 1 suppliers.
+        if (fieldKey is "PeppolId" or "ApprovedServiceProviderId")
+        {
+            return IsWave1;
         }
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
@@ -2819,8 +2840,14 @@ else
             "Number of Entities if VAT Group: Please mention number of entities part of the VAT tax group dealing with DI PJSC.\n\n" +
             "Legal Names of all Entities under the VAT Group: Please enter details of entities part of the VAT Tax Group as per " +
             "VAT Tax Group certificate dealing with DI PJSC."),
-        ["SupplierTin"] = ("Supplier TIN",
-            "Supplier TIN can be obtained from the Emaratax Portal. It is not the same as VAT TRN\n\n" +
+        ["PeppolId"] = ("Peppol ID",
+            "The Peppol ID is the supplier's address on the e-invoicing network. It is formed as " +
+            "0235: followed by the e-Invoicing TIN (maximum 15 characters). Mandatory for Wave 1 suppliers."),
+        ["ApprovedServiceProviderId"] = ("Approved Service Provider ID",
+            "The ID of the Approved Service Provider (ASP) the supplier uses for e-invoicing (maximum 6 " +
+            "characters). Mandatory for Wave 1 suppliers."),
+        ["SupplierTin"] = ("e-Invoicing TIN",
+            "The e-Invoicing TIN can be obtained from the EmaraTax Portal. It is not the same as the VAT TRN\n\n" +
             "How to obtain TIN from Emaratax Portal\n\n" +
             "1. Log in to your EmaraTax profile at www.eservices.tax.gov.ae.\n" +
             "2. View the profile of your entity.\n" +
