@@ -636,6 +636,10 @@ else
                              SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber),
                              SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate(),
                              "Required — attach the VAT Certificate when a TRN/VAT number is provided."))
+                    @(DocCard("Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
+                             RequiresBankConfirmationLetter(),
+                             RequiresBankConfirmationLetter(),
+                             "Required: you changed the bank account, so a Bank Confirmation Letter must be attached."))
 
                     <div class="di-doccard">
                         @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
@@ -1209,13 +1213,6 @@ else
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.783 14 5v.5H2V5l6-3.217zM2 6h12v6h1v1H1v-1h1V6zm2 1v4h1V7H4zm3 0v4h1V7H7zm3 0v4h1V7h-1zM1 14h14v1H1v-1z" /></svg>
                         <span>Add New Bank Account</span>
                     </button>
-                </div>
-
-                <div class="di-documents-grid">
-                    @(DocCard("Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
-                             RequiresBankConfirmationLetter(),
-                             RequiresBankConfirmationLetter(),
-                             "Required: you changed the bank account, so a Bank Confirmation Letter must be attached."))
                 </div>
             </div>
             </fieldset>
