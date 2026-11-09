@@ -1332,7 +1332,7 @@ else
                 </details>
 
                 <details class="di-acc">
-                    <summary>Address</summary>
+                    <summary>Recent Changes in Business Circumstances</summary>
                     <div class="di-section-body">
                         @YesNo(Label("KysOperatingAddressDifferent", "Is the supplier's actual operating address different from the address provided in the trade license?"), formModel.KysOperatingAddressDifferent, v => formModel.KysOperatingAddressDifferent = v)
                         @if (formModel.KysOperatingAddressDifferent == true)
@@ -1342,12 +1342,6 @@ else
                                 <InputTextArea @bind-Value="formModel.KysActualOperatingAddress" rows="2" />
                             </div>
                         }
-                    </div>
-                </details>
-
-                <details class="di-acc">
-                    <summary>Recent Changes in Business Circumstances</summary>
-                    <div class="di-section-body">
                         @YesNo(Label("KysAddressChangedTwice", "Has the registered address (as per trade license) changed more than twice in the last 12 months?"), formModel.KysAddressChangedTwice, v => formModel.KysAddressChangedTwice = v)
                         @if (formModel.KysAddressChangedTwice == true)
                         {
