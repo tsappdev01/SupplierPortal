@@ -30,7 +30,11 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     /// previously-seeded database still has a row for them.</summary>
     // NumberOfVatGroupEntities / VatGroupEntityNames are superseded by the structured VAT Group table.
     private static readonly HashSet<string> RemovedFieldKeys =
-        ["ProvinceId", "NumberOfVatGroupEntities", "VatGroupEntityNames"];
+        ["ProvinceId", "NumberOfVatGroupEntities", "VatGroupEntityNames",
+         // KYS fields dropped in the 2026 revision (kept as columns for data safety, removed from the form).
+         "KysAvailableToMeet", "KysCountryId", "KysExpectedVolumeValue", "KysBankAuthorisedUae",
+         "KysGoodsGenuine", "KysGoodsGenuineProof", "KysCommercialReason", "KysPricingBasis",
+         "KysAdverseMedia", "KysAdverseMediaDetails"];
 
     private static bool IsHidden(string fieldKey) =>
         fieldKey == ListPageSizeKey || RemovedFieldKeys.Contains(fieldKey);

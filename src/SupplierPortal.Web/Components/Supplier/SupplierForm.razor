@@ -645,10 +645,6 @@ else
                              SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber),
                              SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate(),
                              "Required — attach the VAT Certificate when a TRN/VAT number is provided."))
-                    @(DocCard("Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
-                             RequiresBankConfirmationLetter(),
-                             RequiresBankConfirmationLetter(),
-                             "Required: you changed the bank account, so a Bank Confirmation Letter must be attached."))
 
                     <div class="di-doccard">
                         @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
@@ -1310,14 +1306,14 @@ else
             <div class="di-kys">
 
                 <details class="di-acc" open>
-                    <summary>Identity / licence</summary>
+                    <summary>Identity of the Supplier</summary>
                     <div class="di-section-body">
                         <div class="di-field di-full">
                             <label>@Label("KysLicensedActivities", "Licensed business activities (as per trade licence)")</label>
                             <InputTextArea @bind-Value="formModel.KysLicensedActivities" rows="2" />
                         </div>
                         <div class="di-field">
-                            <label>@Label("KysIdNumber", "Emirates ID / Passport No.")</label>
+                            <label>@Label("KysIdNumber", "Emirates ID / Passport No. of the Person Authorized to Represent the Supplier")@Help("KysIdNumber")</label>
                             <InputText @bind-Value="formModel.KysIdNumber" />
                         </div>
                         <div class="di-field">
@@ -1332,72 +1328,177 @@ else
                             <label>@Label("KysRepPosition", "Job title")</label>
                             <InputText @bind-Value="formModel.KysRepPosition" placeholder="Position / designation" />
                         </div>
-                        @YesNo(Label("KysAvailableToMeet", "Are you available to meet our representative in person or virtually before the first supply?"), formModel.KysAvailableToMeet, v => formModel.KysAvailableToMeet = v)
                     </div>
                 </details>
 
                 <details class="di-acc">
                     <summary>Address</summary>
                     <div class="di-section-body">
-                        @YesNo(Label("KysAddressChangedTwice", "Has the business address changed more than twice in the last 12 months?"), formModel.KysAddressChangedTwice, v => formModel.KysAddressChangedTwice = v)
-                        @YesNo(Label("KysRepsChangedTwice", "Have the employees / representatives dealing with us changed more than twice in the last 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        @YesNo(Label("KysOperatingAddressDifferent", "Is the supplier's actual operating address different from the address provided in the trade license?"), formModel.KysOperatingAddressDifferent, v => formModel.KysOperatingAddressDifferent = v)
+                        @if (formModel.KysOperatingAddressDifferent == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysActualOperatingAddress", "Please provide the supplier's actual operating address")@(Req("KysActualOperatingAddress"))</label>
+                                <InputTextArea @bind-Value="formModel.KysActualOperatingAddress" rows="2" />
+                            </div>
+                        }
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Recent Changes in Business Circumstances</summary>
+                    <div class="di-section-body">
+                        @YesNo(Label("KysAddressChangedTwice", "Has the registered address (as per trade license) changed more than twice in the last 12 months?"), formModel.KysAddressChangedTwice, v => formModel.KysAddressChangedTwice = v)
+                        @if (formModel.KysAddressChangedTwice == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysAddressChangeReason", "Please provide reasons for the registered address change")@(Req("KysAddressChangeReason"))</label>
+                                <InputTextArea @bind-Value="formModel.KysAddressChangeReason" rows="2" />
+                            </div>
+                        }
+                        @YesNo(Label("KysRepsChangedTwice", "Have the supplier's key employees or persons authorised to represent the supplier changed more than twice in the last 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        @if (formModel.KysRepsChangedTwice == true)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysRepsChangeReason", "Please provide reasons for the change in key employees / authorised persons")@(Req("KysRepsChangeReason"))</label>
+                                <InputTextArea @bind-Value="formModel.KysRepsChangeReason" rows="2" />
+                            </div>
+                        }
+                    </div>
+                </details>
+
+                <details class="di-acc">
+                    <summary>Bank Account Details</summary>
+                    <div class="di-section-body">
+                        <div class="di-field"><label>@Label("KysAccountHolderName", "Account Holder Name")@(Req("KysAccountHolderName"))</label><InputText @bind-Value="formModel.KysAccountHolderName" /></div>
+                        <div class="di-field"><label>@Label("KysBankName", "Bank Name")@(Req("KysBankName"))</label><InputText @bind-Value="formModel.KysBankName" /></div>
+                        <div class="di-field"><label>@Label("KysBankBranch", "Bank Branch")@(Req("KysBankBranch"))</label><InputText @bind-Value="formModel.KysBankBranch" /></div>
                         <div class="di-field">
-                            <label>@Label("KysCountryId", "Country")</label>
-                            <InputSelect @bind-Value="formModel.KysCountryId">
+                            <label>@Label("KysBankCountryId", "Country")@(Req("KysBankCountryId"))</label>
+                            <InputSelect @bind-Value="formModel.KysBankCountryId">
                                 <option value="">— Select —</option>
-                                @foreach (var lov in countries)
-                                {
-                                    <option value="@lov.Id">@lov.Code - @lov.DisplayName</option>
-                                }
+                                @foreach (var lov in countries) { <option value="@lov.Id">@lov.Code - @lov.DisplayName</option> }
                             </InputSelect>
                         </div>
-                        <div class="di-field di-full">
-                            <label>@Label("KysExpectedVolumeValue", "Expected volume & value of supplies to us (per month / year)")</label>
-                            <InputText @bind-Value="formModel.KysExpectedVolumeValue" />
+                        <div class="di-field"><label>@Label("KysAccountNumber", "Account Number")@(Req("KysAccountNumber"))</label><InputText @bind-Value="formModel.KysAccountNumber" /></div>
+                        <div class="di-field"><label>@Label("KysIban", "IBAN")@(Req("KysIban"))</label><InputText @bind-Value="formModel.KysIban" /></div>
+                        <div class="di-field"><label>@Label("KysSwiftBic", "SWIFT / BIC Code")@(Req("KysSwiftBic"))</label><InputText @bind-Value="formModel.KysSwiftBic" /></div>
+                        <div class="di-field">
+                            <label>@Label("KysAccountCurrencyId", "Bank Account Currency")@(Req("KysAccountCurrencyId"))</label>
+                            <InputSelect @bind-Value="formModel.KysAccountCurrencyId">
+                                <option value="">— Select —</option>
+                                @foreach (var lov in currencies) { <option value="@lov.Id">@lov.Code - @lov.DisplayName</option> }
+                            </InputSelect>
                         </div>
-                    </div>
-                </details>
 
-                <details class="di-acc">
-                    <summary>Banking</summary>
-                    <div class="di-section-body">
-                        @YesNo(Label("KysBankAuthorisedUae", "Is the bank authorised / licensed in the UAE?"), formModel.KysBankAuthorisedUae, v => formModel.KysBankAuthorisedUae = v)
+                        <p class="di-kys-note di-full">The bank account details above must match the <strong>Written Bank Confirmation Letter</strong> uploaded in the Documents section below (Account Holder Name, Bank Name, Account Number / IBAN and SWIFT/BIC).</p>
+
                         @YesNo(Label("KysPaymentToOtherParty", "Will payment ever be requested to a party other than the named account holder?"), formModel.KysPaymentToOtherParty, v => formModel.KysPaymentToOtherParty = v)
+                        @if (formModel.KysPaymentToOtherParty == true)
+                        {
+                            <div class="di-kys-subblock di-full">
+                                <div class="di-kys-subhead">Alternative payment beneficiary</div>
+                                <div class="di-field"><label>@Label("KysAltAccountHolderName", "Account Holder Name")@(Req("KysAltAccountHolderName"))</label><InputText @bind-Value="formModel.KysAltAccountHolderName" /></div>
+                                <div class="di-field"><label>@Label("KysAltBankName", "Bank Name")@(Req("KysAltBankName"))</label><InputText @bind-Value="formModel.KysAltBankName" /></div>
+                                <div class="di-field"><label>@Label("KysAltBankBranch", "Bank Branch")@(Req("KysAltBankBranch"))</label><InputText @bind-Value="formModel.KysAltBankBranch" /></div>
+                                <div class="di-field">
+                                    <label>@Label("KysAltBankCountryId", "Country")@(Req("KysAltBankCountryId"))</label>
+                                    <InputSelect @bind-Value="formModel.KysAltBankCountryId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in countries) { <option value="@lov.Id">@lov.Code - @lov.DisplayName</option> }
+                                    </InputSelect>
+                                </div>
+                                <div class="di-field"><label>@Label("KysAltAccountNumber", "Account Number")@(Req("KysAltAccountNumber"))</label><InputText @bind-Value="formModel.KysAltAccountNumber" /></div>
+                                <div class="di-field"><label>@Label("KysAltIban", "IBAN")@(Req("KysAltIban"))</label><InputText @bind-Value="formModel.KysAltIban" /></div>
+                                <div class="di-field"><label>@Label("KysAltSwiftBic", "SWIFT / BIC Code")@(Req("KysAltSwiftBic"))</label><InputText @bind-Value="formModel.KysAltSwiftBic" /></div>
+                                <div class="di-field">
+                                    <label>@Label("KysAltAccountCurrencyId", "Bank Account Currency")@(Req("KysAltAccountCurrencyId"))</label>
+                                    <InputSelect @bind-Value="formModel.KysAltAccountCurrencyId">
+                                        <option value="">— Select —</option>
+                                        @foreach (var lov in currencies) { <option value="@lov.Id">@lov.Code - @lov.DisplayName</option> }
+                                    </InputSelect>
+                                </div>
+                            </div>
+                        }
+
                         @YesNo(Label("KysPaymentsElectronicOnly", "Do you confirm that all payments will be received by electronic means and not in cash?"), formModel.KysPaymentsElectronicOnly, v => formModel.KysPaymentsElectronicOnly = v)
+                        @if (formModel.KysPaymentsElectronicOnly == false)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysElectronicPaymentDetails", "Please provide further details")@(Req("KysElectronicPaymentDetails"))</label>
+                                <InputTextArea @bind-Value="formModel.KysElectronicPaymentDetails" rows="2" />
+                            </div>
+                        }
                     </div>
                 </details>
 
                 <details class="di-acc">
-                    <summary>Goods / supply &amp; pricing</summary>
+                    <summary>Supply and Pricing</summary>
                     <div class="di-section-body">
                         <div class="di-field di-full">
                             <label>@Label("KysGoodsDescription", "Description of goods / services to be supplied to us")</label>
                             <InputTextArea @bind-Value="formModel.KysGoodsDescription" rows="2" />
                         </div>
                         <div class="di-field di-full">
-                            <label>@Label("KysCoveringActivity", "Which licensed activity (Section 1) covers this supply?")</label>
+                            <label>@Label("KysCoveringActivity", "Which activity listed on the supplier's Trade License covers the goods or services being supplied?")</label>
                             <InputText @bind-Value="formModel.KysCoveringActivity" />
                         </div>
-                        <div class="di-field di-full">
-                            <label>@Label("KysPricingBasis", "Basis of pricing (price list / quotation / contract) and profit margin, where available")</label>
-                            <InputTextArea @bind-Value="formModel.KysPricingBasis" rows="2" />
+                        <div class="di-field">
+                            <label>@Label("KysPricingBasisType", "Basis of pricing")@(Req("KysPricingBasisType"))</label>
+                            <InputSelect @bind-Value="formModel.KysPricingBasisType">
+                                <option value="">— Select —</option>
+                                <option value="Price List">Price List</option>
+                                <option value="Quotation">Quotation</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Others">Others</option>
+                            </InputSelect>
                         </div>
-                        <div class="di-field di-full">
-                            <label>@Label("KysGoodsOrigin", "Origin of the goods (country and manufacturer / source)")</label>
-                            <InputText @bind-Value="formModel.KysGoodsOrigin" />
-                        </div>
-                        @YesNo(Label("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?"), formModel.KysOwnGoodsAtSupply, v => formModel.KysOwnGoodsAtSupply = v)
-                        @YesNo(Label("KysGoodsGenuine", "Are the goods genuine / authentic?"), formModel.KysGoodsGenuine, v => formModel.KysGoodsGenuine = v)
-                        @if (formModel.KysGoodsGenuine == true)
+                        @if (formModel.KysPricingBasisType == "Others")
                         {
                             <div class="di-field di-full">
-                                <label>@Label("KysGoodsGenuineProof", "State the proof available (brand authorisation, purchase invoice, certificate of origin)")</label>
-                                <InputTextArea @bind-Value="formModel.KysGoodsGenuineProof" rows="2" />
+                                <label>@Label("KysPricingBasisOther", "Please specify the basis of pricing")@(Req("KysPricingBasisOther"))</label>
+                                <InputText @bind-Value="formModel.KysPricingBasisOther" />
+                            </div>
+                        }
+                        @YesNo(Label("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?"), formModel.KysOwnGoodsAtSupply, v => formModel.KysOwnGoodsAtSupply = v)
+                        @if (formModel.KysOwnGoodsAtSupply == false)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysLegalOwnerDetails", "Please provide the legal owner's details and explain the supplier's role in the supply")@(Req("KysLegalOwnerDetails"))</label>
+                                <InputTextArea @bind-Value="formModel.KysLegalOwnerDetails" rows="2" />
                             </div>
                         }
                         <div class="di-field di-full">
-                            <label>@Label("KysCommercialReason", "Commercial reason for the supply and for the price offered")</label>
-                            <InputTextArea @bind-Value="formModel.KysCommercialReason" rows="2" />
+                            <label>@Label("KysSupportingDocs", "What supporting documentation is available?")</label>
+                            <div class="di-checkbox-group">
+                                @foreach (var opt in KysSupportingDocOptions)
+                                {
+                                    var cbId = "ksd_" + opt.Replace(" ", "");
+                                    <div class="di-checkbox-item">
+                                        <input type="checkbox" id="@cbId" checked="@KysHasDoc(opt)"
+                                               @onchange="e => KysToggleDoc(opt, (bool)e.Value!)" />
+                                        <label for="@cbId" style="margin:0;">@opt</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        @if (KysHasDoc("Other"))
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysSupportingDocsOther", "Please specify the supporting documentation available")@(Req("KysSupportingDocsOther"))</label>
+                                <InputText @bind-Value="formModel.KysSupportingDocsOther" />
+                            </div>
+                        }
+                        <div class="di-field">
+                            <label>@Label("KysGoodsOriginCountryId", "Country of origin of the goods")</label>
+                            <InputSelect @bind-Value="formModel.KysGoodsOriginCountryId">
+                                <option value="">— Select —</option>
+                                @foreach (var lov in countries) { <option value="@lov.Id">@lov.Code - @lov.DisplayName</option> }
+                            </InputSelect>
+                        </div>
+                        <div class="di-field">
+                            <label>@Label("KysGoodsOrigin", "Manufacturer / source")</label>
+                            <InputText @bind-Value="formModel.KysGoodsOrigin" />
                         </div>
                     </div>
                 </details>
@@ -1413,20 +1514,16 @@ else
                                 <InputTextArea @bind-Value="formModel.KysFtaPenaltyDetails" rows="2" />
                             </div>
                         }
-                        @YesNo(Label("KysAdverseMedia", "Are you aware of any adverse media, reviews or regulatory action concerning the business relating to tax matters?"), formModel.KysAdverseMedia, v => formModel.KysAdverseMedia = v)
-                        @if (formModel.KysAdverseMedia == true)
-                        {
-                            <div class="di-field di-full">
-                                <label>@Label("KysAdverseMediaDetails", "If yes, please explain")</label>
-                                <InputTextArea @bind-Value="formModel.KysAdverseMediaDetails" rows="2" />
-                            </div>
-                        }
                     </div>
                 </details>
 
                 <details class="di-acc">
                     <summary>Documents</summary>
                     <div class="di-section-body di-doc-grid">
+                        @(DocCard("Written Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
+                                 true,
+                                 !HasBankConfirmationLetter(),
+                                 "Required — upload a Written Bank Confirmation Letter confirming the Account Holder Name, Bank Name, Account Number / IBAN and SWIFT/BIC Code entered in Bank Account Details above."))
                         @(DocCard("Copy of valid Emirates ID / passport", SupplierDocumentType.EmiratesIdOrPassport, "di-thumb-blue", false, false, ""))
                         @(DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SupplierDocumentType.ProofOfAddress, "di-thumb-green", false, false, ""))
                         @(DocCard("Proof of origin, ownership & authenticity of goods (purchase invoice, certificate of origin, brand authorisation)", SupplierDocumentType.ProofOfOrigin, "di-thumb-green", false, false, ""))
@@ -1747,6 +1844,15 @@ else
     .di-tl-parties-table tbody tr:last-child td { border-bottom: none; }
     /* KYS accordion */
     .di-kys { display: flex; flex-direction: column; gap: 12px; }
+    .di-kys-note { grid-column: 1 / -1; margin: 2px 0 4px; font-size: 0.82rem; color: var(--di-text-muted, #55617a); }
+    .di-kys-subblock {
+        grid-column: 1 / -1; border: 1px dashed var(--di-border, #cfd6e4); border-radius: 8px;
+        padding: 10px 12px; margin: 4px 0 2px; display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+        background: var(--di-surface-2, #f7f9fc);
+    }
+    .di-kys-subhead { grid-column: 1 / -1; font-weight: 600; font-size: 0.85rem; color: var(--di-text, #0b2545); }
+    .di-checkbox-group { display: flex; flex-wrap: wrap; gap: 8px 18px; }
     .di-acc { border: 1px solid var(--di-border, #e2e5ea); border-radius: 10px; overflow: hidden; background: var(--di-surface, #fff); }
     .di-acc > summary {
         list-style: none; cursor: pointer; user-select: none;
@@ -2212,6 +2318,19 @@ else
     /// • Issuing Body if Others — required only when the issuing body is "Others".
     /// • VAT Group entity count / names — required when the VAT Registration Type is a VAT Group.
     /// • VAT-dependent fields (TRN, VAT type, TIN) — never required when VAT Registered is not "Yes".</summary>
+    // KYS supporting-documentation multi-select (stored as a pipe-separated list in KysSupportingDocs).
+    private static readonly string[] KysSupportingDocOptions =
+        ["Brand Authorisation", "Purchase Invoice", "Certificate of Origin", "Other"];
+    private bool KysHasDoc(string opt) =>
+        (formModel.KysSupportingDocs ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(opt);
+    private void KysToggleDoc(string opt, bool on)
+    {
+        var set = (formModel.KysSupportingDocs ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (on) { if (!set.Contains(opt)) { set.Add(opt); } }
+        else { set.Remove(opt); }
+        formModel.KysSupportingDocs = set.Count == 0 ? null : string.Join("|", set);
+    }
+
     /// <summary>True when the selected e-Invoicing wave is Wave 1 (drives Peppol ID / ASP ID requirements).</summary>
     private bool IsWave1 =>
         formModel.EInvoicingWaveId is int w
@@ -2234,6 +2353,26 @@ else
         if (fieldKey is "PeppolId" or "ApprovedServiceProviderId")
         {
             return IsWave1;
+        }
+        // KYS conditional-mandatory fields — required only when their trigger answer is set.
+        switch (fieldKey)
+        {
+            case "KysActualOperatingAddress": return formModel.KysOperatingAddressDifferent == true;
+            case "KysAddressChangeReason": return formModel.KysAddressChangedTwice == true;
+            case "KysRepsChangeReason": return formModel.KysRepsChangedTwice == true;
+            case "KysAltAccountHolderName":
+            case "KysAltBankName":
+            case "KysAltBankBranch":
+            case "KysAltBankCountryId":
+            case "KysAltAccountNumber":
+            case "KysAltIban":
+            case "KysAltSwiftBic":
+            case "KysAltAccountCurrencyId":
+                return formModel.KysPaymentToOtherParty == true;
+            case "KysElectronicPaymentDetails": return formModel.KysPaymentsElectronicOnly == false;
+            case "KysPricingBasisOther": return formModel.KysPricingBasisType == "Others";
+            case "KysLegalOwnerDetails": return formModel.KysOwnGoodsAtSupply == false;
+            case "KysSupportingDocsOther": return KysHasDoc("Other");
         }
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
@@ -3039,11 +3178,17 @@ else
             }
         }
 
-        // Supplier TIN must be exactly 10 digits; TRN/VAT Registration Number exactly 15 digits (when entered).
+        // e-Invoicing TIN must be at most 10 characters (numeric); checked as exactly 10 digits when entered.
         if (step == StepOf("SupplierTin", 1) && !IsHiddenFromSupplier("SupplierTin")
             && !string.IsNullOrWhiteSpace(model.SupplierTin) && !IsDigits(model.SupplierTin, 10))
         {
-            errors.Add("Supplier TIN must be exactly 10 digits.");
+            errors.Add("e-Invoicing TIN must be exactly 10 digits.");
+        }
+        // Peppol ID must be formed as 0235: followed by the e-Invoicing TIN (format check, all views).
+        if (step == StepOf("PeppolId", 1) && !IsHiddenFromSupplier("PeppolId")
+            && !string.IsNullOrWhiteSpace(model.PeppolId) && !model.PeppolId.StartsWith("0235:", StringComparison.Ordinal))
+        {
+            errors.Add("Peppol ID must start with '0235:' followed by the e-Invoicing TIN.");
         }
         if (step == StepOf("TaxRegistrationNumber", 1) && !IsHiddenFromSupplier("TaxRegistrationNumber") && IsVatRegistered
             && !string.IsNullOrWhiteSpace(model.TaxRegistrationNumber) && !IsDigits(model.TaxRegistrationNumber, 15))
@@ -3113,6 +3258,12 @@ else
             {
                 errors.Add("A VAT Registration Certificate must be attached when a TRN/VAT Registration Number is provided.");
             }
+        }
+
+        // KYS (step 6): a Written Bank Confirmation Letter is mandatory (confirms the bank account details).
+        if (step == 6 && SupplierFacing && Supplier.Id != 0 && !HasBankConfirmationLetter())
+        {
+            errors.Add("A Written Bank Confirmation Letter must be attached in the KYS Documents section.");
         }
 
         // Mandatory-field enforcement blocks moving to the next step whenever a required field is empty
