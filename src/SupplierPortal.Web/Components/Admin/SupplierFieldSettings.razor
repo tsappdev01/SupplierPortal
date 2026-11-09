@@ -193,18 +193,17 @@ else
         </div>
     }
 
-    @{ var kysRows = rows.Where(r => r.Step == 6 && !r.IsRemoved).OrderBy(r => r.Sequence).ToList(); }
-    @if (kysRows.Count > 0)
+    @if (KysRows.Count > 0)
     {
         <div class="di-field-settings-section">
-            <div class="di-field-settings-header">KYS Field Labels <span class="di-tab-count">@kysRows.Count field(s)</span></div>
+            <div class="di-field-settings-header">KYS Field Labels <span class="di-tab-count">@KysRows.Count field(s)</span></div>
             <div class="p-3">
                 <p class="text-muted mb-2" style="font-size: 13px;">
                     Edit the label / question text shown for each <strong>KYS (Know Your Supplier)</strong> field
                     on the supplier form (internal and self-service). The KYS tab's layout is fixed, so only the
                     label is editable here (not order, visibility or mandatory).
                 </p>
-                @foreach (var row in kysRows)
+                @foreach (var row in KysRows)
                 {
                     <div class="di-kys-label-row">
                         <input class="form-control form-control-sm" @bind="row.DisplayLabel" maxlength="150" placeholder="Field label" />
@@ -373,6 +372,9 @@ else
     private int pageSize = 50;
 
     private List<FieldRow> RemovedRows => rows.Where(r => r.IsRemoved).OrderBy(r => r.Step).ThenBy(r => r.DisplayLabel).ToList();
+
+    // KYS (step 6) fields — label-only editing (the KYS tab layout is fixed, so it is not in the main grid).
+    private List<FieldRow> KysRows => rows.Where(r => r.Step == 6 && !r.IsRemoved).OrderBy(r => r.Sequence).ToList();
 
     private List<FieldRow> ActiveRowsForStep(int step) =>
         rows.Where(r => !r.IsRemoved && r.Step == step).OrderBy(r => r.Sequence).ToList();
