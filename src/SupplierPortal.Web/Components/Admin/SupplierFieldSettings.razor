@@ -13,10 +13,10 @@
 
 <h1>Supplier Field Manager</h1>
 <p class="text-muted">
-    Manage the supplier form's fields and tabs. Reorder fields within a tab, move a field to another
-    tab, hide it from the form, mark it Mandatory, or remove it entirely. Toggling <strong>Show on
-    Form</strong> off hides the field on every form (internal Register/Edit and the supplier
-    self-service portal); these settings drive both.
+    Manage the supplier form's fields and tabs. Edit a field's <strong>label</strong> (the text shown
+    on the form), reorder fields within a tab, move a field to another tab, hide it from the form, mark
+    it Mandatory, or remove it entirely. Label, visibility and Mandatory changes apply to every form
+    (internal Register/Edit and the supplier self-service portal); these settings drive both.
 </p>
 
 @if (savedMessage is not null)
@@ -153,7 +153,8 @@ else
                                 }
                             </td>
                             <td>
-                                @row.DisplayLabel
+                                <input class="form-control form-control-sm di-label-input" @bind="row.DisplayLabel"
+                                       maxlength="150" placeholder="Field label" title="The label shown for this field on the supplier form (internal and self-service)" />
                                 <div class="di-field-key">@row.FieldKey</div>
                             </td>
                             <td>
@@ -252,6 +253,8 @@ else
     .di-editor-item { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; padding: 2px 0; cursor: pointer; }
     .di-editor-item input { width: 15px; height: 15px; accent-color: #2f6fed; }
 
+    .di-label-input { max-width: 340px; margin-bottom: 3px; }
+
     .di-field-key { font-size: 0.72rem; color: #8a93a6; font-family: monospace; }
 
     .di-fixed-badge {
@@ -329,7 +332,7 @@ else
     private sealed class FieldRow
     {
         public string FieldKey { get; init; } = "";
-        public string DisplayLabel { get; init; } = "";
+        public string DisplayLabel { get; set; } = "";
         public bool IsFixed { get; init; }
         public int Step { get; set; }
         public int Sequence { get; set; }
@@ -447,7 +450,7 @@ else
         {
             NormalizeSequences();
             var layouts = rows.Select(r => new SupplierFieldSettingService.FieldLayout(
-                r.FieldKey, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
+                r.FieldKey, r.DisplayLabel, r.Step, r.Sequence, r.IsVisibleToSupplier, r.IsMandatory, r.IsRemoved));
             await SupplierFieldSettingService.SaveLayoutAsync(layouts, currentUser);
 
             var tabLayouts = tabs.Select(t => new SupplierFieldSettingService.TabLayout(

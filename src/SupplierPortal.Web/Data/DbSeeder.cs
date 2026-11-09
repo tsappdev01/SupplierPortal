@@ -249,12 +249,13 @@ public static class DbSeeder
         {
             if (existingByKey.TryGetValue(f.FieldKey, out var row))
             {
-                // Keep the administrator's Mandatory / Show-to-Supplier choices, but bring the
-                // display label and wizard step into line with the current spec (so relabels and
-                // step re-groupings ship without wiping configuration).
-                if (row.DisplayLabel != f.DisplayLabel || row.Step != f.Step)
+                // Keep the administrator's Mandatory / Show-to-Supplier choices, and bring the wizard
+                // step into line with the current spec (step re-groupings still ship). The display
+                // label is NOT synced here: it is admin-editable via Settings > Supplier Fields, so an
+                // existing row's label is left untouched (the seed label only applies to new fields on
+                // insert below). This stops a restart from reverting a label an administrator changed.
+                if (row.Step != f.Step)
                 {
-                    row.DisplayLabel = f.DisplayLabel;
                     row.Step = f.Step;
                     changed = true;
                 }
