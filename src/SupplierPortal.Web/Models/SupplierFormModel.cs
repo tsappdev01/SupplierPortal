@@ -55,6 +55,8 @@ public class SupplierFormModel
     public int? BusinessPartnerTypeId { get; set; }
     public int? BusinessLocationTypeId { get; set; }
     public int? EInvoicingWaveId { get; set; }
+    public string? PeppolId { get; set; }
+    public string? ApprovedServiceProviderId { get; set; }
 
     [Required(ErrorMessage = "Trade License Number is required.")]
     public string TradeLicenseNumber { get; set; } = "";
@@ -196,6 +198,35 @@ public class SupplierFormModel
     public bool? KysAdverseMedia { get; set; }
     public string? KysAdverseMediaDetails { get; set; }
 
+    // KYS 2026 revision additions
+    public bool? KysOperatingAddressDifferent { get; set; }
+    public string? KysActualOperatingAddress { get; set; }
+    public string? KysAddressChangeReason { get; set; }
+    public string? KysRepsChangeReason { get; set; }
+    public string? KysAccountHolderName { get; set; }
+    public string? KysBankName { get; set; }
+    public string? KysBankBranch { get; set; }
+    public int? KysBankCountryId { get; set; }
+    public string? KysAccountNumber { get; set; }
+    public string? KysIban { get; set; }
+    public string? KysSwiftBic { get; set; }
+    public int? KysAccountCurrencyId { get; set; }
+    public string? KysAltAccountHolderName { get; set; }
+    public string? KysAltBankName { get; set; }
+    public string? KysAltBankBranch { get; set; }
+    public int? KysAltBankCountryId { get; set; }
+    public string? KysAltAccountNumber { get; set; }
+    public string? KysAltIban { get; set; }
+    public string? KysAltSwiftBic { get; set; }
+    public int? KysAltAccountCurrencyId { get; set; }
+    public string? KysElectronicPaymentDetails { get; set; }
+    public string? KysPricingBasisType { get; set; }
+    public string? KysPricingBasisOther { get; set; }
+    public string? KysLegalOwnerDetails { get; set; }
+    public string? KysSupportingDocs { get; set; }
+    public string? KysSupportingDocsOther { get; set; }
+    public int? KysGoodsOriginCountryId { get; set; }
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         KysLicensedActivities = s.KysLicensedActivities,
@@ -223,6 +254,33 @@ public class SupplierFormModel
         KysFtaPenaltyDetails = s.KysFtaPenaltyDetails,
         KysAdverseMedia = s.KysAdverseMedia,
         KysAdverseMediaDetails = s.KysAdverseMediaDetails,
+        KysOperatingAddressDifferent = s.KysOperatingAddressDifferent,
+        KysActualOperatingAddress = s.KysActualOperatingAddress,
+        KysAddressChangeReason = s.KysAddressChangeReason,
+        KysRepsChangeReason = s.KysRepsChangeReason,
+        KysAccountHolderName = s.KysAccountHolderName,
+        KysBankName = s.KysBankName,
+        KysBankBranch = s.KysBankBranch,
+        KysBankCountryId = s.KysBankCountryId,
+        KysAccountNumber = s.KysAccountNumber,
+        KysIban = s.KysIban,
+        KysSwiftBic = s.KysSwiftBic,
+        KysAccountCurrencyId = s.KysAccountCurrencyId,
+        KysAltAccountHolderName = s.KysAltAccountHolderName,
+        KysAltBankName = s.KysAltBankName,
+        KysAltBankBranch = s.KysAltBankBranch,
+        KysAltBankCountryId = s.KysAltBankCountryId,
+        KysAltAccountNumber = s.KysAltAccountNumber,
+        KysAltIban = s.KysAltIban,
+        KysAltSwiftBic = s.KysAltSwiftBic,
+        KysAltAccountCurrencyId = s.KysAltAccountCurrencyId,
+        KysElectronicPaymentDetails = s.KysElectronicPaymentDetails,
+        KysPricingBasisType = s.KysPricingBasisType,
+        KysPricingBasisOther = s.KysPricingBasisOther,
+        KysLegalOwnerDetails = s.KysLegalOwnerDetails,
+        KysSupportingDocs = s.KysSupportingDocs,
+        KysSupportingDocsOther = s.KysSupportingDocsOther,
+        KysGoodsOriginCountryId = s.KysGoodsOriginCountryId,
         SupplierNumber = s.SupplierNumber,
         Priority = s.Priority,
         IsActive = s.IsActive,
@@ -257,6 +315,8 @@ public class SupplierFormModel
         BusinessPartnerTypeId = s.BusinessPartnerTypeId,
         BusinessLocationTypeId = s.BusinessLocationTypeId,
         EInvoicingWaveId = s.EInvoicingWaveId,
+        PeppolId = s.PeppolId,
+        ApprovedServiceProviderId = s.ApprovedServiceProviderId,
         TradeLicenseNumber = s.TradeLicenseNumber ?? "",
         TradeLicenseIssueDate = s.TradeLicenseIssueDate,
         TradeLicenseExpiryDate = s.TradeLicenseExpiryDate,
@@ -360,6 +420,8 @@ public class SupplierFormModel
         s.BusinessPartnerTypeId = BusinessPartnerTypeId;
         s.BusinessLocationTypeId = BusinessLocationTypeId;
         s.EInvoicingWaveId = EInvoicingWaveId;
+        s.PeppolId = PeppolId;
+        s.ApprovedServiceProviderId = ApprovedServiceProviderId;
         s.TradeLicenseNumber = TradeLicenseNumber;
         s.TradeLicenseIssueDate = TradeLicenseIssueDate;
         s.TradeLicenseExpiryDate = TradeLicenseExpiryDate;
@@ -469,6 +531,36 @@ public class SupplierFormModel
         s.KysFtaPenaltyDetails = KysFtaPenalty == true ? KysFtaPenaltyDetails : null;
         s.KysAdverseMedia = KysAdverseMedia;
         s.KysAdverseMediaDetails = KysAdverseMedia == true ? KysAdverseMediaDetails : null;
+
+        // KYS 2026 revision additions (conditional fields are cleared when their trigger is not set).
+        s.KysOperatingAddressDifferent = KysOperatingAddressDifferent;
+        s.KysActualOperatingAddress = KysOperatingAddressDifferent == true ? KysActualOperatingAddress : null;
+        s.KysAddressChangeReason = KysAddressChangedTwice == true ? KysAddressChangeReason : null;
+        s.KysRepsChangeReason = KysRepsChangedTwice == true ? KysRepsChangeReason : null;
+        s.KysAccountHolderName = KysAccountHolderName;
+        s.KysBankName = KysBankName;
+        s.KysBankBranch = KysBankBranch;
+        s.KysBankCountryId = KysBankCountryId;
+        s.KysAccountNumber = KysAccountNumber;
+        s.KysIban = KysIban;
+        s.KysSwiftBic = KysSwiftBic;
+        s.KysAccountCurrencyId = KysAccountCurrencyId;
+        var kysAltBeneficiary = KysPaymentToOtherParty == true;
+        s.KysAltAccountHolderName = kysAltBeneficiary ? KysAltAccountHolderName : null;
+        s.KysAltBankName = kysAltBeneficiary ? KysAltBankName : null;
+        s.KysAltBankBranch = kysAltBeneficiary ? KysAltBankBranch : null;
+        s.KysAltBankCountryId = kysAltBeneficiary ? KysAltBankCountryId : null;
+        s.KysAltAccountNumber = kysAltBeneficiary ? KysAltAccountNumber : null;
+        s.KysAltIban = kysAltBeneficiary ? KysAltIban : null;
+        s.KysAltSwiftBic = kysAltBeneficiary ? KysAltSwiftBic : null;
+        s.KysAltAccountCurrencyId = kysAltBeneficiary ? KysAltAccountCurrencyId : null;
+        s.KysElectronicPaymentDetails = KysPaymentsElectronicOnly == false ? KysElectronicPaymentDetails : null;
+        s.KysPricingBasisType = KysPricingBasisType;
+        s.KysPricingBasisOther = KysPricingBasisType == "Others" ? KysPricingBasisOther : null;
+        s.KysLegalOwnerDetails = KysOwnGoodsAtSupply == false ? KysLegalOwnerDetails : null;
+        s.KysSupportingDocs = KysSupportingDocs;
+        s.KysSupportingDocsOther = KysSupportingDocs is not null && KysSupportingDocs.Contains("Other") ? KysSupportingDocsOther : null;
+        s.KysGoodsOriginCountryId = KysGoodsOriginCountryId;
 
         ApplyContactsTo(s);
         ApplyBankAccountsTo(s);

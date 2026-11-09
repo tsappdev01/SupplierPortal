@@ -68,6 +68,13 @@ public class Supplier
     public int? EInvoicingWaveId { get; set; }
     public LookupValue? EInvoicingWave { get; set; }
 
+    /// <summary>Peppol ID (e-invoicing network address), format 0235:&lt;e-Invoicing TIN&gt;. Conditionally
+    /// mandatory for Wave 1.</summary>
+    [MaxLength(15)] public string? PeppolId { get; set; }
+
+    /// <summary>Approved Service Provider (ASP) ID. Conditionally mandatory for Wave 1.</summary>
+    [MaxLength(6)] public string? ApprovedServiceProviderId { get; set; }
+
     [MaxLength(100)]
     public string? TradeLicenseNumber { get; set; }
 
@@ -366,6 +373,53 @@ public class Supplier
     [MaxLength(2000)] public string? KysFtaPenaltyDetails { get; set; }
     public bool? KysAdverseMedia { get; set; }
     [MaxLength(2000)] public string? KysAdverseMediaDetails { get; set; }
+
+    // -- KYS 2026 revision additions --
+
+    // Address: is the actual operating address different from the trade-licence address?
+    public bool? KysOperatingAddressDifferent { get; set; }
+    [MaxLength(1000)] public string? KysActualOperatingAddress { get; set; }
+
+    // Recent changes in business circumstances: reasons when "changed twice" = Yes.
+    [MaxLength(1000)] public string? KysAddressChangeReason { get; set; }
+    [MaxLength(1000)] public string? KysRepsChangeReason { get; set; }
+
+    // Bank account details (primary beneficiary).
+    [MaxLength(200)] public string? KysAccountHolderName { get; set; }
+    [MaxLength(200)] public string? KysBankName { get; set; }
+    [MaxLength(200)] public string? KysBankBranch { get; set; }
+    public int? KysBankCountryId { get; set; }
+    [MaxLength(50)] public string? KysAccountNumber { get; set; }
+    [MaxLength(50)] public string? KysIban { get; set; }
+    [MaxLength(50)] public string? KysSwiftBic { get; set; }
+    public int? KysAccountCurrencyId { get; set; }
+
+    // Alternative payment beneficiary (captured when payment may go to a party other than the named holder).
+    [MaxLength(200)] public string? KysAltAccountHolderName { get; set; }
+    [MaxLength(200)] public string? KysAltBankName { get; set; }
+    [MaxLength(200)] public string? KysAltBankBranch { get; set; }
+    public int? KysAltBankCountryId { get; set; }
+    [MaxLength(50)] public string? KysAltAccountNumber { get; set; }
+    [MaxLength(50)] public string? KysAltIban { get; set; }
+    [MaxLength(50)] public string? KysAltSwiftBic { get; set; }
+    public int? KysAltAccountCurrencyId { get; set; }
+
+    /// <summary>Further details when payments are NOT confirmed to be electronic-only.</summary>
+    [MaxLength(1000)] public string? KysElectronicPaymentDetails { get; set; }
+
+    // Supply & pricing.
+    /// <summary>Pricing basis: Price List / Quotation / Contract / Others.</summary>
+    [MaxLength(40)] public string? KysPricingBasisType { get; set; }
+    [MaxLength(500)] public string? KysPricingBasisOther { get; set; }
+    /// <summary>Legal owner details + the supplier's role, when the supplier does not own the goods at supply.</summary>
+    [MaxLength(1000)] public string? KysLegalOwnerDetails { get; set; }
+    /// <summary>Supporting documentation available — CSV of: Brand Authorisation, Purchase Invoice,
+    /// Certificate of Origin, Other.</summary>
+    [MaxLength(300)] public string? KysSupportingDocs { get; set; }
+    [MaxLength(500)] public string? KysSupportingDocsOther { get; set; }
+    /// <summary>Country of origin of the goods (LookupValue Country category); manufacturer/source text is
+    /// kept in <see cref="KysGoodsOrigin"/>.</summary>
+    public int? KysGoodsOriginCountryId { get; set; }
 
     // -- Trade License (auto-read) --
     //    Captured automatically from the uploaded Trade License (Claude vision, with the DED text parser as
