@@ -151,7 +151,7 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
     }
 
     /// <summary>One field's full layout state as edited in the admin field manager.</summary>
-    public record FieldLayout(string FieldKey, int Step, int Sequence, bool IsVisibleToSupplier, bool IsMandatory, bool IsRemoved);
+    public record FieldLayout(string FieldKey, string DisplayLabel, int Step, int Sequence, bool IsVisibleToSupplier, bool IsMandatory, bool IsRemoved);
 
     /// <summary>Persists the complete field layout — tab (step), order, visibility, mandatory and
     /// removed state — for every field the admin manager sent. Sequences are renumbered per tab so
@@ -173,6 +173,12 @@ public class SupplierFieldSettingService(IDbContextFactory<ApplicationDbContext>
 
             var next = perStepCounter.TryGetValue(layout.Step, out var c) ? c + 1 : 1;
             perStepCounter[layout.Step] = next;
+
+            // The display label is admin-editable; keep the existing one if the admin cleared the box.
+            if (!string.IsNullOrWhiteSpace(layout.DisplayLabel))
+            {
+                setting.DisplayLabel = layout.DisplayLabel.Trim();
+            }
 
             setting.Step = layout.Step;
             setting.Sequence = next;

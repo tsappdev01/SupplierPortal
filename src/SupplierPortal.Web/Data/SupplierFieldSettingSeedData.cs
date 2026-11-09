@@ -98,6 +98,35 @@ public static class SupplierFieldSettingSeedData
         ("IntermediaryAccountNumber", "Intermediary Account Number", 5, false),
         ("IntermediaryBranchNumber", "Intermediary Branch Number", 5, false),
         ("IntermediaryIban", "Intermediary IBAN", 5, false),
-        ("IntermediaryBicSwiftCode", "Intermediary BIC/Swift Code", 5, false)
+        ("IntermediaryBicSwiftCode", "Intermediary BIC/Swift Code", 5, false),
+
+        // Step 6: KYS (Know Your Supplier) due-diligence. These fields drive the KYS tab's labels and
+        // questions; their text is admin-editable via Settings > Supplier Fields (KYS Field Labels).
+        // The KYS layout is fixed, so only the label is honoured for these (not reorder/mandatory).
+        ("KysLicensedActivities", "Licensed business activities (as per trade licence)", 6, false),
+        ("KysIdNumber", "Emirates ID / Passport No.", 6, false),
+        ("KysIdExpiryDate", "ID expiry date", 6, false),
+        ("KysSignatoryName", "Name of signatory", 6, false),
+        ("KysRepPosition", "Job title", 6, false),
+        ("KysAvailableToMeet", "Are you available to meet our representative in person or virtually before the first supply?", 6, false),
+        ("KysAddressChangedTwice", "Has the business address changed more than twice in the last 12 months?", 6, false),
+        ("KysRepsChangedTwice", "Have the employees / representatives dealing with us changed more than twice in the last 12 months?", 6, false),
+        ("KysCountryId", "Country", 6, false),
+        ("KysExpectedVolumeValue", "Expected volume & value of supplies to us (per month / year)", 6, false),
+        ("KysBankAuthorisedUae", "Is the bank authorised / licensed in the UAE?", 6, false),
+        ("KysPaymentToOtherParty", "Will payment ever be requested to a party other than the named account holder?", 6, false),
+        ("KysPaymentsElectronicOnly", "Do you confirm that all payments will be received by electronic means and not in cash?", 6, false),
+        ("KysGoodsDescription", "Description of goods / services to be supplied to us", 6, false),
+        ("KysCoveringActivity", "Which licensed activity (Section 1) covers this supply?", 6, false),
+        ("KysPricingBasis", "Basis of pricing (price list / quotation / contract) and profit margin, where available", 6, false),
+        ("KysGoodsOrigin", "Origin of the goods (country and manufacturer / source)", 6, false),
+        ("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?", 6, false),
+        ("KysGoodsGenuine", "Are the goods genuine / authentic?", 6, false),
+        ("KysGoodsGenuineProof", "State the proof available (brand authorisation, purchase invoice, certificate of origin)", 6, false),
+        ("KysCommercialReason", "Commercial reason for the supply and for the price offered", 6, false),
+        ("KysFtaPenalty", "Has the business or any owner / manager been subject to an FTA penalty, or investigated or convicted for Tax Evasion, in the UAE or elsewhere?", 6, false),
+        ("KysFtaPenaltyDetails", "If yes, please explain", 6, false),
+        ("KysAdverseMedia", "Are you aware of any adverse media, reviews or regulatory action concerning the business relating to tax matters?", 6, false),
+        ("KysAdverseMediaDetails", "If yes, please explain", 6, false)
     ];
 }
