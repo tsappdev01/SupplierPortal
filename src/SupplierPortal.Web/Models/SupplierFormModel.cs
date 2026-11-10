@@ -559,7 +559,7 @@ public class SupplierFormModel
         s.KysPricingBasisOther = KysPricingBasisType == "Others" ? KysPricingBasisOther : null;
         s.KysLegalOwnerDetails = KysOwnGoodsAtSupply == false ? KysLegalOwnerDetails : null;
         s.KysSupportingDocs = KysSupportingDocs;
-        s.KysSupportingDocsOther = KysSupportingDocs is not null && KysSupportingDocs.Contains("Other") ? KysSupportingDocsOther : null;
+        s.KysSupportingDocsOther = KysSupportingDocs == "Other" ? KysSupportingDocsOther : null;
         s.KysGoodsOriginCountryId = KysGoodsOriginCountryId;
 
         ApplyContactsTo(s);

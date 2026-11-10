@@ -1462,21 +1462,17 @@ else
                                 <InputTextArea @bind-Value="formModel.KysLegalOwnerDetails" rows="2" />
                             </div>
                         }
-                        <div class="di-field di-full">
+                        <div class="di-field">
                             <label>@Label("KysSupportingDocs", "What supporting documentation is available?")</label>
-                            <div class="di-checkbox-group">
+                            <InputSelect @bind-Value="formModel.KysSupportingDocs">
+                                <option value="">— Select —</option>
                                 @foreach (var opt in KysSupportingDocOptions)
                                 {
-                                    var cbId = "ksd_" + opt.Replace(" ", "");
-                                    <div class="di-checkbox-item">
-                                        <input type="checkbox" id="@cbId" checked="@KysHasDoc(opt)"
-                                               @onchange="e => KysToggleDoc(opt, (bool)e.Value!)" />
-                                        <label for="@cbId" style="margin:0;">@opt</label>
-                                    </div>
+                                    <option value="@opt">@opt</option>
                                 }
-                            </div>
+                            </InputSelect>
                         </div>
-                        @if (KysHasDoc("Other"))
+                        @if (formModel.KysSupportingDocs == "Other")
                         {
                             <div class="di-field di-full">
                                 <label>@Label("KysSupportingDocsOther", "Please specify the supporting documentation available")@(Req("KysSupportingDocsOther"))</label>
@@ -2312,18 +2308,9 @@ else
     /// • Issuing Body if Others — required only when the issuing body is "Others".
     /// • VAT Group entity count / names — required when the VAT Registration Type is a VAT Group.
     /// • VAT-dependent fields (TRN, VAT type, TIN) — never required when VAT Registered is not "Yes".</summary>
-    // KYS supporting-documentation multi-select (stored as a pipe-separated list in KysSupportingDocs).
+    // KYS supporting-documentation (single selection, stored in KysSupportingDocs).
     private static readonly string[] KysSupportingDocOptions =
         ["Brand Authorisation", "Purchase Invoice", "Certificate of Origin", "Other"];
-    private bool KysHasDoc(string opt) =>
-        (formModel.KysSupportingDocs ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(opt);
-    private void KysToggleDoc(string opt, bool on)
-    {
-        var set = (formModel.KysSupportingDocs ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();
-        if (on) { if (!set.Contains(opt)) { set.Add(opt); } }
-        else { set.Remove(opt); }
-        formModel.KysSupportingDocs = set.Count == 0 ? null : string.Join("|", set);
-    }
 
     /// <summary>True when the selected e-Invoicing wave is Wave 1 (drives Peppol ID / ASP ID requirements).</summary>
     private bool IsWave1 =>
@@ -2366,7 +2353,7 @@ else
             case "KysElectronicPaymentDetails": return formModel.KysPaymentsElectronicOnly == false;
             case "KysPricingBasisOther": return formModel.KysPricingBasisType == "Others";
             case "KysLegalOwnerDetails": return formModel.KysOwnGoodsAtSupply == false;
-            case "KysSupportingDocsOther": return KysHasDoc("Other");
+            case "KysSupportingDocsOther": return formModel.KysSupportingDocs == "Other";
         }
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
