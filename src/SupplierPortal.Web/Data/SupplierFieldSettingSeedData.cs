@@ -145,7 +145,7 @@ public static class SupplierFieldSettingSeedData
         ("KysPricingBasisType", "Basis of pricing", 6, false),
         ("KysPricingBasisOther", "Please specify the basis of pricing", 6, false),
         ("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?", 6, false),
-        ("KysLegalOwnerDetails", "Please provide the legal owner's details and explain the supplier's role in the supply", 6, false),
+        ("KysLegalOwnerDetails", "Please provide details of the legal owner of the goods and explain your role in the supply.", 6, false),
         ("KysSupportingDocs", "What supporting documentation is available?", 6, false),
         ("KysSupportingDocsOther", "Please specify the supporting documentation available", 6, false),
         ("KysGoodsOriginCountryId", "Country of origin of the goods", 6, false),
