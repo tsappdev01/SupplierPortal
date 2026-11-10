@@ -1454,6 +1454,14 @@ else
                                 <InputText @bind-Value="formModel.KysPricingBasisOther" />
                             </div>
                         }
+                        @YesNo(Label("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?"), formModel.KysOwnGoodsAtSupply, v => formModel.KysOwnGoodsAtSupply = v)
+                        @if (formModel.KysOwnGoodsAtSupply == false)
+                        {
+                            <div class="di-field di-full">
+                                <label>@Label("KysLegalOwnerDetails", "Please provide details of the legal owner of the goods and explain your role in the supply.")@(Req("KysLegalOwnerDetails"))</label>
+                                <InputTextArea @bind-Value="formModel.KysLegalOwnerDetails" rows="2" />
+                            </div>
+                        }
                         <div class="di-field">
                             <label>@Label("KysSupportingDocs", "What supporting documentation is available?")</label>
                             <InputSelect @bind-Value="formModel.KysSupportingDocs">
@@ -1469,14 +1477,6 @@ else
                             <div class="di-field di-full">
                                 <label>@Label("KysSupportingDocsOther", "Please specify the supporting documentation available")@(Req("KysSupportingDocsOther"))</label>
                                 <InputText @bind-Value="formModel.KysSupportingDocsOther" />
-                            </div>
-                        }
-                        @YesNo(Label("KysOwnGoodsAtSupply", "Do you own the goods at the time of supply?"), formModel.KysOwnGoodsAtSupply, v => formModel.KysOwnGoodsAtSupply = v)
-                        @if (formModel.KysOwnGoodsAtSupply == false)
-                        {
-                            <div class="di-field di-full">
-                                <label>@Label("KysLegalOwnerDetails", "Please provide details of the legal owner of the goods and explain your role in the supply.")@(Req("KysLegalOwnerDetails"))</label>
-                                <InputTextArea @bind-Value="formModel.KysLegalOwnerDetails" rows="2" />
                             </div>
                         }
                         <div class="di-field">
