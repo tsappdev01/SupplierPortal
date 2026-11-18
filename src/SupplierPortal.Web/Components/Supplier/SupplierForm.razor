@@ -150,6 +150,10 @@ else
         <label>@Label("ApprovedServiceProviderId", "Approved Service Provider ID")@(Req("ApprovedServiceProviderId"))@Help("ApprovedServiceProviderId")</label>
         <InputText @bind-Value="formModel.ApprovedServiceProviderId" maxlength="6" title="Maximum 6 characters" />
     </div>;
+    fieldFragments["DateOfIncorporation"] = @<div class="di-field @FieldClass("DateOfIncorporation")">
+        <label>@Label("DateOfIncorporation", "Date of Incorporation")@(Req("DateOfIncorporation"))</label>
+        <InputDate @bind-Value="formModel.DateOfIncorporation" />
+    </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
         <label>@Label("BusinessPartnerTypeId", "Business Partner Type")@(Req("BusinessPartnerTypeId"))</label>
         <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
@@ -1313,7 +1317,7 @@ else
                             <InputTextArea @bind-Value="formModel.KysLicensedActivities" rows="2" />
                         </div>
                         <div class="di-field">
-                            <label>@Label("KysIdNumber", "Emirates ID / Passport No. of the Person Authorized to Represent the Supplier")@Help("KysIdNumber")</label>
+                            <label>@Label("KysIdNumber", "Emirates ID / Passport No. of the Director, Agent or Employee Authorized to Represent the Supplier")@Help("KysIdNumber")</label>
                             <InputText @bind-Value="formModel.KysIdNumber" />
                         </div>
                         <div class="di-field">
@@ -1350,7 +1354,7 @@ else
                                 <InputTextArea @bind-Value="formModel.KysAddressChangeReason" rows="2" />
                             </div>
                         }
-                        @YesNo(Label("KysRepsChangedTwice", "Have the supplier's key employees or persons authorised to represent the supplier changed more than twice in the last 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        @YesNo(Label("KysRepsChangedTwice", "Has the manager reflected on the trade license changed more than twice over the previous 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
                         @if (formModel.KysRepsChangedTwice == true)
                         {
                             <div class="di-field di-full">
@@ -1463,7 +1467,7 @@ else
                             </div>
                         }
                         <div class="di-field">
-                            <label>@Label("KysSupportingDocs", "What supporting documentation is available?")</label>
+                            <label>@Label("KysSupportingDocs", "Please indicate the documentation available to support the source and authenticity of the goods.")</label>
                             <InputSelect @bind-Value="formModel.KysSupportingDocs">
                                 <option value="">— Select —</option>
                                 @foreach (var opt in KysSupportingDocOptions)
@@ -2312,13 +2316,6 @@ else
     private static readonly string[] KysSupportingDocOptions =
         ["Brand Authorisation", "Purchase Invoice", "Certificate of Origin", "Other"];
 
-    /// <summary>True when the selected e-Invoicing wave is Wave 1 (drives Peppol ID / ASP ID requirements).</summary>
-    private bool IsWave1 =>
-        formModel.EInvoicingWaveId is int w
-        && eInvoicingWaves.FirstOrDefault(l => l.Id == w) is { } lov
-        && ((lov.Code?.Trim() is "1" or "Wave1" or "Wave 1")
-            || (lov.DisplayName?.Replace(" ", "").Contains("Wave1", StringComparison.OrdinalIgnoreCase) ?? false));
-
     private bool IsFieldMandatory(string fieldKey)
     {
         // Supplier Site is a free-text field with no validation — never required, whatever the admin setting.
@@ -2330,12 +2327,8 @@ else
         {
             return IsIssuingBodyOthers;
         }
-        // Peppol ID and Approved Service Provider ID are conditionally mandatory for Wave 1 suppliers.
-        if (fieldKey is "PeppolId" or "ApprovedServiceProviderId")
-        {
-            return IsWave1;
-        }
-        // KYS conditional-mandatory fields — required only when their trigger answer is set.
+        // KYS conditional-mandatory fields — required only when their trigger answer is set (all other
+        // KYS fields are mandatory via the admin flag). Peppol ID / ASP ID are now always mandatory too.
         switch (fieldKey)
         {
             case "KysActualOperatingAddress": return formModel.KysOperatingAddressDifferent == true;
@@ -2346,14 +2339,17 @@ else
             case "KysAltBankBranch":
             case "KysAltBankCountryId":
             case "KysAltAccountNumber":
-            case "KysAltIban":
             case "KysAltSwiftBic":
             case "KysAltAccountCurrencyId":
                 return formModel.KysPaymentToOtherParty == true;
+            // IBAN is mandatory only when the selected bank country is the UAE.
+            case "KysIban": return formModel.KysBankCountryId == UaeCountryId;
+            case "KysAltIban": return formModel.KysPaymentToOtherParty == true && formModel.KysAltBankCountryId == UaeCountryId;
             case "KysElectronicPaymentDetails": return formModel.KysPaymentsElectronicOnly == false;
             case "KysPricingBasisOther": return formModel.KysPricingBasisType == "Others";
             case "KysLegalOwnerDetails": return formModel.KysOwnGoodsAtSupply == false;
             case "KysSupportingDocsOther": return formModel.KysSupportingDocs == "Other";
+            case "KysFtaPenaltyDetails": return formModel.KysFtaPenalty == true;
         }
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
