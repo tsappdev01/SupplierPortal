@@ -1370,6 +1370,35 @@ else
                         @(DocCard("Current price list / quotation", SupplierDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, ""))
                     </div>
 
+                @* Extract & store all KYS data from the uploaded documents (internal reviewers only). *@
+                @if (!SupplierFacing && Supplier.Id != 0)
+                {
+                    <div class="di-kys-extract">
+                        <button type="button" class="di-xtract-rerun" @onclick="ExtractKysFromDocumentsAsync" disabled="@extractingKys">
+                            @if (extractingKys)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span class="ms-1">Extracting &amp; storing…</span>
+                            }
+                            else
+                            {
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                                <span>Extract &amp; store KYS data from documents</span>
+                            }
+                        </button>
+                        <span class="di-kys-extract-hint">Reads the uploaded Trade License, VAT Certificate, Certificate of Incorporation, Bank Confirmation Letter, Emirates ID / Passport and Proof of Address with Claude, and stores the values into empty KYS fields.</span>
+                        @if (kysExtractResult is not null && kysExtractResult.Stored.Count > 0)
+                        {
+                            <div class="di-kys-extract-done">
+                                <div class="di-kys-extract-head">Stored @kysExtractResult.Stored.Count field(s) from @string.Join(", ", kysExtractResult.DocsRead):</div>
+                                <ul class="di-kys-extract-list">
+                                    @foreach (var s in kysExtractResult.Stored) { <li>@s</li> }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                }
+
                 @* Prompt to extract when nothing has been read from the Trade License yet (internal view only). *@
                 @if (!SupplierFacing && HasTradeLicenseDocument() && tlReadback?.HasData != true)
                 {
@@ -1990,6 +2019,14 @@ else
     .di-review-meta { font-size: 0.74rem; color: #2e7d32; margin-top: 2px; }
     .di-review-btn { flex: 0 0 auto; border: 1px solid #1f3864; background: transparent; color: #1f3864; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
     .di-review-btn.on { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+
+    /* Extract & store KYS data from documents */
+    .di-kys-extract { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; padding: 12px; border: 1px dashed var(--di-border, #cdd5e3); border-radius: 10px; background: var(--di-card, #fff); }
+    .di-kys-extract-hint { font-size: 0.78rem; color: var(--di-text-muted, #55617a); }
+    .di-kys-extract-done { margin-top: 4px; font-size: 0.82rem; }
+    .di-kys-extract-head { font-weight: 600; color: #2e7d32; margin-bottom: 2px; }
+    .di-kys-extract-list { margin: 0; padding-left: 18px; color: var(--di-text, #1f2a44); }
+    .di-kys-extract-list li { margin: 1px 0; }
 </style>
 }
 
@@ -2304,6 +2341,8 @@ else
     private SupplierPortal.Web.Services.IdentityReadback? idReadback;
     private bool reExtracting;
     private bool reExtractingId;
+    private bool extractingKys;
+    private SupplierPortal.Web.Services.KysExtractionResult? kysExtractResult;
     private bool uploadingDocument;
     private SupplierDocumentType? uploadingType;   // which card is mid-upload (for its spinner overlay)
     private bool viewingDocument;
@@ -3067,6 +3106,52 @@ else
         SupplierDocumentType.CertificateOfIncorporation => "Certificate of Incorporation",
         _ => "Other"
     };
+
+    /// <summary>Internal reviewers only: run Claude over every uploaded document and store the key KYS
+    /// attributes it reads onto this supplier (empty fields only), then reload the form to show them.</summary>
+    private async Task ExtractKysFromDocumentsAsync()
+    {
+        if (SupplierFacing || extractingKys || Supplier.Id == 0)
+        {
+            return;
+        }
+        extractingKys = true;
+        kysExtractResult = null;
+        StateHasChanged();
+        try
+        {
+            kysExtractResult = await SupplierDocumentService.ExtractAndApplyKysAsync(Supplier.Id, CurrentUser);
+            if (!string.IsNullOrWhiteSpace(kysExtractResult.Error))
+            {
+                ToastService.ShowError(kysExtractResult.Error);
+            }
+            else if (kysExtractResult.Stored.Count > 0)
+            {
+                // The values were stored on the supplier; reload them into the form.
+                var reloaded = await SupplierService.GetByIdAsync(Supplier.Id);
+                if (reloaded is not null)
+                {
+                    formModel = SupplierFormModel.FromSupplier(reloaded);
+                }
+                ToastService.ShowSuccess($"Stored {kysExtractResult.Stored.Count} field(s) from {kysExtractResult.DocsRead.Count} document(s).");
+            }
+            else
+            {
+                ToastService.ShowInfo(kysExtractResult.DocsRead.Count > 0
+                    ? "Documents were read, but every matching KYS field is already filled."
+                    : "No readable documents were found to extract from.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Extraction failed: {ex.Message}");
+        }
+        finally
+        {
+            extractingKys = false;
+            StateHasChanged();
+        }
+    }
 
     /// <summary>Reloads the document list via the gateway (self-service) or the database (internal).</summary>
     private async Task<List<SupplierDocument>> LoadDocumentsAsync()
