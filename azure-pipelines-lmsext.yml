@@ -38,10 +38,13 @@ steps:
     clean: true
     fetchDepth: 0
 
-  # The agent has the .NET 9 SDK but the app targets net8.0, so install the .NET 8 SDK (needs outbound
-  # internet to the Microsoft CDN).
+  # The agent has the .NET 9 SDK, which can build the net8.0 projects on its own. Installing the matching
+  # 8.0 SDK is preferred but downloads from the Microsoft CDN, which intermittently times out here.
+  # continueOnError so a failed SDK download falls back to the agent's 9.x SDK instead of failing the run
+  # (no global.json pins 8.0.x; the server runs the app on its .NET 8 Hosting Bundle).
   - task: UseDotNet@2
     displayName: 'Ensure .NET 8 SDK'
+    continueOnError: true
     inputs:
       packageType: 'sdk'
       version: '8.0.x'
