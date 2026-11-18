@@ -148,7 +148,9 @@ public class ExcelImportService(
         var businessPartnerTypes = await LoadLookupAsync(db, LookupCategory.BusinessPartnerType, includeCode: true);
         var businessLocationTypes = await LoadLookupAsync(db, LookupCategory.BusinessLocationType);
         var eInvoicingWaves = await LoadLookupAsync(db, LookupCategory.EInvoicingWave);
-        var licensingAuthorities = await LoadLookupAsync(db, LookupCategory.LicensingAuthority);
+        // includeCode so an upload that gives the short authority code (e.g. "DIFC", "JAFZA") resolves,
+        // not only the full display name.
+        var licensingAuthorities = await LoadLookupAsync(db, LookupCategory.LicensingAuthority, includeCode: true);
         var banks = await db.Banks.Include(b => b.Branches).ToListAsync();
         var businessUnits = await db.BusinessUnits.ToDictionaryAsync(b => b.Name.ToLowerInvariant(), b => b.Id);
 

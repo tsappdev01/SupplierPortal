@@ -49,6 +49,7 @@ public static class SupplierMasterSeedData
         "Ras Al Khaimah",
         "Umm Al Quwain",
         "Fujairah",
+        "Kolkata",
     ];
 
     public static readonly string[] PaymentMethods =
@@ -142,6 +143,7 @@ public static class SupplierMasterSeedData
         ("AJFZ", "Ajman Free Zone"),
         ("ADGM", "Abu Dhabi Global Market (ADGM)"),
         ("KEZAD", "Khalifa Economic Zones Abu Dhabi (KEZAD)"),
+        ("DIFC", "Dubai International Financial Centre (DIFC)"),
         ("OTHERS", "Others"),
     ];
 
