@@ -149,6 +149,16 @@
                         }
                     </select>
                 </div>
+                <div class="di-print-field">
+                    <label>Status</label>
+                    <select @bind="templateStatus">
+                        <option value="">All Statuses</option>
+                        @foreach (var status in SupplierStatuses.All)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                </div>
             }
             @if (generatingTemplate)
             {
@@ -1077,6 +1087,7 @@ else if (TabFilteredSuppliers.Any())
     private bool showTemplateDialog;
     private bool templatePopulate;
     private int templateBuId;
+    private string templateStatus = "";
     private bool generatingTemplate;
     private string templateProgress = "";
 
@@ -1084,6 +1095,8 @@ else if (TabFilteredSuppliers.Any())
     {
         templatePopulate = false;
         templateBuId = filterBusinessUnitId;
+        // Pre-select whatever status the grid is currently filtered by (blank = all).
+        templateStatus = statusFilter;
         generatingTemplate = false;
         showTemplateDialog = true;
     }
@@ -1116,7 +1129,9 @@ else if (TabFilteredSuppliers.Any())
                 StateHasChanged();
 
                 suppliers = await SupplierService.GetSuppliersAsync(
-                    AccessBusinessUnitIds(templateBuId), assignedToUserId: AssigneeScope, visibleToDepartmentId: DepartmentScope);
+                    AccessBusinessUnitIds(templateBuId),
+                    statusName: string.IsNullOrWhiteSpace(templateStatus) ? null : templateStatus,
+                    assignedToUserId: AssigneeScope, visibleToDepartmentId: DepartmentScope);
             }
 
             templateProgress = templatePopulate
@@ -1126,7 +1141,8 @@ else if (TabFilteredSuppliers.Any())
 
             // Offload the CPU-bound workbook build so the spinner renders while it runs.
             var bytes = await Task.Run(() => ExportService.ExportToExcelUploadTemplate(suppliers));
-            var fileName = templatePopulate ? "Supplier Template (Populated).xlsx" : "Supplier Template (Blank).xlsx";
+            var statusSuffix = templatePopulate && !string.IsNullOrWhiteSpace(templateStatus) ? $" - {templateStatus}" : "";
+            var fileName = templatePopulate ? $"Supplier Template (Populated{statusSuffix}).xlsx" : "Supplier Template (Blank).xlsx";
 
             templateProgress = "Preparing download…";
             StateHasChanged();
