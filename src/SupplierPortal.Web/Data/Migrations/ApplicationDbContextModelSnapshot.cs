@@ -2168,6 +2168,68 @@ namespace SupplierPortal.Web.Data.Migrations
 
                     b.HasIndex("VatRegistrationTypeId");
 
+                    b.Property<DateTime?>("DateOfIncorporation")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool?>("IntAttachmentsReviewed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IntAdverseMedia")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IntAdverseMediaDetails")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("IntResponseComments")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("IntMeetingType")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("IntMeetingRepName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("IntMeetingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IntMeetingDiRep")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("IntPobMethod")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<bool?>("IntPobAddressMatch")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("IntPobRepName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("IntPobDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IntPobDiRep")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool?>("IntPobActivitiesCompatible")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IntTransactionsProportionate")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IntActivitiesReviewed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("IntDeclarationReviewed")
+                        .HasColumnType("bit");
+
                     b.ToTable("Suppliers");
                 });
 
@@ -2425,6 +2487,16 @@ namespace SupplierPortal.Web.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SupplierId", "DocumentType");
+
+                    b.Property<bool>("IsReviewed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
 
                     b.ToTable("SupplierDocuments");
                 });

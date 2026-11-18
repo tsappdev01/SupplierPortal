@@ -131,7 +131,8 @@ public class LocalSupplierSelfServiceDataGateway(
         if (type is not (SupplierDocumentType.TradeLicense or SupplierDocumentType.VatCertification
             or SupplierDocumentType.BankConfirmationLetter or SupplierDocumentType.Other
             or SupplierDocumentType.EmiratesIdOrPassport or SupplierDocumentType.ProofOfAddress
-            or SupplierDocumentType.PriceListOrQuotation or SupplierDocumentType.ProofOfOrigin))
+            or SupplierDocumentType.PriceListOrQuotation or SupplierDocumentType.ProofOfOrigin
+            or SupplierDocumentType.CertificateOfIncorporation))
         {
             return new SsUploadResult(false, "That document type cannot be uploaded.", null, null);
         }

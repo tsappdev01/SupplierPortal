@@ -13,7 +13,8 @@ public enum SupplierDocumentType
     EmiratesIdOrPassport = 5,
     ProofOfAddress = 6,
     PriceListOrQuotation = 7,
-    ProofOfOrigin = 8
+    ProofOfOrigin = 8,
+    CertificateOfIncorporation = 9
 }
 
 /// <summary>Metadata for a supplier-uploaded document. The physical file lives outside wwwroot
@@ -53,4 +54,13 @@ public class SupplierDocument
 
     [Required, MaxLength(150)]
     public string UploadedBy { get; set; } = string.Empty;
+
+    /// <summary>Internal review flag — set when an internal reviewer marks this attachment as reviewed
+    /// (internal-review checklist). Never set by suppliers.</summary>
+    public bool IsReviewed { get; set; }
+
+    [MaxLength(150)]
+    public string? ReviewedBy { get; set; }
+
+    public DateTime? ReviewedAt { get; set; }
 }

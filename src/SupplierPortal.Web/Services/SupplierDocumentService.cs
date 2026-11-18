@@ -822,6 +822,7 @@ public class SupplierDocumentService(
         SupplierDocumentType.ProofOfAddress => "Proof of Address",
         SupplierDocumentType.PriceListOrQuotation => "Price List or Quotation",
         SupplierDocumentType.ProofOfOrigin => "Proof of Origin",
+        SupplierDocumentType.CertificateOfIncorporation => "Certificate of Incorporation",
         _ => "Other"
     };
 
