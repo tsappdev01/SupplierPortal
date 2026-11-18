@@ -3270,6 +3270,17 @@ else
             }
         }
 
+        // Date of Incorporation can't be in the future (a data-quality rule for everyone, like the dates
+        // above; the field itself stays optional — this only validates a value that was entered). Skipped
+        // only for a self-service supplier who can't see the field.
+        if (step == StepOf("DateOfIncorporation", 1) && !(SupplierFacing && IsHiddenFromSupplier("DateOfIncorporation")))
+        {
+            if (model.DateOfIncorporation is DateTime doi && doi.Date > DateTime.Today)
+            {
+                errors.Add("Date of Incorporation cannot be a future date.");
+            }
+        }
+
         // When the address differs from the Trade License / VAT Certificate, the alternate VAT-certificate
         // address is mandatory. This is a data-quality rule (like the dates above) so it applies to every
         // view — the toggle is shown on the Address step (2) to internal users and self-service alike.
