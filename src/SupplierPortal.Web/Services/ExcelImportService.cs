@@ -198,6 +198,9 @@ public class ExcelImportService(
         var errors = new List<ImportRowError>();
         var warnings = new List<ImportRowError>();
         var suppliers = new List<Supplier>();
+        // New suppliers whose bank branch was auto-created this import: their scalar BankBranchId is
+        // filled in once the branch has been saved and has a real id (see after the row loop).
+        var newBranchFixups = new List<(Supplier Supplier, BankBranch Branch)>();
 
         foreach (var row in worksheet.RowsUsed().Skip(1))
         {
@@ -247,7 +250,7 @@ public class ExcelImportService(
             var procurementBuId = ResolveLookup(values, "ProcurementBu", businessUnits, required: false, rowErrors, rowWarnings);
             var clientBuId = ResolveLookup(values, "ClientBu", businessUnits, required: false, rowErrors, rowWarnings);
             var billToBuId = ResolveLookup(values, "BillToBu", businessUnits, required: false, rowErrors, rowWarnings);
-            var (bankId, bankBranchId) = ResolveBankBranch(values, banks, rowWarnings);
+            var (bankId, bankBranchId, newBankBranch) = ResolveBankBranch(values, banks, rowWarnings);
 
             // Extended round-trip fields.
             var businessPartnerTypeId = ResolveLookup(values, "BusinessPartnerType", businessPartnerTypes, required: false, rowErrors, rowWarnings);
@@ -388,16 +391,37 @@ public class ExcelImportService(
                 existing.UpdatedBy = uploadedBy;
                 existing.UpdatedAt = DateTime.UtcNow;
                 updateCount++;
+                // The existing supplier and the auto-created branch are tracked by the same context, so
+                // linking by navigation lets EF insert the branch and fix up the FK on save.
+                if (newBankBranch is not null)
+                {
+                    existing.BankBranch = newBankBranch;
+                }
             }
             else
             {
+                // New suppliers are inserted through a separate context (AddRangeAsync), which only
+                // carries the scalar FK — so an auto-created branch is saved here first, then the new
+                // supplier is pointed at its resolved id below.
+                if (newBankBranch is not null)
+                {
+                    newBranchFixups.Add((parsed, newBankBranch));
+                }
                 suppliers.Add(parsed);
             }
         }
 
-        if (updateCount > 0)
+        // Persist in-place supplier updates and any auto-created branches. This gives the new branches
+        // real ids and fixes up the FK for updated suppliers (linked above by navigation).
+        if (updateCount > 0 || newBranchFixups.Count > 0)
         {
             await db.SaveChangesAsync();
+        }
+        // Point each new supplier at its now-saved branch id before it is inserted (its own context
+        // only carries the scalar FK, so the branch entity itself is not part of that graph).
+        foreach (var (supplier, branch) in newBranchFixups)
+        {
+            supplier.BankBranchId = branch.Id;
         }
         var insertedCount = suppliers.Count > 0 ? await supplierService.AddRangeAsync(suppliers) : 0;
         return new ImportResult(insertedCount + updateCount, errors, warnings);
@@ -525,9 +549,14 @@ public class ExcelImportService(
         return null;
     }
 
-    /// <summary>Resolves Bank/Branch names to ids. Best-effort like the LOV fields: an unrecognized
-    /// bank or branch is left blank with a warning rather than rejecting the row.</summary>
-    private static (int? BankId, int? BankBranchId) ResolveBankBranch(
+    /// <summary>Resolves Bank/Branch names to ids. The bank must already exist in the master (an
+    /// unrecognized bank is left blank with a warning). A branch name that the matched bank does not
+    /// yet have is auto-created under that bank so the branch data is kept and future lookups recognise
+    /// it; the new branch is added to the tracked <see cref="Bank.Branches"/> collection (so EF inserts
+    /// it on save and the same name repeated later in the file reuses it) and returned as
+    /// <c>NewBranch</c> for the caller to link via the navigation property (its id isn't known until
+    /// save). A matched existing branch is returned as a plain id.</summary>
+    private static (int? BankId, int? BankBranchId, BankBranch? NewBranch) ResolveBankBranch(
         Dictionary<string, string> values, List<Bank> banks, List<string> rowWarnings)
     {
         values.TryGetValue("BankName", out var bankName);
@@ -539,29 +568,34 @@ public class ExcelImportService(
             {
                 rowWarnings.Add("Branch Name has no matching Bank Name — left blank.");
             }
-            return (null, null);
+            return (null, null, null);
         }
 
         var bank = banks.FirstOrDefault(b => string.Equals(b.Name, bankName, StringComparison.OrdinalIgnoreCase));
         if (bank is null)
         {
             rowWarnings.Add($"Unrecognized Bank Name value '{bankName}' — left blank.");
-            return (null, null);
+            return (null, null, null);
         }
 
         if (string.IsNullOrWhiteSpace(branchName))
         {
-            return (bank.Id, null);
+            return (bank.Id, null, null);
         }
 
         var branch = bank.Branches.FirstOrDefault(b => string.Equals(b.Name, branchName, StringComparison.OrdinalIgnoreCase));
         if (branch is null)
         {
-            rowWarnings.Add($"Unrecognized Branch Name value '{branchName}' for bank '{bankName}' — left blank.");
-            return (bank.Id, null);
+            // Auto-create the branch under the matched bank rather than dropping it. Added to the
+            // tracked collection so EF inserts it and later rows with the same name reuse this instance.
+            // (No Bank back-reference: new suppliers are saved through a separate context, and pulling a
+            // bank that already exists into that graph would try to re-insert it.)
+            branch = new BankBranch { BankId = bank.Id, Name = branchName.Trim() };
+            bank.Branches.Add(branch);
         }
 
-        return (bank.Id, branch.Id);
+        // A branch with a real id links by FK; a freshly-created one (id still 0) links by navigation.
+        return branch.Id > 0 ? (bank.Id, branch.Id, null) : (bank.Id, null, branch);
     }
 
     /// <summary>
