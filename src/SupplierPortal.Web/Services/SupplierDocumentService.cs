@@ -33,7 +33,7 @@ public class SupplierDocumentService(
     IDbContextFactory<ApplicationDbContext> dbFactory, IWebHostEnvironment env, AuditService auditService,
     IDocumentOcrService ocr, IHttpClientFactory httpClientFactory, LicenseQrService qrService,
     SupplierPortal.Web.Services.Storage.IFileStorageService fileStore, ITradeLicenseReader licenseReader,
-    IIdentityDocumentReader identityReader)
+    IIdentityDocumentReader identityReader, IDocumentFieldReader docReader)
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024;
 
@@ -286,6 +286,186 @@ public class SupplierDocumentService(
 
         await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId, "Re-ran Emirates ID / Passport extraction");
         return (true, null, true);
+    }
+
+    // ---- KYS document extraction prompts (flat JSON out; prefer the English value on bilingual docs) ----
+    private const string VatPrompt = """
+Extract from this UAE Federal Tax Authority VAT Registration Certificate. It is bilingual Arabic/English;
+prefer the ENGLISH value. Return ONLY a JSON object with these keys, using null when absent:
+{ "taxRegistrationNumber": string|null, "legalName": string|null, "effectiveRegistrationDate": "DD/MM/YYYY"|null }
+""";
+
+    private const string CertIncorpPrompt = """
+Extract from this Certificate of Incorporation / commercial registration certificate. It may be bilingual;
+prefer the ENGLISH value. Return ONLY a JSON object with these keys, using null when absent:
+{ "companyName": string|null, "registrationNumber": string|null, "dateOfIncorporation": "DD/MM/YYYY"|null }
+""";
+
+    private const string BankLetterPrompt = """
+Extract from this written bank account confirmation / IBAN letter. Return ONLY a JSON object with these keys,
+using null when absent. Keep the IBAN and account number exactly as printed (no spaces):
+{ "accountHolderName": string|null, "bankName": string|null, "branchName": string|null,
+  "accountNumber": string|null, "iban": string|null, "swiftBic": string|null }
+""";
+
+    private const string ProofOfAddressPrompt = """
+Extract the operating address from this proof of address (tenancy contract / Ejari / utility bill). Prefer the
+ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single full address line).
+""";
+
+    /// <summary>Runs Claude extraction over every uploaded KYS document and STORES the key attributes it
+    /// reads onto the supplier's KYS fields (fill-only: an existing value is never overwritten). Internal
+    /// reviewers only. Returns a summary of what was read and stored. Never throws.</summary>
+    public async Task<KysExtractionResult> ExtractAndApplyKysAsync(int supplierId, string actorUsername)
+    {
+        var result = new KysExtractionResult { Enabled = docReader.IsEnabled };
+        if (!docReader.IsEnabled && !licenseReader.IsEnabled && !identityReader.IsEnabled)
+        {
+            result.Error = "The Claude reader is not configured (no Claude:ApiKey).";
+            return result;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null) { result.Error = "Supplier not found."; return result; }
+
+        var docs = await db.SupplierDocuments.Where(d => d.SupplierId == supplierId).ToListAsync();
+
+        async Task<byte[]?> BytesAsync(SupplierDocument d)
+        {
+            var b = d.Content;
+            if ((b is null || b.Length == 0) && !string.IsNullOrWhiteSpace(d.BlobKey))
+            {
+                try { b = await fileStore.ReadAsync(d.BlobKey); } catch { b = null; }
+            }
+            return b is { Length: > 0 } ? b : null;
+        }
+
+        SupplierDocument? Latest(SupplierDocumentType t) =>
+            docs.Where(d => d.DocumentType == t).OrderByDescending(d => d.Id).FirstOrDefault();
+
+        void SetStr(string label, Func<string?> get, Action<string> set, string? value)
+        {
+            var v = value?.Trim();
+            if (!string.IsNullOrWhiteSpace(v) && string.IsNullOrWhiteSpace(get()))
+            {
+                set(v!);
+                result.Stored.Add($"{label}: {v}");
+            }
+        }
+
+        async Task<Dictionary<string, string>?> ReadDocAsync(SupplierDocumentType t, string prompt, string label)
+        {
+            var doc = Latest(t);
+            if (doc is null || !docReader.IsEnabled) { return null; }
+            var bytes = await BytesAsync(doc);
+            if (bytes is null) { return null; }
+            Dictionary<string, string>? fields = null;
+            try { (fields, _) = await docReader.ReadFieldsAsync(bytes, doc.ContentType, prompt); } catch { }
+            if (fields is { Count: > 0 }) { result.DocsRead.Add(label); }
+            return fields;
+        }
+
+        static string? V(Dictionary<string, string>? f, string key) =>
+            f is not null && f.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+        // VAT Certificate -> TRN
+        var vat = await ReadDocAsync(SupplierDocumentType.VatCertification, VatPrompt, "VAT Certificate");
+        SetStr("TRN / VAT Registration Number", () => supplier.TaxRegistrationNumber, v => supplier.TaxRegistrationNumber = v, V(vat, "taxRegistrationNumber"));
+
+        // Certificate of Incorporation -> Date of Incorporation
+        var inc = await ReadDocAsync(SupplierDocumentType.CertificateOfIncorporation, CertIncorpPrompt, "Certificate of Incorporation");
+        var incDate = ParseLicenseDate(V(inc, "dateOfIncorporation"));
+        if (supplier.DateOfIncorporation is null && incDate is not null)
+        {
+            supplier.DateOfIncorporation = incDate;
+            result.Stored.Add($"Date of Incorporation: {incDate:dd/MM/yyyy}");
+        }
+
+        // Bank Confirmation Letter -> KYS Bank Account Details
+        var bank = await ReadDocAsync(SupplierDocumentType.BankConfirmationLetter, BankLetterPrompt, "Bank Confirmation Letter");
+        SetStr("Account Holder Name", () => supplier.KysAccountHolderName, v => supplier.KysAccountHolderName = v, V(bank, "accountHolderName"));
+        SetStr("Bank Name", () => supplier.KysBankName, v => supplier.KysBankName = v, V(bank, "bankName"));
+        SetStr("Bank Branch", () => supplier.KysBankBranch, v => supplier.KysBankBranch = v, V(bank, "branchName"));
+        SetStr("Account Number", () => supplier.KysAccountNumber, v => supplier.KysAccountNumber = v, V(bank, "accountNumber"));
+        SetStr("IBAN", () => supplier.KysIban, v => supplier.KysIban = v, V(bank, "iban"));
+        SetStr("SWIFT / BIC", () => supplier.KysSwiftBic, v => supplier.KysSwiftBic = v, V(bank, "swiftBic"));
+
+        // Proof of Address -> KYS actual operating address
+        var addr = await ReadDocAsync(SupplierDocumentType.ProofOfAddress, ProofOfAddressPrompt, "Proof of Address");
+        SetStr("Actual Operating Address", () => supplier.KysActualOperatingAddress, v => supplier.KysActualOperatingAddress = v, V(addr, "address"));
+
+        // Trade License (reuse the dedicated reader) -> licensed activities + signatory
+        var tlDoc = Latest(SupplierDocumentType.TradeLicense);
+        if (tlDoc is not null && licenseReader.IsEnabled)
+        {
+            var bytes = await BytesAsync(tlDoc);
+            if (bytes is not null)
+            {
+                ParsedLicense? lic = null;
+                try { lic = await licenseReader.ReadAsync(bytes, tlDoc.ContentType); } catch { }
+                if (lic is not null)
+                {
+                    result.DocsRead.Add("Trade License");
+                    if (lic.Activities.Count > 0)
+                    {
+                        var acts = string.Join("; ", lic.Activities.Select(a => a.Name));
+                        if (acts.Length > 500) { acts = acts[..500]; }
+                        SetStr("Licensed business activities", () => supplier.KysLicensedActivities,
+                            v => supplier.KysLicensedActivities = v, acts);
+                    }
+                    var signatory = lic.Members.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Name));
+                    if (signatory is not null)
+                    {
+                        SetStr("Name of signatory", () => supplier.KysSignatoryName, v => supplier.KysSignatoryName = v, signatory.Name);
+                        SetStr("Job title", () => supplier.KysRepPosition, v => supplier.KysRepPosition = v, signatory.Role);
+                    }
+                }
+            }
+        }
+
+        // Emirates ID / Passport (reuse the identity reader) -> KYS ID No / expiry
+        var idDoc = Latest(SupplierDocumentType.EmiratesIdOrPassport);
+        if (idDoc is not null && identityReader.IsEnabled)
+        {
+            var bytes = await BytesAsync(idDoc);
+            if (bytes is not null)
+            {
+                ParsedIdentityDocument? id = null;
+                try { id = await identityReader.ReadAsync(bytes, idDoc.ContentType); } catch { }
+                if (id is not null && id.HasData)
+                {
+                    result.DocsRead.Add("Emirates ID / Passport");
+                    SetStr("Emirates ID / Passport No.", () => supplier.KysIdNumber, v => supplier.KysIdNumber = v,
+                        id.EmiratesIdNumber ?? id.PassportNumber);
+                    var expiry = ParseLicenseDate(id.EmiratesIdExpiry) ?? ParseLicenseDate(id.PassportExpiry);
+                    if (supplier.KysIdExpiryDate is null && expiry is not null)
+                    {
+                        supplier.KysIdExpiryDate = expiry;
+                        result.Stored.Add($"ID expiry date: {expiry:dd/MM/yyyy}");
+                    }
+                }
+            }
+        }
+
+        if (result.Stored.Count > 0)
+        {
+            supplier.UpdatedBy = actorUsername;
+            supplier.UpdatedAt = DateTime.UtcNow;
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                result.Stored.Clear();
+                result.Error = $"Extraction succeeded but saving failed: {ex.Message}";
+                return result;
+            }
+            await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+                $"Extracted & stored KYS data from documents ({string.Join(", ", result.DocsRead)})");
+        }
+        return result;
     }
 
     /// <summary>The auto-read Emirates ID / Passport capture for the read-only panel under that document.</summary>
@@ -1018,4 +1198,17 @@ public sealed class IdentityReadback
     /// <summary>True when something was read (so the panel is worth showing).</summary>
     public bool HasData => ReadAt is not null
         || !string.IsNullOrWhiteSpace(EmiratesIdNumber) || !string.IsNullOrWhiteSpace(PassportNumber);
+}
+
+/// <summary>Summary of a "extract &amp; store all KYS data from documents" run.</summary>
+public sealed class KysExtractionResult
+{
+    /// <summary>True when the Claude document reader is configured.</summary>
+    public bool Enabled { get; set; }
+    /// <summary>Documents that were read (had content Claude could parse).</summary>
+    public List<string> DocsRead { get; } = [];
+    /// <summary>"Field: value" entries that were newly stored on the supplier (empty fields only).</summary>
+    public List<string> Stored { get; } = [];
+    /// <summary>A fatal error (reader not configured, supplier missing); null on success.</summary>
+    public string? Error { get; set; }
 }
