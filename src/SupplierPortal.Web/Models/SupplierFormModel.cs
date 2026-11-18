@@ -57,6 +57,7 @@ public class SupplierFormModel
     public int? EInvoicingWaveId { get; set; }
     public string? PeppolId { get; set; }
     public string? ApprovedServiceProviderId { get; set; }
+    public DateTime? DateOfIncorporation { get; set; }
 
     [Required(ErrorMessage = "Trade License Number is required.")]
     public string TradeLicenseNumber { get; set; } = "";
@@ -227,6 +228,25 @@ public class SupplierFormModel
     public string? KysSupportingDocsOther { get; set; }
     public int? KysGoodsOriginCountryId { get; set; }
 
+    // Internal review checklist (internal-only)
+    public bool? IntAttachmentsReviewed { get; set; }
+    public bool? IntAdverseMedia { get; set; }
+    public string? IntAdverseMediaDetails { get; set; }
+    public string? IntResponseComments { get; set; }
+    public string? IntMeetingType { get; set; }
+    public string? IntMeetingRepName { get; set; }
+    public DateTime? IntMeetingDate { get; set; }
+    public string? IntMeetingDiRep { get; set; }
+    public string? IntPobMethod { get; set; }
+    public bool? IntPobAddressMatch { get; set; }
+    public string? IntPobRepName { get; set; }
+    public DateTime? IntPobDate { get; set; }
+    public string? IntPobDiRep { get; set; }
+    public bool? IntPobActivitiesCompatible { get; set; }
+    public bool? IntTransactionsProportionate { get; set; }
+    public bool? IntActivitiesReviewed { get; set; }
+    public bool? IntDeclarationReviewed { get; set; }
+
     public static SupplierFormModel FromSupplier(Supplier s) => new()
     {
         KysLicensedActivities = s.KysLicensedActivities,
@@ -281,6 +301,23 @@ public class SupplierFormModel
         KysSupportingDocs = s.KysSupportingDocs,
         KysSupportingDocsOther = s.KysSupportingDocsOther,
         KysGoodsOriginCountryId = s.KysGoodsOriginCountryId,
+        IntAttachmentsReviewed = s.IntAttachmentsReviewed,
+        IntAdverseMedia = s.IntAdverseMedia,
+        IntAdverseMediaDetails = s.IntAdverseMediaDetails,
+        IntResponseComments = s.IntResponseComments,
+        IntMeetingType = s.IntMeetingType,
+        IntMeetingRepName = s.IntMeetingRepName,
+        IntMeetingDate = s.IntMeetingDate,
+        IntMeetingDiRep = s.IntMeetingDiRep,
+        IntPobMethod = s.IntPobMethod,
+        IntPobAddressMatch = s.IntPobAddressMatch,
+        IntPobRepName = s.IntPobRepName,
+        IntPobDate = s.IntPobDate,
+        IntPobDiRep = s.IntPobDiRep,
+        IntPobActivitiesCompatible = s.IntPobActivitiesCompatible,
+        IntTransactionsProportionate = s.IntTransactionsProportionate,
+        IntActivitiesReviewed = s.IntActivitiesReviewed,
+        IntDeclarationReviewed = s.IntDeclarationReviewed,
         SupplierNumber = s.SupplierNumber,
         Priority = s.Priority,
         IsActive = s.IsActive,
@@ -317,6 +354,7 @@ public class SupplierFormModel
         EInvoicingWaveId = s.EInvoicingWaveId,
         PeppolId = s.PeppolId,
         ApprovedServiceProviderId = s.ApprovedServiceProviderId,
+        DateOfIncorporation = s.DateOfIncorporation,
         TradeLicenseNumber = s.TradeLicenseNumber ?? "",
         TradeLicenseIssueDate = s.TradeLicenseIssueDate,
         TradeLicenseExpiryDate = s.TradeLicenseExpiryDate,
@@ -422,6 +460,7 @@ public class SupplierFormModel
         s.EInvoicingWaveId = EInvoicingWaveId;
         s.PeppolId = PeppolId;
         s.ApprovedServiceProviderId = ApprovedServiceProviderId;
+        s.DateOfIncorporation = DateOfIncorporation;
         s.TradeLicenseNumber = TradeLicenseNumber;
         s.TradeLicenseIssueDate = TradeLicenseIssueDate;
         s.TradeLicenseExpiryDate = TradeLicenseExpiryDate;
@@ -561,6 +600,26 @@ public class SupplierFormModel
         s.KysSupportingDocs = KysSupportingDocs;
         s.KysSupportingDocsOther = KysSupportingDocs == "Other" ? KysSupportingDocsOther : null;
         s.KysGoodsOriginCountryId = KysGoodsOriginCountryId;
+
+        // Internal review checklist (written by internal staff; a self-service save round-trips the
+        // loaded values unchanged because the section is hidden from suppliers).
+        s.IntAttachmentsReviewed = IntAttachmentsReviewed;
+        s.IntAdverseMedia = IntAdverseMedia;
+        s.IntAdverseMediaDetails = IntAdverseMedia == true ? IntAdverseMediaDetails : null;
+        s.IntResponseComments = IntResponseComments;
+        s.IntMeetingType = IntMeetingType;
+        s.IntMeetingRepName = IntMeetingRepName;
+        s.IntMeetingDate = IntMeetingDate;
+        s.IntMeetingDiRep = IntMeetingDiRep;
+        s.IntPobMethod = IntPobMethod;
+        s.IntPobAddressMatch = IntPobAddressMatch;
+        s.IntPobRepName = IntPobRepName;
+        s.IntPobDate = IntPobDate;
+        s.IntPobDiRep = IntPobDiRep;
+        s.IntPobActivitiesCompatible = IntPobActivitiesCompatible;
+        s.IntTransactionsProportionate = IntTransactionsProportionate;
+        s.IntActivitiesReviewed = IntActivitiesReviewed;
+        s.IntDeclarationReviewed = IntDeclarationReviewed;
 
         ApplyContactsTo(s);
         ApplyBankAccountsTo(s);

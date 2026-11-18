@@ -75,6 +75,9 @@ public class Supplier
     /// <summary>Approved Service Provider (ASP) ID. Conditionally mandatory for Wave 1.</summary>
     [MaxLength(6)] public string? ApprovedServiceProviderId { get; set; }
 
+    /// <summary>Date of incorporation of the business (Business / Organization section).</summary>
+    public DateTime? DateOfIncorporation { get; set; }
+
     [MaxLength(100)]
     public string? TradeLicenseNumber { get; set; }
 
@@ -420,6 +423,26 @@ public class Supplier
     /// <summary>Country of origin of the goods (LookupValue Country category); manufacturer/source text is
     /// kept in <see cref="KysGoodsOrigin"/>.</summary>
     public int? KysGoodsOriginCountryId { get; set; }
+
+    // -- Internal review checklist --
+    //    Completed by internal staff when reviewing a supplier's declaration (never shown to suppliers).
+    public bool? IntAttachmentsReviewed { get; set; }
+    public bool? IntAdverseMedia { get; set; }
+    [MaxLength(2000)] public string? IntAdverseMediaDetails { get; set; }
+    [MaxLength(2000)] public string? IntResponseComments { get; set; }
+    [MaxLength(40)] public string? IntMeetingType { get; set; }
+    [MaxLength(200)] public string? IntMeetingRepName { get; set; }
+    public DateTime? IntMeetingDate { get; set; }
+    [MaxLength(200)] public string? IntMeetingDiRep { get; set; }
+    [MaxLength(60)] public string? IntPobMethod { get; set; }
+    public bool? IntPobAddressMatch { get; set; }
+    [MaxLength(200)] public string? IntPobRepName { get; set; }
+    public DateTime? IntPobDate { get; set; }
+    [MaxLength(200)] public string? IntPobDiRep { get; set; }
+    public bool? IntPobActivitiesCompatible { get; set; }
+    public bool? IntTransactionsProportionate { get; set; }
+    public bool? IntActivitiesReviewed { get; set; }
+    public bool? IntDeclarationReviewed { get; set; }
 
     // -- Trade License (auto-read) --
     //    Captured automatically from the uploaded Trade License (Claude vision, with the DED text parser as

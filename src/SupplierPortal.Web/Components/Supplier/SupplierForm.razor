@@ -150,6 +150,10 @@ else
         <label>@Label("ApprovedServiceProviderId", "Approved Service Provider ID")@(Req("ApprovedServiceProviderId"))@Help("ApprovedServiceProviderId")</label>
         <InputText @bind-Value="formModel.ApprovedServiceProviderId" maxlength="6" title="Maximum 6 characters" />
     </div>;
+    fieldFragments["DateOfIncorporation"] = @<div class="di-field @FieldClass("DateOfIncorporation")">
+        <label>@Label("DateOfIncorporation", "Date of Incorporation")@(Req("DateOfIncorporation"))</label>
+        <InputDate @bind-Value="formModel.DateOfIncorporation" />
+    </div>;
     fieldFragments["BusinessPartnerTypeId"] = @<div class="di-field @FieldClass("BusinessPartnerTypeId")">
         <label>@Label("BusinessPartnerTypeId", "Business Partner Type")@(Req("BusinessPartnerTypeId"))</label>
         <InputSelect @bind-Value="formModel.BusinessPartnerTypeId">
@@ -636,209 +640,6 @@ else
                     </div>
                 }
 
-                <div class="di-documents-grid">
-                    @(DocCard("Trade License", SupplierDocumentType.TradeLicense, "di-thumb-red",
-                             SupplierFacing,
-                             SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument(),
-                             "Required — attach the Trade License before submitting."))
-                    @(DocCard("VAT Certificate", SupplierDocumentType.VatCertification, "di-thumb-green",
-                             SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber),
-                             SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate(),
-                             "Required — attach the VAT Certificate when a TRN/VAT number is provided."))
-
-                    <div class="di-doccard">
-                        @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
-                        @if (uploadingType == SupplierDocumentType.Other)
-                        {
-                            <div class="di-doccard-uploading"><span class="di-doccard-spinner"></span><span>Uploading…</span></div>
-                        }
-                        <div class="di-doccard-thumb di-thumb-amber">
-                            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
-                            <span class="di-doccard-ext">FILES</span>
-                        </div>
-                        <div class="di-doccard-main">
-                            <div class="di-doccard-title">Other Documents</div>
-                            @if (OtherDocuments.Count == 0)
-                            {
-                                <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
-                            }
-                            else
-                            {
-                                @foreach (var doc in OtherDocuments)
-                                {
-                                    <div class="di-doccard-chip">
-                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
-                                        <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
-                                        <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">@(viewingDocId == doc.Id ? "Opening…" : "View")</button>
-                                        <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
-                                    </div>
-                                }
-                            }
-                        </div>
-                        <div class="di-doccard-upload">
-                            <label class="di-doccard-choose @(otherDisabled ? "is-disabled" : null)" for="docfile-Other">
-                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
-                                <span>Choose File</span>
-                                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
-                            </label>
-                            <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@otherDisabled" />
-                            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
-                        </div>
-                    </div>
-                </div>
-
-                @* Prompt to extract when nothing has been read from the Trade License yet (internal view only). *@
-                @if (!SupplierFacing && HasTradeLicenseDocument() && tlReadback?.HasData != true)
-                {
-                    <div class="di-tl-reextract">
-                        <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
-                            @if (reExtracting)
-                            {
-                                <span class="spinner-border spinner-border-sm" role="status"></span>
-                                <span class="ms-1">Extracting…</span>
-                            }
-                            else
-                            {
-                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                <span>Extract data from Trade License</span>
-                            }
-                        </button>
-                        @if (!reExtracting)
-                        {
-                            <span class="text-muted small ms-2">No data has been extracted from this Trade License yet.</span>
-                        }
-                    </div>
-                }
-
-                @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
-                @if (!SupplierFacing && tlReadback?.HasData == true)
-                {
-                    var tlIsAi = tlReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
-                    var tlDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.TradeLicense);
-                    var tlIsPdf = (tlDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
-                        || (tlDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
-                    <div class="di-xtract">
-                        <div class="di-xtract-head">
-                            <div class="di-xtract-title">
-                                <span class="di-xtract-ic">
-                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
-                                </span>
-                                <div class="di-xtract-titletext">
-                                    <div class="di-xtract-h">Trade License</div>
-                                    <div class="di-xtract-sub">Read from the uploaded document@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
-                                </div>
-                            </div>
-                            <div class="di-xtract-actions">
-                                <span class="di-xtract-badge ok">
-                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
-                                    @(tlIsAi ? "AI Extraction Completed" : "Extraction Completed")
-                                </span>
-                                @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource))
-                                {
-                                    <span class="di-xtract-src">@tlReadback.ReadSource</span>
-                                }
-                                @if (tlDoc is not null)
-                                {
-                                    <a class="di-xtract-dl" href="/suppliers/documents/@tlDoc.Id?download=1" target="_blank" rel="noopener">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                                        <span>Download</span>
-                                    </a>
-                                }
-                                <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
-                                    @if (reExtracting)
-                                    {
-                                        <span class="spinner-border spinner-border-sm" role="status"></span>
-                                        <span class="ms-1">Extracting…</span>
-                                    }
-                                    else
-                                    {
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                        <span>Re-run Extraction</span>
-                                    }
-                                </button>
-                            </div>
-                        </div>
-                        <div class="di-xtract-main">
-                            <div class="di-xtract-doc">
-                                @if (tlDoc is null)
-                                {
-                                    <div class="di-xtract-doc-empty">No preview available</div>
-                                }
-                                else
-                                {
-                                    <div class="di-xtract-doc-view">
-                                        @if (tlIsPdf)
-                                        {
-                                            <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
-                                        }
-                                        else
-                                        {
-                                            <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
-                                        }
-                                    </div>
-                                    <a class="di-xtract-doc-open" href="/suppliers/documents/@tlDoc.Id" target="_blank" rel="noopener">
-                                        Open document in a new tab
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-                                    </a>
-                                }
-                            </div>
-                            <div class="di-xtract-fields">
-                            <div class="di-xtract-sec">License Information</div>
-                            <div class="di-tl-grid">
-                                @TlRow("License No.", tlReadback.LicenseNumber)
-                                @TlRow("Main License No.", tlReadback.MainLicenseNumber)
-                                @TlRow("Legal Name", tlReadback.LegalName)
-                                @TlRow("Trade Name", tlReadback.TradeName)
-                                @TlRow("Legal Type", tlReadback.LegalType)
-                                @TlRow("License Category", tlReadback.LicenseCategory)
-                                @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
-                                @TlRow("License Type", tlReadback.LicenseType)
-                                @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
-                                @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
-                                @TlRow("Register No.", tlReadback.RegisterNumber)
-                                @TlRow("DCCI No.", tlReadback.DcciNumber)
-                                @TlRow("D-U-N-S", tlReadback.DunsNumber)
-                                @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
-                                @TlRow("P.O. Box", tlReadback.PoBox)
-                                @TlRow("Parcel ID", tlReadback.ParcelId)
-                                @TlRow("Premises", tlReadback.Premises)
-                                @TlRow("Email", tlReadback.Email)
-                                @TlRow("Phone", tlReadback.Phone)
-                                @TlRow("Mobile", tlReadback.Mobile)
-                                @TlRow("Address", tlReadback.Address)
-                                @TlRow("Activities", tlReadback.Activities)
-                            </div>
-                            @if (tlReadback.Parties.Count > 0)
-                            {
-                                <div class="di-xtract-sec">Partners / Managers</div>
-                                <table class="di-tl-parties-table">
-                                    <thead><tr><th>Name</th><th>Nationality</th><th>Role</th><th>Share</th></tr></thead>
-                                    <tbody>
-                                        @foreach (var p in tlReadback.Parties)
-                                        {
-                                            <tr>
-                                                <td>@p.Name</td>
-                                                <td>@(string.IsNullOrWhiteSpace(p.Nationality) ? "—" : p.Nationality)</td>
-                                                <td>@(string.IsNullOrWhiteSpace(p.Role) ? "—" : p.Role)</td>
-                                                <td>@(FormatShare(p.Share) ?? "—")</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            }
-                            <div class="di-xtract-done">
-                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
-                                <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
-                            </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-
-                @if (Supplier.Id == 0)
-                {
-                    <p class="text-muted di-document-hint">Documents can be uploaded after the first save (click Next).</p>
-                }
             </div>
         </div>
 
@@ -1313,7 +1114,7 @@ else
                             <InputTextArea @bind-Value="formModel.KysLicensedActivities" rows="2" />
                         </div>
                         <div class="di-field">
-                            <label>@Label("KysIdNumber", "Emirates ID / Passport No. of the Person Authorized to Represent the Supplier")@Help("KysIdNumber")</label>
+                            <label>@Label("KysIdNumber", "Emirates ID / Passport No. of the Director, Agent or Employee Authorized to Represent the Supplier")@Help("KysIdNumber")</label>
                             <InputText @bind-Value="formModel.KysIdNumber" />
                         </div>
                         <div class="di-field">
@@ -1350,7 +1151,7 @@ else
                                 <InputTextArea @bind-Value="formModel.KysAddressChangeReason" rows="2" />
                             </div>
                         }
-                        @YesNo(Label("KysRepsChangedTwice", "Have the supplier's key employees or persons authorised to represent the supplier changed more than twice in the last 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
+                        @YesNo(Label("KysRepsChangedTwice", "Has the manager reflected on the trade license changed more than twice over the previous 12 months?"), formModel.KysRepsChangedTwice, v => formModel.KysRepsChangedTwice = v)
                         @if (formModel.KysRepsChangedTwice == true)
                         {
                             <div class="di-field di-full">
@@ -1463,7 +1264,7 @@ else
                             </div>
                         }
                         <div class="di-field">
-                            <label>@Label("KysSupportingDocs", "What supporting documentation is available?")</label>
+                            <label>@Label("KysSupportingDocs", "Please indicate the documentation available to support the source and authenticity of the goods.")</label>
                             <InputSelect @bind-Value="formModel.KysSupportingDocs">
                                 <option value="">— Select —</option>
                                 @foreach (var opt in KysSupportingDocOptions)
@@ -1510,6 +1311,55 @@ else
                 <details class="di-acc">
                     <summary>Documents</summary>
                     <div class="di-section-body di-doc-grid">
+                    @(DocCard("Trade License", SupplierDocumentType.TradeLicense, "di-thumb-red",
+                             SupplierFacing,
+                             SupplierFacing && Supplier.Id != 0 && !HasTradeLicenseDocument(),
+                             "Required — attach the Trade License before submitting."))
+                    @(DocCard("VAT Certificate", SupplierDocumentType.VatCertification, "di-thumb-green",
+                             SupplierFacing && !string.IsNullOrWhiteSpace(formModel.TaxRegistrationNumber),
+                             SupplierFacing && Supplier.Id != 0 && RequiresVatCertificate(),
+                             "Required — attach the VAT Certificate when a TRN/VAT number is provided."))
+                    @(DocCard("Certificate of Incorporation", SupplierDocumentType.CertificateOfIncorporation, "di-thumb-blue", false, false, ""))
+
+                    <div class="di-doccard">
+                        @{ var otherDisabled = Supplier.Id == 0 || uploadingDocument; }
+                        @if (uploadingType == SupplierDocumentType.Other)
+                        {
+                            <div class="di-doccard-uploading"><span class="di-doccard-spinner"></span><span>Uploading…</span></div>
+                        }
+                        <div class="di-doccard-thumb di-thumb-amber">
+                            <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+                            <span class="di-doccard-ext">FILES</span>
+                        </div>
+                        <div class="di-doccard-main">
+                            <div class="di-doccard-title">Other Documents</div>
+                            @if (OtherDocuments.Count == 0)
+                            {
+                                <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                            }
+                            else
+                            {
+                                @foreach (var doc in OtherDocuments)
+                                {
+                                    <div class="di-doccard-chip">
+                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                        <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                                        <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">@(viewingDocId == doc.Id ? "Opening…" : "View")</button>
+                                        <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <div class="di-doccard-upload">
+                            <label class="di-doccard-choose @(otherDisabled ? "is-disabled" : null)" for="docfile-Other">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                <span>Choose File</span>
+                                <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+                            </label>
+                            <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SupplierDocumentType.Other)" disabled="@otherDisabled" />
+                            <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+                        </div>
+                    </div>
                         @(DocCard("Written Bank Confirmation Letter", SupplierDocumentType.BankConfirmationLetter, "di-thumb-blue",
                                  true,
                                  !HasBankConfirmationLetter(),
@@ -1519,6 +1369,159 @@ else
                         @(DocCard("Proof of origin, ownership & authenticity of goods (purchase invoice, certificate of origin, brand authorisation)", SupplierDocumentType.ProofOfOrigin, "di-thumb-green", false, false, ""))
                         @(DocCard("Current price list / quotation", SupplierDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, ""))
                     </div>
+
+                @* Prompt to extract when nothing has been read from the Trade License yet (internal view only). *@
+                @if (!SupplierFacing && HasTradeLicenseDocument() && tlReadback?.HasData != true)
+                {
+                    <div class="di-tl-reextract">
+                        <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
+                            @if (reExtracting)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span class="ms-1">Extracting…</span>
+                            }
+                            else
+                            {
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                <span>Extract data from Trade License</span>
+                            }
+                        </button>
+                        @if (!reExtracting)
+                        {
+                            <span class="text-muted small ms-2">No data has been extracted from this Trade License yet.</span>
+                        }
+                    </div>
+                }
+
+                @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
+                @if (!SupplierFacing && tlReadback?.HasData == true)
+                {
+                    var tlIsAi = tlReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
+                    var tlDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.TradeLicense);
+                    var tlIsPdf = (tlDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
+                        || (tlDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
+                    <div class="di-xtract">
+                        <div class="di-xtract-head">
+                            <div class="di-xtract-title">
+                                <span class="di-xtract-ic">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                                </span>
+                                <div class="di-xtract-titletext">
+                                    <div class="di-xtract-h">Trade License</div>
+                                    <div class="di-xtract-sub">Read from the uploaded document@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
+                                </div>
+                            </div>
+                            <div class="di-xtract-actions">
+                                <span class="di-xtract-badge ok">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
+                                    @(tlIsAi ? "AI Extraction Completed" : "Extraction Completed")
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource))
+                                {
+                                    <span class="di-xtract-src">@tlReadback.ReadSource</span>
+                                }
+                                @if (tlDoc is not null)
+                                {
+                                    <a class="di-xtract-dl" href="/suppliers/documents/@tlDoc.Id?download=1" target="_blank" rel="noopener">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                                        <span>Download</span>
+                                    </a>
+                                }
+                                <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
+                                    @if (reExtracting)
+                                    {
+                                        <span class="spinner-border spinner-border-sm" role="status"></span>
+                                        <span class="ms-1">Extracting…</span>
+                                    }
+                                    else
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                                        <span>Re-run Extraction</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                        <div class="di-xtract-main">
+                            <div class="di-xtract-doc">
+                                @if (tlDoc is null)
+                                {
+                                    <div class="di-xtract-doc-empty">No preview available</div>
+                                }
+                                else
+                                {
+                                    <div class="di-xtract-doc-view">
+                                        @if (tlIsPdf)
+                                        {
+                                            <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
+                                        }
+                                        else
+                                        {
+                                            <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
+                                        }
+                                    </div>
+                                    <a class="di-xtract-doc-open" href="/suppliers/documents/@tlDoc.Id" target="_blank" rel="noopener">
+                                        Open document in a new tab
+                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                                    </a>
+                                }
+                            </div>
+                            <div class="di-xtract-fields">
+                            <div class="di-xtract-sec">License Information</div>
+                            <div class="di-tl-grid">
+                                @TlRow("License No.", tlReadback.LicenseNumber)
+                                @TlRow("Main License No.", tlReadback.MainLicenseNumber)
+                                @TlRow("Legal Name", tlReadback.LegalName)
+                                @TlRow("Trade Name", tlReadback.TradeName)
+                                @TlRow("Legal Type", tlReadback.LegalType)
+                                @TlRow("License Category", tlReadback.LicenseCategory)
+                                @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
+                                @TlRow("License Type", tlReadback.LicenseType)
+                                @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
+                                @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
+                                @TlRow("Register No.", tlReadback.RegisterNumber)
+                                @TlRow("DCCI No.", tlReadback.DcciNumber)
+                                @TlRow("D-U-N-S", tlReadback.DunsNumber)
+                                @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
+                                @TlRow("P.O. Box", tlReadback.PoBox)
+                                @TlRow("Parcel ID", tlReadback.ParcelId)
+                                @TlRow("Premises", tlReadback.Premises)
+                                @TlRow("Email", tlReadback.Email)
+                                @TlRow("Phone", tlReadback.Phone)
+                                @TlRow("Mobile", tlReadback.Mobile)
+                                @TlRow("Address", tlReadback.Address)
+                                @TlRow("Activities", tlReadback.Activities)
+                            </div>
+                            @if (tlReadback.Parties.Count > 0)
+                            {
+                                <div class="di-xtract-sec">Partners / Managers</div>
+                                <table class="di-tl-parties-table">
+                                    <thead><tr><th>Name</th><th>Nationality</th><th>Role</th><th>Share</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var p in tlReadback.Parties)
+                                        {
+                                            <tr>
+                                                <td>@p.Name</td>
+                                                <td>@(string.IsNullOrWhiteSpace(p.Nationality) ? "—" : p.Nationality)</td>
+                                                <td>@(string.IsNullOrWhiteSpace(p.Role) ? "—" : p.Role)</td>
+                                                <td>@(FormatShare(p.Share) ?? "—")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            <div class="di-xtract-done">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                                <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (Supplier.Id == 0)
+                {
+                    <p class="text-muted di-document-hint">Documents can be uploaded once the supplier record has been saved.</p>
+                }
 
                     @* Re-run extraction on the Emirates ID / Passport already on file (internal view only). *@
                     @if (!SupplierFacing && documents.Any(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport) && idReadback?.HasData != true)
@@ -1632,6 +1635,115 @@ else
                         </div>
                     }
                 </details>
+
+                @* Internal Validation Checks — internal reviewers only; never shown to the supplier. *@
+                @if (!SupplierFacing)
+                {
+                    <details class="di-acc di-acc-internal">
+                        <summary>Internal Validation Checks</summary>
+                        <div class="di-section-body">
+                            <p class="di-internal-note di-full">For internal reviewers only — this section is not shown to the supplier.</p>
+
+                            <div class="di-internal-h di-full">1. Attachments review</div>
+                            @if (documents.Count == 0)
+                            {
+                                <p class="text-muted di-full">No attachments have been uploaded yet.</p>
+                            }
+                            else
+                            {
+                                <div class="di-review-list di-full">
+                                    @foreach (var doc in documents)
+                                    {
+                                        <div class="di-review-row">
+                                            <div class="di-review-info">
+                                                <span class="di-review-type">@DocTypeLabel(doc.DocumentType)</span>
+                                                <span class="di-review-name" title="@doc.FileName">@doc.FileName</span>
+                                                @if (doc.IsReviewed && doc.ReviewedAt is not null)
+                                                {
+                                                    <span class="di-review-meta">Reviewed by @doc.ReviewedBy · @doc.ReviewedAt?.ToString("dd MMM yyyy, HH:mm") UTC</span>
+                                                }
+                                            </div>
+                                            <button type="button" class="di-review-btn @(doc.IsReviewed ? "on" : "")" @onclick="() => ToggleDocumentReviewedAsync(doc)">
+                                                @(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v)
+
+                            <div class="di-internal-h di-full">2. Adverse media check</div>
+                            @YesNo("Are you aware of any adverse media coverage, reviews or regulatory action relating to the business's tax matters?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v)
+                            @if (formModel.IntAdverseMedia == true)
+                            {
+                                <div class="di-field di-full">
+                                    <label>Details of the adverse media found</label>
+                                    <InputTextArea @bind-Value="formModel.IntAdverseMediaDetails" rows="2" />
+                                </div>
+                            }
+
+                            <div class="di-internal-h di-full">3. Reviewer comments</div>
+                            <div class="di-field di-full">
+                                <label>Comments on the supplier's responses</label>
+                                <InputTextArea @bind-Value="formModel.IntResponseComments" rows="3" />
+                            </div>
+
+                            <div class="di-internal-h di-full">4. Meeting with the supplier</div>
+                            <p class="di-internal-sub di-full">Complete for Natural Person / sole-establishment suppliers.</p>
+                            <div class="di-field">
+                                <label>Meeting type</label>
+                                <InputSelect @bind-Value="formModel.IntMeetingType">
+                                    <option value="">— Select —</option>
+                                    <option value="In-Person">In-Person</option>
+                                    <option value="Phone call">Phone call</option>
+                                    <option value="Video Call">Video Call</option>
+                                </InputSelect>
+                            </div>
+                            <div class="di-field">
+                                <label>Meeting date</label>
+                                <InputDate @bind-Value="formModel.IntMeetingDate" />
+                            </div>
+                            <div class="di-field">
+                                <label>Supplier representative met</label>
+                                <InputText @bind-Value="formModel.IntMeetingRepName" />
+                            </div>
+                            <div class="di-field">
+                                <label>DI representative</label>
+                                <InputText @bind-Value="formModel.IntMeetingDiRep" />
+                            </div>
+
+                            <div class="di-internal-h di-full">5. Place of business verification</div>
+                            <div class="di-field">
+                                <label>Verification method</label>
+                                <InputSelect @bind-Value="formModel.IntPobMethod">
+                                    <option value="">— Select —</option>
+                                    <option value="Web mapping">Web mapping and navigation platforms</option>
+                                    <option value="Site visit">Visiting the supplier's place of business</option>
+                                    <option value="Ejari contract">Ejari contract</option>
+                                </InputSelect>
+                            </div>
+                            <div class="di-field">
+                                <label>Date verified</label>
+                                <InputDate @bind-Value="formModel.IntPobDate" />
+                            </div>
+                            <div class="di-field">
+                                <label>Supplier representative</label>
+                                <InputText @bind-Value="formModel.IntPobRepName" />
+                            </div>
+                            <div class="di-field">
+                                <label>DI representative</label>
+                                <InputText @bind-Value="formModel.IntPobDiRep" />
+                            </div>
+                            @YesNo("Using web mapping / AI, does the address provided by the supplier match the location found online?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v)
+
+                            <div class="di-internal-h di-full">6. Compatibility &amp; final checks</div>
+                            @YesNo("Is the actual place of business compatible with the nature of activities carried out?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v)
+                            @YesNo("Are the commercial transactions disproportionate or unexpected in volume, value or nature compared to the size of the business?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v)
+                            @YesNo("Has the list of licensed activities been reviewed?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v)
+                            @YesNo("Has the final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v)
+                        </div>
+                    </details>
+                }
 
             </div>
             </fieldset>
@@ -1864,6 +1976,20 @@ else
     .di-yn + .di-yn { border-left: 1px solid var(--di-border, #cdd5e3); }
     .di-yn.on { background: #1f3864; color: #fff; }
     .di-yn.di-yn-no.on { background: #b4232a; color: #fff; }
+
+    /* Internal Validation Checks (internal reviewers only) */
+    .di-acc-internal > summary { color: #1f3864; }
+    .di-internal-note { grid-column: 1 / -1; margin: 0 0 4px; font-size: 0.82rem; color: #b4232a; font-weight: 600; }
+    .di-internal-sub { grid-column: 1 / -1; margin: -2px 0 2px; font-size: 0.8rem; color: var(--di-text-muted, #55617a); }
+    .di-internal-h { grid-column: 1 / -1; margin: 12px 0 2px; font-size: 0.9rem; font-weight: 700; color: #1f3864; border-bottom: 1px solid var(--di-border, #cdd5e3); padding-bottom: 4px; }
+    .di-review-list { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+    .di-review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--di-border, #cdd5e3); border-radius: 8px; background: var(--di-card, #fff); }
+    .di-review-info { display: flex; flex-direction: column; min-width: 0; }
+    .di-review-type { font-size: 0.8rem; font-weight: 600; color: #1f3864; }
+    .di-review-name { font-size: 0.82rem; color: var(--di-text-muted, #55617a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-review-meta { font-size: 0.74rem; color: #2e7d32; margin-top: 2px; }
+    .di-review-btn { flex: 0 0 auto; border: 1px solid #1f3864; background: transparent; color: #1f3864; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .di-review-btn.on { background: #2e7d32; border-color: #2e7d32; color: #fff; }
 </style>
 }
 
@@ -2312,13 +2438,6 @@ else
     private static readonly string[] KysSupportingDocOptions =
         ["Brand Authorisation", "Purchase Invoice", "Certificate of Origin", "Other"];
 
-    /// <summary>True when the selected e-Invoicing wave is Wave 1 (drives Peppol ID / ASP ID requirements).</summary>
-    private bool IsWave1 =>
-        formModel.EInvoicingWaveId is int w
-        && eInvoicingWaves.FirstOrDefault(l => l.Id == w) is { } lov
-        && ((lov.Code?.Trim() is "1" or "Wave1" or "Wave 1")
-            || (lov.DisplayName?.Replace(" ", "").Contains("Wave1", StringComparison.OrdinalIgnoreCase) ?? false));
-
     private bool IsFieldMandatory(string fieldKey)
     {
         // Supplier Site is a free-text field with no validation — never required, whatever the admin setting.
@@ -2330,12 +2449,8 @@ else
         {
             return IsIssuingBodyOthers;
         }
-        // Peppol ID and Approved Service Provider ID are conditionally mandatory for Wave 1 suppliers.
-        if (fieldKey is "PeppolId" or "ApprovedServiceProviderId")
-        {
-            return IsWave1;
-        }
-        // KYS conditional-mandatory fields — required only when their trigger answer is set.
+        // KYS conditional-mandatory fields — required only when their trigger answer is set (all other
+        // KYS fields are mandatory via the admin flag). Peppol ID / ASP ID are now always mandatory too.
         switch (fieldKey)
         {
             case "KysActualOperatingAddress": return formModel.KysOperatingAddressDifferent == true;
@@ -2346,14 +2461,17 @@ else
             case "KysAltBankBranch":
             case "KysAltBankCountryId":
             case "KysAltAccountNumber":
-            case "KysAltIban":
             case "KysAltSwiftBic":
             case "KysAltAccountCurrencyId":
                 return formModel.KysPaymentToOtherParty == true;
+            // IBAN is mandatory only when the selected bank country is the UAE.
+            case "KysIban": return formModel.KysBankCountryId == UaeCountryId;
+            case "KysAltIban": return formModel.KysPaymentToOtherParty == true && formModel.KysAltBankCountryId == UaeCountryId;
             case "KysElectronicPaymentDetails": return formModel.KysPaymentsElectronicOnly == false;
             case "KysPricingBasisOther": return formModel.KysPricingBasisType == "Others";
             case "KysLegalOwnerDetails": return formModel.KysOwnGoodsAtSupply == false;
             case "KysSupportingDocsOther": return formModel.KysSupportingDocs == "Other";
+            case "KysFtaPenaltyDetails": return formModel.KysFtaPenalty == true;
         }
         if (fieldKey is "NumberOfVatGroupEntities" or "VatGroupEntityNames")
         {
@@ -2915,6 +3033,40 @@ else
             ToastService.ShowError(error ?? "Could not remove the document.");
         }
     }
+
+    /// <summary>Internal reviewers toggle the per-attachment "Reviewed" flag. Never available on the
+    /// supplier self-service form (the internal-review section is hidden there).</summary>
+    private async Task ToggleDocumentReviewedAsync(SupplierDocument doc)
+    {
+        if (SupplierFacing)
+        {
+            return;
+        }
+        var (success, error) = await SupplierDocumentService.SetReviewedAsync(doc.Id, !doc.IsReviewed, CurrentUser);
+        if (success)
+        {
+            documents = await LoadDocumentsAsync();
+        }
+        else
+        {
+            ToastService.ShowError(error ?? "Could not update the review status.");
+        }
+    }
+
+    /// <summary>Friendly label for a document type, used by the internal-review attachment list.</summary>
+    private static string DocTypeLabel(SupplierDocumentType type) => type switch
+    {
+        SupplierDocumentType.TradeLicense => "Trade License",
+        SupplierDocumentType.VatCertification => "VAT Certificate",
+        SupplierDocumentType.BankConfirmationLetter => "Bank Confirmation Letter",
+        SupplierDocumentType.SignedDeclaration => "Signed Declaration",
+        SupplierDocumentType.EmiratesIdOrPassport => "Emirates ID / Passport",
+        SupplierDocumentType.ProofOfAddress => "Proof of Address",
+        SupplierDocumentType.PriceListOrQuotation => "Price List / Quotation",
+        SupplierDocumentType.ProofOfOrigin => "Proof of Origin",
+        SupplierDocumentType.CertificateOfIncorporation => "Certificate of Incorporation",
+        _ => "Other"
+    };
 
     /// <summary>Reloads the document list via the gateway (self-service) or the database (internal).</summary>
     private async Task<List<SupplierDocument>> LoadDocumentsAsync()
