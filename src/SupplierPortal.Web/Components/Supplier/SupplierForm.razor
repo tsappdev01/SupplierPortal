@@ -1673,7 +1673,7 @@ else
                             @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v)
 
                             <div class="di-internal-h di-full">2. Adverse media check</div>
-                            @YesNo("Was any adverse media identified for the supplier or its owners / managers?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v)
+                            @YesNo("Are you aware of any adverse media coverage, reviews or regulatory action relating to the business's tax matters?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v)
                             @if (formModel.IntAdverseMedia == true)
                             {
                                 <div class="di-field di-full">
@@ -1695,8 +1695,8 @@ else
                                 <InputSelect @bind-Value="formModel.IntMeetingType">
                                     <option value="">— Select —</option>
                                     <option value="In-Person">In-Person</option>
-                                    <option value="Phone">Phone</option>
-                                    <option value="Video">Video</option>
+                                    <option value="Phone call">Phone call</option>
+                                    <option value="Video Call">Video Call</option>
                                 </InputSelect>
                             </div>
                             <div class="di-field">
@@ -1717,9 +1717,9 @@ else
                                 <label>Verification method</label>
                                 <InputSelect @bind-Value="formModel.IntPobMethod">
                                     <option value="">— Select —</option>
-                                    <option value="Web mapping">Web mapping</option>
-                                    <option value="Physical visit">Physical visit</option>
-                                    <option value="Ejari / tenancy">Ejari / tenancy</option>
+                                    <option value="Web mapping">Web mapping and navigation platforms</option>
+                                    <option value="Site visit">Visiting the supplier's place of business</option>
+                                    <option value="Ejari contract">Ejari contract</option>
                                 </InputSelect>
                             </div>
                             <div class="di-field">
@@ -1734,13 +1734,13 @@ else
                                 <label>DI representative</label>
                                 <InputText @bind-Value="formModel.IntPobDiRep" />
                             </div>
-                            @YesNo("Does the verified place of business match the address on file?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v)
+                            @YesNo("Using web mapping / AI, does the address provided by the supplier match the location found online?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v)
 
                             <div class="di-internal-h di-full">6. Compatibility &amp; final checks</div>
-                            @YesNo("Are the supplier's actual activities compatible with its licensed activities and place of business?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v)
-                            @YesNo("Are the expected transactions proportionate to the supplier's profile?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v)
-                            @YesNo("Have the licensed activities been reviewed against the trade license?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v)
-                            @YesNo("Has the supplier's final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v)
+                            @YesNo("Is the actual place of business compatible with the nature of activities carried out?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v)
+                            @YesNo("Are the commercial transactions disproportionate or unexpected in volume, value or nature compared to the size of the business?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v)
+                            @YesNo("Has the list of licensed activities been reviewed?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v)
+                            @YesNo("Has the final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v)
                         </div>
                     </details>
                 }
