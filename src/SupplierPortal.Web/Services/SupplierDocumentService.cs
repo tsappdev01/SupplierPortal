@@ -766,6 +766,27 @@ public class SupplierDocumentService(
         return (true, null);
     }
 
+    /// <summary>Marks (or clears) an attachment's internal-review flag. Internal reviewers only - this is
+    /// never driven from the supplier self-service form. Records who reviewed it and when.</summary>
+    public async Task<(bool Success, string? Error)> SetReviewedAsync(int documentId, bool reviewed, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var document = await db.SupplierDocuments.FirstOrDefaultAsync(d => d.Id == documentId);
+        if (document is null)
+        {
+            return (false, "Document not found.");
+        }
+
+        document.IsReviewed = reviewed;
+        document.ReviewedBy = reviewed ? actorUsername : null;
+        document.ReviewedAt = reviewed ? DateTime.UtcNow : null;
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", document.SupplierId,
+            $"{(reviewed ? "Marked" : "Cleared")} review on {document.DocumentType} document '{document.FileName}'");
+
+        return (true, null);
+    }
+
     /// <summary>Returns the bytes + file name of every image attachment for a supplier (in display
     /// order), for combining into a PDF / Excel export. Non-image documents (e.g. PDFs) are skipped.</summary>
     public async Task<List<(byte[] Bytes, string FileName)>> GetImageFilesAsync(int supplierId)

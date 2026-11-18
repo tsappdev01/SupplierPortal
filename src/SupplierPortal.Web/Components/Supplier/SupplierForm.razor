@@ -1636,6 +1636,115 @@ else
                     }
                 </details>
 
+                @* Internal Validation Checks — internal reviewers only; never shown to the supplier. *@
+                @if (!SupplierFacing)
+                {
+                    <details class="di-acc di-acc-internal">
+                        <summary>Internal Validation Checks</summary>
+                        <div class="di-section-body">
+                            <p class="di-internal-note di-full">For internal reviewers only — this section is not shown to the supplier.</p>
+
+                            <div class="di-internal-h di-full">1. Attachments review</div>
+                            @if (documents.Count == 0)
+                            {
+                                <p class="text-muted di-full">No attachments have been uploaded yet.</p>
+                            }
+                            else
+                            {
+                                <div class="di-review-list di-full">
+                                    @foreach (var doc in documents)
+                                    {
+                                        <div class="di-review-row">
+                                            <div class="di-review-info">
+                                                <span class="di-review-type">@DocTypeLabel(doc.DocumentType)</span>
+                                                <span class="di-review-name" title="@doc.FileName">@doc.FileName</span>
+                                                @if (doc.IsReviewed && doc.ReviewedAt is not null)
+                                                {
+                                                    <span class="di-review-meta">Reviewed by @doc.ReviewedBy · @doc.ReviewedAt?.ToString("dd MMM yyyy, HH:mm") UTC</span>
+                                                }
+                                            </div>
+                                            <button type="button" class="di-review-btn @(doc.IsReviewed ? "on" : "")" @onclick="() => ToggleDocumentReviewedAsync(doc)">
+                                                @(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v)
+
+                            <div class="di-internal-h di-full">2. Adverse media check</div>
+                            @YesNo("Was any adverse media identified for the supplier or its owners / managers?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v)
+                            @if (formModel.IntAdverseMedia == true)
+                            {
+                                <div class="di-field di-full">
+                                    <label>Details of the adverse media found</label>
+                                    <InputTextArea @bind-Value="formModel.IntAdverseMediaDetails" rows="2" />
+                                </div>
+                            }
+
+                            <div class="di-internal-h di-full">3. Reviewer comments</div>
+                            <div class="di-field di-full">
+                                <label>Comments on the supplier's responses</label>
+                                <InputTextArea @bind-Value="formModel.IntResponseComments" rows="3" />
+                            </div>
+
+                            <div class="di-internal-h di-full">4. Meeting with the supplier</div>
+                            <p class="di-internal-sub di-full">Complete for Natural Person / sole-establishment suppliers.</p>
+                            <div class="di-field">
+                                <label>Meeting type</label>
+                                <InputSelect @bind-Value="formModel.IntMeetingType">
+                                    <option value="">— Select —</option>
+                                    <option value="In-Person">In-Person</option>
+                                    <option value="Phone">Phone</option>
+                                    <option value="Video">Video</option>
+                                </InputSelect>
+                            </div>
+                            <div class="di-field">
+                                <label>Meeting date</label>
+                                <InputDate @bind-Value="formModel.IntMeetingDate" />
+                            </div>
+                            <div class="di-field">
+                                <label>Supplier representative met</label>
+                                <InputText @bind-Value="formModel.IntMeetingRepName" />
+                            </div>
+                            <div class="di-field">
+                                <label>DI representative</label>
+                                <InputText @bind-Value="formModel.IntMeetingDiRep" />
+                            </div>
+
+                            <div class="di-internal-h di-full">5. Place of business verification</div>
+                            <div class="di-field">
+                                <label>Verification method</label>
+                                <InputSelect @bind-Value="formModel.IntPobMethod">
+                                    <option value="">— Select —</option>
+                                    <option value="Web mapping">Web mapping</option>
+                                    <option value="Physical visit">Physical visit</option>
+                                    <option value="Ejari / tenancy">Ejari / tenancy</option>
+                                </InputSelect>
+                            </div>
+                            <div class="di-field">
+                                <label>Date verified</label>
+                                <InputDate @bind-Value="formModel.IntPobDate" />
+                            </div>
+                            <div class="di-field">
+                                <label>Supplier representative</label>
+                                <InputText @bind-Value="formModel.IntPobRepName" />
+                            </div>
+                            <div class="di-field">
+                                <label>DI representative</label>
+                                <InputText @bind-Value="formModel.IntPobDiRep" />
+                            </div>
+                            @YesNo("Does the verified place of business match the address on file?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v)
+
+                            <div class="di-internal-h di-full">6. Compatibility &amp; final checks</div>
+                            @YesNo("Are the supplier's actual activities compatible with its licensed activities and place of business?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v)
+                            @YesNo("Are the expected transactions proportionate to the supplier's profile?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v)
+                            @YesNo("Have the licensed activities been reviewed against the trade license?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v)
+                            @YesNo("Has the supplier's final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v)
+                        </div>
+                    </details>
+                }
+
             </div>
             </fieldset>
         </div>
@@ -1867,6 +1976,20 @@ else
     .di-yn + .di-yn { border-left: 1px solid var(--di-border, #cdd5e3); }
     .di-yn.on { background: #1f3864; color: #fff; }
     .di-yn.di-yn-no.on { background: #b4232a; color: #fff; }
+
+    /* Internal Validation Checks (internal reviewers only) */
+    .di-acc-internal > summary { color: #1f3864; }
+    .di-internal-note { grid-column: 1 / -1; margin: 0 0 4px; font-size: 0.82rem; color: #b4232a; font-weight: 600; }
+    .di-internal-sub { grid-column: 1 / -1; margin: -2px 0 2px; font-size: 0.8rem; color: var(--di-text-muted, #55617a); }
+    .di-internal-h { grid-column: 1 / -1; margin: 12px 0 2px; font-size: 0.9rem; font-weight: 700; color: #1f3864; border-bottom: 1px solid var(--di-border, #cdd5e3); padding-bottom: 4px; }
+    .di-review-list { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+    .di-review-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--di-border, #cdd5e3); border-radius: 8px; background: var(--di-card, #fff); }
+    .di-review-info { display: flex; flex-direction: column; min-width: 0; }
+    .di-review-type { font-size: 0.8rem; font-weight: 600; color: #1f3864; }
+    .di-review-name { font-size: 0.82rem; color: var(--di-text-muted, #55617a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .di-review-meta { font-size: 0.74rem; color: #2e7d32; margin-top: 2px; }
+    .di-review-btn { flex: 0 0 auto; border: 1px solid #1f3864; background: transparent; color: #1f3864; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .di-review-btn.on { background: #2e7d32; border-color: #2e7d32; color: #fff; }
 </style>
 }
 
@@ -2910,6 +3033,40 @@ else
             ToastService.ShowError(error ?? "Could not remove the document.");
         }
     }
+
+    /// <summary>Internal reviewers toggle the per-attachment "Reviewed" flag. Never available on the
+    /// supplier self-service form (the internal-review section is hidden there).</summary>
+    private async Task ToggleDocumentReviewedAsync(SupplierDocument doc)
+    {
+        if (SupplierFacing)
+        {
+            return;
+        }
+        var (success, error) = await SupplierDocumentService.SetReviewedAsync(doc.Id, !doc.IsReviewed, CurrentUser);
+        if (success)
+        {
+            documents = await LoadDocumentsAsync();
+        }
+        else
+        {
+            ToastService.ShowError(error ?? "Could not update the review status.");
+        }
+    }
+
+    /// <summary>Friendly label for a document type, used by the internal-review attachment list.</summary>
+    private static string DocTypeLabel(SupplierDocumentType type) => type switch
+    {
+        SupplierDocumentType.TradeLicense => "Trade License",
+        SupplierDocumentType.VatCertification => "VAT Certificate",
+        SupplierDocumentType.BankConfirmationLetter => "Bank Confirmation Letter",
+        SupplierDocumentType.SignedDeclaration => "Signed Declaration",
+        SupplierDocumentType.EmiratesIdOrPassport => "Emirates ID / Passport",
+        SupplierDocumentType.ProofOfAddress => "Proof of Address",
+        SupplierDocumentType.PriceListOrQuotation => "Price List / Quotation",
+        SupplierDocumentType.ProofOfOrigin => "Proof of Origin",
+        SupplierDocumentType.CertificateOfIncorporation => "Certificate of Incorporation",
+        _ => "Other"
+    };
 
     /// <summary>Reloads the document list via the gateway (self-service) or the database (internal).</summary>
     private async Task<List<SupplierDocument>> LoadDocumentsAsync()
