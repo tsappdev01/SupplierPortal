@@ -846,6 +846,34 @@
 .di-doccard-viewbtn:hover:not(:disabled) { background: #1e7e34; color: #fff; }
 .di-doccard-viewbtn:disabled { opacity: 0.6; cursor: default; }
 
+/* Internal reviewer "Mark Reviewed" acknowledgement toggle on each attachment card. */
+.di-doccard-reviewbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #b58105;
+    color: #8a6200;
+    background: #fff;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.di-doccard-reviewbtn:hover:not(:disabled) { background: #fff8e6; }
+
+.di-doccard-reviewbtn.on {
+    border-color: #1e7e34;
+    color: #fff;
+    background: #1e7e34;
+}
+
+.di-doccard-reviewbtn-sm { padding: 6px 12px; font-size: 12.5px; }
+
 .di-doccard-upload {
     flex: none;
     display: flex;
