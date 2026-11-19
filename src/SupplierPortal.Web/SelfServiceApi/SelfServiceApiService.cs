@@ -81,10 +81,11 @@ public class SelfServiceApiService(
         var businessUnitDto = businessUnit is null ? null : DtoMapper.ToDto(businessUnit);
         if (businessUnitDto is not null)
         {
-            // Same logo source as the OTP response (fetched + inlined so it renders on the form page even
-            // when the storage account isn't publicly reachable from the supplier's browser).
+            // Same logo source as the OTP response: prefer the UPLOADED logo, inlined as a data URI, so the
+            // form page renders it even when the BU's hosted LogoUrl isn't reachable from this server or the
+            // supplier's browser (falls back to the hosted URL only when no image was uploaded).
             businessUnitDto.LogoUrl = await logoInliner.InlineIfUrlAsync(
-                await brandingService.GetBusinessUnitLogoSrcAsync(supplier.BusinessUnitId));
+                await brandingService.GetBusinessUnitUploadedLogoSrcAsync(supplier.BusinessUnitId));
         }
 
         return new SupplierFormBootstrapDto

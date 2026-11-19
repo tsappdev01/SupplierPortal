@@ -58,10 +58,13 @@ public static class SelfServiceEndpoints
             var devMode = env.IsDevelopment();
             var (success, error, code) = await accessTokens.IssueOtpAsync(token.Id, sendEmail: !devMode, forceResend: req.Resend);
 
-            // The supplier's business-unit logo. Prefer the BU's configured hosted LogoUrl (the image URL
-            // set on the business unit), falling back to the uploaded logo as a data URI when no URL is set.
+            // The supplier's business-unit logo. Prefer the UPLOADED logo (served inline as a data URI) so the
+            // portal renders reliably even when the BU's hosted LogoUrl isn't reachable from this server or the
+            // supplier's browser (e.g. an untrusted TLS chain); the hosted URL is used only when no image was
+            // uploaded. Emails keep using the hosted URL (GetBusinessUnitLogoSrcAsync), which renders better in
+            // mail clients. This matches the Customer self-service portal.
             var logo = await logoInliner.InlineIfUrlAsync(
-                await branding.GetBusinessUnitLogoSrcAsync(token.Supplier?.BusinessUnitId));
+                await branding.GetBusinessUnitUploadedLogoSrcAsync(token.Supplier?.BusinessUnitId));
 
             return Results.Ok(new OtpRequestResponse
             {
@@ -92,7 +95,7 @@ public static class SelfServiceEndpoints
                 Success = true,
                 BusinessUnitName = await branding.GetBusinessUnitNameAsync(buId),
                 BusinessUnitEmail = await branding.GetPortalSenderEmailAsync(buId, Models.PortalType.Supplier),
-                LogoUrl = await logoInliner.InlineIfUrlAsync(await branding.GetBusinessUnitLogoSrcAsync(buId))
+                LogoUrl = await logoInliner.InlineIfUrlAsync(await branding.GetBusinessUnitUploadedLogoSrcAsync(buId))
             });
         })
         .RequireRateLimiting("otp");
