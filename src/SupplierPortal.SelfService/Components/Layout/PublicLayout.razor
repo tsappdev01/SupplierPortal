@@ -2,6 +2,16 @@
 @implements IDisposable
 @inject SelfServiceBranding Branding
 
+@* Brand the browser-tab icon with the supplier's business-unit logo too. Browsers use the LAST
+   <link rel="icon">, so this overrides the static favicon.png once branding is known. Uses the same
+   already-inlined BU logo as the header, so it needs no extra fetch. *@
+@if (!string.IsNullOrWhiteSpace(Branding.LogoUrl))
+{
+    <HeadContent>
+        <link rel="icon" href="@Branding.LogoUrl" />
+    </HeadContent>
+}
+
 <div class="public-layout">
     <div class="public-header">
         @if (!string.IsNullOrWhiteSpace(Branding.LogoUrl))
