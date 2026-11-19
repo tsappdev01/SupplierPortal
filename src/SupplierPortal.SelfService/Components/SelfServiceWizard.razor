@@ -223,52 +223,8 @@
                             </div>
                         }
 
-                        @if (step == 1)
-                        {
-                            <div class="di-documents-grid">
-                                @DocCard("Trade License", SelfServiceDocumentType.TradeLicense, "di-thumb-red", true, !HasTradeLicenseDocument(), "Required — attach the Trade License before submitting.")
-                                @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", IsVatRegistered, RequiresVatCertificate(), "Required — attach the VAT Certificate because VAT Registered is set to Yes.")
-                                <div class="di-doccard">
-                                    <div class="di-doccard-thumb di-thumb-amber">
-                                        <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
-                                        <span class="di-doccard-ext">FILES</span>
-                                    </div>
-                                    <div class="di-doccard-main">
-                                        <div class="di-doccard-title">Other Documents</div>
-                                        @if (!OtherDocuments.Any())
-                                        {
-                                            <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
-                                        }
-                                        else
-                                        {
-                                            @foreach (var doc in OtherDocuments)
-                                            {
-                                                <div class="di-doccard-chip">
-                                                    <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
-                                                    <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
-                                                    <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
-                                                </div>
-                                            }
-                                        }
-                                    </div>
-                                    <div class="di-doccard-upload">
-                                        <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="docfile-Other">
-                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
-                                            <span>Choose File</span>
-                                            <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
-                                        </label>
-                                        <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
-                                        <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                        @if (step == 5)
-                        {
-                            <div class="di-documents-grid">
-                                @DocCard("Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
-                            </div>
-                        }
+                        @* All supporting documents are consolidated into the KYS tab's "Documents" section
+                           (step 6), matching the internal portal, so they are uploaded from one place. *@
 
                         @if (step == 6)
                         {
@@ -374,11 +330,49 @@
                                     </div>
                                 </details>
 
-                                <details class="di-acc">
+                                <details class="di-acc" open>
                                     <summary>Documents</summary>
                                     <div class="di-section-body di-documents-grid">
+                                        @DocCard("Trade License", SelfServiceDocumentType.TradeLicense, "di-thumb-red", true, !HasTradeLicenseDocument(), "Required — attach the Trade License before submitting.")
+                                        @DocCard("VAT Certificate", SelfServiceDocumentType.VatCertification, "di-thumb-green", IsVatRegistered, RequiresVatCertificate(), "Required — attach the VAT Certificate because VAT Registered is set to Yes.")
+                                        @DocCard("Certificate of Incorporation", SelfServiceDocumentType.CertificateOfIncorporation, "di-thumb-blue", false, false, "")
+                                        <div class="di-doccard">
+                                            <div class="di-doccard-thumb di-thumb-amber">
+                                                <svg width="26" height="26" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 2a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-4a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1h-3z" /></svg>
+                                                <span class="di-doccard-ext">FILES</span>
+                                            </div>
+                                            <div class="di-doccard-main">
+                                                <div class="di-doccard-title">Other Documents</div>
+                                                @if (!OtherDocuments.Any())
+                                                {
+                                                    <div class="di-doccard-meta di-doccard-empty">No files uploaded yet.</div>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var doc in OtherDocuments)
+                                                    {
+                                                        <div class="di-doccard-chip">
+                                                            <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
+                                                            <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">View</button>
+                                                            <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                            <div class="di-doccard-upload">
+                                                <label class="di-doccard-choose @(uploadingDocument ? "is-disabled" : null)" for="docfile-Other">
+                                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
+                                                    <span>Choose File</span>
+                                                    <svg class="di-doccard-caret" width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" /></svg>
+                                                </label>
+                                                <InputFile id="docfile-Other" class="di-doccard-input" accept=".pdf,.jpg,.jpeg,.png" OnChange="e => UploadDocumentAsync(e, SelfServiceDocumentType.Other)" disabled="@uploadingDocument" />
+                                                <div class="di-doccard-hint">Supported formats: PDF, JPG, PNG<br />Max size: @MaxUploadMb MB</div>
+                                            </div>
+                                        </div>
+                                        @DocCard("Written Bank Confirmation Letter", SelfServiceDocumentType.BankConfirmationLetter, "di-thumb-blue", RequiresBankConfirmationLetter(), RequiresBankConfirmationLetter(), "Required: you changed the bank account, so a Bank Confirmation Letter must be attached.")
                                         @DocCard("Copy of valid Emirates ID / passport", SelfServiceDocumentType.EmiratesIdOrPassport, "di-thumb-blue", false, false, "")
                                         @DocCard("Proof of address (tenancy contract / Ejari, utility bill)", SelfServiceDocumentType.ProofOfAddress, "di-thumb-green", false, false, "")
+                                        @DocCard("Proof of origin, ownership & authenticity of goods (purchase invoice, certificate of origin, brand authorisation)", SelfServiceDocumentType.ProofOfOrigin, "di-thumb-green", false, false, "")
                                         @DocCard("Current price list / quotation", SelfServiceDocumentType.PriceListOrQuotation, "di-thumb-blue", false, false, "")
                                     </div>
                                 </details>
@@ -770,7 +764,29 @@
 
     private void OnBankChanged() => model.BankBranchId = null;
     private void Back() => currentIndex = Math.Max(0, currentIndex - 1);
-    private void GoToIndex(int idx) => currentIndex = Math.Clamp(idx, 0, displayTabs.Count - 1);
+    private void GoToIndex(int idx)
+    {
+        idx = Math.Clamp(idx, 0, displayTabs.Count - 1);
+        // Moving back to an earlier tab (or staying) is always allowed, so the supplier can correct
+        // something they already passed.
+        if (idx <= currentIndex) { currentIndex = idx; errorMessage = null; return; }
+
+        // Jumping FORWARD via the stepper: every tab from the current one up to the target must be
+        // complete first — the supplier can't skip past a tab with missing required fields. Stop at (and
+        // show the errors for) the first incomplete tab.
+        for (var i = currentIndex; i < idx; i++)
+        {
+            var tabErrors = displayTabs[i].Steps.SelectMany(ValidateStep).ToList();
+            if (tabErrors.Count > 0)
+            {
+                currentIndex = i;
+                errorMessage = FormatErrors(tabErrors);
+                return;
+            }
+        }
+        currentIndex = idx;
+        errorMessage = null;
+    }
 
     private bool HasVatCertificateDocument() => documents.Any(d => d.DocumentType == SelfServiceDocumentType.VatCertification);
     // When the supplier is VAT registered, a VAT Certificate document must be attached before submitting.
@@ -984,23 +1000,10 @@
         var errors = tab.Steps.SelectMany(ValidateStep).ToList();
         if (errors.Count > 0) { errorMessage = FormatErrors(errors); return; }
 
-        // Document requirements whose upload lives on a step within this tab — enforced on Next (not only on
-        // Proceed) so the supplier can't move past the tab that carries a required, still-missing document.
-        if (tab.Steps.Contains(1) && !HasTradeLicenseDocument())
-        {
-            errorMessage = "Please attach the Trade License document before continuing.";
-            return;
-        }
-        if (tab.Steps.Contains(1) && RequiresVatCertificate())
-        {
-            errorMessage = "Please attach the VAT Certificate — it is required because VAT Registered is set to \"Yes\".";
-            return;
-        }
-        if (tab.Steps.Contains(5) && RequiresBankConfirmationLetter())
-        {
-            errorMessage = "A Bank Confirmation Letter must be attached because the bank account was changed.";
-            return;
-        }
+        // All supporting documents now live in the KYS tab's "Documents" section (consolidated, like the
+        // internal portal), so the required-document checks (Trade License, VAT Certificate, Bank
+        // Confirmation Letter) are enforced in SubmitAsync rather than on Next — a supplier must not be
+        // blocked on an earlier tab for a document they can only attach on the KYS tab.
         isSaving = true;
         try
         {
