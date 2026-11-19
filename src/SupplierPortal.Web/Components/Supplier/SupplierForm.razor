@@ -1348,6 +1348,12 @@ else
                                         <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
                                         <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
                                         <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">@(viewingDocId == doc.Id ? "Opening…" : "View")</button>
+                                        @if (!SupplierFacing)
+                                        {
+                                            <button type="button" class="di-doccard-reviewbtn di-doccard-reviewbtn-sm @(doc.IsReviewed ? "on" : "")"
+                                                    title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}" : "Mark this attachment as reviewed")"
+                                                    @onclick="() => ToggleDocumentReviewedAsync(doc)">@(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")</button>
+                                        }
                                         <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
                                     </div>
                                 }
@@ -1677,31 +1683,7 @@ else
                             <p class="di-internal-note di-full">For internal reviewers only — this section is not shown to the supplier.</p>
 
                             <div class="di-internal-h di-full">1. Attachments review</div>
-                            @if (documents.Count == 0)
-                            {
-                                <p class="text-muted di-full">No attachments have been uploaded yet.</p>
-                            }
-                            else
-                            {
-                                <div class="di-review-list di-full">
-                                    @foreach (var doc in documents)
-                                    {
-                                        <div class="di-review-row">
-                                            <div class="di-review-info">
-                                                <span class="di-review-type">@DocTypeLabel(doc.DocumentType)</span>
-                                                <span class="di-review-name" title="@doc.FileName">@doc.FileName</span>
-                                                @if (doc.IsReviewed && doc.ReviewedAt is not null)
-                                                {
-                                                    <span class="di-review-meta">Reviewed by @doc.ReviewedBy · @doc.ReviewedAt?.ToString("dd MMM yyyy, HH:mm") UTC</span>
-                                                }
-                                            </div>
-                                            <button type="button" class="di-review-btn @(doc.IsReviewed ? "on" : "")" @onclick="() => ToggleDocumentReviewedAsync(doc)">
-                                                @(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")
-                                            </button>
-                                        </div>
-                                    }
-                                </div>
-                            }
+                            <p class="di-internal-sub di-full">Mark each uploaded attachment "Reviewed" on its card in the Documents section above, then confirm below.</p>
                             @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v)
 
                             <div class="di-internal-h di-full">2. Adverse media check</div>
@@ -2647,6 +2629,14 @@ else
                         <span>View</span>
                     }
                 </button>
+                @if (!SupplierFacing)
+                {
+                    <button type="button" class="di-doccard-reviewbtn @(doc.IsReviewed ? "on" : "")"
+                            title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}{(doc.ReviewedAt is { } ra ? $" on {ra.ToLocalTime():dd MMM yyyy}" : "")}" : "Mark this attachment as reviewed")"
+                            @onclick="() => ToggleDocumentReviewedAsync(doc)">
+                        @(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")
+                    </button>
+                }
             </div>
         }
         <div class="di-doccard-upload">
@@ -3188,6 +3178,60 @@ else
         }
     }
 
+    /// <summary>Validates the Internal Validation Checks section: every uploaded attachment must be marked
+    /// Reviewed, and all check fields must be answered/filled (conditional sections only when started).
+    /// Returns the list of problems, empty when the tab is complete. Internal reviewers only.</summary>
+    private List<string> ValidateInternalChecks()
+    {
+        var e = new List<string>();
+        var m = formModel;
+        void YN(bool? v, string label) { if (v is null) { e.Add($"{label}: please select Yes or No."); } }
+
+        // Every uploaded attachment must be acknowledged as reviewed (its "Reviewed" button on the card).
+        var unreviewed = documents.Count(d => !d.IsReviewed);
+        if (unreviewed > 0)
+        {
+            e.Add($"Mark every uploaded attachment as Reviewed on its card ({unreviewed} not yet reviewed).");
+        }
+
+        YN(m.IntAttachmentsReviewed, "1. Attachments review");
+        YN(m.IntAdverseMedia, "2. Adverse media check");
+        if (m.IntAdverseMedia == true && string.IsNullOrWhiteSpace(m.IntAdverseMediaDetails))
+        {
+            e.Add("2. Adverse media: please provide the details.");
+        }
+        if (string.IsNullOrWhiteSpace(m.IntResponseComments))
+        {
+            e.Add("3. Reviewer comments: please comment on the supplier's responses.");
+        }
+
+        // 4. Meeting — required only once started (it applies to Natural Person / sole-establishment suppliers).
+        var meetingStarted = !string.IsNullOrWhiteSpace(m.IntMeetingType) || m.IntMeetingDate is not null
+            || !string.IsNullOrWhiteSpace(m.IntMeetingRepName) || !string.IsNullOrWhiteSpace(m.IntMeetingDiRep);
+        if (meetingStarted)
+        {
+            if (string.IsNullOrWhiteSpace(m.IntMeetingType)) { e.Add("4. Meeting: select a meeting type."); }
+            if (m.IntMeetingDate is null) { e.Add("4. Meeting: enter the meeting date."); }
+            if (string.IsNullOrWhiteSpace(m.IntMeetingRepName)) { e.Add("4. Meeting: enter the supplier representative met."); }
+            if (string.IsNullOrWhiteSpace(m.IntMeetingDiRep)) { e.Add("4. Meeting: enter the DI representative."); }
+        }
+
+        // 5. Place of business verification (required).
+        if (string.IsNullOrWhiteSpace(m.IntPobMethod)) { e.Add("5. Place of business: select a verification method."); }
+        if (m.IntPobDate is null) { e.Add("5. Place of business: enter the date verified."); }
+        if (string.IsNullOrWhiteSpace(m.IntPobRepName)) { e.Add("5. Place of business: enter the supplier representative."); }
+        if (string.IsNullOrWhiteSpace(m.IntPobDiRep)) { e.Add("5. Place of business: enter the DI representative."); }
+        YN(m.IntPobAddressMatch, "5. Place of business address match");
+
+        // 6. Compatibility & final checks (required).
+        YN(m.IntPobActivitiesCompatible, "6. Activities compatible with place of business");
+        YN(m.IntTransactionsProportionate, "6. Commercial transactions proportionality");
+        YN(m.IntActivitiesReviewed, "6. Licensed activities reviewed");
+        YN(m.IntDeclarationReviewed, "6. Final declaration reviewed");
+
+        return e;
+    }
+
     /// <summary>Reviewer saves edits to a Verification-Pending record without completing it (status stays
     /// Verification Pending, so they can still Verify or raise an RFI afterwards).</summary>
     private async Task SaveReviewEditsAsync()
@@ -3209,6 +3253,17 @@ else
         {
             return;
         }
+
+        // All Internal Validation Checks must be completed (and every attachment acknowledged) before the
+        // reviewer can mark the record Completed.
+        var checkErrors = ValidateInternalChecks();
+        if (checkErrors.Count > 0)
+        {
+            ToastService.ShowError("Complete all Internal Validation Checks before verifying.");
+            ToastService.ShowErrors(checkErrors);
+            return;
+        }
+
         isSaving = true;
         try
         {
