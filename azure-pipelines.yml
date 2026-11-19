@@ -61,12 +61,14 @@ variables:
   landlordSiteName: 'Landlord Portal'     # Landlord internal site (SupplierPortal.Leasing.Web) -> C:\Websites\Landlord\INT
   landlordUrl: 'https://lms.dipark.com/'
 
-  # ---- DMZ / self-service (external) sites: NOT deployed by this pipeline ----
-  # By design this pipeline publishes INTERNAL sites only. The external/self-service sites
-  # (Partner Connect, and Landlord SelfService / lmsext.dipark.com) are managed separately and are
-  # intentionally left blank so their deploy steps are skipped. Do not fill these in here.
-  selfServiceSiteName: ''                 # Partner Connect (SupplierPortal.SelfService) - external, not published here
-  selfServiceUrl: ''
+  # ---- DMZ / self-service sites ----
+  # Partner Connect (supplier self-service) runs on this same UATWEB01 agent as the IIS site
+  # 'DI PORTAL' (physical path C:\Websites\partnerconnect, host upartnerconnect.dubaiinvestments.com),
+  # so the pipeline deploys it alongside the internal sites. The deploy preserves the site's
+  # appsettings.Local.json (its Api config), and configGuard is off, so no secrets are needed here.
+  # Landlord SelfService (lmsext.dipark.com) is still managed separately — left blank to skip it.
+  selfServiceSiteName: 'DI PORTAL'        # Partner Connect (SupplierPortal.SelfService) IIS site name on UATWEB01
+  selfServiceUrl: 'https://upartnerconnect.dubaiinvestments.com/'
   landlordDmzSiteName: ''                 # Landlord SelfService (SupplierPortal.Leasing.SelfService) - external, not published here
   landlordDmzUrl: ''
 
