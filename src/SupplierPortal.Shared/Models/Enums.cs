@@ -81,13 +81,14 @@ public static class SupplierStatuses
     // display text stored in LookupValues and shown in the UI is "Not Submitted"/"Completed".
     public const string New = "Not Submitted";
     public const string AwaitingSupplierResponse = "Awaiting Supplier Response";
-    // "For Review" and "Rejected" are retained only so legacy records and any transition code that
-    // still references them resolve. They are no longer part of the active workflow: a supplier
-    // submission auto-completes the record (see SupplierService.UpdateAsync) and there is no reject
-    // step, so both are excluded from All / filters / stats.
-    public const string ForReview = "For Review";
+    // A supplier self-service submission moves to "Verification Pending"; an internal reviewer then either
+    // verifies it (→ Completed) or raises an RFI (→ Awaiting Supplier Response, loops back on resubmission).
+    // (This constant was previously "For Review"; the DB label is migrated in AddVerificationPendingStatus.)
+    public const string VerificationPending = "Verification Pending";
     public const string Complete = "Completed";
+    // "Rejected" is retained only so any legacy record / transition code resolves; it is not part of the
+    // active workflow (there is no reject step), so it is excluded from All / filters / stats.
     public const string Rejected = "Rejected";
 
-    public static readonly string[] All = [New, AwaitingSupplierResponse, Complete];
+    public static readonly string[] All = [New, AwaitingSupplierResponse, VerificationPending, Complete];
 }

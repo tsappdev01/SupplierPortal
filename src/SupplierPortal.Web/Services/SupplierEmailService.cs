@@ -61,7 +61,8 @@ public class SupplierEmailService(
     /// entity) so callers - including bulk sends over the dashboard's lightweight list projection -
     /// don't need to load the full ~20-navigation-property Supplier graph just to send a link.</summary>
     public async Task<(bool Success, string? Error)> NotifySupplierAsync(
-        int supplierId, string supplierName, string? contactEmail, string actorUsername, string baseUrl)
+        int supplierId, string supplierName, string? contactEmail, string actorUsername, string baseUrl,
+        string? reviewComment = null)
     {
         if (string.IsNullOrWhiteSpace(contactEmail))
         {
@@ -101,9 +102,18 @@ public class SupplierEmailService(
         var brand = await branding.GetBrandNameAsync(actorUsername, businessUnitId);
         var logo = await BusinessUnitLogoAsync(businessUnitId, actorUsername);
         var body = await File.ReadAllTextAsync(templatePath);
+        // When the reviewer raises an RFI, surface the requested information as a highlighted block below the
+        // greeting; otherwise the placeholder is removed. Encoded, with line breaks preserved.
+        var reviewBlock = string.IsNullOrWhiteSpace(reviewComment)
+            ? ""
+            : "<p style=\"margin:0 0 16px 0;padding:12px 14px;background:#fff7ed;border-left:4px solid #d97706;" +
+              "font-size:14px;color:#7c2d12;line-height:1.6;\"><strong>Additional information requested by our " +
+              "team:</strong><br>" + System.Net.WebUtility.HtmlEncode(reviewComment).Replace("\n", "<br>") + "</p>";
+
         body = body
             .Replace("{CompanyLogo}", BrandBlock(logo, brand))
             .Replace("{Supplier Name}", System.Net.WebUtility.HtmlEncode(supplierName))
+            .Replace("{ReviewComment}", reviewBlock)
             .Replace("{Link}", link);
 
         var subject = $"Supplier Information Update – UAE e-Invoicing Compliance - {supplierName}";

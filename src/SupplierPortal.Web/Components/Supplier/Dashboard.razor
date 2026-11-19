@@ -39,6 +39,10 @@
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.AwaitingSupplierResponse)</div>
         <div class="di-stat-label">Awaiting Supplier Response</div>
     </div>
+    <div class="di-stat-tile di-stat-review">
+        <div class="di-stat-value">@CountByStatus(SupplierStatuses.VerificationPending)</div>
+        <div class="di-stat-label">Verification Pending</div>
+    </div>
     <div class="di-stat-tile di-stat-complete">
         <div class="di-stat-value">@CountByStatus(SupplierStatuses.Complete)</div>
         <div class="di-stat-label">Completed</div>
@@ -1889,6 +1893,7 @@ else if (TabFilteredSuppliers.Any())
     {
         SupplierStatuses.New => "bg-secondary",
         SupplierStatuses.AwaitingSupplierResponse => "bg-info text-dark",
+        SupplierStatuses.VerificationPending => "bg-warning text-dark",
         SupplierStatuses.Complete => "bg-success",
         _ => "bg-light text-dark"
     };
