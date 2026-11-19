@@ -11,7 +11,9 @@ public enum SelfServiceDocumentType
     // KYS document types (aligned with the internal SupplierDocumentType; 4 = SignedDeclaration is internal-only)
     EmiratesIdOrPassport = 5,
     ProofOfAddress = 6,
-    PriceListOrQuotation = 7
+    PriceListOrQuotation = 7,
+    ProofOfOrigin = 8,
+    CertificateOfIncorporation = 9
 }
 
 public class LookupItemDto
