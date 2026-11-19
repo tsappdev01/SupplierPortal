@@ -91,13 +91,9 @@ public class LocalSupplierSelfServiceDataGateway(
             // Best-effort notifications (must not fail the submission). The requestor link points at the
             // internal portal (SelfService:InternalUrl), not the public DMZ host.
             var internalBase = configuration["SelfService:InternalUrl"] ?? "";
+            // The submission now moves to "Verification Pending" (not Completed), so the requestor is told to
+            // verify it. The supplier's "completed" email is sent later, when a reviewer marks it Verified.
             try { await emailService.NotifyRequestorOfSubmissionAsync(updated, access.CreatedBy, internalBase); } catch { }
-            try
-            {
-                await emailService.NotifySupplierCompletedAsync(
-                    updated.Id, updated.SupplierName, updated.ContactEmail, Actor, updated.BusinessUnitId);
-            }
-            catch { }
         }
 
         // Return the reloaded record so the form can sync database-generated child (contact/account) ids.

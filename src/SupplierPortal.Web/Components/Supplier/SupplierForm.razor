@@ -1,5 +1,8 @@
 @using SupplierPortal.Web.Models
 @using SupplierPortal.Web.Services
+@using Microsoft.Extensions.DependencyInjection
+@inject NavigationManager Nav
+@inject IServiceProvider Services
 @inject SupplierService SupplierService
 @inject BusinessUnitService BusinessUnitService
 @inject SupplierFieldSettingService SupplierFieldSettingService
@@ -1793,6 +1796,12 @@ else
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708Z" /></svg>
                 </button>
             }
+            else if (!SupplierFacing && IsVerificationPending)
+            {
+                <button class="di-btn di-btn-secondary" type="button" @onclick="SaveReviewEditsAsync" disabled="@isSaving">Save Changes</button>
+                <button class="di-btn di-btn-secondary" type="button" @onclick="() => showRfi = !showRfi" disabled="@isSaving">Request Information</button>
+                <button class="di-btn di-btn-primary" type="button" @onclick="VerifyCompleteAsync" disabled="@isSaving">Verify &amp; Complete</button>
+            }
             else if (Supplier.IsDraft)
             {
                 <button class="di-btn di-btn-secondary" type="button" @onclick="SaveAsDraftAsync" disabled="@isSaving">Save as Draft</button>
@@ -1803,6 +1812,19 @@ else
                 <button class="di-btn di-btn-primary" type="button" @onclick="SubmitForApprovalAsync" disabled="@isSaving">Save Changes</button>
             }
         </div>
+
+        @if (!SupplierFacing && IsVerificationPending && showRfi)
+        {
+            <div class="di-rfi">
+                <label class="di-rfi-label">Request further information from the supplier</label>
+                <textarea class="di-rfi-text" rows="3" @bind="rfiComment"
+                          placeholder="Describe what the supplier needs to correct or provide. This is emailed to them with a fresh secure link."></textarea>
+                <div class="di-rfi-actions">
+                    <button class="di-btn di-btn-secondary" type="button" @onclick="() => showRfi = false" disabled="@isSaving">Cancel</button>
+                    <button class="di-btn di-btn-primary" type="button" @onclick="RequestInfoAsync" disabled="@isSaving">Send request to supplier</button>
+                </div>
+            </div>
+        }
     </EditForm>
 
     @if (viewerUrl is not null)
@@ -2027,6 +2049,12 @@ else
     .di-kys-extract-head { font-weight: 600; color: #2e7d32; margin-bottom: 2px; }
     .di-kys-extract-list { margin: 0; padding-left: 18px; color: var(--di-text, #1f2a44); }
     .di-kys-extract-list li { margin: 1px 0; }
+
+    /* Request-Information (RFI) panel under the action bar */
+    .di-rfi { margin: 12px 0 0; padding: 14px 16px; border: 1px solid #d97706; border-radius: 10px; background: #fff7ed; }
+    .di-rfi-label { display: block; font-weight: 700; color: #7c2d12; margin-bottom: 6px; font-size: 0.9rem; }
+    .di-rfi-text { width: 100%; border: 1px solid var(--di-border, #cdd5e3); border-radius: 8px; padding: 8px 10px; font-size: 0.9rem; resize: vertical; }
+    .di-rfi-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 </style>
 }
 
@@ -2343,6 +2371,13 @@ else
     private bool reExtractingId;
     private bool extractingKys;
     private SupplierPortal.Web.Services.KysExtractionResult? kysExtractResult;
+    private bool showRfi;
+    private string? rfiComment;
+
+    /// <summary>The internal reviewer's verify / RFI actions appear only while the record is awaiting
+    /// verification (status "Verification Pending").</summary>
+    private bool IsVerificationPending =>
+        string.Equals(Supplier.Status?.DisplayName, SupplierStatuses.VerificationPending, StringComparison.OrdinalIgnoreCase);
     private bool uploadingDocument;
     private SupplierDocumentType? uploadingType;   // which card is mid-upload (for its spinner overlay)
     private bool viewingDocument;
@@ -3150,6 +3185,93 @@ else
         {
             extractingKys = false;
             StateHasChanged();
+        }
+    }
+
+    /// <summary>Reviewer saves edits to a Verification-Pending record without completing it (status stays
+    /// Verification Pending, so they can still Verify or raise an RFI afterwards).</summary>
+    private async Task SaveReviewEditsAsync()
+    {
+        var errors = CurrentSections.Where(CanEditTab).SelectMany(s => ValidateStep(formModel, s)).ToList();
+        if (errors.Count > 0)
+        {
+            ToastService.ShowErrors(errors);
+            return;
+        }
+        await FinishAsync(submitting: false);
+    }
+
+    /// <summary>Internal reviewer verifies a Verification-Pending submission → Completed, and emails the
+    /// supplier the completion confirmation (best-effort). Then hands back to the host (OnComplete).</summary>
+    private async Task VerifyCompleteAsync()
+    {
+        if (SupplierFacing || isSaving || !IsVerificationPending)
+        {
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            var (ok, error) = await SupplierService.MarkVerifiedCompleteAsync(Supplier.Id, CurrentUser);
+            if (!ok)
+            {
+                ToastService.ShowError(error ?? "Could not verify the supplier.");
+                return;
+            }
+            try
+            {
+                var emailService = Services.GetRequiredService<SupplierEmailService>();
+                await emailService.NotifySupplierCompletedAsync(
+                    Supplier.Id, Supplier.SupplierName, Supplier.ContactEmail, CurrentUser, Supplier.BusinessUnitId);
+            }
+            catch { /* best-effort courtesy email */ }
+            ToastService.ShowSuccess("Supplier verified and marked Completed.");
+            await OnComplete.InvokeAsync(Supplier);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    /// <summary>Internal reviewer raises an RFI: records the comment, emails the supplier a fresh secure link
+    /// with that comment, and the email send moves the record to Awaiting Supplier Response.</summary>
+    private async Task RequestInfoAsync()
+    {
+        if (SupplierFacing || isSaving || !IsVerificationPending)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(rfiComment))
+        {
+            ToastService.ShowError("Please enter the information you are requesting from the supplier.");
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            var (ok, error) = await SupplierService.RecordRfiRemarkAsync(Supplier.Id, rfiComment, CurrentUser);
+            if (!ok)
+            {
+                ToastService.ShowError(error);
+                return;
+            }
+            var emailService = Services.GetRequiredService<SupplierEmailService>();
+            var (sent, sendError) = await emailService.NotifySupplierAsync(
+                Supplier.Id, Supplier.SupplierName, Supplier.ContactEmail, CurrentUser, Nav.BaseUri, reviewComment: rfiComment);
+            if (!sent)
+            {
+                ToastService.ShowError(sendError ?? "The RFI was saved but the email could not be sent.");
+                return;
+            }
+            ToastService.ShowSuccess("Information request sent. Status moved to Awaiting Supplier Response.");
+            showRfi = false;
+            rfiComment = null;
+            await OnComplete.InvokeAsync(Supplier);
+        }
+        finally
+        {
+            isSaving = false;
         }
     }
 

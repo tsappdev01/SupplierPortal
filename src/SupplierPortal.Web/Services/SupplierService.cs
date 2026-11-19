@@ -429,6 +429,42 @@ public class SupplierService(
         (await db.LookupValues.FirstOrDefaultAsync(
             l => l.Category == LookupCategory.SupplierStatus && l.DisplayName == statusName))?.Id;
 
+    /// <summary>Internal reviewer verifies a Verification-Pending submission and marks it Completed.
+    /// Clears any outstanding RFI remark. Returns (false, reason) if the supplier is missing.</summary>
+    public async Task<(bool Success, string? Error)> MarkVerifiedCompleteAsync(int supplierId, string actorUsername)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null) { return (false, "Supplier not found."); }
+
+        supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Complete) ?? supplier.StatusId;
+        supplier.ReviewRemarks = null;
+        supplier.UpdatedBy = actorUsername;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+            "Verified supplier information and marked the registration Completed.");
+        return (true, null);
+    }
+
+    /// <summary>Records the internal reviewer's RFI comment on the supplier (ReviewRemarks). The caller then
+    /// emails the supplier a fresh self-service link, which moves the record to Awaiting Supplier Response.</summary>
+    public async Task<(bool Success, string? Error)> RecordRfiRemarkAsync(int supplierId, string? remark, string actorUsername)
+    {
+        if (string.IsNullOrWhiteSpace(remark)) { return (false, "Please enter the information you are requesting from the supplier."); }
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var supplier = await db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId);
+        if (supplier is null) { return (false, "Supplier not found."); }
+
+        supplier.ReviewRemarks = remark.Trim();
+        supplier.UpdatedBy = actorUsername;
+        supplier.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+            "Requested further information from the supplier (RFI).");
+        return (true, null);
+    }
+
     public async Task<int> CreateAsync(Supplier supplier, string actorUsername)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -798,10 +834,12 @@ public class SupplierService(
         }
         else if (markComplete)
         {
-            // A supplier self-service *submission* is treated as final: the record is auto-marked
-            // "Completed" with no further review step. Intermediate saves as the supplier steps
-            // through the wizard (markComplete == false) must not flip the status.
-            supplier.StatusId = await ResolveStatusIdAsync(db, SupplierStatuses.Complete) ?? supplier.StatusId;
+            // A self-service submission (made via an access token) now goes to "Verification Pending" so an
+            // internal reviewer can verify it (→ Completed) or raise an RFI (→ Awaiting Supplier Response).
+            // An internal completion (no access token — the reviewer's own "Save Changes") is authoritative
+            // and goes straight to Completed. Intermediate wizard saves (markComplete == false) never flip it.
+            var targetStatus = accessTokenId is not null ? SupplierStatuses.VerificationPending : SupplierStatuses.Complete;
+            supplier.StatusId = await ResolveStatusIdAsync(db, targetStatus) ?? supplier.StatusId;
         }
 
         await db.SaveChangesAsync();
