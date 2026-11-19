@@ -57,7 +57,7 @@ public static class LandlordSelfServiceEndpoints
                 Error = error,
                 MaskedEmail = SupplierPortal.Web.Services.Leasing.LandlordAccessTokenService.MaskEmail(token.Landlord.Email),
                 ExpiresInMinutes = 10,
-                LogoUrl = await branding.GetBusinessUnitLogoSrcAsync(token.Landlord.BusinessUnitId)
+                LogoUrl = await branding.GetBusinessUnitUploadedLogoSrcAsync(token.Landlord.BusinessUnitId)
             });
         }).RequireRateLimiting("otp");
 
@@ -70,7 +70,7 @@ public static class LandlordSelfServiceEndpoints
                 Success = t is not null,
                 BusinessUnitName = buId is int b1 ? await branding.GetBusinessUnitNameAsync(b1) : null,
                 BusinessUnitEmail = buId is int b2 ? await branding.GetPortalSenderEmailAsync(b2, Models.PortalType.Landlord) : null,
-                LogoUrl = buId is int b3 ? await branding.GetBusinessUnitLogoSrcAsync(b3) : null
+                LogoUrl = buId is int b3 ? await branding.GetBusinessUnitUploadedLogoSrcAsync(b3) : null
             });
         }).RequireRateLimiting("otp");
 
@@ -122,7 +122,7 @@ public static class LandlordSelfServiceEndpoints
                 AgreementType = landlord.Type.ToString(),
                 SigningRule = landlord.SigningRule.ToString(),
                 CorrectionComment = correction?.Comment,
-                LogoUrl = await branding.GetBusinessUnitLogoSrcAsync(landlord.BusinessUnitId),
+                LogoUrl = await branding.GetBusinessUnitUploadedLogoSrcAsync(landlord.BusinessUnitId),
                 Contacts = landlord.Contacts.OrderByDescending(c => c.IsPrimary).Select(ToContactDto).ToList(),
                 Signatories = landlord.Signatories.Where(s => !s.IsPrimaryContact).OrderBy(s => s.Order)
                     .Select(s => new LandlordSignatoryDto { Name = s.Name, Email = s.Email, Mobile = s.Mobile }).ToList(),
