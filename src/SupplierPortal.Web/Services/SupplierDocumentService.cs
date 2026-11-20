@@ -311,8 +311,22 @@ using null when absent. Keep the IBAN and account number exactly as printed (no 
 """;
 
     private const string ProofOfAddressPrompt = """
-Extract the operating address from this proof of address (tenancy contract / Ejari / utility bill). Prefer the
-ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single full address line).
+Extract from this proof of address (UAE Ejari tenancy contract or a utility bill). Prefer the ENGLISH value.
+Return ONLY a JSON object, using null when a value is absent. Dates as DD/MM/YYYY:
+{ "address": string|null, "tenantName": string|null, "landlordName": string|null,
+  "ejariOrContractNumber": string|null, "contractStartDate": "DD/MM/YYYY"|null,
+  "contractEndDate": "DD/MM/YYYY"|null, "annualRent": string|null, "propertyUsage": string|null,
+  "plotOrBuilding": string|null }
+("address" is a single full address line.)
+""";
+
+    private const string IdentityPrompt = """
+Extract from this identity document (a UAE Emirates ID or a passport). Return ONLY a JSON object, using null
+when a value is absent. Dates as DD/MM/YYYY:
+{ "documentKind": "Emirates ID"|"Passport"|null, "idOrPassportNumber": string|null, "fullName": string|null,
+  "nationality": string|null, "dateOfBirth": "DD/MM/YYYY"|null, "sex": "M"|"F"|null, "placeOfBirth": string|null,
+  "dateOfIssue": "DD/MM/YYYY"|null, "placeOfIssue": string|null, "dateOfExpiry": "DD/MM/YYYY"|null,
+  "issuingAuthority": string|null }
 """;
 
     /// <summary>Runs Claude extraction over every uploaded KYS document and STORES the key attributes it
@@ -456,6 +470,15 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
         var addrDoc = Latest(SupplierDocumentType.ProofOfAddress);
         var addr = await ReadDocAsync(SupplierDocumentType.ProofOfAddress, ProofOfAddressPrompt, "Proof of Address");
         SetStr(addrDoc, "Proof of Address", "Actual Operating Address", () => supplier.KysActualOperatingAddress, v => supplier.KysActualOperatingAddress = v, V(addr, "address"));
+        // Remaining tenancy / Ejari fields have no supplier column — captured in the extraction log.
+        LogRead(addrDoc, "Proof of Address", "Tenant name", V(addr, "tenantName"));
+        LogRead(addrDoc, "Proof of Address", "Landlord name", V(addr, "landlordName"));
+        LogRead(addrDoc, "Proof of Address", "Ejari / Contract number", V(addr, "ejariOrContractNumber"));
+        LogRead(addrDoc, "Proof of Address", "Contract start date", V(addr, "contractStartDate"));
+        LogRead(addrDoc, "Proof of Address", "Contract end date", V(addr, "contractEndDate"));
+        LogRead(addrDoc, "Proof of Address", "Annual rent", V(addr, "annualRent"));
+        LogRead(addrDoc, "Proof of Address", "Property usage", V(addr, "propertyUsage"));
+        LogRead(addrDoc, "Proof of Address", "Plot / Building", V(addr, "plotOrBuilding"));
 
         // Trade License (reuse the dedicated reader) -> licensed activities + signatory
         var tlDoc = Latest(SupplierDocumentType.TradeLicense);
@@ -482,37 +505,70 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
                         SetStr(tlDoc, "Trade License", "Name of signatory", () => supplier.KysSignatoryName, v => supplier.KysSignatoryName = v, signatory.Name);
                         SetStr(tlDoc, "Trade License", "Job title", () => supplier.KysRepPosition, v => supplier.KysRepPosition = v, signatory.Role);
                     }
+                    // Capture every other field read from the Trade License in the extraction log (reference).
+                    LogRead(tlDoc, "Trade License", "License Number", lic.LicenseNumber);
+                    LogRead(tlDoc, "Trade License", "Main License Number", lic.MainLicenseNumber);
+                    LogRead(tlDoc, "Trade License", "Legal Name", lic.LegalName ?? lic.BusinessName);
+                    LogRead(tlDoc, "Trade License", "Trade Name", lic.TradeName);
+                    LogRead(tlDoc, "Trade License", "Legal Type", lic.LegalType);
+                    LogRead(tlDoc, "Trade License", "License Category", lic.LicenseCategory);
+                    LogRead(tlDoc, "Trade License", "Issuing Authority", lic.IssuingAuthority);
+                    LogRead(tlDoc, "Trade License", "License Type", lic.LicenseKind);
+                    LogRead(tlDoc, "Trade License", "Issue Date", lic.IssueDate);
+                    LogRead(tlDoc, "Trade License", "Expiry Date", lic.ExpiryDate);
+                    LogRead(tlDoc, "Trade License", "Register Number", lic.RegisterNumber);
+                    LogRead(tlDoc, "Trade License", "DCCI Number", lic.DcciNumber);
+                    LogRead(tlDoc, "Trade License", "D&B D-U-N-S Number", lic.DunsNumber);
+                    LogRead(tlDoc, "Trade License", "Paid-up Capital", lic.PaidCapital);
+                    LogRead(tlDoc, "Trade License", "Capital Currency", lic.CapitalCurrency);
+                    LogRead(tlDoc, "Trade License", "P.O. Box", lic.PoBox);
+                    LogRead(tlDoc, "Trade License", "Parcel ID", lic.ParcelId);
+                    LogRead(tlDoc, "Trade License", "Premises", lic.Premises);
+                    LogRead(tlDoc, "Trade License", "Address", lic.Address);
+                    LogRead(tlDoc, "Trade License", "Email", lic.Email);
+                    LogRead(tlDoc, "Trade License", "Phone", lic.Phone);
+                    LogRead(tlDoc, "Trade License", "Mobile", lic.Mobile);
+                    if (lic.Activities.Count > 0)
+                    {
+                        LogRead(tlDoc, "Trade License", "All licensed activities", string.Join("; ", lic.Activities.Select(a => a.Name)));
+                    }
+                    if (lic.Members.Count > 0)
+                    {
+                        var partners = string.Join(" | ", lic.Members.Where(m => !string.IsNullOrWhiteSpace(m.Name))
+                            .Select(m => string.Join(", ", new[] { m.Name, m.Role, m.Nationality, m.Share }
+                                .Where(x => !string.IsNullOrWhiteSpace(x)))));
+                        LogRead(tlDoc, "Trade License", "Partners / Managers", partners);
+                    }
                 }
             }
         }
 
-        // Emirates ID / Passport (reuse the identity reader) -> KYS ID No / expiry
+        // Emirates ID / Passport -> KYS ID No + expiry (stored); all other identity fields logged for reference.
         var idDoc = Latest(SupplierDocumentType.EmiratesIdOrPassport);
-        if (idDoc is not null && identityReader.IsEnabled)
+        var idf = await ReadDocAsync(SupplierDocumentType.EmiratesIdOrPassport, IdentityPrompt, "Emirates ID / Passport");
+        if (idf is { Count: > 0 })
         {
-            var bytes = await BytesAsync(idDoc);
-            if (bytes is not null)
+            SetStr(idDoc, "Emirates ID / Passport", "Emirates ID / Passport No.", () => supplier.KysIdNumber, v => supplier.KysIdNumber = v, V(idf, "idOrPassportNumber"));
+            var idExpiry = ParseLicenseDate(V(idf, "dateOfExpiry"));
+            if (idExpiry is not null)
             {
-                ParsedIdentityDocument? id = null;
-                try { id = await identityReader.ReadAsync(bytes, idDoc.ContentType); } catch { }
-                if (id is not null && id.HasData)
+                var stored = supplier.KysIdExpiryDate is null;
+                if (stored)
                 {
-                    result.DocsRead.Add("Emirates ID / Passport");
-                    SetStr(idDoc, "Emirates ID / Passport", "Emirates ID / Passport No.", () => supplier.KysIdNumber, v => supplier.KysIdNumber = v,
-                        id.EmiratesIdNumber ?? id.PassportNumber);
-                    var expiry = ParseLicenseDate(id.EmiratesIdExpiry) ?? ParseLicenseDate(id.PassportExpiry);
-                    if (expiry is not null)
-                    {
-                        var stored = supplier.KysIdExpiryDate is null;
-                        if (stored)
-                        {
-                            supplier.KysIdExpiryDate = expiry;
-                            result.Stored.Add($"ID expiry date: {expiry:dd/MM/yyyy}");
-                        }
-                        LogField(idDoc, "Emirates ID / Passport", "ID expiry date", expiry.Value.ToString("dd/MM/yyyy"), stored);
-                    }
+                    supplier.KysIdExpiryDate = idExpiry;
+                    result.Stored.Add($"ID expiry date: {idExpiry:dd/MM/yyyy}");
                 }
+                LogField(idDoc, "Emirates ID / Passport", "Expiry date", idExpiry.Value.ToString("dd/MM/yyyy"), stored);
             }
+            LogRead(idDoc, "Emirates ID / Passport", "Document kind", V(idf, "documentKind"));
+            LogRead(idDoc, "Emirates ID / Passport", "Full name", V(idf, "fullName"));
+            LogRead(idDoc, "Emirates ID / Passport", "Nationality", V(idf, "nationality"));
+            LogRead(idDoc, "Emirates ID / Passport", "Date of birth", V(idf, "dateOfBirth"));
+            LogRead(idDoc, "Emirates ID / Passport", "Sex", V(idf, "sex"));
+            LogRead(idDoc, "Emirates ID / Passport", "Place of birth", V(idf, "placeOfBirth"));
+            LogRead(idDoc, "Emirates ID / Passport", "Date of issue", V(idf, "dateOfIssue"));
+            LogRead(idDoc, "Emirates ID / Passport", "Place of issue", V(idf, "placeOfIssue"));
+            LogRead(idDoc, "Emirates ID / Passport", "Issuing authority", V(idf, "issuingAuthority"));
         }
 
         if (result.Stored.Count > 0 || extractionLogs.Count > 0)
