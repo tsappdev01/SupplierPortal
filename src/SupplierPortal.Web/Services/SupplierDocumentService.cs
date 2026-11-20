@@ -290,9 +290,11 @@ public class SupplierDocumentService(
 
     // ---- KYS document extraction prompts (flat JSON out; prefer the English value on bilingual docs) ----
     private const string VatPrompt = """
-Extract from this UAE Federal Tax Authority VAT Registration Certificate. It is bilingual Arabic/English;
-prefer the ENGLISH value. Return ONLY a JSON object with these keys, using null when absent:
-{ "taxRegistrationNumber": string|null, "legalName": string|null, "effectiveRegistrationDate": "DD/MM/YYYY"|null }
+Extract from this UAE Federal Tax Authority VAT Registration Certificate. It is bilingual Arabic/English.
+Return ONLY a JSON object with these keys, using null when a value is absent. Keep the registered address
+as a single full line exactly as printed:
+{ "taxRegistrationNumber": string|null, "legalNameEnglish": string|null, "legalNameArabic": string|null,
+  "registeredAddress": string|null, "effectiveRegistrationDate": "DD/MM/YYYY"|null }
 """;
 
     private const string CertIncorpPrompt = """
@@ -366,6 +368,25 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
             });
         }
 
+        // Logs a value read from a document that has no supplier field to store into (reference / audit only).
+        void LogRead(SupplierDocument? doc, string docLabel, string fieldName, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) { return; }
+            extractionLogs.Add(new SupplierKysExtractionLog
+            {
+                SupplierId = supplierId,
+                DocumentId = doc?.Id,
+                DocumentType = doc?.DocumentType.ToString() ?? "",
+                DocumentLabel = docLabel,
+                FileName = doc?.FileName,
+                FieldName = fieldName,
+                FieldValue = Trunc(value.Trim(), 2000),
+                Outcome = "Read (reference only)",
+                ExtractedAt = DateTime.UtcNow,
+                ExtractedBy = actorUsername,
+            });
+        }
+
         // Stores a value onto the supplier (fill-only: never overwrites) and logs the field + source document.
         void SetStr(SupplierDocument? doc, string docLabel, string label, Func<string?> get, Action<string> set, string? value)
         {
@@ -399,6 +420,12 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
         var vatDoc = Latest(SupplierDocumentType.VatCertification);
         var vat = await ReadDocAsync(SupplierDocumentType.VatCertification, VatPrompt, "VAT Certificate");
         SetStr(vatDoc, "VAT Certificate", "TRN / VAT Registration Number", () => supplier.TaxRegistrationNumber, v => supplier.TaxRegistrationNumber = v, V(vat, "taxRegistrationNumber"));
+        // The remaining VAT Certificate fields have no dedicated supplier column, so they are captured in the
+        // extraction log for reference (visible in SupplierKysExtractionLogs).
+        LogRead(vatDoc, "VAT Certificate", "Full English legal name", V(vat, "legalNameEnglish"));
+        LogRead(vatDoc, "VAT Certificate", "Full Arabic legal name", V(vat, "legalNameArabic"));
+        LogRead(vatDoc, "VAT Certificate", "Registered address", V(vat, "registeredAddress"));
+        LogRead(vatDoc, "VAT Certificate", "Effective Registration Date", V(vat, "effectiveRegistrationDate"));
 
         // Certificate of Incorporation -> Date of Incorporation
         var incDoc = Latest(SupplierDocumentType.CertificateOfIncorporation);
