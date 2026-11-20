@@ -1291,6 +1291,53 @@ DD/MM/YYYY. Return ONLY a JSON object, using null when a value is absent. Dates 
             File.Delete(path);
         }
     }
+
+    /// <summary>One read-only "what Claude read from this document" card per uploaded document, built from
+    /// the per-field extraction log. Used to show every document's extracted fields (VAT Certificate,
+    /// Certificate of Incorporation, Bank Confirmation Letter, Proof of Address, …) the same way the Trade
+    /// License capture is shown. For each document the latest value seen for each field is used, so re-runs
+    /// supersede earlier ones without duplicating rows.</summary>
+    public async Task<List<KysExtractionCard>> GetExtractionCardsAsync(int supplierId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var logs = await db.SupplierKysExtractionLogs.AsNoTracking()
+            .Where(l => l.SupplierId == supplierId)
+            .ToListAsync();
+
+        var cards = new List<KysExtractionCard>();
+        foreach (var group in logs.GroupBy(l => l.DocumentType))
+        {
+            if (string.IsNullOrWhiteSpace(group.Key)) { continue; }
+
+            // Latest row per field name (most recent extraction wins), kept in the order they were written
+            // in that newest run so the card reads top-to-bottom like the document.
+            var latestByField = group
+                .GroupBy(x => x.FieldName)
+                .Select(fg => fg.OrderByDescending(x => x.ExtractedAt).ThenByDescending(x => x.Id).First())
+                .OrderBy(x => x.Id)
+                .ToList();
+            if (latestByField.Count == 0) { continue; }
+
+            var newest = group.OrderByDescending(x => x.ExtractedAt).ThenByDescending(x => x.Id).First();
+            cards.Add(new KysExtractionCard
+            {
+                DocumentType = group.Key,
+                DocumentLabel = string.IsNullOrWhiteSpace(newest.DocumentLabel) ? group.Key : newest.DocumentLabel,
+                DocumentId = newest.DocumentId,
+                FileName = newest.FileName,
+                ExtractedAt = newest.ExtractedAt,
+                ExtractedBy = newest.ExtractedBy,
+                Fields = latestByField.Select(x => new KysExtractionCardField
+                {
+                    Name = x.FieldName,
+                    Value = x.FieldValue ?? string.Empty,
+                    Outcome = x.Outcome,
+                }).ToList(),
+            });
+        }
+        // Stable order: show the documents in a sensible, repeatable sequence.
+        return cards.OrderBy(c => c.DocumentLabel, StringComparer.OrdinalIgnoreCase).ToList();
+    }
 }
 
 /// <summary>The auto-read Trade License capture surfaced read-only under the Trade License document.</summary>
@@ -1353,4 +1400,30 @@ public sealed class KysExtractionResult
     public List<string> Stored { get; } = [];
     /// <summary>A fatal error (reader not configured, supplier missing); null on success.</summary>
     public string? Error { get; set; }
+}
+
+/// <summary>A read-only "what Claude read from this document" card, built from the per-field extraction log.
+/// One card per uploaded document (VAT Certificate, Certificate of Incorporation, Bank Confirmation Letter,
+/// Proof of Address, …), shown under the Documents section the same way the Trade License capture is shown.</summary>
+public sealed class KysExtractionCard
+{
+    /// <summary>The <see cref="SupplierDocumentType"/> name (e.g. "VatCertification").</summary>
+    public string DocumentType { get; set; } = string.Empty;
+    /// <summary>Friendly document name shown in the card header (e.g. "VAT Certificate").</summary>
+    public string DocumentLabel { get; set; } = string.Empty;
+    /// <summary>The source document id (for preview / download); null if the document was removed.</summary>
+    public int? DocumentId { get; set; }
+    public string? FileName { get; set; }
+    public DateTime ExtractedAt { get; set; }
+    public string? ExtractedBy { get; set; }
+    public List<KysExtractionCardField> Fields { get; set; } = [];
+}
+
+/// <summary>One extracted field (name + value) on a <see cref="KysExtractionCard"/>.</summary>
+public sealed class KysExtractionCardField
+{
+    public string Name { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+    /// <summary>"Stored", "Skipped (already filled)" or "Read (reference only)".</summary>
+    public string Outcome { get; set; } = string.Empty;
 }

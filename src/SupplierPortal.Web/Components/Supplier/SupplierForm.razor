@@ -1672,6 +1672,87 @@ else
                             </div>
                         </div>
                     }
+
+                    @* Read-only capture panels for every other document Claude read (VAT Certificate, Certificate
+                       of Incorporation, Bank Confirmation Letter, Proof of Address, …) — internal view only.
+                       Trade License and Emirates ID / Passport have their own dedicated panels above. *@
+                    @if (!SupplierFacing)
+                    {
+                        foreach (var card in extractionCards.Where(c =>
+                            c.DocumentType != nameof(SupplierDocumentType.TradeLicense)
+                            && c.DocumentType != nameof(SupplierDocumentType.EmiratesIdOrPassport)
+                            && c.Fields.Count > 0))
+                        {
+                            var cDoc = DocForCard(card);
+                            var cIsPdf = (cDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
+                                || (cDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
+                            <div class="di-xtract">
+                                <div class="di-xtract-head">
+                                    <div class="di-xtract-title">
+                                        <span class="di-xtract-ic">
+                                            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                                        </span>
+                                        <div class="di-xtract-titletext">
+                                            <div class="di-xtract-h">@card.DocumentLabel</div>
+                                            <div class="di-xtract-sub">Read from the uploaded document@(card.ExtractedAt != default ? $" · {card.ExtractedAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
+                                        </div>
+                                    </div>
+                                    <div class="di-xtract-actions">
+                                        <span class="di-xtract-badge ok">
+                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
+                                            AI Extraction Completed
+                                        </span>
+                                        <span class="di-xtract-src">Claude Vision</span>
+                                        @if (cDoc is not null)
+                                        {
+                                            <a class="di-xtract-dl" href="/suppliers/documents/@cDoc.Id?download=1" target="_blank" rel="noopener">
+                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
+                                                <span>Download</span>
+                                            </a>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="di-xtract-main">
+                                    <div class="di-xtract-doc">
+                                        @if (cDoc is null)
+                                        {
+                                            <div class="di-xtract-doc-empty">No preview available</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="di-xtract-doc-view">
+                                                @if (cIsPdf)
+                                                {
+                                                    <iframe src="/suppliers/documents/@cDoc.Id#toolbar=0&view=FitH" title="@card.DocumentLabel preview"></iframe>
+                                                }
+                                                else
+                                                {
+                                                    <img src="/suppliers/documents/@cDoc.Id" alt="@card.DocumentLabel preview" />
+                                                }
+                                            </div>
+                                            <a class="di-xtract-doc-open" href="/suppliers/documents/@cDoc.Id" target="_blank" rel="noopener">
+                                                Open document in a new tab
+                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                                            </a>
+                                        }
+                                    </div>
+                                    <div class="di-xtract-fields">
+                                        <div class="di-xtract-sec">Extracted Information</div>
+                                        <div class="di-tl-grid">
+                                            @foreach (var f in card.Fields)
+                                            {
+                                                @TlRow(f.Name, f.Value)
+                                            }
+                                        </div>
+                                        <div class="di-xtract-done">
+                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
+                                            <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
                 </details>
 
                 @* Internal Validation Checks — internal reviewers only; never shown to the supplier. *@
@@ -2353,6 +2434,9 @@ else
     private bool reExtractingId;
     private bool extractingKys;
     private SupplierPortal.Web.Services.KysExtractionResult? kysExtractResult;
+    // Per-document "what Claude read" cards (internal view only), built from the extraction log so every
+    // document shows its extracted fields the same way the Trade License capture does.
+    private List<SupplierPortal.Web.Services.KysExtractionCard> extractionCards = [];
     private bool showRfi;
     private string? rfiComment;
 
@@ -2807,6 +2891,7 @@ else
             {
                 tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
                 idReadback = await SupplierDocumentService.GetIdReadbackAsync(Supplier.Id);
+                extractionCards = await SupplierDocumentService.GetExtractionCardsAsync(Supplier.Id);
             }
         }
     }
@@ -3100,20 +3185,43 @@ else
 
     /// <summary>Internal reviewers toggle the per-attachment "Reviewed" flag. Never available on the
     /// supplier self-service form (the internal-review section is hidden there).</summary>
+    /// <summary>The uploaded <see cref="SupplierDocument"/> a capture card was read from, for its preview /
+    /// download (by document id, falling back to the latest document of that type).</summary>
+    private SupplierDocument? DocForCard(SupplierPortal.Web.Services.KysExtractionCard card)
+    {
+        if (card.DocumentId is int id)
+        {
+            var byId = documents.FirstOrDefault(d => d.Id == id);
+            if (byId is not null) { return byId; }
+        }
+        return Enum.TryParse<SupplierDocumentType>(card.DocumentType, out var t)
+            ? documents.Where(d => d.DocumentType == t).OrderByDescending(d => d.Id).FirstOrDefault()
+            : null;
+    }
+
     private async Task ToggleDocumentReviewedAsync(SupplierDocument doc)
     {
         if (SupplierFacing)
         {
             return;
         }
-        var (success, error) = await SupplierDocumentService.SetReviewedAsync(doc.Id, !doc.IsReviewed, CurrentUser);
-        if (success)
+        try
         {
-            documents = await LoadDocumentsAsync();
+            var (success, error) = await SupplierDocumentService.SetReviewedAsync(doc.Id, !doc.IsReviewed, CurrentUser);
+            if (success)
+            {
+                documents = await LoadDocumentsAsync();
+            }
+            else
+            {
+                ToastService.ShowError(error ?? "Could not update the review status.");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ToastService.ShowError(error ?? "Could not update the review status.");
+            // Never let a failure here bubble up as an unhandled circuit error (which would make the whole
+            // page stop responding to clicks); show it instead.
+            ToastService.ShowError($"Could not update the review status: {ex.Message}");
         }
     }
 
@@ -3165,6 +3273,13 @@ else
                 ToastService.ShowInfo(kysExtractResult.DocsRead.Count > 0
                     ? "Documents were read, but every matching KYS field is already filled."
                     : "No readable documents were found to extract from.");
+            }
+            // Refresh the per-document capture panels with whatever this run read.
+            if (!SupplierFacing)
+            {
+                tlReadback = await SupplierDocumentService.GetLicenseReadbackAsync(Supplier.Id);
+                idReadback = await SupplierDocumentService.GetIdReadbackAsync(Supplier.Id);
+                extractionCards = await SupplierDocumentService.GetExtractionCardsAsync(Supplier.Id);
             }
         }
         catch (Exception ex)
