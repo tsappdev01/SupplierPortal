@@ -344,14 +344,40 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
         SupplierDocument? Latest(SupplierDocumentType t) =>
             docs.Where(d => d.DocumentType == t).OrderByDescending(d => d.Id).FirstOrDefault();
 
-        void SetStr(string label, Func<string?> get, Action<string> set, string? value)
+        // Per-field extraction log rows (field + value + source document/file), saved to SupplierKysExtractionLogs.
+        var extractionLogs = new List<SupplierKysExtractionLog>();
+        static string? Trunc(string? s, int max) => string.IsNullOrEmpty(s) ? s : (s.Length <= max ? s : s[..max]);
+
+        void LogField(SupplierDocument? doc, string docLabel, string fieldName, string? value, bool stored)
+        {
+            if (string.IsNullOrWhiteSpace(value)) { return; }
+            extractionLogs.Add(new SupplierKysExtractionLog
+            {
+                SupplierId = supplierId,
+                DocumentId = doc?.Id,
+                DocumentType = doc?.DocumentType.ToString() ?? "",
+                DocumentLabel = docLabel,
+                FileName = doc?.FileName,
+                FieldName = fieldName,
+                FieldValue = Trunc(value.Trim(), 2000),
+                Outcome = stored ? "Stored" : "Skipped (already filled)",
+                ExtractedAt = DateTime.UtcNow,
+                ExtractedBy = actorUsername,
+            });
+        }
+
+        // Stores a value onto the supplier (fill-only: never overwrites) and logs the field + source document.
+        void SetStr(SupplierDocument? doc, string docLabel, string label, Func<string?> get, Action<string> set, string? value)
         {
             var v = value?.Trim();
-            if (!string.IsNullOrWhiteSpace(v) && string.IsNullOrWhiteSpace(get()))
+            if (string.IsNullOrWhiteSpace(v)) { return; }
+            var stored = string.IsNullOrWhiteSpace(get());
+            if (stored)
             {
                 set(v!);
                 result.Stored.Add($"{label}: {v}");
             }
+            LogField(doc, docLabel, label, v, stored);
         }
 
         async Task<Dictionary<string, string>?> ReadDocAsync(SupplierDocumentType t, string prompt, string label)
@@ -370,30 +396,39 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
             f is not null && f.TryGetValue(key, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
 
         // VAT Certificate -> TRN
+        var vatDoc = Latest(SupplierDocumentType.VatCertification);
         var vat = await ReadDocAsync(SupplierDocumentType.VatCertification, VatPrompt, "VAT Certificate");
-        SetStr("TRN / VAT Registration Number", () => supplier.TaxRegistrationNumber, v => supplier.TaxRegistrationNumber = v, V(vat, "taxRegistrationNumber"));
+        SetStr(vatDoc, "VAT Certificate", "TRN / VAT Registration Number", () => supplier.TaxRegistrationNumber, v => supplier.TaxRegistrationNumber = v, V(vat, "taxRegistrationNumber"));
 
         // Certificate of Incorporation -> Date of Incorporation
+        var incDoc = Latest(SupplierDocumentType.CertificateOfIncorporation);
         var inc = await ReadDocAsync(SupplierDocumentType.CertificateOfIncorporation, CertIncorpPrompt, "Certificate of Incorporation");
         var incDate = ParseLicenseDate(V(inc, "dateOfIncorporation"));
-        if (supplier.DateOfIncorporation is null && incDate is not null)
+        if (incDate is not null)
         {
-            supplier.DateOfIncorporation = incDate;
-            result.Stored.Add($"Date of Incorporation: {incDate:dd/MM/yyyy}");
+            var stored = supplier.DateOfIncorporation is null;
+            if (stored)
+            {
+                supplier.DateOfIncorporation = incDate;
+                result.Stored.Add($"Date of Incorporation: {incDate:dd/MM/yyyy}");
+            }
+            LogField(incDoc, "Certificate of Incorporation", "Date of Incorporation", incDate.Value.ToString("dd/MM/yyyy"), stored);
         }
 
         // Bank Confirmation Letter -> KYS Bank Account Details
+        var bankDoc = Latest(SupplierDocumentType.BankConfirmationLetter);
         var bank = await ReadDocAsync(SupplierDocumentType.BankConfirmationLetter, BankLetterPrompt, "Bank Confirmation Letter");
-        SetStr("Account Holder Name", () => supplier.KysAccountHolderName, v => supplier.KysAccountHolderName = v, V(bank, "accountHolderName"));
-        SetStr("Bank Name", () => supplier.KysBankName, v => supplier.KysBankName = v, V(bank, "bankName"));
-        SetStr("Bank Branch", () => supplier.KysBankBranch, v => supplier.KysBankBranch = v, V(bank, "branchName"));
-        SetStr("Account Number", () => supplier.KysAccountNumber, v => supplier.KysAccountNumber = v, V(bank, "accountNumber"));
-        SetStr("IBAN", () => supplier.KysIban, v => supplier.KysIban = v, V(bank, "iban"));
-        SetStr("SWIFT / BIC", () => supplier.KysSwiftBic, v => supplier.KysSwiftBic = v, V(bank, "swiftBic"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "Account Holder Name", () => supplier.KysAccountHolderName, v => supplier.KysAccountHolderName = v, V(bank, "accountHolderName"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "Bank Name", () => supplier.KysBankName, v => supplier.KysBankName = v, V(bank, "bankName"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "Bank Branch", () => supplier.KysBankBranch, v => supplier.KysBankBranch = v, V(bank, "branchName"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "Account Number", () => supplier.KysAccountNumber, v => supplier.KysAccountNumber = v, V(bank, "accountNumber"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "IBAN", () => supplier.KysIban, v => supplier.KysIban = v, V(bank, "iban"));
+        SetStr(bankDoc, "Bank Confirmation Letter", "SWIFT / BIC", () => supplier.KysSwiftBic, v => supplier.KysSwiftBic = v, V(bank, "swiftBic"));
 
         // Proof of Address -> KYS actual operating address
+        var addrDoc = Latest(SupplierDocumentType.ProofOfAddress);
         var addr = await ReadDocAsync(SupplierDocumentType.ProofOfAddress, ProofOfAddressPrompt, "Proof of Address");
-        SetStr("Actual Operating Address", () => supplier.KysActualOperatingAddress, v => supplier.KysActualOperatingAddress = v, V(addr, "address"));
+        SetStr(addrDoc, "Proof of Address", "Actual Operating Address", () => supplier.KysActualOperatingAddress, v => supplier.KysActualOperatingAddress = v, V(addr, "address"));
 
         // Trade License (reuse the dedicated reader) -> licensed activities + signatory
         var tlDoc = Latest(SupplierDocumentType.TradeLicense);
@@ -411,14 +446,14 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
                     {
                         var acts = string.Join("; ", lic.Activities.Select(a => a.Name));
                         if (acts.Length > 500) { acts = acts[..500]; }
-                        SetStr("Licensed business activities", () => supplier.KysLicensedActivities,
+                        SetStr(tlDoc, "Trade License", "Licensed business activities", () => supplier.KysLicensedActivities,
                             v => supplier.KysLicensedActivities = v, acts);
                     }
                     var signatory = lic.Members.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.Name));
                     if (signatory is not null)
                     {
-                        SetStr("Name of signatory", () => supplier.KysSignatoryName, v => supplier.KysSignatoryName = v, signatory.Name);
-                        SetStr("Job title", () => supplier.KysRepPosition, v => supplier.KysRepPosition = v, signatory.Role);
+                        SetStr(tlDoc, "Trade License", "Name of signatory", () => supplier.KysSignatoryName, v => supplier.KysSignatoryName = v, signatory.Name);
+                        SetStr(tlDoc, "Trade License", "Job title", () => supplier.KysRepPosition, v => supplier.KysRepPosition = v, signatory.Role);
                     }
                 }
             }
@@ -436,22 +471,36 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
                 if (id is not null && id.HasData)
                 {
                     result.DocsRead.Add("Emirates ID / Passport");
-                    SetStr("Emirates ID / Passport No.", () => supplier.KysIdNumber, v => supplier.KysIdNumber = v,
+                    SetStr(idDoc, "Emirates ID / Passport", "Emirates ID / Passport No.", () => supplier.KysIdNumber, v => supplier.KysIdNumber = v,
                         id.EmiratesIdNumber ?? id.PassportNumber);
                     var expiry = ParseLicenseDate(id.EmiratesIdExpiry) ?? ParseLicenseDate(id.PassportExpiry);
-                    if (supplier.KysIdExpiryDate is null && expiry is not null)
+                    if (expiry is not null)
                     {
-                        supplier.KysIdExpiryDate = expiry;
-                        result.Stored.Add($"ID expiry date: {expiry:dd/MM/yyyy}");
+                        var stored = supplier.KysIdExpiryDate is null;
+                        if (stored)
+                        {
+                            supplier.KysIdExpiryDate = expiry;
+                            result.Stored.Add($"ID expiry date: {expiry:dd/MM/yyyy}");
+                        }
+                        LogField(idDoc, "Emirates ID / Passport", "ID expiry date", expiry.Value.ToString("dd/MM/yyyy"), stored);
                     }
                 }
             }
         }
 
-        if (result.Stored.Count > 0)
+        if (result.Stored.Count > 0 || extractionLogs.Count > 0)
         {
-            supplier.UpdatedBy = actorUsername;
-            supplier.UpdatedAt = DateTime.UtcNow;
+            // Save the per-field extraction log (field + value + source file) regardless of whether anything
+            // was newly stored, so the reviewer can always see what each document yielded.
+            if (extractionLogs.Count > 0)
+            {
+                db.SupplierKysExtractionLogs.AddRange(extractionLogs);
+            }
+            if (result.Stored.Count > 0)
+            {
+                supplier.UpdatedBy = actorUsername;
+                supplier.UpdatedAt = DateTime.UtcNow;
+            }
             try
             {
                 await db.SaveChangesAsync();
@@ -462,8 +511,11 @@ ENGLISH value. Return ONLY a JSON object: { "address": string|null }  (a single 
                 result.Error = $"Extraction succeeded but saving failed: {ex.Message}";
                 return result;
             }
-            await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
-                $"Extracted & stored KYS data from documents ({string.Join(", ", result.DocsRead)})");
+            if (result.Stored.Count > 0)
+            {
+                await auditService.LogAsync(actorUsername, AuditAction.Update, "Supplier", supplierId,
+                    $"Extracted & stored KYS data from documents ({string.Join(", ", result.DocsRead)})");
+            }
         }
         return result;
     }

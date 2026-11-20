@@ -23,6 +23,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<SupplierAccessToken> SupplierAccessTokens => Set<SupplierAccessToken>();
     public DbSet<SupplierFieldChange> SupplierFieldChanges => Set<SupplierFieldChange>();
     public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
+    public DbSet<SupplierKysExtractionLog> SupplierKysExtractionLogs => Set<SupplierKysExtractionLog>();
     public DbSet<SupplierPartner> SupplierPartners => Set<SupplierPartner>();
     public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
     public DbSet<SupplierBankAccount> SupplierBankAccounts => Set<SupplierBankAccount>();
