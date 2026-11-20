@@ -321,12 +321,16 @@ Return ONLY a JSON object, using null when a value is absent. Dates as DD/MM/YYY
 """;
 
     private const string IdentityPrompt = """
-Extract from this identity document (a UAE Emirates ID or a passport). Return ONLY a JSON object, using null
-when a value is absent. Dates as DD/MM/YYYY:
+Extract from this identity document (a UAE Emirates ID or a passport). If it is a passport, LOCATE the Machine
+Readable Zone (MRZ) — the two lines of monospaced characters at the bottom filled with '<' — read both lines
+exactly, and PREFER the MRZ-derived values (passport number, nationality/country code, date of birth, sex,
+date of expiry) over the printed text when they differ. In the MRZ, dates are YYMMDD; convert them to
+DD/MM/YYYY. Return ONLY a JSON object, using null when a value is absent. Dates as DD/MM/YYYY:
 { "documentKind": "Emirates ID"|"Passport"|null, "idOrPassportNumber": string|null, "fullName": string|null,
-  "nationality": string|null, "dateOfBirth": "DD/MM/YYYY"|null, "sex": "M"|"F"|null, "placeOfBirth": string|null,
-  "dateOfIssue": "DD/MM/YYYY"|null, "placeOfIssue": string|null, "dateOfExpiry": "DD/MM/YYYY"|null,
-  "issuingAuthority": string|null }
+  "nationality": string|null, "countryCode": string|null, "dateOfBirth": "DD/MM/YYYY"|null, "sex": "M"|"F"|null,
+  "placeOfBirth": string|null, "dateOfIssue": "DD/MM/YYYY"|null, "placeOfIssue": string|null,
+  "dateOfExpiry": "DD/MM/YYYY"|null, "issuingAuthority": string|null, "mrzLine1": string|null,
+  "mrzLine2": string|null }
 """;
 
     /// <summary>Runs Claude extraction over every uploaded KYS document and STORES the key attributes it
@@ -569,6 +573,9 @@ when a value is absent. Dates as DD/MM/YYYY:
             LogRead(idDoc, "Emirates ID / Passport", "Date of issue", V(idf, "dateOfIssue"));
             LogRead(idDoc, "Emirates ID / Passport", "Place of issue", V(idf, "placeOfIssue"));
             LogRead(idDoc, "Emirates ID / Passport", "Issuing authority", V(idf, "issuingAuthority"));
+            LogRead(idDoc, "Emirates ID / Passport", "Country code", V(idf, "countryCode"));
+            LogRead(idDoc, "Emirates ID / Passport", "MRZ line 1", V(idf, "mrzLine1"));
+            LogRead(idDoc, "Emirates ID / Passport", "MRZ line 2", V(idf, "mrzLine2"));
         }
 
         if (result.Stored.Count > 0 || extractionLogs.Count > 0)
