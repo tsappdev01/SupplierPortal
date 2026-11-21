@@ -1344,15 +1344,17 @@ else
                             {
                                 @foreach (var doc in OtherDocuments)
                                 {
-                                    <div class="di-doccard-chip">
+                                    <div class="di-doccard-chip@(reviewFlaggedDocIds.Contains(doc.Id) ? " di-doccard-flag" : "")" id="docreview-@doc.Id">
                                         <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" /><path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z" /></svg>
                                         <span class="di-doccard-fname" title="@doc.FileName">@doc.FileName</span>
                                         <button type="button" class="di-doccard-view-inline" @onclick="() => ViewDocumentAsync(doc.Id)" disabled="@viewingDocument">@(viewingDocId == doc.Id ? "Opening…" : "View")</button>
                                         @if (!SupplierFacing)
                                         {
-                                            <button type="button" class="di-doccard-reviewbtn di-doccard-reviewbtn-sm @(doc.IsReviewed ? "on" : "")"
-                                                    title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}" : "Mark this attachment as reviewed")"
-                                                    @onclick="() => ToggleDocumentReviewedAsync(doc)">@(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")</button>
+                                            <label class="di-doccard-reviewchk di-doccard-reviewchk-sm @(doc.IsReviewed ? "on" : "")"
+                                                   title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}" : "Mark this attachment as reviewed")">
+                                                <input type="checkbox" checked="@doc.IsReviewed" @onchange="() => ToggleDocumentReviewedAsync(doc)" />
+                                                <span>@(doc.IsReviewed ? "Reviewed" : "Mark Reviewed")</span>
+                                            </label>
                                         }
                                         <button type="button" class="di-document-remove" title="Remove" @onclick="() => RemoveDocumentAsync(doc.Id)">&times;</button>
                                     </div>
@@ -1765,27 +1767,27 @@ else
 
                             <div class="di-internal-h di-full">1. Attachments review</div>
                             <p class="di-internal-sub di-full">Mark each uploaded attachment "Reviewed" on its card in the Documents section above, then confirm below.</p>
-                            @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v)
+                            @YesNo("Have all required attachments been reviewed and found complete?", formModel.IntAttachmentsReviewed, v => formModel.IntAttachmentsReviewed = v, "chk-attachments")
 
                             <div class="di-internal-h di-full">2. Adverse media check</div>
-                            @YesNo("Are you aware of any adverse media coverage, reviews or regulatory action relating to the business's tax matters?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v)
+                            @YesNo("Are you aware of any adverse media coverage, reviews or regulatory action relating to the business's tax matters?", formModel.IntAdverseMedia, v => formModel.IntAdverseMedia = v, "chk-adverse")
                             @if (formModel.IntAdverseMedia == true)
                             {
-                                <div class="di-field di-full">
+                                <div class="di-field di-full@(ChkInvalidCls("chk-adverse-details"))" id="chk-adverse-details">
                                     <label>Details of the adverse media found</label>
                                     <InputTextArea @bind-Value="formModel.IntAdverseMediaDetails" rows="2" />
                                 </div>
                             }
 
                             <div class="di-internal-h di-full">3. Reviewer comments</div>
-                            <div class="di-field di-full">
+                            <div class="di-field di-full@(ChkInvalidCls("chk-comments"))" id="chk-comments">
                                 <label>Comments on the supplier's responses</label>
                                 <InputTextArea @bind-Value="formModel.IntResponseComments" rows="3" />
                             </div>
 
                             <div class="di-internal-h di-full">4. Meeting with the supplier</div>
                             <p class="di-internal-sub di-full">Complete for Natural Person / sole-establishment suppliers.</p>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-meeting-type"))" id="chk-meeting-type">
                                 <label>Meeting type</label>
                                 <InputSelect @bind-Value="formModel.IntMeetingType">
                                     <option value="">— Select —</option>
@@ -1794,21 +1796,21 @@ else
                                     <option value="Video Call">Video Call</option>
                                 </InputSelect>
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-meeting-date"))" id="chk-meeting-date">
                                 <label>Meeting date</label>
                                 <InputDate @bind-Value="formModel.IntMeetingDate" />
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-meeting-rep"))" id="chk-meeting-rep">
                                 <label>Supplier representative met</label>
                                 <InputText @bind-Value="formModel.IntMeetingRepName" />
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-meeting-direp"))" id="chk-meeting-direp">
                                 <label>DI representative</label>
                                 <InputText @bind-Value="formModel.IntMeetingDiRep" />
                             </div>
 
                             <div class="di-internal-h di-full">5. Place of business verification</div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-pob-method"))" id="chk-pob-method">
                                 <label>Verification method</label>
                                 <InputSelect @bind-Value="formModel.IntPobMethod">
                                     <option value="">— Select —</option>
@@ -1817,25 +1819,25 @@ else
                                     <option value="Ejari contract">Ejari contract</option>
                                 </InputSelect>
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-pob-date"))" id="chk-pob-date">
                                 <label>Date verified</label>
                                 <InputDate @bind-Value="formModel.IntPobDate" />
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-pob-rep"))" id="chk-pob-rep">
                                 <label>Supplier representative</label>
                                 <InputText @bind-Value="formModel.IntPobRepName" />
                             </div>
-                            <div class="di-field">
+                            <div class="di-field@(ChkInvalidCls("chk-pob-direp"))" id="chk-pob-direp">
                                 <label>DI representative</label>
                                 <InputText @bind-Value="formModel.IntPobDiRep" />
                             </div>
-                            @YesNo("Using web mapping / AI, does the address provided by the supplier match the location found online?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v)
+                            @YesNo("Using web mapping / AI, does the address provided by the supplier match the location found online?", formModel.IntPobAddressMatch, v => formModel.IntPobAddressMatch = v, "chk-pob-match")
 
                             <div class="di-internal-h di-full">6. Compatibility &amp; final checks</div>
-                            @YesNo("Is the actual place of business compatible with the nature of activities carried out?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v)
-                            @YesNo("Are the commercial transactions disproportionate or unexpected in volume, value or nature compared to the size of the business?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v)
-                            @YesNo("Has the list of licensed activities been reviewed?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v)
-                            @YesNo("Has the final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v)
+                            @YesNo("Is the actual place of business compatible with the nature of activities carried out?", formModel.IntPobActivitiesCompatible, v => formModel.IntPobActivitiesCompatible = v, "chk-pob-compat")
+                            @YesNo("Are the commercial transactions disproportionate or unexpected in volume, value or nature compared to the size of the business?", formModel.IntTransactionsProportionate, v => formModel.IntTransactionsProportionate = v, "chk-txn")
+                            @YesNo("Has the list of licensed activities been reviewed?", formModel.IntActivitiesReviewed, v => formModel.IntActivitiesReviewed = v, "chk-activities")
+                            @YesNo("Has the final declaration been reviewed?", formModel.IntDeclarationReviewed, v => formModel.IntDeclarationReviewed = v, "chk-decl")
                         </div>
                     </details>
                 }
@@ -2225,8 +2227,10 @@ else
     }
 
     /// <summary>A full-width Yes/No toggle for the KYS tab (tri-state: unanswered shows neither button active).</summary>
-    private RenderFragment YesNo(string label, bool? value, Action<bool?> set) =>
-        @<div class="di-field di-full">
+    private RenderFragment YesNo(string label, bool? value, Action<bool?> set) => YesNo(label, value, set, null);
+
+    private RenderFragment YesNo(string label, bool? value, Action<bool?> set, string? key) =>
+        @<div class="di-field di-full@(key is null ? "" : ChkInvalidCls(key))" id="@key">
             <label>@label</label>
             <div class="di-yesno">
                 <button type="button" class="di-yn @(value == true ? "on" : "")" @onclick="() => set(true)">Yes</button>
@@ -2437,6 +2441,11 @@ else
     // Per-document "what Claude read" cards (internal view only), built from the extraction log so every
     // document shows its extracted fields the same way the Trade License capture does.
     private List<SupplierPortal.Web.Services.KysExtractionCard> extractionCards = [];
+    // Validation highlighting for the internal reviewer's "Verify & Complete": attachment cards that still
+    // need reviewing, and internal-check field anchors that are unfilled. Drives the red highlight + scroll.
+    private HashSet<int> reviewFlaggedDocIds = [];
+    private HashSet<string> invalidCheckKeys = [];
+    private string? firstInvalidAnchor;
     private bool showRfi;
     private string? rfiComment;
 
@@ -2659,7 +2668,7 @@ else
     /// action and a branded Choose File button with supported-format hints.</summary>
     private RenderFragment DocCard(string title, SupplierDocumentType type, string thumbClass, bool showStar, bool showRequiredMsg, string requiredMsg)
     {
-        return @<div class="di-doccard">
+        return @<div class="di-doccard@(DocFlagCls(type))" id="@DocAnchorId(type)">
         @{
             var doc = GetDocument(type);
             var inputId = $"docfile-{type}";
@@ -2715,11 +2724,11 @@ else
                 </button>
                 @if (!SupplierFacing)
                 {
-                    <button type="button" class="di-doccard-reviewbtn @(doc.IsReviewed ? "on" : "")"
-                            title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}{(doc.ReviewedAt is { } ra ? $" on {ra.ToLocalTime():dd MMM yyyy}" : "")}" : "Mark this attachment as reviewed")"
-                            @onclick="() => ToggleDocumentReviewedAsync(doc)">
-                        @(doc.IsReviewed ? "Reviewed ✓" : "Mark Reviewed")
-                    </button>
+                    <label class="di-doccard-reviewchk @(doc.IsReviewed ? "on" : "")"
+                           title="@(doc.IsReviewed ? $"Reviewed by {doc.ReviewedBy}{(doc.ReviewedAt is { } ra ? $" on {ra.ToLocalTime():dd MMM yyyy}" : "")}" : "Mark this attachment as reviewed")">
+                        <input type="checkbox" checked="@doc.IsReviewed" @onchange="() => ToggleDocumentReviewedAsync(doc)" />
+                        <span>@(doc.IsReviewed ? "Reviewed" : "Mark Reviewed")</span>
+                    </label>
                 }
             </div>
         }
@@ -3199,6 +3208,23 @@ else
             : null;
     }
 
+    /// <summary>Anchor id for a document's upload card, so validation can scroll to an unreviewed attachment.</summary>
+    private string? DocAnchorId(SupplierDocumentType type)
+    {
+        var d = GetDocument(type);
+        return d is null ? null : $"docreview-{d.Id}";
+    }
+
+    /// <summary>Red-highlight class for a document card whose attachment still needs reviewing.</summary>
+    private string DocFlagCls(SupplierDocumentType type)
+    {
+        var d = GetDocument(type);
+        return d is not null && reviewFlaggedDocIds.Contains(d.Id) ? " di-doccard-flag" : string.Empty;
+    }
+
+    /// <summary>Red-highlight class for an internal-check field that failed validation.</summary>
+    private string ChkInvalidCls(string key) => invalidCheckKeys.Contains(key) ? " di-chk-invalid" : string.Empty;
+
     private async Task ToggleDocumentReviewedAsync(SupplierDocument doc)
     {
         if (SupplierFacing)
@@ -3211,6 +3237,8 @@ else
             if (success)
             {
                 documents = await LoadDocumentsAsync();
+                // Clear the "needs review" highlight for any attachment that is now reviewed.
+                reviewFlaggedDocIds.RemoveWhere(id => documents.Any(d => d.Id == id && d.IsReviewed));
             }
             else
             {
@@ -3300,24 +3328,42 @@ else
     {
         var e = new List<string>();
         var m = formModel;
-        void YN(bool? v, string label) { if (v is null) { e.Add($"{label}: please select Yes or No."); } }
 
-        // Every uploaded attachment must be acknowledged as reviewed (its "Reviewed" button on the card).
-        var unreviewed = documents.Count(d => !d.IsReviewed);
-        if (unreviewed > 0)
+        // Reset the highlight state; it's recomputed on every validation run.
+        reviewFlaggedDocIds = [];
+        invalidCheckKeys = [];
+        firstInvalidAnchor = null;
+
+        void Flag(string key)
         {
-            e.Add($"Mark every uploaded attachment as Reviewed on its card ({unreviewed} not yet reviewed).");
+            invalidCheckKeys.Add(key);
+            firstInvalidAnchor ??= key;
+        }
+        void YN(bool? v, string key, string label) { if (v is null) { e.Add($"{label}: please select Yes or No."); Flag(key); } }
+
+        // Every uploaded attachment must be acknowledged as reviewed (its "Reviewed" checkbox on the card).
+        // Flag each unreviewed attachment card (red highlight) and scroll to the first one — the Documents
+        // section is above the checks, so an unreviewed attachment is the first thing to point to.
+        var unreviewed = documents.Where(d => !d.IsReviewed).ToList();
+        if (unreviewed.Count > 0)
+        {
+            foreach (var d in unreviewed) { reviewFlaggedDocIds.Add(d.Id); }
+            firstInvalidAnchor ??= $"docreview-{unreviewed[0].Id}";
+            var names = string.Join(", ", unreviewed.Select(d => DocTypeLabel(d.DocumentType)).Distinct());
+            e.Add($"Mark every uploaded attachment as Reviewed on its card ({unreviewed.Count} not yet reviewed): {names}.");
         }
 
-        YN(m.IntAttachmentsReviewed, "1. Attachments review");
-        YN(m.IntAdverseMedia, "2. Adverse media check");
+        YN(m.IntAttachmentsReviewed, "chk-attachments", "1. Attachments review");
+        YN(m.IntAdverseMedia, "chk-adverse", "2. Adverse media check");
         if (m.IntAdverseMedia == true && string.IsNullOrWhiteSpace(m.IntAdverseMediaDetails))
         {
             e.Add("2. Adverse media: please provide the details.");
+            Flag("chk-adverse-details");
         }
         if (string.IsNullOrWhiteSpace(m.IntResponseComments))
         {
             e.Add("3. Reviewer comments: please comment on the supplier's responses.");
+            Flag("chk-comments");
         }
 
         // 4. Meeting — required only once started (it applies to Natural Person / sole-establishment suppliers).
@@ -3325,24 +3371,24 @@ else
             || !string.IsNullOrWhiteSpace(m.IntMeetingRepName) || !string.IsNullOrWhiteSpace(m.IntMeetingDiRep);
         if (meetingStarted)
         {
-            if (string.IsNullOrWhiteSpace(m.IntMeetingType)) { e.Add("4. Meeting: select a meeting type."); }
-            if (m.IntMeetingDate is null) { e.Add("4. Meeting: enter the meeting date."); }
-            if (string.IsNullOrWhiteSpace(m.IntMeetingRepName)) { e.Add("4. Meeting: enter the supplier representative met."); }
-            if (string.IsNullOrWhiteSpace(m.IntMeetingDiRep)) { e.Add("4. Meeting: enter the DI representative."); }
+            if (string.IsNullOrWhiteSpace(m.IntMeetingType)) { e.Add("4. Meeting: select a meeting type."); Flag("chk-meeting-type"); }
+            if (m.IntMeetingDate is null) { e.Add("4. Meeting: enter the meeting date."); Flag("chk-meeting-date"); }
+            if (string.IsNullOrWhiteSpace(m.IntMeetingRepName)) { e.Add("4. Meeting: enter the supplier representative met."); Flag("chk-meeting-rep"); }
+            if (string.IsNullOrWhiteSpace(m.IntMeetingDiRep)) { e.Add("4. Meeting: enter the DI representative."); Flag("chk-meeting-direp"); }
         }
 
         // 5. Place of business verification (required).
-        if (string.IsNullOrWhiteSpace(m.IntPobMethod)) { e.Add("5. Place of business: select a verification method."); }
-        if (m.IntPobDate is null) { e.Add("5. Place of business: enter the date verified."); }
-        if (string.IsNullOrWhiteSpace(m.IntPobRepName)) { e.Add("5. Place of business: enter the supplier representative."); }
-        if (string.IsNullOrWhiteSpace(m.IntPobDiRep)) { e.Add("5. Place of business: enter the DI representative."); }
-        YN(m.IntPobAddressMatch, "5. Place of business address match");
+        if (string.IsNullOrWhiteSpace(m.IntPobMethod)) { e.Add("5. Place of business: select a verification method."); Flag("chk-pob-method"); }
+        if (m.IntPobDate is null) { e.Add("5. Place of business: enter the date verified."); Flag("chk-pob-date"); }
+        if (string.IsNullOrWhiteSpace(m.IntPobRepName)) { e.Add("5. Place of business: enter the supplier representative."); Flag("chk-pob-rep"); }
+        if (string.IsNullOrWhiteSpace(m.IntPobDiRep)) { e.Add("5. Place of business: enter the DI representative."); Flag("chk-pob-direp"); }
+        YN(m.IntPobAddressMatch, "chk-pob-match", "5. Place of business address match");
 
         // 6. Compatibility & final checks (required).
-        YN(m.IntPobActivitiesCompatible, "6. Activities compatible with place of business");
-        YN(m.IntTransactionsProportionate, "6. Commercial transactions proportionality");
-        YN(m.IntActivitiesReviewed, "6. Licensed activities reviewed");
-        YN(m.IntDeclarationReviewed, "6. Final declaration reviewed");
+        YN(m.IntPobActivitiesCompatible, "chk-pob-compat", "6. Activities compatible with place of business");
+        YN(m.IntTransactionsProportionate, "chk-txn", "6. Commercial transactions proportionality");
+        YN(m.IntActivitiesReviewed, "chk-activities", "6. Licensed activities reviewed");
+        YN(m.IntDeclarationReviewed, "chk-decl", "6. Final declaration reviewed");
 
         return e;
     }
@@ -3374,8 +3420,13 @@ else
         var checkErrors = ValidateInternalChecks();
         if (checkErrors.Count > 0)
         {
-            ToastService.ShowError("Complete all Internal Validation Checks before verifying.");
+            ToastService.ShowError("Complete the highlighted items before verifying — the screen has jumped to the first one.");
             ToastService.ShowErrors(checkErrors);
+            StateHasChanged();   // apply the red highlights before scrolling
+            if (firstInvalidAnchor is not null)
+            {
+                try { await JS.InvokeVoidAsync("ssForm.scrollToInvalid", firstInvalidAnchor); } catch { /* scroll is best-effort */ }
+            }
             return;
         }
 
