@@ -1410,351 +1410,12 @@ else
                     </div>
                 }
 
-                @* Prompt to extract when nothing has been read from the Trade License yet (internal view only). *@
-                @if (!SupplierFacing && HasTradeLicenseDocument() && tlReadback?.HasData != true)
-                {
-                    <div class="di-tl-reextract">
-                        <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
-                            @if (reExtracting)
-                            {
-                                <span class="spinner-border spinner-border-sm" role="status"></span>
-                                <span class="ms-1">Extracting…</span>
-                            }
-                            else
-                            {
-                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                <span>Extract data from Trade License</span>
-                            }
-                        </button>
-                        @if (!reExtracting)
-                        {
-                            <span class="text-muted small ms-2">No data has been extracted from this Trade License yet.</span>
-                        }
-                    </div>
-                }
-
-                @* Read-only panel: what was auto-read from the uploaded Trade License (internal view only). *@
-                @if (!SupplierFacing && tlReadback?.HasData == true)
-                {
-                    var tlIsAi = tlReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
-                    var tlDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.TradeLicense);
-                    var tlIsPdf = (tlDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
-                        || (tlDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
-                    <div class="di-xtract">
-                        <div class="di-xtract-head">
-                            <div class="di-xtract-title">
-                                <span class="di-xtract-ic">
-                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
-                                </span>
-                                <div class="di-xtract-titletext">
-                                    <div class="di-xtract-h">Trade License</div>
-                                    <div class="di-xtract-sub">Read from the uploaded document@(tlReadback.ReadAt is not null ? $" · {tlReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
-                                </div>
-                            </div>
-                            <div class="di-xtract-actions">
-                                <span class="di-xtract-badge ok">
-                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
-                                    @(tlIsAi ? "AI Extraction Completed" : "Extraction Completed")
-                                </span>
-                                @if (!string.IsNullOrWhiteSpace(tlReadback.ReadSource))
-                                {
-                                    <span class="di-xtract-src">@tlReadback.ReadSource</span>
-                                }
-                                @if (tlDoc is not null)
-                                {
-                                    <a class="di-xtract-dl" href="/suppliers/documents/@tlDoc.Id?download=1" target="_blank" rel="noopener">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                                        <span>Download</span>
-                                    </a>
-                                }
-                                <button type="button" class="di-xtract-rerun" @onclick="ReExtractLicenseAsync" disabled="@reExtracting">
-                                    @if (reExtracting)
-                                    {
-                                        <span class="spinner-border spinner-border-sm" role="status"></span>
-                                        <span class="ms-1">Extracting…</span>
-                                    }
-                                    else
-                                    {
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                        <span>Re-run Extraction</span>
-                                    }
-                                </button>
-                            </div>
-                        </div>
-                        <div class="di-xtract-main">
-                            <div class="di-xtract-doc">
-                                @if (tlDoc is null)
-                                {
-                                    <div class="di-xtract-doc-empty">No preview available</div>
-                                }
-                                else
-                                {
-                                    <div class="di-xtract-doc-view">
-                                        @if (tlIsPdf)
-                                        {
-                                            <iframe src="/suppliers/documents/@tlDoc.Id#toolbar=0&view=FitH" title="Trade License preview"></iframe>
-                                        }
-                                        else
-                                        {
-                                            <img src="/suppliers/documents/@tlDoc.Id" alt="Trade License preview" />
-                                        }
-                                    </div>
-                                    <a class="di-xtract-doc-open" href="/suppliers/documents/@tlDoc.Id" target="_blank" rel="noopener">
-                                        Open document in a new tab
-                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-                                    </a>
-                                }
-                            </div>
-                            <div class="di-xtract-fields">
-                            <div class="di-xtract-sec">License Information</div>
-                            <div class="di-tl-grid">
-                                @TlRow("License No.", tlReadback.LicenseNumber)
-                                @TlRow("Main License No.", tlReadback.MainLicenseNumber)
-                                @TlRow("Legal Name", tlReadback.LegalName)
-                                @TlRow("Trade Name", tlReadback.TradeName)
-                                @TlRow("Legal Type", tlReadback.LegalType)
-                                @TlRow("License Category", tlReadback.LicenseCategory)
-                                @TlRow("Issuing Authority", tlReadback.IssuingAuthority)
-                                @TlRow("License Type", tlReadback.LicenseType)
-                                @TlRow("Issue Date", tlReadback.IssueDate?.ToString("dd/MM/yyyy"))
-                                @TlRow("Expiry Date", tlReadback.ExpiryDate?.ToString("dd/MM/yyyy"))
-                                @TlRow("Register No.", tlReadback.RegisterNumber)
-                                @TlRow("DCCI No.", tlReadback.DcciNumber)
-                                @TlRow("D-U-N-S", tlReadback.DunsNumber)
-                                @TlRow("Paid Capital", tlReadback.PaidCapital is null ? null : ($"{tlReadback.PaidCapital:#,0.##} {tlReadback.CapitalCurrency}").Trim())
-                                @TlRow("P.O. Box", tlReadback.PoBox)
-                                @TlRow("Parcel ID", tlReadback.ParcelId)
-                                @TlRow("Premises", tlReadback.Premises)
-                                @TlRow("Email", tlReadback.Email)
-                                @TlRow("Phone", tlReadback.Phone)
-                                @TlRow("Mobile", tlReadback.Mobile)
-                                @TlRow("Address", tlReadback.Address)
-                                @TlRow("Activities", tlReadback.Activities)
-                            </div>
-                            @if (tlReadback.Parties.Count > 0)
-                            {
-                                <div class="di-xtract-sec">Partners / Managers</div>
-                                <table class="di-tl-parties-table">
-                                    <thead><tr><th>Name</th><th>Nationality</th><th>Role</th><th>Share</th></tr></thead>
-                                    <tbody>
-                                        @foreach (var p in tlReadback.Parties)
-                                        {
-                                            <tr>
-                                                <td>@p.Name</td>
-                                                <td>@(string.IsNullOrWhiteSpace(p.Nationality) ? "—" : p.Nationality)</td>
-                                                <td>@(string.IsNullOrWhiteSpace(p.Role) ? "—" : p.Role)</td>
-                                                <td>@(FormatShare(p.Share) ?? "—")</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            }
-                            <div class="di-xtract-done">
-                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
-                                <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
-                            </div>
-                            </div>
-                        </div>
-                    </div>
-                }
 
                 @if (Supplier.Id == 0)
                 {
                     <p class="text-muted di-document-hint">Documents can be uploaded once the supplier record has been saved.</p>
                 }
 
-                    @* Re-run extraction on the Emirates ID / Passport already on file (internal view only). *@
-                    @if (!SupplierFacing && documents.Any(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport) && idReadback?.HasData != true)
-                    {
-                        <div class="di-tl-reextract">
-                            <button type="button" class="di-xtract-rerun" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
-                                @if (reExtractingId)
-                                {
-                                    <span class="spinner-border spinner-border-sm" role="status"></span>
-                                    <span class="ms-1">Extracting…</span>
-                                }
-                                else
-                                {
-                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                    <span>Extract Emirates ID / Passport data</span>
-                                }
-                            </button>
-                            @if (!reExtractingId)
-                            {
-                                <span class="text-muted small ms-2">No data has been extracted from this document yet.</span>
-                            }
-                        </div>
-                    }
-
-                    @* Read-only panel: what was auto-read from the Emirates ID / Passport (internal view only). *@
-                    @if (!SupplierFacing && idReadback?.HasData == true)
-                    {
-                        var idIsAi = idReadback.ReadSource?.Contains("vision", StringComparison.OrdinalIgnoreCase) == true;
-                        var idDoc = documents.FirstOrDefault(d => d.DocumentType == SupplierDocumentType.EmiratesIdOrPassport);
-                        var idIsPdf = (idDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
-                            || (idDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
-                        <div class="di-xtract">
-                            <div class="di-xtract-head">
-                                <div class="di-xtract-title">
-                                    <span class="di-xtract-ic">
-                                        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h12zM2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H2z"/><path d="M3 5.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM3 8a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5A.5.5 0 0 1 3 8zm0 2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm8.5-1a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
-                                    </span>
-                                    <div class="di-xtract-titletext">
-                                        <div class="di-xtract-h">Emirates ID / Passport</div>
-                                        <div class="di-xtract-sub">Read from the uploaded document@(idReadback.ReadAt is not null ? $" · {idReadback.ReadAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
-                                    </div>
-                                </div>
-                                <div class="di-xtract-actions">
-                                    <span class="di-xtract-badge ok">
-                                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
-                                        @(idIsAi ? "AI Extraction Completed" : "Extraction Completed")
-                                    </span>
-                                    @if (!string.IsNullOrWhiteSpace(idReadback.ReadSource))
-                                    {
-                                        <span class="di-xtract-src">@idReadback.ReadSource</span>
-                                    }
-                                    @if (idDoc is not null)
-                                    {
-                                        <a class="di-xtract-dl" href="/suppliers/documents/@idDoc.Id?download=1" target="_blank" rel="noopener">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                                            <span>Download</span>
-                                        </a>
-                                    }
-                                    <button type="button" class="di-xtract-rerun" @onclick="ReExtractIdentityAsync" disabled="@reExtractingId">
-                                        @if (reExtractingId)
-                                        {
-                                            <span class="spinner-border spinner-border-sm" role="status"></span>
-                                            <span class="ms-1">Extracting…</span>
-                                        }
-                                        else
-                                        {
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
-                                            <span>Re-run Extraction</span>
-                                        }
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="di-xtract-main">
-                                <div class="di-xtract-doc">
-                                    @if (idDoc is null)
-                                    {
-                                        <div class="di-xtract-doc-empty">No preview available</div>
-                                    }
-                                    else
-                                    {
-                                        <div class="di-xtract-doc-view">
-                                            @if (idIsPdf)
-                                            {
-                                                <iframe src="/suppliers/documents/@idDoc.Id#toolbar=0&view=FitH" title="Emirates ID / Passport preview"></iframe>
-                                            }
-                                            else
-                                            {
-                                                <img src="/suppliers/documents/@idDoc.Id" alt="Emirates ID / Passport preview" />
-                                            }
-                                        </div>
-                                        <a class="di-xtract-doc-open" href="/suppliers/documents/@idDoc.Id" target="_blank" rel="noopener">
-                                            Open document in a new tab
-                                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-                                        </a>
-                                    }
-                                </div>
-                                <div class="di-xtract-fields">
-                                <div class="di-xtract-sec">Identity Information</div>
-                                <div class="di-tl-grid">
-                                    @TlRow("Emirates ID No.", idReadback.EmiratesIdNumber)
-                                    @TlRow("Emirates ID Expiry", idReadback.EmiratesIdExpiryDate?.ToString("dd/MM/yyyy"))
-                                    @TlRow("Passport No.", idReadback.PassportNumber)
-                                    @TlRow("Passport Expiry", idReadback.PassportExpiryDate?.ToString("dd/MM/yyyy"))
-                                </div>
-                                <div class="di-xtract-done">
-                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
-                                    <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
-                                </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
-
-                    @* Read-only capture panels for every other document Claude read (VAT Certificate, Certificate
-                       of Incorporation, Bank Confirmation Letter, Proof of Address, …) — internal view only.
-                       Trade License and Emirates ID / Passport have their own dedicated panels above. *@
-                    @if (!SupplierFacing)
-                    {
-                        foreach (var card in extractionCards.Where(c =>
-                            c.DocumentType != nameof(SupplierDocumentType.TradeLicense)
-                            && c.DocumentType != nameof(SupplierDocumentType.EmiratesIdOrPassport)
-                            && c.Fields.Count > 0))
-                        {
-                            var cDoc = DocForCard(card);
-                            var cIsPdf = (cDoc?.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) ?? false)
-                                || (cDoc?.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ?? false);
-                            <div class="di-xtract">
-                                <div class="di-xtract-head">
-                                    <div class="di-xtract-title">
-                                        <span class="di-xtract-ic">
-                                            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
-                                        </span>
-                                        <div class="di-xtract-titletext">
-                                            <div class="di-xtract-h">@card.DocumentLabel</div>
-                                            <div class="di-xtract-sub">Read from the uploaded document@(card.ExtractedAt != default ? $" · {card.ExtractedAt:dd MMM yyyy, HH:mm} UTC" : "")</div>
-                                        </div>
-                                    </div>
-                                    <div class="di-xtract-actions">
-                                        <span class="di-xtract-badge ok">
-                                            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l1.094 1.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg>
-                                            AI Extraction Completed
-                                        </span>
-                                        <span class="di-xtract-src">Claude Vision</span>
-                                        @if (cDoc is not null)
-                                        {
-                                            <a class="di-xtract-dl" href="/suppliers/documents/@cDoc.Id?download=1" target="_blank" rel="noopener">
-                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>
-                                                <span>Download</span>
-                                            </a>
-                                        }
-                                    </div>
-                                </div>
-                                <div class="di-xtract-main">
-                                    <div class="di-xtract-doc">
-                                        @if (cDoc is null)
-                                        {
-                                            <div class="di-xtract-doc-empty">No preview available</div>
-                                        }
-                                        else
-                                        {
-                                            <div class="di-xtract-doc-view">
-                                                @if (cIsPdf)
-                                                {
-                                                    <iframe src="/suppliers/documents/@cDoc.Id#toolbar=0&view=FitH" title="@card.DocumentLabel preview"></iframe>
-                                                }
-                                                else
-                                                {
-                                                    <img src="/suppliers/documents/@cDoc.Id" alt="@card.DocumentLabel preview" />
-                                                }
-                                            </div>
-                                            <a class="di-xtract-doc-open" href="/suppliers/documents/@cDoc.Id" target="_blank" rel="noopener">
-                                                Open document in a new tab
-                                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-                                            </a>
-                                        }
-                                    </div>
-                                    <div class="di-xtract-fields">
-                                        <div class="di-xtract-sec">Extracted Information</div>
-                                        <div class="di-tl-grid">
-                                            @foreach (var f in card.Fields)
-                                            {
-                                                @TlRow(f.Name, f.Value)
-                                            }
-                                        </div>
-                                        <div class="di-xtract-done">
-                                            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>
-                                            <span>Captured from the document. Review the fields above and edit the form if anything needs correcting.</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    }
                 </details>
 
                 @* Internal Validation Checks — internal reviewers only; never shown to the supplier. *@
@@ -1901,6 +1562,33 @@ else
                     <button type="button" class="di-viewer-close" title="Close" @onclick="CloseViewer">&times;</button>
                 </div>
                 <iframe class="di-viewer-frame" src="@viewerUrl" title="Document preview"></iframe>
+            </div>
+        </div>
+    }
+
+    @* Extracted-data popup: the fields Claude read from one document, opened from its "Extracted data" button. *@
+    @if (dataModalCard is not null)
+    {
+        <div class="di-viewer-backdrop" @onclick="() => dataModalCard = null">
+            <div class="di-data-modal" @onclick:stopPropagation="true">
+                <div class="di-viewer-head">
+                    <span class="di-viewer-name">
+                        @dataModalCard.DocumentLabel — extracted data
+                        @if (dataModalCard.ExtractedAt != default)
+                        {
+                            <span class="di-data-modal-sub"> · read @dataModalCard.ExtractedAt.ToString("dd MMM yyyy, HH:mm") UTC</span>
+                        }
+                    </span>
+                    <button type="button" class="di-viewer-close" title="Close" @onclick="() => dataModalCard = null">&times;</button>
+                </div>
+                <div class="di-data-modal-body">
+                    <div class="di-tl-grid">
+                        @foreach (var f in dataModalCard.Fields)
+                        {
+                            @TlRow(f.Name, f.Value)
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     }
@@ -2438,9 +2126,10 @@ else
     private bool reExtractingId;
     private bool extractingKys;
     private SupplierPortal.Web.Services.KysExtractionResult? kysExtractResult;
-    // Per-document "what Claude read" cards (internal view only), built from the extraction log so every
-    // document shows its extracted fields the same way the Trade License capture does.
+    // Per-document "what Claude read" cards (internal view only), built from the extraction log. Each
+    // document card's "Extracted data" button opens dataModalCard in a popup.
     private List<SupplierPortal.Web.Services.KysExtractionCard> extractionCards = [];
+    private SupplierPortal.Web.Services.KysExtractionCard? dataModalCard;
     // Validation highlighting for the internal reviewer's "Verify & Complete": attachment cards that still
     // need reviewing, and internal-check field anchors that are unfilled. Drives the red highlight + scroll.
     private HashSet<int> reviewFlaggedDocIds = [];
@@ -2729,6 +2418,15 @@ else
                         <input type="checkbox" checked="@doc.IsReviewed" @onchange="() => ToggleDocumentReviewedAsync(doc)" />
                         <span>@(doc.IsReviewed ? "Reviewed" : "Mark Reviewed")</span>
                     </label>
+                    @{ var xcard = CardForType(type); }
+                    @if (xcard is { Fields.Count: > 0 })
+                    {
+                        <button type="button" class="di-doccard-databtn" title="View the data Claude read from this document"
+                                @onclick="() => dataModalCard = xcard">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zM4.5 9a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0-2.5a.5.5 0 0 0 0 1h7a.5.5 0 0 0 0-1h-7zm0 5a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/></svg>
+                            <span>Extracted data</span>
+                        </button>
+                    }
                 }
             </div>
         }
@@ -3225,6 +2923,11 @@ else
     /// <summary>Red-highlight class for an internal-check field that failed validation.</summary>
     private string ChkInvalidCls(string key) => invalidCheckKeys.Contains(key) ? " di-chk-invalid" : string.Empty;
 
+    /// <summary>The extracted-data card for a document type, if Claude has read any fields from it — used to
+    /// show the "Extracted data" button and its popup on that document's card.</summary>
+    private SupplierPortal.Web.Services.KysExtractionCard? CardForType(SupplierDocumentType type) =>
+        extractionCards.FirstOrDefault(c => c.DocumentType == type.ToString());
+
     private async Task ToggleDocumentReviewedAsync(SupplierDocument doc)
     {
         if (SupplierFacing)
@@ -3344,7 +3047,9 @@ else
         // Every uploaded attachment must be acknowledged as reviewed (its "Reviewed" checkbox on the card).
         // Flag each unreviewed attachment card (red highlight) and scroll to the first one — the Documents
         // section is above the checks, so an unreviewed attachment is the first thing to point to.
-        var unreviewed = documents.Where(d => !d.IsReviewed).ToList();
+        // The system-generated Signed Declaration has no review card (it's covered by check 6 "Final
+        // declaration reviewed"), so it isn't part of the per-attachment review requirement.
+        var unreviewed = documents.Where(d => d.DocumentType != SupplierDocumentType.SignedDeclaration && !d.IsReviewed).ToList();
         if (unreviewed.Count > 0)
         {
             foreach (var d in unreviewed) { reviewFlaggedDocIds.Add(d.Id); }

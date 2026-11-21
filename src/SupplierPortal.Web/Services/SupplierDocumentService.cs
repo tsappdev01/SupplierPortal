@@ -1255,9 +1255,20 @@ DD/MM/YYYY. Return ONLY a JSON object, using null when a value is absent. Dates 
     /// or the legacy local-disk copy — in that order. Returns null when the file can't be found.</summary>
     private async Task<byte[]?> ReadStoredBytesAsync(SupplierDocument doc)
     {
+        // Prefer the blob, but never give up on it alone: if the blob read fails or comes back empty
+        // (e.g. a stale/missing blob key on a record whose bytes are actually in the database or on disk),
+        // fall through to the Content column and then the legacy local-disk copy.
         if (!string.IsNullOrWhiteSpace(doc.BlobKey))
         {
-            return await fileStore.ReadAsync(doc.BlobKey);
+            try
+            {
+                var blobBytes = await fileStore.ReadAsync(doc.BlobKey);
+                if (blobBytes is { Length: > 0 })
+                {
+                    return blobBytes;
+                }
+            }
+            catch { /* fall through to the other sources below */ }
         }
         if (doc.Content is { Length: > 0 })
         {
