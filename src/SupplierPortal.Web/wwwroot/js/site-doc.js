@@ -199,6 +199,25 @@ window.ssDoc = {
     }
 };
 
+// Form validation helpers: reveal and scroll to the first element that failed validation (e.g. an
+// unreviewed attachment card or an unfilled internal-check field), opening any collapsed <details>
+// ancestors so the highlighted element is actually visible, then focusing it.
+window.ssForm = {
+    scrollToInvalid: function (id) {
+        if (!id) { return; }
+        var el = document.getElementById(id);
+        if (!el) { return; }
+        var p = el;
+        while (p) {
+            if (p.tagName === 'DETAILS') { p.open = true; }
+            p = p.parentElement;
+        }
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
+        var focusTarget = (typeof el.focus === 'function') ? el : el.querySelector('input, select, textarea, button');
+        if (focusTarget) { try { focusTarget.focus({ preventScroll: true }); } catch (e) { } }
+    }
+};
+
 // Mouse/touch signature pad. Blazor passes the <canvas> element reference; drawing produces a PNG
 // data URL captured on submit. Used on the supplier declaration to draw a wet-ink style signature.
 // Smooth signature pad — Pointer Events (mouse/touch/stylus) + quadratic-curve smoothing.
