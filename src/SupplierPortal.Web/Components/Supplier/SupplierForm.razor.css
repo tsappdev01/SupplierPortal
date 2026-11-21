@@ -912,6 +912,32 @@
 
 .di-doccard-reviewchk-sm { padding: 5px 10px; font-size: 12.5px; }
 
+/* "Extracted data" button on a document card — opens the per-document extracted-fields popup. */
+.di-doccard-databtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #2457b8;
+    color: #2457b8;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.di-doccard-databtn:hover { background: #2457b8; color: #fff; }
+
+[data-theme="dark"] .di-doccard-databtn {
+    background: #1f2937;
+    color: #93b4f5;
+    border-color: #3a5fa0;
+}
+
 /* Validation highlight: an attachment card (or Other Documents chip) that still needs reviewing. */
 .di-doccard.di-doccard-flag,
 .di-doccard-chip.di-doccard-flag {
@@ -1062,6 +1088,28 @@
     border: none;
     background: #f5f6f8;
 }
+
+/* Extracted-data popup (opened from a document card's "Extracted data" button). */
+.di-data-modal {
+    background: #fff;
+    border-radius: 8px;
+    width: min(820px, 100%);
+    max-height: min(88vh, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.di-data-modal-sub { font-size: 12px; font-weight: 400; opacity: 0.8; }
+
+.di-data-modal-body {
+    padding: 16px;
+    overflow: auto;
+    background: var(--di-surface, #fff);
+}
+
+[data-theme="dark"] .di-data-modal { background: #141b26; }
 
 .di-document-hint {
     font-size: 14px;
