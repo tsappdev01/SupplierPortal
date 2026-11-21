@@ -2418,8 +2418,7 @@ else
                         <input type="checkbox" checked="@doc.IsReviewed" @onchange="() => ToggleDocumentReviewedAsync(doc)" />
                         <span>@(doc.IsReviewed ? "Reviewed" : "Mark Reviewed")</span>
                     </label>
-                    @{ var xcard = CardForType(type); }
-                    @if (xcard is { Fields.Count: > 0 })
+                    @if (CardForType(type) is { Fields.Count: > 0 } xcard)
                     {
                         <button type="button" class="di-doccard-databtn" title="View the data Claude read from this document"
                                 @onclick="() => dataModalCard = xcard">
